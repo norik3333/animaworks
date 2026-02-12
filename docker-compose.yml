@@ -1,0 +1,62 @@
+x-common-env: &common-env
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+  REDIS_URL: redis://redis:6379
+  ANIMAWORKS_GATEWAY_URL: http://gateway:18500
+  TZ: Asia/Tokyo
+
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile.gateway
+    ports:
+      - "18500:18500"
+    environment:
+      <<: *common-env
+      ANIMAWORKS_MODE: gateway
+      ANIMAWORKS_REDIS_URL: redis://redis:6379
+    volumes:
+      - ./persons:/app/persons:ro
+      - ./company:/app/company:ro
+      - ./server/static:/app/server/static:ro
+      - shared-data:/app/shared
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  worker-sakura:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    environment:
+      <<: *common-env
+      ANIMAWORKS_MODE: worker
+      ANIMAWORKS_WORKER_ID: worker-sakura
+      ANIMAWORKS_PERSON_NAMES: sakura
+      ANIMAWORKS_REDIS_URL: redis://redis:6379
+      ANIMAWORKS_LISTEN_PORT: "18501"
+    volumes:
+      - ./persons:/app/persons
+      - ./company:/app/company:ro
+      - shared-data:/app/shared
+    depends_on:
+      redis:
+        condition: service_healthy
+      gateway:
+        condition: service_started
+
+volumes:
+  redis-data:
+  shared-data:
