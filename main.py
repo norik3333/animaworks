@@ -13,10 +13,11 @@ load_dotenv()
 from core.init import ensure_runtime_dir
 from core.paths import get_data_dir, get_persons_dir, get_shared_dir
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    datefmt="%H:%M:%S",
+from core.logging_config import setup_logging
+
+setup_logging(
+    level=os.environ.get("ANIMAWORKS_LOG_LEVEL", "INFO"),
+    log_dir=get_data_dir() / "logs",
 )
 logger = logging.getLogger("animaworks")
 

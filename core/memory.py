@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import re
 from datetime import date
@@ -7,6 +8,8 @@ from pathlib import Path
 
 from core.paths import get_company_dir
 from core.schemas import ModelConfig
+
+logger = logging.getLogger("animaworks.memory")
 
 
 class MemoryManager:
@@ -147,6 +150,7 @@ class MemoryManager:
             )
         with open(path, "a", encoding="utf-8") as f:
             f.write(f"\n{entry}\n")
+        logger.debug("Episode appended, length=%d", len(entry))
 
     def update_state(self, content: str) -> None:
         (self.state_dir / "current_task.md").write_text(content, encoding="utf-8")
@@ -157,6 +161,7 @@ class MemoryManager:
     def write_knowledge(self, topic: str, content: str) -> None:
         safe = re.sub(r"[^\w\-_]", "_", topic)
         (self.knowledge_dir / f"{safe}.md").write_text(content, encoding="utf-8")
+        logger.debug("Knowledge written topic='%s' length=%d", topic, len(content))
 
     # ── Search (Python-side; LLM uses Grep directly) ─────
 
@@ -167,4 +172,5 @@ class MemoryManager:
             for line in f.read_text(encoding="utf-8").splitlines():
                 if q in line.lower():
                     results.append((f.name, line.strip()))
+        logger.debug("search_knowledge query='%s' results=%d", query, len(results))
         return results

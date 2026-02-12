@@ -53,6 +53,10 @@ class DigitalPerson:
     async def process_message(
         self, content: str, from_person: str = "human"
     ) -> str:
+        logger.info(
+            "[%s] process_message START from=%s content_len=%d",
+            self.name, from_person, len(content),
+        )
         async with self._lock:
             self._status = "thinking"
             self._current_task = f"Responding to {from_person}"
@@ -66,12 +70,20 @@ class DigitalPerson:
                     prompt, trigger=f"message:{from_person}"
                 )
                 self._last_activity = datetime.now()
+                logger.info(
+                    "[%s] process_message END duration_ms=%d",
+                    self.name, result.duration_ms,
+                )
                 return result.summary
+            except Exception:
+                logger.exception("[%s] process_message FAILED", self.name)
+                raise
             finally:
                 self._status = "idle"
                 self._current_task = ""
 
     async def run_heartbeat(self) -> CycleResult:
+        logger.info("[%s] run_heartbeat START", self.name)
         async with self._lock:
             self._status = "checking"
             self._last_heartbeat = datetime.now()
@@ -80,8 +92,14 @@ class DigitalPerson:
             checklist = hb_config or load_prompt("heartbeat_default_checklist")
             parts = [load_prompt("heartbeat", checklist=checklist)]
 
+            unread_count = 0
             if self.messenger.has_unread():
                 messages = self.messenger.receive_and_archive()
+                unread_count = len(messages)
+                logger.info(
+                    "[%s] Processing %d unread messages in heartbeat",
+                    self.name, unread_count,
+                )
                 summary = "\n".join(
                     f"- {m.from_person}: {m.content[:100]}" for m in messages
                 )
@@ -92,7 +110,14 @@ class DigitalPerson:
                     "\n\n".join(parts), trigger="heartbeat"
                 )
                 self._last_activity = datetime.now()
+                logger.info(
+                    "[%s] run_heartbeat END duration_ms=%d unread_processed=%d",
+                    self.name, result.duration_ms, unread_count,
+                )
                 return result
+            except Exception:
+                logger.exception("[%s] run_heartbeat FAILED", self.name)
+                raise
             finally:
                 self._status = "idle"
                 self._current_task = ""
@@ -100,6 +125,7 @@ class DigitalPerson:
     async def run_cron_task(
         self, task_name: str, description: str
     ) -> CycleResult:
+        logger.info("[%s] run_cron_task START task=%s", self.name, task_name)
         async with self._lock:
             self._status = "working"
             self._current_task = task_name
@@ -113,7 +139,16 @@ class DigitalPerson:
                     prompt, trigger=f"cron:{task_name}"
                 )
                 self._last_activity = datetime.now()
+                logger.info(
+                    "[%s] run_cron_task END task=%s duration_ms=%d",
+                    self.name, task_name, result.duration_ms,
+                )
                 return result
+            except Exception:
+                logger.exception(
+                    "[%s] run_cron_task FAILED task=%s", self.name, task_name,
+                )
+                raise
             finally:
                 self._status = "idle"
                 self._current_task = ""

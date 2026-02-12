@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from core.memory import MemoryManager
 from core.paths import PROJECT_DIR, load_prompt
 from core.shortterm_memory import ShortTermMemory
+
+logger = logging.getLogger("animaworks.prompt_builder")
 
 
 def _discover_other_persons(person_dir: Path) -> list[str]:
@@ -103,6 +106,10 @@ def build_system_prompt(memory: MemoryManager) -> str:
     other_persons = _discover_other_persons(pd)
     parts.append(_build_messaging_section(pd, other_persons))
 
+    logger.debug(
+        "System prompt built: %d sections, total_len=%d",
+        len(parts), sum(len(p) for p in parts),
+    )
     return "\n\n---\n\n".join(parts)
 
 

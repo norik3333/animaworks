@@ -61,6 +61,12 @@ class AgentCore:
         to short-term memory and automatically continued in a fresh session.
         """
         start = time.monotonic()
+        sdk_label = "agent-sdk" if self._sdk_available else "anthropic"
+        logger.info(
+            "run_cycle START trigger=%s prompt_len=%d sdk=%s",
+            trigger, len(prompt), sdk_label,
+        )
+
         shortterm = ShortTermMemory(self.person_dir)
         tracker = ContextTracker(
             model=self.model_config.model,
@@ -69,6 +75,7 @@ class AgentCore:
 
         # Build system prompt; inject short-term memory from prior session
         system_prompt = build_system_prompt(self.memory)
+        logger.debug("System prompt assembled, length=%d", len(system_prompt))
         if shortterm.has_pending():
             system_prompt = inject_shortterm(system_prompt, shortterm)
             logger.info("Injected short-term memory into system prompt")
@@ -143,6 +150,10 @@ class AgentCore:
         shortterm.clear()
 
         duration_ms = int((time.monotonic() - start) * 1000)
+        logger.info(
+            "run_cycle END trigger=%s duration_ms=%d response_len=%d chained=%s",
+            trigger, duration_ms, len(result), session_chained,
+        )
         return CycleResult(
             trigger=trigger,
             action="responded",
@@ -241,15 +252,21 @@ class AgentCore:
 
         response_text: list[str] = []
         result_message: ResultMessage | None = None
+        message_count = 0
         async for message in query(prompt=prompt, options=options):
             if isinstance(message, ResultMessage):
                 result_message = message
                 tracker.update_from_result_message(message.usage)
             elif isinstance(message, AssistantMessage):
+                message_count += 1
                 for block in message.content:
                     if isinstance(block, TextBlock):
                         response_text.append(block.text)
 
+        logger.debug(
+            "Agent SDK completed, messages=%d text_blocks=%d",
+            message_count, len(response_text),
+        )
         return "\n".join(response_text) or "(no response)", result_message
 
     # ── Anthropic SDK fallback path ─────────────────────────
@@ -283,6 +300,9 @@ class AgentCore:
         chain_count = 0
 
         for iteration in range(10):
+            logger.debug(
+                "API call iteration=%d messages_count=%d", iteration, len(messages),
+            )
             response = await client.messages.create(
                 model=self.model_config.model,
                 max_tokens=self.model_config.max_tokens,
@@ -339,12 +359,17 @@ class AgentCore:
 
             tool_uses = [b for b in response.content if b.type == "tool_use"]
             if not tool_uses:
+                logger.debug("Final response received at iteration=%d", iteration)
                 final_text = "\n".join(
                     b.text for b in response.content if b.type == "text"
                 )
                 all_response_text.append(final_text)
                 return "\n".join(all_response_text)
 
+            logger.info(
+                "Tool calls at iteration=%d: %s",
+                iteration, ", ".join(tu.name for tu in tool_uses),
+            )
             messages.append(
                 {"role": "assistant", "content": response.content}
             )
@@ -360,6 +385,7 @@ class AgentCore:
                 )
             messages.append({"role": "user", "content": tool_results})
 
+        logger.warning("Max iterations (10) reached, returning fallback response")
         return "\n".join(all_response_text) or "(max iterations reached)"
 
     # ── Tool definitions (Anthropic SDK fallback) ───────────
@@ -450,8 +476,14 @@ class AgentCore:
         ]
 
     def _handle_tool_call(self, name: str, args: dict) -> str:
+        logger.debug("tool_call name=%s args_keys=%s", name, list(args.keys()))
+
         if name == "search_memory":
             results = self.memory.search_knowledge(args.get("query", ""))
+            logger.debug(
+                "search_memory query=%s results=%d",
+                args.get("query", ""), len(results),
+            )
             if not results:
                 return f"No results for '{args.get('query', '')}'"
             return "\n".join(
@@ -461,7 +493,9 @@ class AgentCore:
         if name == "read_memory_file":
             path = self.person_dir / args["path"]
             if path.exists() and path.is_file():
+                logger.debug("read_memory_file path=%s", args["path"])
                 return path.read_text(encoding="utf-8")
+            logger.debug("read_memory_file NOT FOUND path=%s", args["path"])
             return f"File not found: {args['path']}"
 
         if name == "write_memory_file":
@@ -472,6 +506,7 @@ class AgentCore:
                     f.write(args["content"])
             else:
                 path.write_text(args["content"], encoding="utf-8")
+            logger.info("write_memory_file path=%s mode=%s", args["path"], args.get("mode", "overwrite"))
             return f"Written to {args['path']}"
 
         if name == "send_message":
@@ -483,6 +518,8 @@ class AgentCore:
                 thread_id=args.get("thread_id", ""),
                 reply_to=args.get("reply_to", ""),
             )
+            logger.info("send_message to=%s thread=%s", args["to"], msg.thread_id)
             return f"Message sent to {args['to']} (id: {msg.id}, thread: {msg.thread_id})"
 
+        logger.warning("Unknown tool requested: %s", name)
         return f"Unknown tool: {name}"
