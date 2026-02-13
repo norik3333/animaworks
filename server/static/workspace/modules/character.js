@@ -5,7 +5,7 @@
 
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-import { probeAsset } from "./api.js";
+import { probeAsset, fetchAssetMetadata } from "./api.js";
 
 /** Shared GLTFLoader instance. */
 const _gltfLoader = new GLTFLoader();
@@ -37,6 +37,18 @@ const MAX_PARTICLES = 10;
 
 /** Canvas size for face textures. */
 const FACE_TEX_SIZE = 64;
+
+/** Mapping from animation state to asset filename for GLB animation clips. */
+const _STATE_ANIM_FILES = {
+  idle:      "anim_idle.glb",
+  working:   "anim_sitting.glb",
+  thinking:  "anim_idle.glb",
+  talking:   "anim_talking.glb",
+  reporting: "anim_talking.glb",
+  success:   "anim_waving.glb",
+  sleeping:  "anim_sitting.glb",
+  error:     "anim_idle.glb",
+};
 
 // ── Module State ──────────────────────
 
@@ -354,7 +366,8 @@ function _hslToHex(h, s, l) {
 // ── Character Construction ──────────────────────
 
 /**
- * Build the procedural SD character mesh group.
+ * Build the procedural SD character mesh group as a faceless silhouette.
+ * No eyes, no expressions — just a minimal body shape placeholder.
  * Total height ~0.7 units. Origin at the character's feet.
  * @param {string} name
  * @param {{hairColor: number, eyeColor: number, bodyColor: number, role: string}} profile
@@ -366,6 +379,14 @@ function _buildCharacterMesh(name, profile) {
   const group = new THREE.Group();
   group.name = `character_${name}`;
 
+  // Single semi-transparent silhouette colour derived from hair colour
+  const silhouetteColor = profile.hairColor;
+  const silhouetteMat = new THREE.MeshLambertMaterial({
+    color: silhouetteColor,
+    transparent: true,
+    opacity: 0.55,
+  });
+
   // ── Measurements ──────────
   const legH   = 0.12;
   const bodyH  = 0.25;
@@ -374,72 +395,55 @@ function _buildCharacterMesh(name, profile) {
   const bodyY  = legH + bodyH / 2;       // ~0.245
 
   // ── Legs ──────────
-  const legMat = new THREE.MeshLambertMaterial({ color: 0x444466 });
-  const legL = new THREE.Mesh(_geo.leg, legMat);
+  const legL = new THREE.Mesh(_geo.leg, silhouetteMat);
   legL.position.set(-0.06, legH / 2, 0);
   legL.name = "legL";
   group.add(legL);
 
-  const legR = new THREE.Mesh(_geo.leg, legMat);
+  const legR = new THREE.Mesh(_geo.leg, silhouetteMat);
   legR.position.set(0.06, legH / 2, 0);
   legR.name = "legR";
   group.add(legR);
 
   // ── Body ──────────
-  const bodyMat = new THREE.MeshLambertMaterial({ color: profile.bodyColor });
-  const body = new THREE.Mesh(_geo.body, bodyMat);
+  const body = new THREE.Mesh(_geo.body, silhouetteMat);
   body.position.set(0, bodyY, 0);
   body.name = "body";
   group.add(body);
 
   // ── Arms ──────────
-  const armMat = new THREE.MeshLambertMaterial({ color: profile.bodyColor });
-  const armL = new THREE.Mesh(_geo.arm, armMat);
+  const armL = new THREE.Mesh(_geo.arm, silhouetteMat);
   armL.position.set(-0.17, bodyY + 0.02, 0);
   armL.rotation.z = 0.15;
   armL.name = "armL";
   group.add(armL);
 
-  const armR = new THREE.Mesh(_geo.arm, armMat);
+  const armR = new THREE.Mesh(_geo.arm, silhouetteMat);
   armR.position.set(0.17, bodyY + 0.02, 0);
   armR.rotation.z = -0.15;
   armR.name = "armR";
   group.add(armR);
 
   // ── Hair (behind head) ──────────
-  const hairMat = new THREE.MeshLambertMaterial({ color: profile.hairColor });
-  const hair = new THREE.Mesh(_geo.hair, hairMat);
+  const hair = new THREE.Mesh(_geo.hair, silhouetteMat);
   hair.position.set(0, headY, -0.04);
   hair.name = "hair";
   group.add(hair);
 
-  // ── Head ──────────
-  const headMat = new THREE.MeshLambertMaterial({ color: profile.bodyColor });
-  const head = new THREE.Mesh(_geo.head, headMat);
+  // ── Head (no face / no eyes) ──────────
+  const head = new THREE.Mesh(_geo.head, silhouetteMat);
   head.position.set(0, headY, 0);
   head.name = "head";
   group.add(head);
-
-  // ── Face plane ──────────
-  const faceTextures = _buildFaceTextures(profile.eyeColor);
-  const faceMat = new THREE.MeshBasicMaterial({
-    map: faceTextures["idle"],
-    transparent: true,
-    depthWrite: false,
-    side: THREE.FrontSide,
-  });
-  const face = new THREE.Mesh(_geo.face, faceMat);
-  face.position.set(0, headY, headR + 0.001);
-  face.name = "face";
-  group.add(face);
 
   // ── userData for raycasting ──────────
   group.traverse((child) => {
     child.userData.personName = name;
   });
 
-  const parts = { head, hair, face, body, armL, armR, legL, legR };
-  return { group, parts, faceTextures };
+  // face is null — no expression textures for silhouette models
+  const parts = { head, hair, face: null, body, armL, armR, legL, legR };
+  return { group, parts, faceTextures: {} };
 }
 
 // ── Animation Functions ──────────────────────
@@ -464,8 +468,10 @@ function _resetPose(rec) {
   parts.head.rotation.set(0, 0, 0);
   parts.hair.position.set(0, headY, -0.04);
   parts.hair.rotation.set(0, 0, 0);
-  parts.face.position.set(0, headY, headR + 0.001);
-  parts.face.rotation.set(0, 0, 0);
+  if (parts.face) {
+    parts.face.position.set(0, headY, headR + 0.001);
+    parts.face.rotation.set(0, 0, 0);
+  }
   parts.body.position.set(0, bodyY, 0);
   parts.body.rotation.set(0, 0, 0);
   parts.armL.position.set(-0.17, bodyY + 0.02, 0);
@@ -502,7 +508,7 @@ function _animWorking(rec, _dt, elapsed) {
   parts.body.rotation.x = 0.12;
   parts.head.rotation.x = 0.08;
   parts.hair.rotation.x = 0.08;
-  parts.face.rotation.x = 0.08;
+  if (parts.face) parts.face.rotation.x = 0.08;
 
   // Typing gesture — arms move up/down alternately
   const cycle = elapsed * 6;
@@ -526,7 +532,7 @@ function _animThinking(rec, _dt, elapsed) {
   // Head tilt to the side
   parts.head.rotation.z = 0.2;
   parts.hair.rotation.z = 0.2;
-  parts.face.rotation.z = 0.2;
+  if (parts.face) parts.face.rotation.z = 0.2;
 
   // Right arm to chin
   parts.armR.rotation.x = -0.6;
@@ -571,7 +577,7 @@ function _animSleeping(rec, _dt, elapsed) {
   parts.body.rotation.x = 0.3;
   parts.head.rotation.x = 0.25;
   parts.hair.rotation.x = 0.25;
-  parts.face.rotation.x = 0.25;
+  if (parts.face) parts.face.rotation.x = 0.25;
 
   // Breathing: gentle scale oscillation on body
   const breath = 1 + Math.sin(elapsed * 1.8) * 0.03;
@@ -605,7 +611,7 @@ function _animTalking(rec, _dt, elapsed) {
   // Slight head nod
   parts.head.rotation.x = Math.sin(elapsed * 2.5) * 0.08;
   parts.hair.rotation.x = parts.head.rotation.x;
-  parts.face.rotation.x = parts.head.rotation.x;
+  if (parts.face) parts.face.rotation.x = parts.head.rotation.x;
 }
 
 /**
@@ -772,7 +778,9 @@ function _clearParticles(rec) {
  * @param {CharacterRecord} rec
  */
 function _applyFaceTexture(rec) {
+  if (!rec.parts.face) return;  // silhouette model — no face
   const tex = rec.faceTextures[rec.state] || rec.faceTextures["idle"];
+  if (!tex) return;
   const faceMat = /** @type {THREE.MeshBasicMaterial} */ (rec.parts.face.material);
   if (faceMat.map !== tex) {
     faceMat.map = tex;
@@ -819,8 +827,8 @@ export function initCharacters(scene) {
 
 /**
  * Create a character and add it to the scene.
- * Tries to load a GLB model from the assets API first.
- * Falls back to procedural SD character on failure or if no asset exists.
+ * Tries to load a rigged GLB model first, then un-rigged, then procedural.
+ * Also fetches asset metadata for dynamic color profiles.
  *
  * @param {string} name     - Person name (key in CHARACTER_PROFILES or dynamic).
  * @param {THREE.Vector3} position - World position to place the character.
@@ -836,11 +844,31 @@ export async function createCharacter(name, position) {
     removeCharacter(name);
   }
 
-  // ── Try GLB model first ──────────
+  // Fetch metadata to update dynamic color profile for non-hardcoded persons
+  if (!CHARACTER_PROFILES[name]) {
+    try {
+      const meta = await fetchAssetMetadata(name);
+      if (meta?.colors?.image_color) {
+        _applyMetadataColor(name, meta.colors.image_color);
+      }
+    } catch { /* proceed without metadata colours */ }
+  }
+
+  // ── Try rigged GLB first (has skeleton + animations) ──────────
+  const riggedUrl = await probeAsset(name, "avatar_chibi_rigged.glb");
+  if (riggedUrl) {
+    try {
+      return await _createGLBCharacter(name, position, riggedUrl, true);
+    } catch (err) {
+      console.warn(`character.js: Rigged GLB failed for "${name}", trying un-rigged.`, err);
+    }
+  }
+
+  // ── Try un-rigged GLB ──────────
   const glbUrl = await probeAsset(name, "avatar_chibi.glb");
   if (glbUrl) {
     try {
-      return await _createGLBCharacter(name, position, glbUrl);
+      return await _createGLBCharacter(name, position, glbUrl, false);
     } catch (err) {
       console.warn(`character.js: GLB load failed for "${name}", falling back to procedural.`, err);
     }
@@ -851,79 +879,145 @@ export async function createCharacter(name, position) {
 }
 
 /**
+ * Apply an image_color hex string from asset metadata as the key colour
+ * for a dynamically generated profile.
+ * @param {string} name
+ * @param {string} hexStr - e.g. "#FFB7C5"
+ */
+function _applyMetadataColor(name, hexStr) {
+  const hex = parseInt(hexStr.replace("#", ""), 16);
+  if (isNaN(hex)) return;
+  const profile = _generateProfile(name);
+  profile.hairColor = hex;
+  CHARACTER_PROFILES[name] = profile;
+}
+
+/**
  * Load a GLB model and register it as a character.
+ * For rigged models, also loads separate animation GLB files and sets up
+ * state-driven animation crossfading.
+ *
  * @param {string} name
  * @param {THREE.Vector3} position
  * @param {string} url
+ * @param {boolean} isRigged - Whether this is a rigged model with skeleton
  * @returns {Promise<THREE.Group>}
  */
-function _createGLBCharacter(name, position, url) {
-  return new Promise((resolve, reject) => {
-    _gltfLoader.load(
-      url,
-      (gltf) => {
-        const group = new THREE.Group();
-        group.name = `character_${name}`;
-
-        const model = gltf.scene;
-        // Normalise scale: fit model into ~0.7 units tall
-        const box = new THREE.Box3().setFromObject(model);
-        const height = box.max.y - box.min.y;
-        const targetHeight = 0.7;
-        const scale = height > 0 ? targetHeight / height : 1;
-        model.scale.setScalar(scale);
-
-        // Center the model horizontally & place feet at y=0
-        const scaledBox = new THREE.Box3().setFromObject(model);
-        model.position.x -= (scaledBox.min.x + scaledBox.max.x) / 2;
-        model.position.y -= scaledBox.min.y;
-
-        group.add(model);
-
-        // Tag for raycasting
-        group.traverse((child) => { child.userData.personName = name; });
-
-        group.position.copy(position);
-        group.userData._baseX = position.x;
-        group.userData._baseY = position.y;
-        group.userData._baseZ = position.z;
-
-        _scene.add(group);
-
-        // AnimationMixer if the model has animations
-        let mixer = null;
-        if (gltf.animations && gltf.animations.length > 0) {
-          mixer = new THREE.AnimationMixer(model);
-          const clip = gltf.animations[0];
-          mixer.clipAction(clip).play();
-        }
-
-        const profile = CHARACTER_PROFILES[name] || _generateProfile(name);
-
-        /** @type {CharacterRecord} */
-        const record = {
-          name,
-          group,
-          state: "idle",
-          prevState: "idle",
-          transitionT: 1.0,
-          parts: {},          // no procedural parts
-          profile,
-          faceTextures: {},   // no face textures
-          statusSprite: null,
-          particles: [],
-          particleAge: 0,
-          _isGLB: true,
-          _mixer: mixer,
-        };
-
-        _characters.set(name, record);
-        resolve(group);
-      },
-      undefined,
-      (err) => reject(err),
-    );
+async function _createGLBCharacter(name, position, url, isRigged) {
+  const gltf = await new Promise((resolve, reject) => {
+    _gltfLoader.load(url, resolve, undefined, reject);
   });
+
+  const group = new THREE.Group();
+  group.name = `character_${name}`;
+
+  const model = gltf.scene;
+  // Normalise scale: fit model into ~0.7 units tall
+  const box = new THREE.Box3().setFromObject(model);
+  const height = box.max.y - box.min.y;
+  const targetHeight = 0.7;
+  const scale = height > 0 ? targetHeight / height : 1;
+  model.scale.setScalar(scale);
+
+  // Center the model horizontally & place feet at y=0
+  const scaledBox = new THREE.Box3().setFromObject(model);
+  model.position.x -= (scaledBox.min.x + scaledBox.max.x) / 2;
+  model.position.y -= scaledBox.min.y;
+
+  group.add(model);
+
+  // Tag for raycasting
+  group.traverse((child) => { child.userData.personName = name; });
+
+  group.position.copy(position);
+  group.userData._baseX = position.x;
+  group.userData._baseY = position.y;
+  group.userData._baseZ = position.z;
+
+  _scene.add(group);
+
+  // Set up AnimationMixer
+  const mixer = new THREE.AnimationMixer(model);
+
+  // Load animation clips from separate GLB files (rigged models only)
+  const animClips = {};  // state name -> THREE.AnimationAction
+  if (isRigged) {
+    const rawClips = await _loadAnimationClips(name);
+    for (const [state, filename] of Object.entries(_STATE_ANIM_FILES)) {
+      const clip = rawClips[filename];
+      if (clip) {
+        animClips[state] = mixer.clipAction(clip);
+        animClips[state].setLoop(THREE.LoopRepeat);
+      }
+    }
+  }
+
+  // Use embedded animations as fallback idle
+  if (gltf.animations && gltf.animations.length > 0 && !animClips["idle"]) {
+    animClips["idle"] = mixer.clipAction(gltf.animations[0]);
+    animClips["idle"].setLoop(THREE.LoopRepeat);
+  }
+
+  // Play idle by default
+  const idleAction = animClips["idle"] || null;
+  if (idleAction) {
+    idleAction.play();
+  }
+
+  const profile = CHARACTER_PROFILES[name] || _generateProfile(name);
+
+  /** @type {CharacterRecord} */
+  const record = {
+    name,
+    group,
+    state: "idle",
+    prevState: "idle",
+    transitionT: 1.0,
+    parts: {},          // no procedural parts
+    profile,
+    faceTextures: {},   // no face textures
+    statusSprite: null,
+    particles: [],
+    particleAge: 0,
+    _isGLB: true,
+    _mixer: mixer,
+    _animClips: animClips,
+    _currentAction: idleAction,
+  };
+
+  _characters.set(name, record);
+  return group;
+}
+
+/**
+ * Load animation clips from separate GLB files for a person.
+ * Returns a map of filename -> THREE.AnimationClip.
+ * @param {string} name
+ * @returns {Promise<Record<string, THREE.AnimationClip>>}
+ */
+async function _loadAnimationClips(name) {
+  /** @type {Record<string, THREE.AnimationClip>} */
+  const clips = {};
+  const filenames = [...new Set(Object.values(_STATE_ANIM_FILES))];
+
+  const promises = filenames.map(async (filename) => {
+    const url = await probeAsset(name, filename);
+    if (!url) return;
+
+    try {
+      const gltf = await new Promise((resolve, reject) => {
+        _gltfLoader.load(url, resolve, undefined, reject);
+      });
+      if (gltf.animations && gltf.animations.length > 0) {
+        clips[filename] = gltf.animations[0];
+      }
+    } catch (err) {
+      console.warn(`character.js: Failed to load animation "${filename}" for "${name}":`, err);
+    }
+  });
+
+  await Promise.all(promises);
+  return clips;
 }
 
 /**
@@ -974,6 +1068,14 @@ export function removeCharacter(name) {
   const rec = _characters.get(name);
   if (!rec) return;
 
+  // Stop animation mixer
+  if (rec._mixer) {
+    rec._mixer.stopAllAction();
+    rec._mixer = null;
+  }
+  rec._animClips = null;
+  rec._currentAction = null;
+
   // Clean up state-specific visuals
   _hideStatusSprite(rec);
   _clearParticles(rec);
@@ -1006,6 +1108,7 @@ export function removeCharacter(name) {
 
 /**
  * Change a character's animation state with a smooth transition.
+ * For GLB models with loaded animation clips, crossfades between actions.
  * @param {string} name  - Person name.
  * @param {string} state - One of the STATES values.
  */
@@ -1021,14 +1124,33 @@ export function updateCharacterState(name, state) {
 
   if (rec.state === state) return;
 
-  // Clean up old state visuals
-  _cleanupState(rec, rec.state);
+  // GLB model: crossfade animation clips
+  if (rec._isGLB && rec._animClips) {
+    const nextAction = rec._animClips[state] || rec._animClips["idle"];
+    const currentAction = rec._currentAction;
+
+    if (nextAction && nextAction !== currentAction) {
+      nextAction.reset();
+      nextAction.play();
+      if (currentAction) {
+        currentAction.crossFadeTo(nextAction, TRANSITION_DURATION, true);
+      }
+      rec._currentAction = nextAction;
+    }
+  }
+
+  // Procedural model: clean up old state visuals
+  if (!rec._isGLB) {
+    _cleanupState(rec, rec.state);
+  }
 
   rec.prevState = rec.state;
   rec.state = state;
   rec.transitionT = 0;
 
-  _applyFaceTexture(rec);
+  if (!rec._isGLB) {
+    _applyFaceTexture(rec);
+  }
 }
 
 /**
@@ -1038,15 +1160,17 @@ export function updateCharacterState(name, state) {
  */
 export function updateAllCharacters(deltaTime, elapsedTime) {
   for (const rec of _characters.values()) {
-    // GLB model: update AnimationMixer + simple idle bob
+    // GLB model: update AnimationMixer
     if (rec._isGLB) {
       if (rec._mixer) {
         rec._mixer.update(deltaTime);
       }
-      // Simple idle bob for GLB models too
-      const baseY = rec.group.userData._baseY;
-      rec.group.position.y = baseY + Math.sin(elapsedTime * 1.5) * 0.02;
-      rec.group.rotation.y = Math.sin(elapsedTime * 0.3) * 0.1;
+      // Only apply idle bob when no animation clips are loaded (un-rigged GLB)
+      if (!rec._animClips || Object.keys(rec._animClips).length === 0) {
+        const baseY = rec.group.userData._baseY;
+        rec.group.position.y = baseY + Math.sin(elapsedTime * 1.5) * 0.02;
+        rec.group.rotation.y = Math.sin(elapsedTime * 0.3) * 0.1;
+      }
       continue;
     }
 

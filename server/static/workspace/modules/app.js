@@ -10,7 +10,7 @@ import { initMemory, loadMemoryTab } from "./memory.js";
 import { initSession, loadSessions } from "./session.js";
 import { escapeHtml, renderSimpleMarkdown } from "./utils.js";
 import { initOffice, getDesks, highlightDesk, setCharacterClickHandler, getScene, registerClickTarget, setCharacterUpdateHook } from "./office3d.js";
-import { initCharacters, createCharacter, updateCharacterState, updateAllCharacters } from "./character.js";
+import { initCharacters, createCharacter, removeCharacter, updateCharacterState, updateAllCharacters } from "./character.js";
 import { initBustup, setCharacter, setExpression, setTalking, onClick as onBustupClick } from "./live2d.js";
 
 // ── DOM References ──────────────────────
@@ -505,6 +505,40 @@ function setupWebSocket() {
       }
     }
     addActivity("chat", personName, msg.slice(0, 60));
+  }));
+
+  wsUnsubscribers.push(onEvent("person.assets_updated", async (data) => {
+    const personName = data.name;
+    addActivity("system", personName, `アセット更新: ${(data.assets || []).join(", ")}`);
+
+    // Refresh 3D character if office is initialised
+    if (getState().officeInitialized) {
+      const desks = getDesks();
+      const deskKeys = Object.keys(desks);
+      const { persons } = getState();
+      const idx = persons.findIndex((p) => p.name === personName);
+      if (idx >= 0) {
+        const deskKey = deskKeys[idx % deskKeys.length];
+        const deskPos = desks[deskKey];
+        if (deskPos) {
+          removeCharacter(personName);
+          const group = await createCharacter(
+            personName,
+            { x: deskPos.x, y: deskPos.y + 0.4, z: deskPos.z - 0.3 },
+          );
+          if (group) {
+            group.traverse((child) => {
+              if (child.isMesh) registerClickTarget(personName, child);
+            });
+          }
+        }
+      }
+    }
+
+    // Refresh bust-up if conversation is open for this person
+    if (getState().conversationPerson === personName) {
+      await setCharacter(personName);
+    }
   }));
 
   // Track connection state for status indicator

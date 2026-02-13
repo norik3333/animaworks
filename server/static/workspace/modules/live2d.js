@@ -61,6 +61,9 @@ let _expressionTransitionStart = 0;
 /** @type {boolean} — true when showing AI-generated bust-up image instead of Canvas */
 let _imageMode = false;
 
+/** @type {boolean} — true when no image asset exists; shows coloured silhouette instead of detailed Canvas */
+let _silhouetteMode = false;
+
 /** @type {HTMLImageElement|null} — bust-up image element (shown when _imageMode=true) */
 let _bustupImg = null;
 
@@ -1328,6 +1331,55 @@ function drawSilhouette() {
   _ctx.fillText("?", cx, headCy);
 }
 
+/**
+ * Draw a coloured silhouette for a loaded character that has no bust-up image.
+ * Uses the character's hair/clothing colours instead of generic grey.
+ */
+function drawCharacterSilhouette() {
+  if (!_ctx || !_profile || _width <= 0 || _height <= 0) return;
+
+  _ctx.clearRect(0, 0, _width, _height);
+
+  // Soft gradient background based on clothing colour
+  const grad = _ctx.createLinearGradient(0, 0, 0, _height);
+  grad.addColorStop(0, "#e8e8ec");
+  grad.addColorStop(1, "#d0d0d8");
+  _ctx.fillStyle = grad;
+  _ctx.fillRect(0, 0, _width, _height);
+
+  const cx = _width * 0.5;
+  const headCy = _height * 0.30;
+  const headR = Math.min(_width, _height) * 0.15;
+
+  // Use character's hair colour for the silhouette, semi-transparent
+  const baseColor = _profile.hair || "#888898";
+
+  _ctx.save();
+  _ctx.globalAlpha = 0.45;
+
+  // Head
+  fillEllipse(cx, headCy, headR, headR * 1.1, baseColor);
+
+  // Hair halo (slightly larger, behind)
+  fillEllipse(cx, headCy - headR * 0.1, headR * 1.15, headR * 1.25, baseColor);
+
+  // Shoulders + body trapezoid
+  const bodyTop = headCy + headR * 1.0;
+  _ctx.beginPath();
+  _ctx.moveTo(cx - headR * 0.6, bodyTop);
+  // Shoulders
+  _ctx.quadraticCurveTo(cx - headR * 1.8, bodyTop + headR * 0.3, cx - headR * 2.0, bodyTop + headR * 1.5);
+  _ctx.lineTo(cx - headR * 1.6, _height);
+  _ctx.lineTo(cx + headR * 1.6, _height);
+  _ctx.lineTo(cx + headR * 2.0, bodyTop + headR * 1.5);
+  _ctx.quadraticCurveTo(cx + headR * 1.8, bodyTop + headR * 0.3, cx + headR * 0.6, bodyTop);
+  _ctx.closePath();
+  _ctx.fillStyle = baseColor;
+  _ctx.fill();
+
+  _ctx.restore();
+}
+
 // ── Animation Loop ──────────────────────
 
 /**
@@ -1342,6 +1394,11 @@ function animationLoop(timestamp) {
 
   if (!_profile) {
     drawSilhouette();
+    return;
+  }
+
+  if (_silhouetteMode) {
+    drawCharacterSilhouette();
     return;
   }
 
@@ -1449,6 +1506,7 @@ export async function setCharacter(name) {
   if (!name || typeof name !== "string") {
     _characterName = null;
     _profile = null;
+    _silhouetteMode = false;
     _switchToCanvasMode();
     return;
   }
@@ -1465,12 +1523,16 @@ export async function setCharacter(name) {
   try {
     const url = await probeAsset(key, "avatar_bustup.png");
     if (url) {
+      _silhouetteMode = false;
       _switchToImageMode(url);
       return;
     }
   } catch {
-    // probe failed — fall through to Canvas
+    // probe failed — fall through to silhouette
   }
+
+  // No image asset — show coloured silhouette placeholder
+  _silhouetteMode = true;
   _switchToCanvasMode();
 }
 

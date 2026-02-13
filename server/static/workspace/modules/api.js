@@ -122,6 +122,10 @@ export function fetchAssets(name) {
   return request(`/api/persons/${encodeURIComponent(name)}/assets`);
 }
 
+export function fetchAssetMetadata(name) {
+  return request(`/api/persons/${encodeURIComponent(name)}/assets/metadata`);
+}
+
 /**
  * Check if an asset exists by issuing a HEAD request.
  * Returns the URL if it exists, or null otherwise.

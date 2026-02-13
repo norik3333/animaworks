@@ -26,6 +26,7 @@
     systemStatus: $id("systemStatus"),
     systemStatusText: $id("systemStatusText"),
     personDropdown: $id("personDropdown"),
+    personAvatar: $id("personAvatar"),
     chatMessages: $id("chatMessages"),
     chatForm: $id("chatForm"),
     chatInput: $id("chatInput"),
@@ -159,6 +160,37 @@
       hideHistoryDetail();
       loadSessionList();
     }
+
+    // Update avatar thumbnail
+    updatePersonAvatar();
+  }
+
+  // ── Person Avatar ───────────────────────────
+  async function updatePersonAvatar() {
+    const container = dom.personAvatar;
+    if (!container) return;
+
+    const name = state.selectedPerson;
+    if (!name) {
+      container.innerHTML = "";
+      return;
+    }
+
+    // Try bust-up first, then chibi
+    const candidates = ["avatar_bustup.png", "avatar_chibi.png"];
+    for (const filename of candidates) {
+      const url = `/api/persons/${encodeURIComponent(name)}/assets/${encodeURIComponent(filename)}`;
+      try {
+        const resp = await fetch(url, { method: "HEAD" });
+        if (resp.ok) {
+          container.innerHTML = `<img src="${escapeHtml(url)}" alt="${escapeHtml(name)}" class="person-avatar-img">`;
+          return;
+        }
+      } catch { /* try next */ }
+    }
+
+    // Fallback: initial letter
+    container.innerHTML = `<div class="person-avatar-placeholder">${escapeHtml(name.charAt(0).toUpperCase())}</div>`;
   }
 
   // ── Person State ───────────────────────────
@@ -820,6 +852,17 @@
             if (personName === state.selectedPerson) renderChat();
           }
           addActivity("chat", personName, `応答: ${response.slice(0, 100)}`);
+        }
+        break;
+      }
+
+      case "person.assets_updated": {
+        const personName = data.name;
+        if (personName) {
+          addActivity("system", personName, `アセット更新: ${(data.assets || []).join(", ")}`);
+          if (personName === state.selectedPerson) {
+            updatePersonAvatar();
+          }
         }
         break;
       }

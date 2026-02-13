@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from pathlib import Path
 
 from fastapi import APIRouter, Request, WebSocket, WebSocketDisconnect
@@ -562,6 +563,61 @@ def create_router() -> APIRouter:
             ]
         }
 
+    @api.get("/persons/{name}/assets/metadata")
+    async def get_asset_metadata(name: str, request: Request):
+        """Return structured metadata about a person's available assets."""
+        person = request.app.state.persons.get(name)
+        if not person:
+            return JSONResponse({"error": "Person not found"}, status_code=404)
+
+        assets_dir = person.person_dir / "assets"
+        base_url = f"/api/persons/{name}/assets"
+
+        asset_files = {
+            "avatar_fullbody": "avatar_fullbody.png",
+            "avatar_bustup": "avatar_bustup.png",
+            "avatar_chibi": "avatar_chibi.png",
+            "model_chibi": "avatar_chibi.glb",
+            "model_rigged": "avatar_chibi_rigged.glb",
+        }
+
+        result: dict = {"name": name, "assets": {}, "animations": {}, "colors": None}
+
+        if assets_dir.exists():
+            for key, filename_ in asset_files.items():
+                path = assets_dir / filename_
+                if path.exists():
+                    result["assets"][key] = {
+                        "filename": filename_,
+                        "url": f"{base_url}/{filename_}",
+                        "size": path.stat().st_size,
+                    }
+
+            for f in sorted(assets_dir.iterdir()):
+                if f.is_file() and f.name.startswith("anim_") and f.suffix == ".glb":
+                    anim_name = f.stem[len("anim_"):]
+                    result["animations"][anim_name] = {
+                        "filename": f.name,
+                        "url": f"{base_url}/{f.name}",
+                        "size": f.stat().st_size,
+                    }
+
+        # Extract image_color from identity.md
+        identity_path = person.person_dir / "identity.md"
+        if identity_path.exists():
+            try:
+                text = identity_path.read_text(encoding="utf-8")
+                match = re.search(
+                    r"(?:イメージカラー|image[_ ]?color|カラー)\s*[:：]\s*.*?(#[0-9A-Fa-f]{6})",
+                    text,
+                )
+                if match:
+                    result["colors"] = {"image_color": match.group(1)}
+            except OSError:
+                pass
+
+        return result
+
     @api.get("/persons/{name}/assets/{filename}")
     async def get_asset(name: str, filename: str, request: Request):
         """Serve a static asset file from a person's assets directory."""
@@ -597,6 +653,8 @@ def create_router() -> APIRouter:
         name: str, body: AssetGenerateRequest, request: Request,
     ):
         """Trigger character asset generation pipeline."""
+        import asyncio
+
         person = request.app.state.persons.get(name)
         if not person:
             return JSONResponse({"error": "Person not found"}, status_code=404)
@@ -610,12 +668,44 @@ def create_router() -> APIRouter:
         from core.tools.image_gen import ImageGenPipeline
 
         pipeline = ImageGenPipeline(person.person_dir)
-        result = pipeline.generate_all(
-            prompt=prompt,
-            negative_prompt=body.negative_prompt,
-            skip_existing=body.skip_existing,
-            steps=body.steps,
+
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(
+            None,
+            lambda: pipeline.generate_all(
+                prompt=prompt,
+                negative_prompt=body.negative_prompt,
+                skip_existing=body.skip_existing,
+                steps=body.steps,
+            ),
         )
+
+        # Broadcast asset update via WebSocket
+        generated: list[str] = []
+        if result.fullbody_path:
+            generated.append("avatar_fullbody.png")
+        if result.bustup_path:
+            generated.append("avatar_bustup.png")
+        if result.chibi_path:
+            generated.append("avatar_chibi.png")
+        if result.model_path:
+            generated.append("avatar_chibi.glb")
+        if result.rigged_model_path:
+            generated.append("avatar_chibi_rigged.glb")
+        for anim_name, anim_path in result.animation_paths.items():
+            generated.append(anim_path.name)
+
+        if generated:
+            ws_manager = request.app.state.ws_manager
+            await ws_manager.broadcast({
+                "type": "person.assets_updated",
+                "data": {
+                    "name": name,
+                    "assets": generated,
+                    "errors": result.errors,
+                },
+            })
+
         return result.to_dict()
 
     # ── WebSocket ─────────────────────────────────────────
