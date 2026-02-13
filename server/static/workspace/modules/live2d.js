@@ -15,16 +15,24 @@ import { probeAsset } from "./api.js";
  * @property {string} skin    - Skin tone hex
  */
 
-/** @type {Record<string, CharacterProfile>} */
-const PROFILES = {
-  sakura: { hair: "#1a1a2e", eyes: "#cc3333", clothing: "#8b0000", skin: "#f5e6d3" },
-  kotoha: { hair: "#c4956a", eyes: "#d4a040", clothing: "#ff8c69", skin: "#fff0e0" },
-  mio:    { hair: "#1a1a3e", eyes: "#7788aa", clothing: "#4a5568", skin: "#f0e8f0" },
-  alice:  { hair: "#f0e68c", eyes: "#4477cc", clothing: "#6495ed", skin: "#fff8f0" },
-  rin:    { hair: "#0a0a2a", eyes: "#33aa55", clothing: "#2d5a3d", skin: "#f5f0e8" },
-  rei:    { hair: "#d0d0e0", eyes: "#cc3344", clothing: "#800020", skin: "#f0f0f8" },
-  kaede:  { hair: "#8b4513", eyes: "#daa520", clothing: "#b8860b", skin: "#f8ece0" },
-};
+/** @type {Map<string, CharacterProfile>} */
+const _profileCache = new Map();
+
+/**
+ * Register appearance data for a person from the server API.
+ * Call before setCharacter() with data from /api/persons.
+ * @param {string} name
+ * @param {{hairColor?: string, eyeColor?: string, bodyColor?: string, clothingColor?: string}} appearance
+ */
+export function setLive2dAppearance(name, appearance) {
+  if (!appearance || !name) return;
+  const base = generateProfile(name);
+  if (appearance.hairColor) base.hair = appearance.hairColor;
+  if (appearance.eyeColor) base.eyes = appearance.eyeColor;
+  if (appearance.bodyColor) base.skin = appearance.bodyColor;
+  if (appearance.clothingColor) base.clothing = appearance.clothingColor;
+  _profileCache.set(name.toLowerCase(), base);
+}
 
 /** Valid expression names. */
 const EXPRESSIONS = ["normal", "happy", "troubled", "angry", "surprised", "thinking"];
@@ -1513,7 +1521,7 @@ export async function setCharacter(name) {
 
   const key = name.toLowerCase();
   _characterName = key;
-  _profile = PROFILES[key] || generateProfile(key);
+  _profile = _profileCache.get(key) || generateProfile(key);
 
   // Reset expression
   _expression = "normal";

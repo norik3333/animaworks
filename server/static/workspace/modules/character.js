@@ -12,16 +12,23 @@ const _gltfLoader = new GLTFLoader();
 
 // ── Constants ──────────────────────
 
-/** @type {Record<string, {hairColor: number, eyeColor: number, bodyColor: number, role: string}>} */
-const CHARACTER_PROFILES = {
-  sakura:  { hairColor: 0x1a1a2e, eyeColor: 0xcc3333, bodyColor: 0xf5e6d3, role: "commander" },
-  kotoha:  { hairColor: 0xc4956a, eyeColor: 0xd4a040, bodyColor: 0xfff0e0, role: "communicator" },
-  mio:     { hairColor: 0x1a1a3e, eyeColor: 0x7788aa, bodyColor: 0xf0e8f0, role: "monitor" },
-  alice:   { hairColor: 0xf0e68c, eyeColor: 0x4477cc, bodyColor: 0xfff8f0, role: "researcher" },
-  rin:     { hairColor: 0x0a0a2a, eyeColor: 0x33aa55, bodyColor: 0xf5f0e8, role: "developer" },
-  rei:     { hairColor: 0xd0d0e0, eyeColor: 0xcc3344, bodyColor: 0xf0f0f8, role: "browser" },
-  kaede:   { hairColor: 0x8b4513, eyeColor: 0xdaa520, bodyColor: 0xf8ece0, role: "trader" },
-};
+/** @type {Map<string, {hairColor: number, eyeColor: number, bodyColor: number}>} */
+const _profileCache = new Map();
+
+/**
+ * Register appearance data for a person from the server API.
+ * Call before createCharacter() with data from /api/persons.
+ * @param {string} name
+ * @param {{hairColor?: string, eyeColor?: string, bodyColor?: string}} appearance
+ */
+export function setAppearance(name, appearance) {
+  if (!appearance || !name) return;
+  const base = _generateProfile(name);
+  if (appearance.hairColor) base.hairColor = parseInt(appearance.hairColor.replace("#", ""), 16);
+  if (appearance.eyeColor) base.eyeColor = parseInt(appearance.eyeColor.replace("#", ""), 16);
+  if (appearance.bodyColor) base.bodyColor = parseInt(appearance.bodyColor.replace("#", ""), 16);
+  _profileCache.set(name, base);
+}
 
 /** All valid animation states. */
 const STATES = /** @type {const} */ ([
@@ -878,7 +885,7 @@ export async function createCharacter(name, position) {
   }
 
   // Fetch metadata to update dynamic color profile for non-hardcoded persons
-  if (!CHARACTER_PROFILES[name]) {
+  if (!_profileCache.has(name)) {
     try {
       const meta = await fetchAssetMetadata(name);
       if (meta?.colors?.image_color) {
@@ -922,7 +929,7 @@ function _applyMetadataColor(name, hexStr) {
   if (isNaN(hex)) return;
   const profile = _generateProfile(name);
   profile.hairColor = hex;
-  CHARACTER_PROFILES[name] = profile;
+  _profileCache.set(name, profile);
 }
 
 /**
@@ -997,7 +1004,7 @@ async function _createGLBCharacter(name, position, url, isRigged) {
     idleAction.play();
   }
 
-  const profile = CHARACTER_PROFILES[name] || _generateProfile(name);
+  const profile = _profileCache.get(name) || _generateProfile(name);
 
   /** @type {CharacterRecord} */
   const record = {
@@ -1060,7 +1067,7 @@ async function _loadAnimationClips(name) {
  * @returns {THREE.Group}
  */
 function _createProceduralCharacter(name, position) {
-  const profile = CHARACTER_PROFILES[name] || _generateProfile(name);
+  const profile = _profileCache.get(name) || _generateProfile(name);
   const { group, parts, faceTextures } = _buildCharacterMesh(name, profile);
 
   group.position.copy(position);

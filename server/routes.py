@@ -44,6 +44,17 @@ def create_router() -> APIRouter:
             return []
         return [d.name for d in sorted(users_dir.iterdir()) if d.is_dir()]
 
+    def _read_appearance(person_dir: Path) -> dict | None:
+        """Read appearance.json from a person directory."""
+        path = person_dir / "appearance.json"
+        if not path.exists():
+            return None
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            return data if data else None
+        except (json.JSONDecodeError, OSError):
+            return None
+
     @api.get("/persons")
     async def list_persons(request: Request):
         persons = request.app.state.persons
@@ -53,6 +64,7 @@ def create_router() -> APIRouter:
             mc = p.model_config
             data["role"] = mc.role
             data["supervisor"] = mc.supervisor
+            data["appearance"] = _read_appearance(p.person_dir)
             result.append(data)
         return result
 

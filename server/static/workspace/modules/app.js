@@ -10,8 +10,8 @@ import { initMemory, loadMemoryTab } from "./memory.js";
 import { initSession, loadSessions } from "./session.js";
 import { escapeHtml, renderSimpleMarkdown } from "./utils.js";
 import { initOffice, getDesks, highlightDesk, setCharacterClickHandler, getScene, registerClickTarget, setCharacterUpdateHook, getObstacles, getFloorDimensions } from "./office3d.js";
-import { initCharacters, createCharacter, removeCharacter, updateCharacterState, updateAllCharacters, getCharacterGroup, getCharacterHome } from "./character.js";
-import { initBustup, setCharacter, setExpression, setTalking, onClick as onBustupClick } from "./live2d.js";
+import { initCharacters, createCharacter, removeCharacter, updateCharacterState, updateAllCharacters, getCharacterGroup, getCharacterHome, setAppearance } from "./character.js";
+import { initBustup, setCharacter, setExpression, setTalking, onClick as onBustupClick, setLive2dAppearance } from "./live2d.js";
 import { createNavGrid } from "./navigation.js";
 import { initMovement, registerCharacter, updateMovements, moveTo, moveToHome, stopMovement, isMoving } from "./movement.js";
 import { computePOIs, initIdleBehaviors, updateIdleBehaviors, cancelBehavior } from "./idle_behavior.js";
@@ -129,6 +129,11 @@ async function initOfficeIfNeeded() {
     // Create characters at their dynamically assigned desk positions
     const desks = getDesks();
     for (const p of persons) {
+      // Register appearance from API before creating character
+      if (p.appearance) {
+        setAppearance(p.name, p.appearance);
+        setLive2dAppearance(p.name, p.appearance);
+      }
       const deskPos = desks[p.name];
       if (deskPos) {
         const group = await createCharacter(p.name, { x: deskPos.x, y: 0, z: deskPos.z - 0.55 });
