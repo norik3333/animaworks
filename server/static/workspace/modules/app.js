@@ -37,9 +37,9 @@ function cacheDom() {
   dom.officePanel = document.getElementById("wsOfficePanel");
   dom.officeCanvas = document.getElementById("wsOfficeCanvas");
 
-  // Right panel modes
-  dom.infoPanel = document.getElementById("wsInfoPanel");
-  dom.convPanel = document.getElementById("wsConvPanel");
+  // Conversation overlay (3-column)
+  dom.convOverlay = document.getElementById("wsConvOverlay");
+  dom.convLayout = document.getElementById("wsConvLayout");
   dom.convBack = document.getElementById("wsConvBack");
   dom.convPersonName = document.getElementById("wsConvPersonName");
   dom.convCanvas = document.getElementById("wsConvCanvas");
@@ -173,13 +173,12 @@ let bustupInitialized = false;
 let convStreamController = null;
 
 function openConversation(personName) {
-  if (!dom.convPanel || !dom.infoPanel) return;
+  if (!dom.convOverlay) return;
 
   setState({ conversationOpen: true, conversationPerson: personName });
 
-  // Switch right panel to conversation mode
-  dom.infoPanel.classList.add("hidden");
-  dom.convPanel.classList.remove("hidden");
+  // Show conversation overlay on top of office
+  dom.convOverlay.classList.remove("hidden");
 
   // Update person name
   if (dom.convPersonName) dom.convPersonName.textContent = personName;
@@ -203,21 +202,15 @@ function openConversation(personName) {
   // Load and render chat history
   loadAndRenderConvMessages(personName);
 
-  // Highlight desk in 3D
-  if (getState().officeInitialized) {
-    highlightDesk(personName);
-  }
-
   // Focus input
   dom.convInput?.focus();
 }
 
 function closeConversation() {
-  if (!dom.convPanel || !dom.infoPanel) return;
+  if (!dom.convOverlay) return;
 
-  // Switch right panel back to info mode
-  dom.convPanel.classList.add("hidden");
-  dom.infoPanel.classList.remove("hidden");
+  // Hide conversation overlay
+  dom.convOverlay.classList.add("hidden");
 
   setState({ conversationOpen: false, conversationPerson: null });
   setTalking(false);
@@ -557,6 +550,10 @@ async function startDashboard() {
 
   // Bind conversation panel events
   dom.convBack?.addEventListener("click", closeConversation);
+  dom.convOverlay?.addEventListener("click", (e) => {
+    // Close when clicking the backdrop (outside the card)
+    if (e.target === dom.convOverlay) closeConversation();
+  });
   dom.convSend?.addEventListener("click", sendConversationMessage);
   dom.convInput?.addEventListener("keydown", (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {

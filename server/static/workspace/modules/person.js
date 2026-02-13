@@ -3,7 +3,7 @@
 
 import { getState, setState } from "./state.js";
 import { fetchPersons, fetchPersonDetail } from "./api.js";
-import { escapeHtml } from "./utils.js";
+import { escapeHtml, renderSimpleMarkdown } from "./utils.js";
 
 // ── Private State ──────────────────────
 
@@ -95,45 +95,50 @@ function renderStatusPanel() {
   // Build sections
   let sectionsHtml = "";
 
-  // Identity section
+  // Identity section (Markdown)
   if (d.identity) {
     sectionsHtml += `
       <div class="status-section">
         <div class="status-section-title">Identity</div>
-        <div class="status-section-body">${escapeHtml(truncate(d.identity, 500))}</div>
+        <div class="status-section-body md-content">${renderSimpleMarkdown(d.identity)}</div>
       </div>
     `;
   }
 
-  // Injection section
+  // Injection section (Markdown)
   if (d.injection) {
     sectionsHtml += `
       <div class="status-section">
         <div class="status-section-title">Injection</div>
-        <div class="status-section-body">${escapeHtml(truncate(d.injection, 500))}</div>
+        <div class="status-section-body md-content">${renderSimpleMarkdown(d.injection)}</div>
       </div>
     `;
   }
 
-  // State section
+  // State section (Markdown for strings, JSON for objects)
   if (d.state) {
-    const stateText = typeof d.state === "string" ? d.state : JSON.stringify(d.state, null, 2);
+    const isString = typeof d.state === "string";
+    const body = isString
+      ? `<div class="md-content">${renderSimpleMarkdown(d.state)}</div>`
+      : `<pre>${escapeHtml(JSON.stringify(d.state, null, 2))}</pre>`;
     sectionsHtml += `
       <div class="status-section">
         <div class="status-section-title">State</div>
-        <div class="status-section-body"><pre>${escapeHtml(stateText)}</pre></div>
+        <div class="status-section-body">${body}</div>
       </div>
     `;
   }
 
-  // Pending section
+  // Pending section (Markdown for strings, JSON for objects)
   if (d.pending) {
-    const pendingText =
-      typeof d.pending === "string" ? d.pending : JSON.stringify(d.pending, null, 2);
+    const isString = typeof d.pending === "string";
+    const body = isString
+      ? `<div class="md-content">${renderSimpleMarkdown(d.pending)}</div>`
+      : `<pre>${escapeHtml(JSON.stringify(d.pending, null, 2))}</pre>`;
     sectionsHtml += `
       <div class="status-section">
         <div class="status-section-title">Pending</div>
-        <div class="status-section-body"><pre>${escapeHtml(pendingText)}</pre></div>
+        <div class="status-section-body">${body}</div>
       </div>
     `;
   }
@@ -203,12 +208,6 @@ export async function loadPersons() {
     const persons = await fetchPersons();
     setState({ persons });
     renderDropdown();
-
-    // Auto-select first person if none selected
-    const { selectedPerson } = getState();
-    if (persons.length > 0 && !selectedPerson) {
-      await selectPerson(persons[0].name);
-    }
   } catch (err) {
     console.error("Failed to load persons:", err);
     if (_selectorContainer) {

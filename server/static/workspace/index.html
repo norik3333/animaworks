@@ -43,60 +43,57 @@
     <!-- Main Layout -->
     <div class="ws-layout">
 
-      <!-- Left: 3D Office (always visible) -->
-      <div class="ws-panel-main ws-office-panel" id="wsOfficePanel">
+      <!-- 3D Office (always visible) -->
+      <div class="ws-office-panel" id="wsOfficePanel">
         <div class="ws-office-canvas" id="wsOfficeCanvas"></div>
       </div>
 
-      <!-- Right: Info / Conversation -->
-      <aside class="ws-panel-right">
+      <!-- Conversation Overlay (appears on top of office) -->
+      <div class="ws-conv-overlay hidden" id="wsConvOverlay">
+        <div class="ws-conv-layout" id="wsConvLayout">
 
-        <!-- Mode A: Info Panel (default) -->
-        <div class="ws-info-panel" id="wsInfoPanel">
-          <!-- Tab Bar -->
-          <div class="ws-right-tabs" id="wsRightTabs">
-            <button class="right-tab active" data-tab="state" id="wsTabState">現在の状態</button>
-            <button class="right-tab" data-tab="activity" id="wsTabActivity">アクティビティ</button>
-            <button class="right-tab" data-tab="history" id="wsTabHistory">会話履歴</button>
-          </div>
+          <!-- Left: Info Sidebar -->
+          <aside class="ws-conv-sidebar">
+            <!-- Tab Bar -->
+            <div class="ws-right-tabs" id="wsRightTabs">
+              <button class="right-tab active" data-tab="state" id="wsTabState">状態</button>
+              <button class="right-tab" data-tab="activity" id="wsTabActivity">活動</button>
+              <button class="right-tab" data-tab="history" id="wsTabHistory">履歴</button>
+            </div>
 
-          <!-- Tab Panes -->
-          <div class="ws-right-panes">
-            <div class="tab-pane" data-pane="state" id="wsPaneState"></div>
-            <div class="tab-pane" data-pane="activity" id="wsPaneActivity" style="display:none"></div>
-            <div class="tab-pane" data-pane="history" id="wsPaneHistory" style="display:none"></div>
-          </div>
+            <!-- Tab Panes -->
+            <div class="ws-right-panes">
+              <div class="tab-pane" data-pane="state" id="wsPaneState"></div>
+              <div class="tab-pane" data-pane="activity" id="wsPaneActivity" style="display:none"></div>
+              <div class="tab-pane" data-pane="history" id="wsPaneHistory" style="display:none"></div>
+            </div>
 
-          <!-- Memory Browser -->
-          <div class="ws-memory-panel" id="wsMemoryPanel"></div>
-        </div>
+            <!-- Memory Browser -->
+            <div class="ws-memory-panel" id="wsMemoryPanel"></div>
+          </aside>
 
-        <!-- Mode B: Conversation Panel (character clicked) -->
-        <div class="ws-conv-panel hidden" id="wsConvPanel">
-          <!-- Header -->
-          <div class="ws-conv-panel-header">
-            <button class="ws-conv-back-btn" id="wsConvBack">&larr; 戻る</button>
-            <span class="ws-conv-panel-name" id="wsConvPersonName"></span>
-          </div>
+          <!-- Center: Chat -->
+          <main class="ws-conv-main">
+            <div class="ws-conv-header">
+              <button class="ws-conv-back-btn" id="wsConvBack">&larr; オフィスに戻る</button>
+              <span class="ws-conv-person-name" id="wsConvPersonName"></span>
+            </div>
+            <div class="ws-conv-messages" id="wsConvMessages">
+              <div class="chat-empty">メッセージはまだありません</div>
+            </div>
+            <div class="ws-conv-input-area">
+              <textarea class="ws-conv-input" id="wsConvInput" placeholder="メッセージを入力... (Ctrl+Enter)" rows="1"></textarea>
+              <button class="ws-conv-send" id="wsConvSend">送信</button>
+            </div>
+          </main>
 
-          <!-- Bust-up Canvas -->
-          <div class="ws-conv-bustup">
+          <!-- Right: Live2D Character -->
+          <aside class="ws-conv-character">
             <canvas id="wsConvCanvas"></canvas>
-          </div>
-
-          <!-- Chat Messages -->
-          <div class="ws-conv-messages" id="wsConvMessages">
-            <div class="chat-empty">キャラクターをクリックして会話を始めましょう</div>
-          </div>
-
-          <!-- Chat Input -->
-          <div class="ws-conv-input-area">
-            <textarea class="ws-conv-input" id="wsConvInput" placeholder="メッセージを入力... (Ctrl+Enter)" rows="1"></textarea>
-            <button class="ws-conv-send" id="wsConvSend">送信</button>
-          </div>
+          </aside>
         </div>
+      </div>
 
-      </aside>
     </div>
   </div>
 

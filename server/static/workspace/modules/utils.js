@@ -24,8 +24,42 @@ export function renderSimpleMarkdown(text) {
     return `<pre class="md-code-block"><code>${code}</code></pre>`;
   });
 
+  // Tables: consecutive lines starting with |
+  html = html.replace(/((?:^\|.+\|[ \t]*\n?)+)/gm, (block) => {
+    const rows = block.trim().split("\n").filter((r) => r.trim());
+    if (rows.length < 2) return block;
+
+    // Check if row 2 is a separator (|---|---|)
+    const isSep = /^\|[\s:]*-+[\s:]*(\|[\s:]*-+[\s:]*)*\|?$/.test(rows[1].trim());
+    const headerRow = isSep ? rows[0] : null;
+    const dataRows = isSep ? rows.slice(2) : rows;
+
+    const parseCells = (row) =>
+      row.split("|").slice(1, -1).map((c) => c.trim());
+
+    let tableHtml = '<table class="md-table">';
+    if (headerRow) {
+      const cells = parseCells(headerRow);
+      tableHtml += "<thead><tr>" + cells.map((c) => `<th>${c}</th>`).join("") + "</tr></thead>";
+    }
+    tableHtml += "<tbody>";
+    for (const row of dataRows) {
+      if (!row.trim()) continue;
+      const cells = parseCells(row);
+      tableHtml += "<tr>" + cells.map((c) => `<td>${c}</td>`).join("") + "</tr>";
+    }
+    tableHtml += "</tbody></table>";
+    return tableHtml;
+  });
+
   // Inline code: `...`
   html = html.replace(/`([^`]+)`/g, '<code class="md-code-inline">$1</code>');
+
+  // Headings: # ... #### (must be at line start)
+  html = html.replace(/^#### (.+)$/gm, '<h4 class="md-heading">$1</h4>');
+  html = html.replace(/^### (.+)$/gm, '<h3 class="md-heading">$1</h3>');
+  html = html.replace(/^## (.+)$/gm, '<h2 class="md-heading">$1</h2>');
+  html = html.replace(/^# (.+)$/gm, '<h1 class="md-heading">$1</h1>');
 
   // Bold: **...**
   html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
@@ -43,10 +77,13 @@ export function renderSimpleMarkdown(text) {
   html = html.replace(/^(?:[-*]) (.+)$/gm, "<li>$1</li>");
   html = html.replace(/((?:<li>.*<\/li>\n?)+)/g, "<ul>$1</ul>");
 
-  // Line breaks (outside of pre blocks)
+  // Horizontal rule: --- or ***
+  html = html.replace(/^(?:---|\*\*\*)$/gm, '<hr class="md-hr">');
+
+  // Line breaks (outside of pre, heading, and table blocks)
   html = html.replace(
-    /(<pre[\s\S]*?<\/pre>)|(\n)/g,
-    (_m, pre, nl) => (pre ? pre : nl ? "<br>" : "")
+    /(<pre[\s\S]*?<\/pre>)|(<h[1-4][^>]*>.*?<\/h[1-4]>)|(<table[\s\S]*?<\/table>)|(\n)/g,
+    (_m, pre, heading, table, nl) => (pre || heading || table ? (pre || heading || table) : nl ? "<br>" : "")
   );
 
   return html;

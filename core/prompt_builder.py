@@ -158,6 +158,15 @@ def build_system_prompt(memory: MemoryManager) -> str:
     other_persons = _discover_other_persons(pd)
     parts.append(_build_messaging_section(pd, other_persons))
 
+    # Hiring context: suggest team building when commander has no subordinates
+    if not other_persons:
+        try:
+            model_config = memory.read_model_config()
+            if model_config.role == "commander":
+                parts.append(load_prompt("hiring_context"))
+        except Exception:
+            logger.debug("Skipped hiring context injection", exc_info=True)
+
     logger.debug(
         "System prompt built: %d sections, total_len=%d",
         len(parts), sum(len(p) for p in parts),

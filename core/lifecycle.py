@@ -10,12 +10,10 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
-from datetime import datetime
 from typing import Any, Callable, Coroutine
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
-from apscheduler.triggers.interval import IntervalTrigger
 
 from core.person import DigitalPerson
 from core.schemas import CronTask
@@ -81,10 +79,13 @@ class LifecycleManager:
 
         self.scheduler.add_job(
             self._heartbeat_wrapper,
-            IntervalTrigger(minutes=interval),
+            CronTrigger(
+                minute=f"*/{interval}",
+                hour=f"{active_start}-{active_end - 1}",
+            ),
             id=f"{person.name}_heartbeat",
             name=f"{person.name} heartbeat",
-            args=[person.name, active_start, active_end],
+            args=[person.name],
             replace_existing=True,
         )
         logger.info(
@@ -95,14 +96,7 @@ class LifecycleManager:
             active_end,
         )
 
-    async def _heartbeat_wrapper(
-        self, name: str, active_start: int, active_end: int
-    ) -> None:
-        hour = datetime.now().hour
-        if not (active_start <= hour < active_end):
-            logger.debug("Heartbeat skipped for %s: outside active hours", name)
-            return
-
+    async def _heartbeat_wrapper(self, name: str) -> None:
         person = self.persons.get(name)
         if not person:
             return
