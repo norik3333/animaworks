@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AnimaWorks Workspace</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="/shared/favicon.ico">
+</head>
+<body>
+
+  <!-- ── Login Overlay ────────────────── -->
+  <div id="wsLogin"></div>
+
+  <!-- ── Dashboard ────────────────────── -->
+  <div id="wsDashboard" class="hidden">
+
+    <!-- Header -->
+    <header class="ws-header">
+      <div class="ws-header-left">
+        <span class="ws-title">AnimaWorks</span>
+        <span class="ws-subtitle">Workspace</span>
+      </div>
+      <div class="ws-header-center" id="wsPersonSelector"></div>
+      <div class="ws-header-right">
+        <div class="ws-system-status" id="wsSystemStatus">
+          <span class="status-dot status-offline"></span>
+          <span class="status-text">接続中...</span>
+        </div>
+        <span class="ws-user-info" id="wsUserInfo"></span>
+        <button class="ws-logout-btn" id="wsLogoutBtn">ログアウト</button>
+      </div>
+    </header>
+
+    <!-- Main Layout -->
+    <div class="ws-layout">
+
+      <!-- Left: Chat -->
+      <main class="ws-panel-main" id="wsChatPanel"></main>
+
+      <!-- Right: Tabs + Memory -->
+      <aside class="ws-panel-right">
+        <!-- Tab Bar -->
+        <div class="ws-right-tabs" id="wsRightTabs">
+          <button class="right-tab active" data-tab="state" id="wsTabState">現在の状態</button>
+          <button class="right-tab" data-tab="activity" id="wsTabActivity">アクティビティ</button>
+          <button class="right-tab" data-tab="history" id="wsTabHistory">会話履歴</button>
+        </div>
+
+        <!-- Tab Panes -->
+        <div class="ws-right-panes">
+          <div class="tab-pane" data-pane="state" id="wsPaneState"></div>
+          <div class="tab-pane" data-pane="activity" id="wsPaneActivity" style="display:none"></div>
+          <div class="tab-pane" data-pane="history" id="wsPaneHistory" style="display:none"></div>
+        </div>
+
+        <!-- Memory Browser -->
+        <div class="ws-memory-panel" id="wsMemoryPanel"></div>
+      </aside>
+    </div>
+  </div>
+
+  <!-- ── Module Entry Point ───────────── -->
+  <script type="module" src="modules/app.js"></script>
+</body>
+</html>
