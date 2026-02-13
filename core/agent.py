@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+import asyncio
+import json as _json
 import logging
 import os
+import re
+import shlex
+import subprocess
 import time
+from collections.abc import AsyncGenerator, Callable, Coroutine
 from datetime import datetime
 from pathlib import Path
-from collections.abc import AsyncGenerator
 from typing import Any
 
 from core.context_tracker import ContextTracker
@@ -18,9 +23,18 @@ from core.shortterm_memory import SessionState, ShortTermMemory
 
 logger = logging.getLogger("animaworks.agent")
 
+# Type alias for the delegate callback injected by server/app.py.
+DelegateFn = Callable[[str, str, str | None], Coroutine[Any, Any, str]]
+
 
 class AgentCore:
-    """Wraps Claude Agent SDK to provide thinking/acting for a Digital Person."""
+    """Wraps Claude Agent SDK / LiteLLM to provide thinking/acting for a Digital Person.
+
+    Execution modes:
+      - A1 (autonomous, Claude):   Claude Agent SDK (claude-agent-sdk)
+      - A2 (autonomous, non-Claude): LiteLLM + tool_use loop
+      - B  (assisted):              LiteLLM 1-shot, framework handles memory I/O
+    """
 
     def __init__(
         self,
@@ -35,13 +49,57 @@ class AgentCore:
         self.messenger = messenger
         self._tool_registry = self._init_tool_registry()
         self._sdk_available = self._check_sdk()
+        self._delegate_fn: DelegateFn | None = None
+        self._agent_lock = asyncio.Lock()
 
+        mode = self._resolve_execution_mode()
         logger.info(
-            "AgentCore: model=%s, api_key=%s, base_url=%s",
+            "AgentCore: model=%s, mode=%s, role=%s, api_key=%s, base_url=%s",
             self.model_config.model,
+            mode,
+            self.model_config.role or "(none)",
             "direct" if self.model_config.api_key else f"env:{self.model_config.api_key_env}",
             self.model_config.api_base_url or "(default)",
         )
+
+    # ── Delegate callback ──────────────────────────────────
+
+    def set_delegate_fn(self, fn: DelegateFn) -> None:
+        """Inject the delegate callback (called from server/app.py)."""
+        self._delegate_fn = fn
+
+    # ── Model / mode helpers ───────────────────────────────
+
+    def _is_claude_model(self) -> bool:
+        """True if the configured model is a Claude model usable with Agent SDK."""
+        m = self.model_config.model
+        return m.startswith("claude-") or m.startswith("anthropic/")
+
+    def _resolve_agent_sdk_model(self) -> str:
+        """Return the model name suitable for Claude Agent SDK (strip provider prefix)."""
+        m = self.model_config.model
+        if m.startswith("anthropic/"):
+            return m[len("anthropic/"):]
+        return m
+
+    def _resolve_execution_mode(self) -> str:
+        """Determine the effective execution mode: ``a1``, ``a2``, or ``b``.
+
+        Auto-detection logic (when ``execution_mode`` is None):
+          - Claude model + Agent SDK available → a1
+          - Non-Claude model → a2
+        """
+        explicit = self.model_config.execution_mode
+        if explicit == "assisted":
+            return "b"
+        if explicit == "autonomous" or explicit is None:
+            if self._is_claude_model() and self._sdk_available:
+                return "a1"
+            if explicit is None and not self._is_claude_model():
+                return "a2"
+            # autonomous but non-Claude or SDK unavailable
+            return "a2"
+        return "a2"
 
     def _check_sdk(self) -> bool:
         try:
@@ -76,15 +134,41 @@ class AgentCore:
     ) -> CycleResult:
         """Run one agent cycle with autonomous memory search.
 
-        If the context threshold is crossed, the session is externalized
-        to short-term memory and automatically continued in a fresh session.
+        Routing:
+          - Mode B  (assisted):  ``_run_assisted()``  — 1-shot, no tools
+          - Mode A2 (autonomous): ``_run_with_tool_loop()`` — LiteLLM + tool_use
+          - Mode A1 (autonomous): ``_run_with_agent_sdk()`` — Claude Agent SDK
+
+        If the context threshold is crossed (A1 only), the session is
+        externalized to short-term memory and automatically continued.
         """
+        async with self._agent_lock:
+            return await self._run_cycle_inner(prompt, trigger)
+
+    async def _run_cycle_inner(
+        self, prompt: str, trigger: str
+    ) -> CycleResult:
         start = time.monotonic()
-        sdk_label = "agent-sdk" if self._sdk_available else "anthropic"
+        mode = self._resolve_execution_mode()
         logger.info(
-            "run_cycle START trigger=%s prompt_len=%d sdk=%s",
-            trigger, len(prompt), sdk_label,
+            "run_cycle START trigger=%s prompt_len=%d mode=%s",
+            trigger, len(prompt), mode,
         )
+
+        # ── Mode B: assisted (1-shot, no tools) ──────────
+        if mode == "b":
+            result = await self._run_assisted(prompt)
+            duration_ms = int((time.monotonic() - start) * 1000)
+            logger.info(
+                "run_cycle END (assisted) trigger=%s duration_ms=%d",
+                trigger, duration_ms,
+            )
+            return CycleResult(
+                trigger=trigger,
+                action="responded",
+                summary=result,
+                duration_ms=duration_ms,
+            )
 
         shortterm = ShortTermMemory(self.person_dir)
         tracker = ContextTracker(
@@ -99,16 +183,29 @@ class AgentCore:
             system_prompt = inject_shortterm(system_prompt, shortterm)
             logger.info("Injected short-term memory into system prompt")
 
-        # Run the primary session
-        if self._sdk_available:
-            result, result_msg = await self._run_with_agent_sdk(
-                system_prompt, prompt, tracker
-            )
-        else:
-            result = await self._run_with_anthropic_sdk(
+        # ── Mode A2: LiteLLM tool_use loop ────────────────
+        if mode == "a2":
+            result = await self._run_with_tool_loop(
                 system_prompt, prompt, tracker, shortterm
             )
-            result_msg = None
+            shortterm.clear()
+            duration_ms = int((time.monotonic() - start) * 1000)
+            logger.info(
+                "run_cycle END (a2) trigger=%s duration_ms=%d response_len=%d",
+                trigger, duration_ms, len(result),
+            )
+            return CycleResult(
+                trigger=trigger,
+                action="responded",
+                summary=result,
+                duration_ms=duration_ms,
+                context_usage_ratio=tracker.usage_ratio,
+            )
+
+        # ── Mode A1: Claude Agent SDK ─────────────────────
+        result, result_msg = await self._run_with_agent_sdk(
+            system_prompt, prompt, tracker
+        )
 
         # Session chaining: if threshold was crossed, continue in a new session
         session_chained = False
@@ -116,8 +213,7 @@ class AgentCore:
         chain_count = 0
 
         while (
-            self._sdk_available
-            and tracker.threshold_exceeded
+            tracker.threshold_exceeded
             and chain_count < self.model_config.max_chains
         ):
             session_chained = True
@@ -129,7 +225,6 @@ class AgentCore:
                 tracker.usage_ratio * 100,
             )
 
-            # Always save fresh state (clear stale data first)
             shortterm.clear()
             shortterm.save(
                 SessionState(
@@ -143,7 +238,6 @@ class AgentCore:
                 )
             )
 
-            # New session with restored short-term memory
             tracker.reset()
             system_prompt_2 = inject_shortterm(
                 build_system_prompt(self.memory),
@@ -165,7 +259,6 @@ class AgentCore:
             if result_msg_2:
                 total_turns += result_msg_2.num_turns
 
-        # Clean up short-term memory after successful completion
         shortterm.clear()
 
         duration_ms = int((time.monotonic() - start) * 1000)
@@ -264,7 +357,7 @@ class AgentCore:
             permission_mode="acceptEdits",
             cwd=str(self.person_dir),
             max_turns=self.model_config.max_turns,
-            model=self.model_config.model,
+            model=self._resolve_agent_sdk_model(),
             env=env,
             hooks={
                 "PostToolUse": [HookMatcher(matcher=None, hooks=[_post_tool_hook])],
@@ -367,7 +460,7 @@ class AgentCore:
             permission_mode="acceptEdits",
             cwd=str(self.person_dir),
             max_turns=self.model_config.max_turns,
-            model=self.model_config.model,
+            model=self._resolve_agent_sdk_model(),
             env=env,
             include_partial_messages=True,
             hooks={
@@ -441,11 +534,22 @@ class AgentCore:
         Final event is ``{"type": "cycle_done", "cycle_result": {...}}``.
         """
         start = time.monotonic()
-        sdk_label = "agent-sdk" if self._sdk_available else "anthropic"
+        mode = self._resolve_execution_mode()
         logger.info(
-            "run_cycle_streaming START trigger=%s prompt_len=%d sdk=%s",
-            trigger, len(prompt), sdk_label,
+            "run_cycle_streaming START trigger=%s prompt_len=%d mode=%s",
+            trigger, len(prompt), mode,
         )
+
+        # Mode B / A2: no streaming support — yield complete text
+        if mode in ("b", "a2"):
+            async with self._agent_lock:
+                cycle = await self._run_cycle_inner(prompt, trigger)
+            yield {"type": "text_delta", "text": cycle.summary}
+            yield {
+                "type": "cycle_done",
+                "cycle_result": cycle.model_dump(),
+            }
+            return
 
         shortterm = ShortTermMemory(self.person_dir)
         tracker = ContextTracker(
@@ -457,28 +561,7 @@ class AgentCore:
         if shortterm.has_pending():
             system_prompt = inject_shortterm(system_prompt, shortterm)
 
-        # Fallback: no streaming, yield complete text
-        if not self._sdk_available:
-            result = await self._run_with_anthropic_sdk(
-                system_prompt, prompt, tracker, shortterm
-            )
-            yield {"type": "text_delta", "text": result}
-            duration_ms = int((time.monotonic() - start) * 1000)
-            yield {
-                "type": "cycle_done",
-                "cycle_result": CycleResult(
-                    trigger=trigger,
-                    action="responded",
-                    summary=result,
-                    duration_ms=duration_ms,
-                    context_usage_ratio=tracker.usage_ratio,
-                    session_chained=False,
-                    total_turns=0,
-                ).model_dump(),
-            }
-            return
-
-        # Primary session
+        # Primary session (A1)
         full_text_parts: list[str] = []
         result_message: Any = None
 
@@ -677,7 +760,10 @@ class AgentCore:
             )
             tool_results = []
             for tu in tool_uses:
-                result = self._handle_tool_call(tu.name, tu.input)
+                if tu.name == "delegate_task":
+                    result = await self._handle_delegate_tool_call(tu.input)
+                else:
+                    result = self._handle_tool_call(tu.name, tu.input)
                 tool_results.append(
                     {
                         "type": "tool_result",
@@ -689,6 +775,393 @@ class AgentCore:
 
         logger.warning("Max iterations (10) reached, returning fallback response")
         return "\n".join(all_response_text) or "(max iterations reached)"
+
+    # ── LiteLLM wrapper ────────────────────────────────────
+
+    async def _call_llm(
+        self,
+        messages: list[dict],
+        *,
+        system: str | None = None,
+        tools: list[dict] | None = None,
+    ) -> dict:
+        """Call LiteLLM ``acompletion`` and return the raw response dict.
+
+        Handles credential resolution (API key + base_url) automatically.
+        """
+        import litellm
+
+        kwargs: dict[str, Any] = {
+            "model": self.model_config.model,
+            "messages": messages,
+            "max_tokens": self.model_config.max_tokens,
+        }
+
+        # System prompt — LiteLLM uses it as a system message
+        if system:
+            kwargs["messages"] = [{"role": "system", "content": system}] + messages
+
+        if tools:
+            kwargs["tools"] = [
+                {"type": "function", "function": t} for t in tools
+            ]
+
+        # Credential resolution
+        api_key = self._resolve_api_key()
+        if api_key:
+            kwargs["api_key"] = api_key
+        if self.model_config.api_base_url:
+            kwargs["api_base"] = self.model_config.api_base_url
+
+        response = await litellm.acompletion(**kwargs)
+        return response
+
+    # ── Mode B: assisted (1-shot, framework handles memory) ──
+
+    async def _run_assisted(self, prompt: str) -> str:
+        """Mode B execution: framework reads memory, LLM thinks, framework records.
+
+        Flow:
+          1. Pre-call: inject identity + recent episodes + keyword-matched knowledge
+          2. LLM 1-shot call (no tools)
+          3. Post-call: record episode
+          4. Post-call: extract knowledge (additional 1-shot)
+        """
+        logger.info("_run_assisted START prompt_len=%d", len(prompt))
+
+        # ── 1. Pre-call: gather context ──────────────────
+        identity = self.memory.read_identity()
+        injection = self.memory.read_injection()
+        recent_episodes = self.memory.read_recent_episodes(days=7)
+
+        # Simple keyword extraction for knowledge search
+        keywords = set(re.findall(r"[\w]{3,}", prompt))
+        knowledge_hits: list[str] = []
+        for kw in list(keywords)[:10]:
+            for fname, line in self.memory.search_memory_text(kw, scope="knowledge"):
+                knowledge_hits.append(f"[{fname}] {line}")
+        knowledge_context = "\n".join(dict.fromkeys(knowledge_hits))  # dedupe
+
+        # Build enriched system prompt
+        system_parts = [identity, injection]
+        if recent_episodes:
+            system_parts.append(f"## 直近の行動ログ\n\n{recent_episodes[:4000]}")
+        if knowledge_context:
+            system_parts.append(f"## 関連知識\n\n{knowledge_context[:4000]}")
+        system = "\n\n---\n\n".join(p for p in system_parts if p)
+
+        # ── 2. LLM 1-shot call ───────────────────────────
+        messages = [{"role": "user", "content": prompt}]
+        response = await self._call_llm(messages, system=system)
+        reply = response.choices[0].message.content or ""
+        logger.info("_run_assisted LLM replied, len=%d", len(reply))
+
+        # ── 3. Post-call: record episode ─────────────────
+        ts = datetime.now().strftime("%H:%M")
+        episode = f"- {ts} [assisted] prompt: {prompt[:200]}… → reply: {reply[:200]}…"
+        self.memory.append_episode(episode)
+
+        # ── 4. Post-call: knowledge extraction ───────────
+        try:
+            extract_messages = [
+                {
+                    "role": "user",
+                    "content": (
+                        "以下のやりとりから、今後の判断に役立つ教訓や事実があれば"
+                        "1〜3行で要約してください。なければ「なし」とだけ答えてください。\n\n"
+                        f"質問: {prompt[:1000]}\n\n回答: {reply[:1000]}"
+                    ),
+                }
+            ]
+            extract_resp = await self._call_llm(extract_messages)
+            extracted = extract_resp.choices[0].message.content or ""
+            if extracted.strip() and extracted.strip() != "なし":
+                topic = datetime.now().strftime("learned_%Y%m%d_%H%M%S")
+                self.memory.write_knowledge(topic, extracted.strip())
+                logger.info("Knowledge extracted: %s", extracted[:100])
+        except Exception:
+            logger.debug("Knowledge extraction failed", exc_info=True)
+
+        return reply
+
+    # ── Mode A2: LiteLLM + tool_use loop ─────────────────
+
+    async def _run_with_tool_loop(
+        self,
+        system_prompt: str,
+        prompt: str,
+        tracker: ContextTracker,
+        shortterm: ShortTermMemory,
+    ) -> str:
+        """Mode A2: LiteLLM with tool_use loop.
+
+        The LLM autonomously calls tools (memory, files, commands, delegate)
+        until it produces a final text response or hits the iteration limit.
+        """
+        import litellm
+
+        tools = self._build_a2_tools()
+        messages: list[dict] = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": prompt},
+        ]
+        all_response_text: list[str] = []
+
+        # Credential resolution
+        llm_kwargs: dict[str, Any] = {
+            "model": self.model_config.model,
+            "max_tokens": self.model_config.max_tokens,
+        }
+        api_key = self._resolve_api_key()
+        if api_key:
+            llm_kwargs["api_key"] = api_key
+        if self.model_config.api_base_url:
+            llm_kwargs["api_base"] = self.model_config.api_base_url
+
+        max_iterations = self.model_config.max_turns
+        chain_count = 0
+
+        for iteration in range(max_iterations):
+            logger.debug(
+                "A2 tool loop iteration=%d messages=%d", iteration, len(messages),
+            )
+            response = await litellm.acompletion(
+                messages=messages,
+                tools=[{"type": "function", "function": t} for t in tools],
+                **llm_kwargs,
+            )
+
+            choice = response.choices[0]
+            message = choice.message
+
+            # Track context usage
+            if hasattr(response, "usage") and response.usage:
+                usage_dict = {
+                    "input_tokens": response.usage.prompt_tokens or 0,
+                    "output_tokens": response.usage.completion_tokens or 0,
+                }
+                threshold_crossed = tracker.update_from_usage(usage_dict)
+                if threshold_crossed and chain_count < self.model_config.max_chains:
+                    chain_count += 1
+                    logger.info(
+                        "A2: context threshold crossed at %.1f%%, restarting (chain %d/%d)",
+                        tracker.usage_ratio * 100, chain_count, self.model_config.max_chains,
+                    )
+                    current_text = message.content or ""
+                    if current_text:
+                        all_response_text.append(current_text)
+                    shortterm.save(
+                        SessionState(
+                            session_id="litellm-a2",
+                            timestamp=datetime.now().isoformat(),
+                            trigger="a2_tool_loop",
+                            original_prompt=prompt,
+                            accumulated_response="\n".join(all_response_text),
+                            context_usage_ratio=tracker.usage_ratio,
+                            turn_count=iteration,
+                        )
+                    )
+                    tracker.reset()
+                    system_prompt = inject_shortterm(
+                        build_system_prompt(self.memory), shortterm
+                    )
+                    messages = [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": load_prompt("session_continuation")},
+                    ]
+                    shortterm.clear()
+                    continue
+
+            # Check for tool calls (LiteLLM uses function_call / tool_calls)
+            tool_calls = message.tool_calls
+            if not tool_calls:
+                # Final response — no more tool calls
+                final_text = message.content or ""
+                all_response_text.append(final_text)
+                logger.debug("A2 final response at iteration=%d", iteration)
+                return "\n".join(all_response_text)
+
+            # Process tool calls
+            logger.info(
+                "A2 tool calls at iteration=%d: %s",
+                iteration,
+                ", ".join(tc.function.name for tc in tool_calls),
+            )
+
+            # Append assistant message with tool_calls
+            messages.append(message.model_dump())
+
+            for tc in tool_calls:
+                fn_name = tc.function.name
+                try:
+                    fn_args = _json.loads(tc.function.arguments)
+                except _json.JSONDecodeError:
+                    fn_args = {}
+
+                if fn_name == "delegate_task":
+                    result = await self._handle_delegate_tool_call(fn_args)
+                else:
+                    result = self._handle_tool_call(fn_name, fn_args)
+
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": tc.id,
+                    "content": result,
+                })
+
+        logger.warning("A2 max iterations (%d) reached", max_iterations)
+        return "\n".join(all_response_text) or "(max iterations reached)"
+
+    # ── A2 tool definitions ──────────────────────────────
+
+    def _build_a2_tools(self) -> list[dict]:
+        """Build the tool schema list for Mode A2 (LiteLLM function calling format)."""
+        tools: list[dict] = [
+            # Memory tools (same as Anthropic SDK fallback, restructured for LiteLLM)
+            {
+                "name": "search_memory",
+                "description": "Search the person's long-term memory (knowledge, episodes, procedures) by keyword.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {"type": "string", "description": "Search keyword"},
+                        "scope": {
+                            "type": "string",
+                            "enum": ["knowledge", "episodes", "procedures", "all"],
+                            "description": "Memory category to search",
+                        },
+                    },
+                    "required": ["query"],
+                },
+            },
+            {
+                "name": "read_memory_file",
+                "description": "Read a file from the person's memory directory by relative path.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "path": {"type": "string", "description": "Relative path within person dir"},
+                    },
+                    "required": ["path"],
+                },
+            },
+            {
+                "name": "write_memory_file",
+                "description": "Write or append to a file in the person's memory directory.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "path": {"type": "string"},
+                        "content": {"type": "string"},
+                        "mode": {"type": "string", "enum": ["overwrite", "append"]},
+                    },
+                    "required": ["path", "content"],
+                },
+            },
+            {
+                "name": "send_message",
+                "description": "Send a message to another person.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "to": {"type": "string", "description": "Recipient person name"},
+                        "content": {"type": "string", "description": "Message content"},
+                        "reply_to": {"type": "string", "description": "Message ID to reply to"},
+                        "thread_id": {"type": "string", "description": "Thread ID"},
+                    },
+                    "required": ["to", "content"],
+                },
+            },
+            # File operations (new for A2)
+            {
+                "name": "read_file",
+                "description": "Read an arbitrary file (subject to permissions).",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "path": {"type": "string", "description": "Absolute file path"},
+                    },
+                    "required": ["path"],
+                },
+            },
+            {
+                "name": "write_file",
+                "description": "Write content to a file (subject to permissions).",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "path": {"type": "string", "description": "Absolute file path"},
+                        "content": {"type": "string", "description": "File content"},
+                    },
+                    "required": ["path", "content"],
+                },
+            },
+            {
+                "name": "edit_file",
+                "description": "Replace a specific string in a file.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "path": {"type": "string", "description": "Absolute file path"},
+                        "old_string": {"type": "string", "description": "Text to find"},
+                        "new_string": {"type": "string", "description": "Replacement text"},
+                    },
+                    "required": ["path", "old_string", "new_string"],
+                },
+            },
+            {
+                "name": "execute_command",
+                "description": "Execute a shell command (subject to permissions allow-list).",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "command": {"type": "string", "description": "Shell command to run"},
+                        "timeout": {
+                            "type": "integer",
+                            "description": "Timeout in seconds (default 30)",
+                        },
+                    },
+                    "required": ["command"],
+                },
+            },
+        ]
+
+        # Delegate tool (only for commanders or persons with delegate_fn)
+        if self._delegate_fn and self.model_config.role == "commander":
+            tools.append({
+                "name": "delegate_task",
+                "description": "Delegate a task to a subordinate person and wait for the result.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "to": {"type": "string", "description": "Subordinate person name"},
+                        "task": {"type": "string", "description": "Task instruction"},
+                        "context": {"type": "string", "description": "Background context (optional)"},
+                    },
+                    "required": ["to", "task"],
+                },
+            })
+
+        # External tools from registry
+        if self._tool_registry:
+            try:
+                import importlib
+                from core.tools import TOOL_MODULES
+                for tool_name in self._tool_registry:
+                    if tool_name in TOOL_MODULES:
+                        mod = importlib.import_module(TOOL_MODULES[tool_name])
+                        if hasattr(mod, "get_tool_schemas"):
+                            for schema in mod.get_tool_schemas():
+                                # Convert from Anthropic format to LiteLLM function format
+                                tools.append({
+                                    "name": schema["name"],
+                                    "description": schema.get("description", ""),
+                                    "parameters": schema.get("input_schema", {}),
+                                })
+            except Exception:
+                logger.debug("Failed to load external tool schemas for A2", exc_info=True)
+
+        return tools
 
     # ── Tool definitions (Anthropic SDK fallback) ───────────
 
@@ -776,6 +1249,22 @@ class AgentCore:
             },
         ]
 
+        # Delegate tool (for commanders with Anthropic SDK fallback / A1)
+        if self._delegate_fn and self.model_config.role == "commander":
+            tools.append({
+                "name": "delegate_task",
+                "description": "subordinate にタスクを委任し、結果を受け取る。",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "to": {"type": "string", "description": "委任先の Person 名"},
+                        "task": {"type": "string", "description": "実行してほしい作業の指示"},
+                        "context": {"type": "string", "description": "作業に必要な背景情報（任意）"},
+                    },
+                    "required": ["to", "task"],
+                },
+            })
+
         # External tools from registry
         if self._tool_registry:
             try:
@@ -795,10 +1284,11 @@ class AgentCore:
         logger.debug("tool_call name=%s args_keys=%s", name, list(args.keys()))
 
         if name == "search_memory":
-            results = self.memory.search_knowledge(args.get("query", ""))
+            scope = args.get("scope", "all")
+            results = self.memory.search_memory_text(args.get("query", ""), scope=scope)
             logger.debug(
-                "search_memory query=%s results=%d",
-                args.get("query", ""), len(results),
+                "search_memory query=%s scope=%s results=%d",
+                args.get("query", ""), scope, len(results),
             )
             if not results:
                 return f"No results for '{args.get('query', '')}'"
@@ -837,12 +1327,264 @@ class AgentCore:
             logger.info("send_message to=%s thread=%s", args["to"], msg.thread_id)
             return f"Message sent to {args['to']} (id: {msg.id}, thread: {msg.thread_id})"
 
+        # ── File operation tools (A2) ──────────────────────
+        if name == "read_file":
+            return self._handle_read_file(args)
+
+        if name == "write_file":
+            return self._handle_write_file(args)
+
+        if name == "edit_file":
+            return self._handle_edit_file(args)
+
+        if name == "execute_command":
+            return self._handle_execute_command(args)
+
         # External tool dispatch
         if self._tool_registry:
-            return self._handle_external_tool(name, args)
+            result = self._handle_external_tool(name, args)
+            if not result.startswith("Unknown tool:"):
+                return result
 
         logger.warning("Unknown tool requested: %s", name)
         return f"Unknown tool: {name}"
+
+    # ── File / command tool handlers (A2) ────────────────
+
+    def _check_file_permission(self, path: str) -> str | None:
+        """Check if the file path is allowed by permissions.md.
+
+        Returns None if allowed, or an error message string if denied.
+
+        Access rules (evaluated in order):
+          1. Own person_dir — always allowed
+          2. Paths listed under ``ファイル操作`` section in permissions.md
+          3. Everything else — denied
+        """
+        resolved = Path(path).resolve()
+
+        # Always allow access to own person_dir
+        if resolved.is_relative_to(self.person_dir.resolve()):
+            return None
+
+        permissions = self.memory.read_permissions()
+        if "ファイル操作" not in permissions:
+            return "Permission denied: file operations not enabled in permissions.md"
+
+        # Parse allowed directory whitelist from permissions.md
+        #   ## ファイル操作
+        #   - /home/main/dev/project-x/
+        #   - /tmp/workspace/
+        allowed_dirs: list[Path] = []
+        in_file_section = False
+        for line in permissions.splitlines():
+            stripped = line.strip()
+            if "ファイル操作" in stripped:
+                in_file_section = True
+                continue
+            if in_file_section and stripped.startswith("#"):
+                break
+            if in_file_section and stripped.startswith("-"):
+                dir_path = stripped.lstrip("- ").split(":")[0].strip()
+                if dir_path.startswith("/"):
+                    allowed_dirs.append(Path(dir_path).resolve())
+
+        if not allowed_dirs:
+            # Section exists but no explicit paths = deny external access
+            return (
+                "Permission denied: no allowed paths listed under ファイル操作. "
+                "Add directory paths (e.g. '- /path/to/dir/') to permissions.md."
+            )
+
+        for allowed in allowed_dirs:
+            if resolved.is_relative_to(allowed):
+                return None
+
+        return (
+            f"Permission denied: '{path}' is not under any allowed directory. "
+            f"Allowed: {[str(d) for d in allowed_dirs]}"
+        )
+
+    # Shell metacharacters that indicate injection attempts.
+    _SHELL_METACHAR_RE = re.compile(r"[;&|`$(){}]")
+
+    def _check_command_permission(self, command: str) -> str | None:
+        """Check if the command is in the allowed list from permissions.md.
+
+        Returns None if allowed, or an error message string if denied.
+        Rejects commands containing shell metacharacters to prevent injection.
+        """
+        if not command or not command.strip():
+            return "Permission denied: empty command"
+
+        # Reject shell metacharacters regardless of permissions
+        if self._SHELL_METACHAR_RE.search(command):
+            return (
+                "Permission denied: command contains shell metacharacters "
+                f"({self._SHELL_METACHAR_RE.pattern}). "
+                "Use separate tool calls instead of chaining commands."
+            )
+
+        permissions = self.memory.read_permissions()
+        if "コマンド実行" not in permissions:
+            return "Permission denied: command execution not enabled in permissions.md"
+
+        # Parse the command safely
+        try:
+            argv = shlex.split(command)
+        except ValueError as e:
+            return f"Permission denied: invalid command syntax: {e}"
+
+        if not argv:
+            return "Permission denied: empty command after parsing"
+
+        # Extract allowed commands (lines like "- git: OK" or "- npm: OK")
+        allowed: list[str] = []
+        in_cmd_section = False
+        for line in permissions.splitlines():
+            stripped = line.strip()
+            if "コマンド実行" in stripped:
+                in_cmd_section = True
+                continue
+            if in_cmd_section and stripped.startswith("#"):
+                break
+            if in_cmd_section and stripped.startswith("-"):
+                cmd_name = stripped.lstrip("- ").split(":")[0].strip()
+                if cmd_name:
+                    allowed.append(cmd_name)
+        if not allowed:
+            return None  # No explicit list = allow all (section exists)
+
+        cmd_base = argv[0]
+        if cmd_base not in allowed:
+            return f"Permission denied: command '{cmd_base}' not in allowed list {allowed}"
+        return None
+
+    def _handle_read_file(self, args: dict) -> str:
+        path_str = args.get("path", "")
+        err = self._check_file_permission(path_str)
+        if err:
+            return err
+        path = Path(path_str)
+        if not path.exists():
+            return f"File not found: {path_str}"
+        if not path.is_file():
+            return f"Not a file: {path_str}"
+        try:
+            content = path.read_text(encoding="utf-8")
+            logger.info("read_file path=%s len=%d", path_str, len(content))
+            return content[:100_000]  # cap at 100k chars
+        except Exception as e:
+            return f"Error reading {path_str}: {e}"
+
+    def _handle_write_file(self, args: dict) -> str:
+        path_str = args.get("path", "")
+        err = self._check_file_permission(path_str)
+        if err:
+            return err
+        path = Path(path_str)
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(args.get("content", ""), encoding="utf-8")
+            logger.info("write_file path=%s", path_str)
+            return f"Written to {path_str}"
+        except Exception as e:
+            return f"Error writing {path_str}: {e}"
+
+    def _handle_edit_file(self, args: dict) -> str:
+        path_str = args.get("path", "")
+        err = self._check_file_permission(path_str)
+        if err:
+            return err
+        path = Path(path_str)
+        if not path.exists():
+            return f"File not found: {path_str}"
+        try:
+            content = path.read_text(encoding="utf-8")
+            old = args.get("old_string", "")
+            new = args.get("new_string", "")
+            if old not in content:
+                return f"old_string not found in {path_str}"
+            count = content.count(old)
+            if count > 1:
+                return f"old_string matches {count} locations — provide more context to make it unique"
+            content = content.replace(old, new, 1)
+            path.write_text(content, encoding="utf-8")
+            logger.info("edit_file path=%s", path_str)
+            return f"Edited {path_str}"
+        except Exception as e:
+            return f"Error editing {path_str}: {e}"
+
+    def _handle_execute_command(self, args: dict) -> str:
+        command = args.get("command", "")
+        err = self._check_command_permission(command)
+        if err:
+            return err
+        timeout = args.get("timeout", 30)
+        try:
+            argv = shlex.split(command)
+        except ValueError as e:
+            return f"Error parsing command: {e}"
+        try:
+            proc = subprocess.run(
+                argv,
+                shell=False,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                cwd=str(self.person_dir),
+            )
+            output = proc.stdout
+            if proc.stderr:
+                output += f"\n[stderr]\n{proc.stderr}"
+            logger.info(
+                "execute_command cmd=%s rc=%d", command[:80], proc.returncode,
+            )
+            return output[:50_000] or f"(exit code {proc.returncode})"
+        except subprocess.TimeoutExpired:
+            return f"Command timed out after {timeout}s"
+        except Exception as e:
+            return f"Error executing command: {e}"
+
+    # ── Delegate tool handler (async) ────────────────────
+
+    # Default delegation timeout in seconds.
+    _DELEGATE_TIMEOUT_S: int = 300
+
+    async def _handle_delegate_tool_call(self, args: dict) -> str:
+        """Handle the delegate_task tool call (async because it awaits subordinate).
+
+        Enforces a timeout to prevent indefinite blocking when the
+        subordinate hangs or takes excessively long.
+        """
+        if not self._delegate_fn:
+            return "Error: delegation not configured for this person"
+        target = args.get("to", "")
+        task = args.get("task", "")
+        context = args.get("context")
+        if not target or not task:
+            return "Error: 'to' and 'task' are required"
+        logger.info("delegate_task to=%s task=%s", target, task[:100])
+        try:
+            result = await asyncio.wait_for(
+                self._delegate_fn(target, task, context),
+                timeout=self._DELEGATE_TIMEOUT_S,
+            )
+            logger.info("delegate_task completed, result_len=%d", len(result))
+            return result
+        except asyncio.TimeoutError:
+            logger.error(
+                "delegate_task timed out after %ds: to=%s",
+                self._DELEGATE_TIMEOUT_S, target,
+            )
+            return (
+                f"Delegation to '{target}' timed out after "
+                f"{self._DELEGATE_TIMEOUT_S}s. The subordinate may still be "
+                f"running — consider checking their status or retrying."
+            )
+        except Exception as e:
+            logger.error("delegate_task failed: %s", e)
+            return f"Delegation failed: {e}"
 
     def _handle_external_tool(self, name: str, args: dict) -> str:
         """Dispatch to external tool modules via direct Python calls."""

@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import os
 import re
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 from core.paths import get_common_skills_dir, get_company_dir, get_shared_dir
@@ -89,6 +89,10 @@ class MemoryManager:
                 context_threshold=resolved.context_threshold,
                 max_chains=resolved.max_chains,
                 conversation_history_threshold=resolved.conversation_history_threshold,
+                execution_mode=resolved.execution_mode,
+                role=resolved.role,
+                supervisor=resolved.supervisor,
+                speciality=resolved.speciality,
             )
 
         # Legacy fallback: parse config.md
@@ -221,6 +225,48 @@ class MemoryManager:
         safe = re.sub(r"[^\w\-_]", "_", topic)
         (self.knowledge_dir / f"{safe}.md").write_text(content, encoding="utf-8")
         logger.debug("Knowledge written topic='%s' length=%d", topic, len(content))
+
+    # ── Read helpers for Mode B (assisted) ──────────────────
+
+    def read_recent_episodes(self, days: int = 7) -> str:
+        """Return concatenated episode logs for the last *days* days."""
+        parts: list[str] = []
+        today = date.today()
+        for offset in range(days):
+            d = today - timedelta(days=offset)
+            path = self.episodes_dir / f"{d.isoformat()}.md"
+            if path.exists():
+                parts.append(path.read_text(encoding="utf-8"))
+        return "\n\n".join(parts)
+
+    def search_memory_text(
+        self, query: str, scope: str = "all"
+    ) -> list[tuple[str, str]]:
+        """Search memory files by keyword. Returns (filename, matching_line) pairs.
+
+        *scope* can be ``"knowledge"``, ``"episodes"``, ``"procedures"``, or
+        ``"all"`` (default).
+        """
+        dirs: list[Path] = []
+        if scope in ("knowledge", "all"):
+            dirs.append(self.knowledge_dir)
+        if scope in ("episodes", "all"):
+            dirs.append(self.episodes_dir)
+        if scope in ("procedures", "all"):
+            dirs.append(self.procedures_dir)
+
+        results: list[tuple[str, str]] = []
+        q = query.lower()
+        for d in dirs:
+            for f in d.glob("*.md"):
+                for line in f.read_text(encoding="utf-8").splitlines():
+                    if q in line.lower():
+                        results.append((f.name, line.strip()))
+        return results
+
+    def search_procedures(self, query: str) -> list[tuple[str, str]]:
+        """Search procedures/ by keyword."""
+        return self.search_memory_text(query, scope="procedures")
 
     # ── Search (Python-side; LLM uses Grep directly) ─────
 

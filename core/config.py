@@ -62,6 +62,10 @@ class PersonModelConfig(BaseModel):
     context_threshold: float | None = None
     max_chains: int | None = None
     conversation_history_threshold: float | None = None
+    execution_mode: str | None = None  # "autonomous" or "assisted"
+    role: str | None = None  # "commander" or "worker"
+    supervisor: str | None = None  # name of supervisor Person
+    speciality: str | None = None  # free-text specialisation
 
 
 class PersonDefaults(BaseModel):
@@ -75,6 +79,10 @@ class PersonDefaults(BaseModel):
     context_threshold: float = 0.50
     max_chains: int = 2
     conversation_history_threshold: float = 0.30
+    execution_mode: str | None = None  # None = auto-detect from model
+    role: str | None = None
+    supervisor: str | None = None
+    speciality: str | None = None
 
 
 class AnimaWorksConfig(BaseModel):

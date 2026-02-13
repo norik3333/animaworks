@@ -6,7 +6,7 @@ from collections.abc import AsyncGenerator
 from datetime import datetime
 from pathlib import Path
 
-from core.agent import AgentCore
+from core.agent import AgentCore, DelegateFn
 from core.conversation_memory import ConversationMemory
 from core.memory import MemoryManager
 from core.messenger import Messenger
@@ -40,6 +40,10 @@ class DigitalPerson:
         self._last_activity: datetime | None = None
 
         logger.info("DigitalPerson '%s' initialized from %s", self.name, person_dir)
+
+    def set_delegate_fn(self, fn: DelegateFn) -> None:
+        """Inject a delegate callback so this person can delegate tasks."""
+        self.agent.set_delegate_fn(fn)
 
     @property
     def needs_bootstrap(self) -> bool:

@@ -18,19 +18,40 @@ logger = logging.getLogger("animaworks.context_tracker")
 CHARS_PER_TOKEN = 4
 
 # Context window sizes per model family (input tokens).
+# Keys are matched as prefixes against the model name (after stripping provider/).
 MODEL_CONTEXT_WINDOWS: dict[str, int] = {
+    # Anthropic
     "claude-sonnet-4": 200_000,
     "claude-sonnet-3.5": 200_000,
     "claude-opus-4": 200_000,
     "claude-haiku-3.5": 200_000,
+    # OpenAI
+    "gpt-4o": 128_000,
+    "gpt-4o-mini": 128_000,
+    "gpt-4-turbo": 128_000,
+    "o1": 200_000,
+    "o3": 200_000,
+    # Google
+    "gemini-2.0-flash": 1_048_576,
+    "gemini-2.5-pro": 1_048_576,
+    "gemini-2.5-flash": 1_048_576,
+    # Ollama / local (conservative defaults)
+    "gemma3": 128_000,
+    "llama3": 128_000,
+    "qwen2.5": 128_000,
 }
-_DEFAULT_CONTEXT_WINDOW = 200_000
+_DEFAULT_CONTEXT_WINDOW = 128_000
 
 
 def _resolve_context_window(model: str) -> int:
-    """Return the context window size for the given model name."""
+    """Return the context window size for the given model name.
+
+    Strips the ``provider/`` prefix (e.g. ``openai/gpt-4o`` → ``gpt-4o``)
+    before matching.
+    """
+    bare = model.split("/", 1)[-1] if "/" in model else model
     for prefix, size in MODEL_CONTEXT_WINDOWS.items():
-        if model.startswith(prefix):
+        if bare.startswith(prefix):
             return size
     return _DEFAULT_CONTEXT_WINDOW
 
