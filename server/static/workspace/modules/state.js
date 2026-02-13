@@ -11,10 +11,9 @@ let state = {
   activeRightTab: "state",
   activeMemoryTab: "episodes",
   sessionList: null,
-  viewMode: "chat",              // "chat" | "office"
   officeInitialized: false,      // Whether 3D office has been initialized
-  conversationOverlay: false,    // Whether conversation overlay is open
-  conversationPerson: null,      // Person name shown in conversation overlay
+  conversationOpen: false,       // Whether conversation panel is open in right sidebar
+  conversationPerson: null,      // Person name shown in conversation panel
   characterStates: {},           // Map: personName → animationState (idle/working/thinking/error/sleeping)
 };
 

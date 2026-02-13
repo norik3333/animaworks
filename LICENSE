@@ -1,0 +1,35 @@
+AnimaWorks - Digital Person Framework
+=====================================
+
+This project uses a dual-license structure.
+
+## AGPL-3.0 (Core and Server)
+
+The following directories are licensed under the
+GNU Affero General Public License v3.0 (AGPL-3.0):
+
+  - core/       Framework core (agent, memory, person, lifecycle, tools)
+  - server/     FastAPI server and Web UI
+
+See LICENSES/AGPL-3.0.txt for the full license text.
+
+If you modify these components and provide them as a network service,
+you must make the complete source code available to users of that service
+under the AGPL-3.0.
+
+For commercial licensing (use without AGPL obligations), contact the
+project maintainers.
+
+## MIT (CLI and Templates)
+
+The following are licensed under the MIT License:
+
+  - main.py         CLI entry point
+  - templates/      Initialization templates (prompts, person templates)
+
+See LICENSES/MIT.txt for the full license text.
+
+## Contributor License Agreement
+
+External contributions require signing the project's CLA before merging.
+See CLA.md for details.

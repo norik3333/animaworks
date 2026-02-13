@@ -2,17 +2,16 @@
 // Initialization, screen switching, and event delegation.
 
 import { getState, setState, subscribe } from "./state.js";
-import { fetchSystemStatus } from "./api.js";
+import { fetchSystemStatus, fetchConversationFull } from "./api.js";
 import { connect, onEvent } from "./websocket.js";
 import { initLogin, getCurrentUser, logout } from "./login.js";
 import { initPerson, loadPersons, selectPerson, renderPersonSelector, renderStatus } from "./person.js";
-import { renderChat, initChat, sendMessage, addMessage, loadConversation } from "./chat.js";
 import { initMemory, loadMemoryTab } from "./memory.js";
 import { initSession, loadSessions } from "./session.js";
-import { escapeHtml } from "./utils.js";
-import { initOffice, disposeOffice, getDesks, highlightDesk, clearHighlight, setCharacterClickHandler, getScene, registerClickTarget, unregisterClickTarget, setCharacterUpdateHook } from "./office3d.js";
-import { initCharacters, createCharacter, removeCharacter, updateCharacterState, updateAllCharacters, getCharacterMeshes, disposeCharacters } from "./character.js";
-import { initBustup, disposeBustup, setCharacter, setExpression, setTalking, onClick as onBustupClick } from "./live2d.js";
+import { escapeHtml, renderSimpleMarkdown } from "./utils.js";
+import { initOffice, getDesks, highlightDesk, setCharacterClickHandler, getScene, registerClickTarget, setCharacterUpdateHook } from "./office3d.js";
+import { initCharacters, createCharacter, updateCharacterState, updateAllCharacters } from "./character.js";
+import { initBustup, setCharacter, setExpression, setTalking, onClick as onBustupClick } from "./live2d.js";
 
 // ── DOM References ──────────────────────
 
@@ -24,7 +23,6 @@ function cacheDom() {
   dom.personSelector = document.getElementById("wsPersonSelector");
   dom.systemStatus = document.getElementById("wsSystemStatus");
   dom.userInfo = document.getElementById("wsUserInfo");
-  dom.chatPanel = document.getElementById("wsChatPanel");
   dom.rightTabs = document.getElementById("wsRightTabs");
   dom.tabState = document.getElementById("wsTabState");
   dom.tabActivity = document.getElementById("wsTabActivity");
@@ -35,23 +33,17 @@ function cacheDom() {
   dom.memoryPanel = document.getElementById("wsMemoryPanel");
   dom.logoutBtn = document.getElementById("wsLogoutBtn");
 
-  // Phase 2-3 DOM refs
-  dom.viewTabs = document.getElementById("wsViewTabs");
-  dom.viewChat = document.getElementById("wsViewChat");
-  dom.viewOffice = document.getElementById("wsViewOffice");
+  // 3D Office
   dom.officePanel = document.getElementById("wsOfficePanel");
   dom.officeCanvas = document.getElementById("wsOfficeCanvas");
-  dom.conversationOverlay = document.getElementById("wsConversationOverlay");
-  dom.convClose = document.getElementById("wsConvClose");
-  dom.convStatus = document.getElementById("wsConvStatus");
+
+  // Right panel modes
+  dom.infoPanel = document.getElementById("wsInfoPanel");
+  dom.convPanel = document.getElementById("wsConvPanel");
+  dom.convBack = document.getElementById("wsConvBack");
   dom.convPersonName = document.getElementById("wsConvPersonName");
-  dom.convBrain = document.getElementById("wsConvBrain");
-  dom.convLocation = document.getElementById("wsConvLocation");
-  dom.convTask = document.getElementById("wsConvTask");
-  dom.convActions = document.getElementById("wsConvActions");
   dom.convCanvas = document.getElementById("wsConvCanvas");
-  dom.convSpeaker = document.getElementById("wsConvSpeaker");
-  dom.convText = document.getElementById("wsConvText");
+  dom.convMessages = document.getElementById("wsConvMessages");
   dom.convInput = document.getElementById("wsConvInput");
   dom.convSend = document.getElementById("wsConvSend");
 }
@@ -106,25 +98,7 @@ function activateRightTab(tab) {
   }
 }
 
-// ── View Mode Switching ──────────────────────
-
-function switchView(mode) {
-  setState({ viewMode: mode });
-
-  // Update tab buttons
-  [dom.viewChat, dom.viewOffice].forEach((btn) => {
-    btn?.classList.toggle("active", btn.dataset.view === mode);
-  });
-
-  if (mode === "chat") {
-    dom.chatPanel?.classList.remove("hidden");
-    dom.officePanel?.classList.add("hidden");
-  } else if (mode === "office") {
-    dom.chatPanel?.classList.add("hidden");
-    dom.officePanel?.classList.remove("hidden");
-    initOfficeIfNeeded();
-  }
-}
+// ── 3D Office Initialization ──────────────────────
 
 async function initOfficeIfNeeded() {
   if (getState().officeInitialized) return;
@@ -142,7 +116,6 @@ async function initOfficeIfNeeded() {
     setCharacterUpdateHook(updateAllCharacters);
 
     // Create characters for all known persons
-    // Desk keys are role-based; map person names to desk positions by index
     const desks = getDesks();
     const deskKeys = Object.keys(desks);
     const { persons } = getState();
@@ -153,20 +126,18 @@ async function initOfficeIfNeeded() {
       if (deskPos) {
         const group = createCharacter(p.name, { x: deskPos.x, y: deskPos.y + 0.4, z: deskPos.z - 0.3 });
         if (group) {
-          // Register for raycasting
           group.traverse((child) => {
             if (child.isMesh) {
               registerClickTarget(p.name, child);
             }
           });
         }
-        // Set initial animation state
         const animState = mapPersonStatusToAnim(p.status);
         updateCharacterState(p.name, animState);
       }
     }
 
-    // Handle character clicks
+    // Handle character clicks → open conversation in right panel
     setCharacterClickHandler((personName) => {
       selectPerson(personName);
       openConversation(personName);
@@ -196,21 +167,22 @@ function mapPersonStatusToAnim(status) {
   return "idle";
 }
 
-// ── Conversation Overlay ──────────────────────
+// ── Conversation Panel (Right Sidebar) ──────────────────────
 
 let bustupInitialized = false;
 let convStreamController = null;
 
 function openConversation(personName) {
-  if (!dom.conversationOverlay) return;
+  if (!dom.convPanel || !dom.infoPanel) return;
 
-  setState({ conversationOverlay: true, conversationPerson: personName });
-  dom.conversationOverlay.classList.remove("hidden");
+  setState({ conversationOpen: true, conversationPerson: personName });
 
-  // Update person name display
+  // Switch right panel to conversation mode
+  dom.infoPanel.classList.add("hidden");
+  dom.convPanel.classList.remove("hidden");
+
+  // Update person name
   if (dom.convPersonName) dom.convPersonName.textContent = personName;
-  if (dom.convSpeaker) dom.convSpeaker.textContent = personName;
-  if (dom.convText) dom.convText.textContent = "…";
 
   // Initialize bust-up canvas (once)
   if (!bustupInitialized && dom.convCanvas) {
@@ -218,7 +190,6 @@ function openConversation(personName) {
     bustupInitialized = true;
 
     onBustupClick(() => {
-      // Character clicked — show surprised, then revert
       setExpression("surprised");
       setTimeout(() => setExpression("happy"), 1200);
       setTimeout(() => setExpression("normal"), 2500);
@@ -229,14 +200,26 @@ function openConversation(personName) {
   setCharacter(personName);
   setExpression("normal");
 
-  // Update status panel
-  updateConversationStatus(personName);
+  // Load and render chat history
+  loadAndRenderConvMessages(personName);
+
+  // Highlight desk in 3D
+  if (getState().officeInitialized) {
+    highlightDesk(personName);
+  }
+
+  // Focus input
+  dom.convInput?.focus();
 }
 
 function closeConversation() {
-  if (!dom.conversationOverlay) return;
-  dom.conversationOverlay.classList.add("hidden");
-  setState({ conversationOverlay: false, conversationPerson: null });
+  if (!dom.convPanel || !dom.infoPanel) return;
+
+  // Switch right panel back to info mode
+  dom.convPanel.classList.add("hidden");
+  dom.infoPanel.classList.remove("hidden");
+
+  setState({ conversationOpen: false, conversationPerson: null });
   setTalking(false);
 
   // Abort any active stream
@@ -246,32 +229,61 @@ function closeConversation() {
   }
 }
 
-async function updateConversationStatus(personName) {
-  const { personDetail, persons } = getState();
-  const person = persons.find((p) => p.name === personName);
+// ── Chat Rendering in Conversation Panel ──────────────────────
 
-  if (dom.convBrain) {
-    dom.convBrain.textContent = personDetail?.execution_mode || "Mode A1 (Claude)";
+function renderConvBubble(msg) {
+  if (msg.role === "user") {
+    return `<div class="chat-bubble user">${escapeHtml(msg.text)}</div>`;
   }
-  if (dom.convLocation) {
-    dom.convLocation.textContent = "localhost:18500";
+  const streamClass = msg.streaming ? " streaming" : "";
+  let content = "";
+  if (msg.text) {
+    content = renderSimpleMarkdown(msg.text);
+  } else if (msg.streaming) {
+    content = '<span class="cursor-blink"></span>';
   }
-  if (dom.convTask) {
-    const taskInfo = personDetail?.state;
-    dom.convTask.textContent = taskInfo
-      ? (typeof taskInfo === "object" ? JSON.stringify(taskInfo, null, 1) : String(taskInfo))
-      : "待機中";
-  }
-  if (dom.convActions) {
-    dom.convActions.textContent = "—";
-  }
+  const toolHtml = msg.activeTool
+    ? `<div class="tool-indicator"><span class="tool-spinner"></span>${escapeHtml(msg.activeTool)} を実行中...</div>`
+    : "";
+  return `<div class="chat-bubble assistant${streamClass}">${content}${toolHtml}</div>`;
 }
+
+function renderConvMessages() {
+  if (!dom.convMessages) return;
+  const { chatMessages } = getState();
+  if (chatMessages.length === 0) {
+    dom.convMessages.innerHTML = '<div class="chat-empty">メッセージはまだありません</div>';
+    return;
+  }
+  dom.convMessages.innerHTML = chatMessages.map(renderConvBubble).join("");
+  dom.convMessages.scrollTop = dom.convMessages.scrollHeight;
+}
+
+async function loadAndRenderConvMessages(personName) {
+  if (!personName) return;
+  try {
+    const data = await fetchConversationFull(personName);
+    if (data.turns && data.turns.length > 0) {
+      const messages = data.turns.map((t) => ({
+        role: t.role === "human" ? "user" : "assistant",
+        text: t.content || "",
+      }));
+      setState({ chatMessages: messages });
+    } else {
+      setState({ chatMessages: [] });
+    }
+  } catch (err) {
+    console.error("Failed to load conversation:", err);
+    setState({ chatMessages: [] });
+  }
+  renderConvMessages();
+}
+
+// ── SSE Streaming for Conversation ──────────────────────
 
 /**
  * Parse SSE events from a buffer, properly associating event types with data payloads.
  * Uses "\n\n" as the block delimiter (standard SSE format).
- * @param {string} buffer - Raw SSE text
- * @returns {{ parsed: Array<{event: string, data: Object}>, remaining: string }}
  */
 function parseConvSSE(buffer) {
   const parsed = [];
@@ -310,18 +322,17 @@ async function sendConversationMessage() {
   dom.convInput.disabled = true;
   dom.convSend.disabled = true;
 
-  // Show user message briefly
-  if (dom.convSpeaker) dom.convSpeaker.textContent = getCurrentUser() || "You";
-  if (dom.convText) dom.convText.textContent = text;
-
-  // Start talking animation
-  setExpression("normal");
+  // Add user message + streaming assistant placeholder
+  const { chatMessages } = getState();
+  const userMsg = { role: "user", text };
+  const streamingMsg = { role: "assistant", text: "", streaming: true, activeTool: null };
+  setState({ chatMessages: [...chatMessages, userMsg, streamingMsg] });
+  renderConvMessages();
 
   // Create AbortController for cancellable streaming
   convStreamController = new AbortController();
 
   try {
-    // Use SSE streaming
     const userName = getCurrentUser() || "guest";
     const resp = await fetch(`/api/persons/${encodeURIComponent(personName)}/chat/stream`, {
       method: "POST",
@@ -332,16 +343,12 @@ async function sendConversationMessage() {
 
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
 
-    if (dom.convSpeaker) dom.convSpeaker.textContent = personName;
-    if (dom.convText) dom.convText.textContent = "";
-
     setTalking(true);
     setExpression("normal");
 
     const reader = resp.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
-    let fullText = "";
 
     while (true) {
       const { done, value } = await reader.read();
@@ -353,20 +360,24 @@ async function sendConversationMessage() {
 
       for (const { event: evt, data } of parsed) {
         if (evt === "text_delta" && data.text) {
-          fullText += data.text;
-          if (dom.convText) dom.convText.textContent = fullText;
+          streamingMsg.text += data.text;
+          updateStreamingBubble(streamingMsg);
         } else if (evt === "tool_start") {
+          streamingMsg.activeTool = data.tool_name;
           setExpression("thinking");
+          updateStreamingBubble(streamingMsg);
         } else if (evt === "tool_end") {
+          streamingMsg.activeTool = null;
           setExpression("normal");
+          updateStreamingBubble(streamingMsg);
         } else if (evt === "done") {
           setExpression("happy");
           setTimeout(() => setExpression("normal"), 2000);
         } else if (evt === "error") {
           setExpression("troubled");
           if (data.error || data.message) {
-            fullText += `\n[エラー: ${data.error || data.message}]`;
-            if (dom.convText) dom.convText.textContent = fullText;
+            streamingMsg.text += `\n[エラー: ${data.error || data.message}]`;
+            updateStreamingBubble(streamingMsg);
           }
         }
       }
@@ -374,19 +385,19 @@ async function sendConversationMessage() {
 
     setTalking(false);
 
-    // Sync to main chat via direct state push (avoids streaming guard in addMessage)
-    const { chatMessages } = getState();
-    setState({
-      chatMessages: [
-        ...chatMessages,
-        { role: "user", text },
-        { role: "assistant", text: fullText },
-      ],
-    });
+    // Finalize streaming message
+    streamingMsg.streaming = false;
+    if (!streamingMsg.text) streamingMsg.text = "(空の応答)";
+    setState({ chatMessages: [...getState().chatMessages] });
+    renderConvMessages();
   } catch (err) {
-    if (err.name === "AbortError") return; // User closed overlay
+    if (err.name === "AbortError") return;
     console.error("[conversation] Stream error:", err);
-    if (dom.convText) dom.convText.textContent = `エラー: ${err.message}`;
+    streamingMsg.text = `[エラー] ${err.message}`;
+    streamingMsg.streaming = false;
+    streamingMsg.activeTool = null;
+    setState({ chatMessages: [...getState().chatMessages] });
+    renderConvMessages();
     setExpression("troubled");
     setTalking(false);
   } finally {
@@ -395,6 +406,24 @@ async function sendConversationMessage() {
     if (dom.convSend) dom.convSend.disabled = false;
     dom.convInput?.focus();
   }
+}
+
+function updateStreamingBubble(msg) {
+  if (!dom.convMessages) return;
+  const bubble = dom.convMessages.querySelector(".chat-bubble.assistant.streaming");
+  if (!bubble) return;
+
+  let html = "";
+  if (msg.text) {
+    html = renderSimpleMarkdown(msg.text);
+  } else {
+    html = '<span class="cursor-blink"></span>';
+  }
+  if (msg.activeTool) {
+    html += `<div class="tool-indicator"><span class="tool-spinner"></span>${escapeHtml(msg.activeTool)} を実行中...</div>`;
+  }
+  bubble.innerHTML = html;
+  dom.convMessages.scrollTop = dom.convMessages.scrollHeight;
 }
 
 // ── System Status ──────────────────────
@@ -425,7 +454,6 @@ function updateStatusDisplay(ok, text) {
 const wsUnsubscribers = [];
 
 function setupWebSocket() {
-  // Clean up previous handlers
   wsUnsubscribers.forEach((fn) => fn());
   wsUnsubscribers.length = 0;
 
@@ -448,7 +476,7 @@ function setupWebSocket() {
       updateCharacterState(data.name, animState);
       setState({ characterStates: { ...getState().characterStates, [data.name]: animState } });
     }
-    // Update conversation overlay expression
+    // Update bust-up expression if conversation is open for this person
     if (getState().conversationPerson === data.name) {
       const animState = mapPersonStatusToAnim(data.status);
       if (animState === "error") setExpression("troubled");
@@ -472,9 +500,16 @@ function setupWebSocket() {
   wsUnsubscribers.push(onEvent("chat.response", (data) => {
     const personName = data.person || data.name;
     const msg = data.response || data.message || "";
-    const { selectedPerson } = getState();
-    if (personName === selectedPerson) {
-      addMessage("assistant", msg);
+    // If conversation panel is open for this person, add message there
+    if (getState().conversationPerson === personName) {
+      const { chatMessages } = getState();
+      if (!chatMessages.some((m) => m.streaming)) {
+        const last = chatMessages[chatMessages.length - 1];
+        if (!(last && last.role === "assistant" && last.text === msg)) {
+          setState({ chatMessages: [...chatMessages, { role: "assistant", text: msg }] });
+          renderConvMessages();
+        }
+      }
     }
     addActivity("chat", personName, msg.slice(0, 60));
   }));
@@ -496,24 +531,22 @@ let dashboardInitialized = false;
 async function startDashboard() {
   if (!dom.dashboard) return;
 
-  // Show dashboard, update user info
   dom.dashboard.classList.remove("hidden");
   if (dom.userInfo) {
     dom.userInfo.textContent = getCurrentUser() || "";
   }
 
   if (dashboardInitialized) {
-    // Re-login: just refresh data
     await loadPersons();
     await loadSystemStatus();
+    // Re-init office if needed
+    initOfficeIfNeeded();
     return;
   }
   dashboardInitialized = true;
 
   // Initialize sub-modules
   initPerson(dom.personSelector, dom.paneState, onPersonSelected);
-  renderChat(dom.chatPanel);
-  initChat(dom.chatPanel);
   initMemory(dom.memoryPanel);
   initSession(dom.paneHistory);
 
@@ -522,13 +555,8 @@ async function startDashboard() {
     btn?.addEventListener("click", () => activateRightTab(btn.dataset.tab));
   });
 
-  // Bind view mode tabs
-  [dom.viewChat, dom.viewOffice].forEach((btn) => {
-    btn?.addEventListener("click", () => switchView(btn.dataset.view));
-  });
-
-  // Bind conversation overlay events
-  dom.convClose?.addEventListener("click", closeConversation);
+  // Bind conversation panel events
+  dom.convBack?.addEventListener("click", closeConversation);
   dom.convSend?.addEventListener("click", sendConversationMessage);
   dom.convInput?.addEventListener("keydown", (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
@@ -537,9 +565,15 @@ async function startDashboard() {
     }
   });
 
-  // Close conversation overlay with Escape
+  // Auto-resize conversation input
+  dom.convInput?.addEventListener("input", () => {
+    dom.convInput.style.height = "auto";
+    dom.convInput.style.height = Math.min(dom.convInput.scrollHeight, 100) + "px";
+  });
+
+  // Close conversation with Escape
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && getState().conversationOverlay) {
+    if (e.key === "Escape" && getState().conversationOpen) {
       closeConversation();
     }
   });
@@ -559,19 +593,24 @@ async function startDashboard() {
 
   // Activate default right tab
   activateRightTab("state");
+
+  // Auto-init 3D office (always visible now)
+  initOfficeIfNeeded();
 }
 
 // ── Person Selection Callback ──────────────────────
 
 async function onPersonSelected(name) {
-  // Update 3D office highlight
+  // Highlight desk in 3D
   if (getState().officeInitialized) {
     highlightDesk(name);
   }
 
-  // Load conversation + memory + sessions in parallel
+  // Open conversation panel
+  openConversation(name);
+
+  // Load memory + sessions in parallel
   await Promise.all([
-    loadConversation(),
     loadMemoryTab(getState().activeMemoryTab),
     loadSessions(),
   ]);
@@ -584,11 +623,9 @@ export function init() {
 
   const savedUser = getCurrentUser();
   if (savedUser) {
-    // Already logged in — render login (hidden) and go to dashboard
     initLogin(dom.loginContainer, onLoginSuccess);
     startDashboard();
   } else {
-    // Show login screen
     dom.dashboard?.classList.add("hidden");
     initLogin(dom.loginContainer, onLoginSuccess);
   }

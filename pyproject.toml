@@ -2,6 +2,8 @@
 name = "animaworks"
 version = "0.2.0"
 description = "AnimaWorks - Digital Person Framework with library-type memory"
+license = "AGPL-3.0-or-later AND MIT"
+license-files = ["LICENSE", "LICENSES/*.txt"]
 requires-python = ">=3.12"
 dependencies = [
     "claude-agent-sdk>=0.1.35",

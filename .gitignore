@@ -15,6 +15,7 @@ build/
 
 # Project
 archive/
+docs/
 site-docs/
 mkdocs.yml
 .env
