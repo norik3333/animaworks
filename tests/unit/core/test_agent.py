@@ -16,11 +16,13 @@ def _make_agent(
     person_dir: Path,
     model: str = "claude-sonnet-4-20250514",
     execution_mode: str | None = None,
+    resolved_mode: str | None = None,
 ):
     """Create AgentCore with all external dependencies mocked."""
     mc = ModelConfig(
         model=model,
         execution_mode=execution_mode,
+        resolved_mode=resolved_mode,
         api_key="test-key",
     )
     memory = MagicMock()
@@ -46,7 +48,7 @@ def _make_agent(
 
 class TestResolveExecutionMode:
     def test_assisted_mode(self, tmp_path):
-        agent = _make_agent(tmp_path, execution_mode="assisted")
+        agent = _make_agent(tmp_path, resolved_mode="B")
         assert agent._resolve_execution_mode() == "b"
 
     def test_auto_non_claude_model(self, tmp_path):
@@ -133,7 +135,7 @@ class TestResolveApiKey:
 
 class TestRunCycle:
     async def test_mode_b_returns_result(self, tmp_path):
-        agent = _make_agent(tmp_path, execution_mode="assisted")
+        agent = _make_agent(tmp_path, resolved_mode="B")
         mock_result = MagicMock()
         mock_result.text = "Assisted response"
         agent._executor.execute = AsyncMock(return_value=mock_result)
