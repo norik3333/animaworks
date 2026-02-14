@@ -155,8 +155,8 @@ async def test_log_file_date_format(data_dir: Path, make_person):
         person_log_dir = data_dir / "logs" / "persons" / "test-person"
         log_files = list(person_log_dir.glob("*.log"))
 
-        # Find dated log file (exclude current.log)
-        dated_logs = [f for f in log_files if f.name != "current.log"]
+        # Find dated log file (exclude current.log and stderr.log)
+        dated_logs = [f for f in log_files if f.name not in ("current.log", "stderr.log")]
         assert len(dated_logs) > 0
 
         # Verify filename format (YYYYMMDD.log)

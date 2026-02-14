@@ -72,6 +72,8 @@ class ProcessSupervisor:
         self.processes: dict[str, ProcessHandle] = {}
         self._health_check_task: asyncio.Task | None = None
         self._shutdown = False
+        self._restart_counts: dict[str, int] = {}
+        self._restarting: set[str] = set()
 
     async def start_all(self, person_names: list[str]) -> None:
         """
@@ -253,9 +255,12 @@ class ProcessSupervisor:
             try:
                 await asyncio.sleep(self.health_config.ping_interval_sec)
 
-                # Check all processes
-                for person_name, handle in list(self.processes.items()):
-                    await self._check_process_health(person_name, handle)
+                # Check all processes in parallel
+                checks = [
+                    self._check_process_health(person_name, handle)
+                    for person_name, handle in list(self.processes.items())
+                ]
+                await asyncio.gather(*checks, return_exceptions=True)
 
             except asyncio.CancelledError:
                 break
@@ -270,11 +275,25 @@ class ProcessSupervisor:
         handle: ProcessHandle
     ) -> None:
         """Check health of a single process."""
+        # Skip if currently streaming (IPC lock held, ping would block)
+        if handle._streaming:
+            logger.debug(f"Skipping health check for {person_name} (streaming)")
+            return
+
         # Skip if in startup grace period
         uptime = (datetime.now() - handle.stats.started_at).total_seconds()
         if uptime < self.health_config.startup_grace_sec:
             logger.debug(f"Skipping health check for {person_name} (startup grace)")
             return
+
+        # Reset restart counter after stable uptime
+        if uptime > self.restart_policy.reset_after_sec:
+            if self._restart_counts.get(person_name, 0) > 0:
+                self._restart_counts[person_name] = 0
+                logger.info(
+                    f"Restart counter reset for {person_name} "
+                    f"(stable for {uptime:.0f}s)"
+                )
 
         # Check if process is alive
         if not handle.is_alive():
@@ -282,7 +301,7 @@ class ProcessSupervisor:
                 f"Process exited unexpectedly: {person_name} "
                 f"(exit_code={handle.stats.exit_code})"
             )
-            await self._handle_process_failure(person_name, handle)
+            asyncio.create_task(self._handle_process_failure(person_name, handle))
             return
 
         # Ping process
@@ -306,51 +325,62 @@ class ProcessSupervisor:
                 f"Process hang detected: {person_name} "
                 f"(PID {handle.get_pid()})"
             )
-            await self._handle_process_hang(person_name, handle)
+            asyncio.create_task(self._handle_process_hang(person_name, handle))
 
     async def _handle_process_failure(
         self,
         person_name: str,
         handle: ProcessHandle
     ) -> None:
-        """Handle process exit/crash."""
-        # Check restart count
-        if handle.stats.restart_count >= self.restart_policy.max_retries:
-            logger.error(
-                f"Max restart retries exceeded for {person_name}. "
-                f"Manual intervention required."
-            )
-            handle.state = ProcessState.FAILED
+        """Handle process exit/crash.
+
+        Runs as an independent task so the health-check loop is not blocked
+        by backoff sleeps.  A per-person guard prevents duplicate restarts.
+        """
+        if person_name in self._restarting:
             return
-
-        # Calculate backoff delay
-        backoff = min(
-            self.restart_policy.backoff_base_sec * (2 ** handle.stats.restart_count),
-            self.restart_policy.backoff_max_sec
-        )
-
-        logger.info(
-            f"Scheduling restart for {person_name} "
-            f"(retry {handle.stats.restart_count + 1}/{self.restart_policy.max_retries}, "
-            f"delay={backoff:.1f}s)"
-        )
-
-        # Wait and restart
-        await asyncio.sleep(backoff)
+        self._restarting.add(person_name)
 
         try:
-            handle.stats.restart_count += 1
+            # Check restart count (supervisor-level, survives handle recreation)
+            count = self._restart_counts.get(person_name, 0)
+            if count >= self.restart_policy.max_retries:
+                logger.error(
+                    f"Max restart retries exceeded for {person_name}. "
+                    f"Manual intervention required."
+                )
+                handle.state = ProcessState.FAILED
+                return
+
+            # Calculate backoff delay
+            backoff = min(
+                self.restart_policy.backoff_base_sec * (2 ** count),
+                self.restart_policy.backoff_max_sec
+            )
+
+            logger.info(
+                f"Scheduling restart for {person_name} "
+                f"(retry {count + 1}/{self.restart_policy.max_retries}, "
+                f"delay={backoff:.1f}s)"
+            )
+
+            # Wait and restart
+            await asyncio.sleep(backoff)
+
+            self._restart_counts[person_name] = count + 1
             await self.restart_person(person_name)
 
             logger.info(
                 f"Process restarted: {person_name} "
                 f"(PID {self.processes[person_name].get_pid()}, "
-                f"retry={handle.stats.restart_count}/{self.restart_policy.max_retries})"
+                f"retry={count + 1}/{self.restart_policy.max_retries})"
             )
 
         except Exception as e:
             logger.error(f"Failed to restart {person_name}: {e}")
             handle.state = ProcessState.FAILED
+        finally:
+            self._restarting.discard(person_name)
 
     async def _handle_process_hang(
         self,
@@ -383,7 +413,7 @@ class ProcessSupervisor:
             "status": handle.state.value,
             "pid": handle.get_pid(),
             "uptime_sec": uptime,
-            "restart_count": handle.stats.restart_count,
+            "restart_count": self._restart_counts.get(person_name, 0),
             "missed_pings": handle.stats.missed_pings,
             "last_ping_at": (
                 handle.stats.last_ping_at.isoformat()

@@ -13,7 +13,9 @@ from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
+from io import TextIOWrapper
 from pathlib import Path
+from typing import Any
 
 from core.supervisor.ipc import IPCClient, IPCRequest, IPCResponse
 
@@ -71,6 +73,8 @@ class ProcessHandle:
         self.process: subprocess.Popen | None = None
         self.ipc_client: IPCClient | None = None
         self.stats = ProcessStats(started_at=datetime.now())
+        self._streaming = False
+        self._stderr_file: Any | None = None
 
     async def start(self) -> None:
         """
@@ -99,11 +103,22 @@ class ProcessHandle:
         logger.debug(f"Command: {' '.join(cmd)}")
 
         try:
+            # Redirect stderr to a log file for post-mortem debugging;
+            # stdout is discarded because the child writes its own log files.
+            stderr_path: Path | None = None
+            if self.log_dir:
+                stderr_dir = self.log_dir / "persons" / self.person_name
+                stderr_dir.mkdir(parents=True, exist_ok=True)
+                stderr_path = stderr_dir / "stderr.log"
+
+            self._stderr_file = (
+                open(stderr_path, "a") if stderr_path else None  # noqa: SIM115
+            )
+
             self.process = subprocess.Popen(
                 cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True
+                stdout=subprocess.DEVNULL,
+                stderr=self._stderr_file if self._stderr_file else subprocess.DEVNULL,
             )
             logger.info(f"Process started: {self.person_name} (PID {self.process.pid})")
 
@@ -120,16 +135,9 @@ class ProcessHandle:
         except Exception as e:
             logger.error(f"Failed to start process {self.person_name}: {e}")
 
-            # Capture and log subprocess output if available
-            if self.process:
-                try:
-                    stdout, stderr = self.process.communicate(timeout=1.0)
-                    if stderr:
-                        logger.error(f"Subprocess stderr:\n{stderr}")
-                    if stdout:
-                        logger.debug(f"Subprocess stdout:\n{stdout}")
-                except Exception:
-                    pass
+            # Log stderr file location for debugging
+            if stderr_path and stderr_path.exists():
+                logger.error(f"Subprocess stderr log: {stderr_path}")
 
             self.state = ProcessState.FAILED
             await self._cleanup()
@@ -137,8 +145,9 @@ class ProcessHandle:
 
     async def _wait_for_socket(self, timeout: float) -> None:
         """Wait for socket file to be created."""
-        deadline = asyncio.get_event_loop().time() + timeout
-        while asyncio.get_event_loop().time() < deadline:
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + timeout
+        while loop.time() < deadline:
             if self.socket_path.exists():
                 logger.debug(f"Socket file created: {self.socket_path}")
                 return
@@ -214,10 +223,14 @@ class ProcessHandle:
             params=params
         )
 
-        async for response in self.ipc_client.send_request_stream(
-            request, timeout=timeout
-        ):
-            yield response
+        self._streaming = True
+        try:
+            async for response in self.ipc_client.send_request_stream(
+                request, timeout=timeout
+            ):
+                yield response
+        finally:
+            self._streaming = False
 
     async def ping(self, timeout: float = 5.0) -> bool:
         """
@@ -318,7 +331,7 @@ class ProcessHandle:
 
         logger.warning(f"Killing process: {self.person_name} (PID {self.process.pid})")
         self.process.kill()
-        self.process.wait()
+        await asyncio.get_running_loop().run_in_executor(None, self.process.wait)
         self.stats.exit_code = self.process.returncode
         self.state = ProcessState.FAILED
         await self._cleanup()
@@ -328,6 +341,13 @@ class ProcessHandle:
         if self.ipc_client:
             await self.ipc_client.close()
             self.ipc_client = None
+
+        if self._stderr_file:
+            try:
+                self._stderr_file.close()
+            except Exception:
+                pass
+            self._stderr_file = None
 
         if self.socket_path.exists():
             self.socket_path.unlink()
