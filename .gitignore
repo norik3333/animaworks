@@ -20,6 +20,10 @@ site-docs/
 .env
 tmp/
 
+# Coverage
+.coverage
+htmlcov/
+
 # Evaluation framework - generated data (excluded from repo)
 tests/evaluation/datasets/
 tests/evaluation/scenarios/
