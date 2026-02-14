@@ -342,6 +342,10 @@ class AgentCore:
             system_prompt=system_prompt,
             tracker=tracker,
         )
+        # Merge transcript-parsed replied_to for A1 mode
+        if result.replied_to_from_transcript:
+            self._tool_handler.merge_replied_to(result.replied_to_from_transcript)
+            logger.info("Merged transcript replied_to: %s", result.replied_to_from_transcript)
         result_msg = result.result_message
 
         # Session chaining: if threshold was crossed, continue in a new session
@@ -388,6 +392,9 @@ class AgentCore:
                     system_prompt=system_prompt_2,
                     tracker=tracker,
                 )
+                # Merge from chained session too
+                if result_2.replied_to_from_transcript:
+                    self._tool_handler.merge_replied_to(result_2.replied_to_from_transcript)
             except Exception:
                 logger.exception(
                     "Chained session %d failed; preserving short-term memory",
@@ -465,6 +472,10 @@ class AgentCore:
             if chunk["type"] == "done":
                 full_text_parts.append(chunk["full_text"])
                 result_message = chunk["result_message"]
+                # Merge transcript replied_to
+                transcript_replied = chunk.get("replied_to_from_transcript", set())
+                if transcript_replied:
+                    self._tool_handler.merge_replied_to(transcript_replied)
             else:
                 yield chunk
 
@@ -517,6 +528,10 @@ class AgentCore:
                         result_message = chunk["result_message"]
                         if result_message:
                             total_turns += result_message.num_turns
+                        # Merge transcript replied_to
+                        transcript_replied = chunk.get("replied_to_from_transcript", set())
+                        if transcript_replied:
+                            self._tool_handler.merge_replied_to(transcript_replied)
                     else:
                         yield chunk
             except Exception:

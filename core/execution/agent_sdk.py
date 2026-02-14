@@ -15,6 +15,7 @@ execution, plus a ``PostToolUse`` hook for context monitoring.
 """
 
 import logging
+import re
 from collections.abc import AsyncGenerator
 from typing import Any
 
@@ -25,6 +26,11 @@ from core.memory.shortterm import ShortTermMemory
 from pathlib import Path
 
 logger = logging.getLogger("animaworks.execution.agent_sdk")
+
+_SEND_PATTERNS = [
+    re.compile(r"Sent:\s+\S+\s+->\s+(\w+)"),           # CLI output: "Sent: sakura -> kotoha (...)"
+    re.compile(r"Message sent to (\w+)"),                # ToolHandler: "Message sent to kotoha (...)"
+]
 
 
 class AgentSDKExecutor(BaseExecutor):
@@ -73,6 +79,28 @@ class AgentSDKExecutor(BaseExecutor):
             env["ANTHROPIC_BASE_URL"] = self._model_config.api_base_url
         return env
 
+    # ── Transcript parsing ─────────────────────────────────────
+
+    def _parse_replied_to(self, transcript_path: str) -> set[str]:
+        """Parse Agent SDK transcript for message send patterns."""
+        if not transcript_path:
+            return set()
+        path = Path(transcript_path)
+        if not path.exists():
+            return set()
+        try:
+            content = path.read_text(encoding="utf-8")
+        except OSError:
+            logger.debug("Could not read transcript: %s", transcript_path)
+            return set()
+        names: set[str] = set()
+        for pat in _SEND_PATTERNS:
+            for m in pat.finditer(content):
+                names.add(m.group(1))
+        if names:
+            logger.debug("Parsed replied_to from transcript: %s", names)
+        return names
+
     # ── Blocking execution ───────────────────────────────────
 
     async def execute(
@@ -104,16 +132,18 @@ class AgentSDKExecutor(BaseExecutor):
 
         threshold = self._model_config.context_threshold
         _hook_fired = False
+        _transcript_path = ""
 
         async def _post_tool_hook(
             input_data: HookInput,
             tool_use_id: str | None,
             context: HookContext,
         ) -> SyncHookJSONOutput:
-            nonlocal _hook_fired
+            nonlocal _hook_fired, _transcript_path
             if tracker is None:
                 return SyncHookJSONOutput()
             transcript_path = input_data.get("transcript_path", "")
+            _transcript_path = transcript_path or _transcript_path
             ratio = tracker.estimate_from_transcript(transcript_path)
             if ratio >= threshold and not _hook_fired:
                 _hook_fired = True
@@ -166,9 +196,11 @@ class AgentSDKExecutor(BaseExecutor):
             "Agent SDK completed, messages=%d text_blocks=%d",
             message_count, len(response_text),
         )
+        replied_to = self._parse_replied_to(_transcript_path)
         return ExecutionResult(
             text="\n".join(response_text) or "(no response)",
             result_message=result_message,
+            replied_to_from_transcript=replied_to,
         )
 
     # ── Streaming execution ──────────────────────────────────
@@ -206,14 +238,16 @@ class AgentSDKExecutor(BaseExecutor):
 
         threshold = self._model_config.context_threshold
         _hook_fired = False
+        _transcript_path = ""
 
         async def _post_tool_hook(
             input_data: HookInput,
             tool_use_id: str | None,
             context: HookContext,
         ) -> SyncHookJSONOutput:
-            nonlocal _hook_fired
+            nonlocal _hook_fired, _transcript_path
             transcript_path = input_data.get("transcript_path", "")
+            _transcript_path = transcript_path or _transcript_path
             ratio = tracker.estimate_from_transcript(transcript_path)
             if ratio >= threshold and not _hook_fired:
                 _hook_fired = True
@@ -299,8 +333,10 @@ class AgentSDKExecutor(BaseExecutor):
             message_count, len(response_text),
         )
         full_text = "\n".join(response_text) or "(no response)"
+        replied_to = self._parse_replied_to(_transcript_path)
         yield {
             "type": "done",
             "full_text": full_text,
             "result_message": result_message,
+            "replied_to_from_transcript": replied_to,
         }

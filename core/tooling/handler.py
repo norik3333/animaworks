@@ -97,6 +97,10 @@ class ToolHandler:
         """Clear reply tracking (call at start of each heartbeat cycle)."""
         self._replied_to.clear()
 
+    def merge_replied_to(self, names: set[str]) -> None:
+        """Merge externally detected reply targets into tracking."""
+        self._replied_to.update(names)
+
     # ── Main dispatch ────────────────────────────────────────
 
     def handle(self, name: str, args: dict[str, Any]) -> str:

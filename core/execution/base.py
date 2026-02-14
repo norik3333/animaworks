@@ -33,6 +33,7 @@ class ExecutionResult:
 
     text: str
     result_message: Any = field(default=None, repr=False)
+    replied_to_from_transcript: set[str] = field(default_factory=set)
 
 
 class BaseExecutor(ABC):
