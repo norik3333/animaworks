@@ -8,7 +8,7 @@
 """Character image & 3-D model generation tool for AnimaWorks.
 
 Pipeline:
-  1. NovelAI V4.5 → anime full-body image
+  1. NovelAI V4.5 → anime full-body image (fallback: fal.ai Flux Pro)
   2. Flux Kontext [pro] (fal.ai) → bust-up from reference
   3. Flux Kontext [pro] (fal.ai) → chibi from reference
   4. Meshy Image-to-3D → GLB model from chibi image
@@ -22,6 +22,7 @@ import base64
 import io
 import json
 import logging
+import os
 import sys
 import time
 import zipfile
@@ -40,6 +41,7 @@ NOVELAI_API_URL = "https://image.novelai.net/ai/generate-image"
 NOVELAI_MODEL = "nai-diffusion-4-5-full"
 
 FAL_KONTEXT_SUBMIT_URL = "https://queue.fal.run/fal-ai/flux-pro/kontext"
+FAL_FLUX_PRO_SUBMIT_URL = "https://queue.fal.run/fal-ai/flux-pro/v1.1"
 # Status/result URLs are extracted from the submit response
 # (they omit the /kontext subpath per fal.ai queue convention)
 
@@ -390,6 +392,121 @@ class FluxKontextClient:
         images = result_data.get("images", [])
         if not images:
             raise ValueError("Flux Kontext returned no images")
+
+        image_url = images[0]["url"]
+        img_resp = httpx.get(image_url, timeout=_DOWNLOAD_TIMEOUT)
+        img_resp.raise_for_status()
+        return img_resp.content
+
+
+# ── FalTextToImageClient ──────────────────────────────────
+
+
+class FalTextToImageClient:
+    """Fal.ai Flux Pro text-to-image client (fallback for NovelAI)."""
+
+    POLL_INTERVAL = 2.0  # seconds
+    POLL_TIMEOUT = 120.0  # seconds
+
+    def __init__(self) -> None:
+        self._key = get_env_or_fail("FAL_KEY", "image_gen")
+
+    def generate_fullbody(
+        self,
+        prompt: str,
+        negative_prompt: str = "",
+        width: int = 768,
+        height: int = 1024,
+        seed: int | None = None,
+        output_format: str = "png",
+        guidance_scale: float = 3.5,
+        # Accept and ignore NovelAI-specific params for interface compatibility
+        steps: int = 28,
+        scale: float = 5.0,
+        sampler: str = "k_euler_ancestral",
+        vibe_image: bytes | None = None,
+        vibe_strength: float = 0.6,
+        vibe_info_extracted: float = 0.8,
+    ) -> bytes:
+        """Generate a full-body character image from text prompt.
+
+        Uses fal.ai Flux Pro v1.1 model.  Compatible with the same
+        call signature as :meth:`NovelAIClient.generate_fullbody` but
+        ignores NovelAI-specific parameters (vibe transfer, sampler, etc.).
+
+        Returns:
+            PNG image bytes.
+        """
+        payload: dict[str, Any] = {
+            "prompt": prompt,
+            "image_size": {"width": width, "height": height},
+            "output_format": output_format,
+            "guidance_scale": guidance_scale,
+            "num_images": 1,
+            "safety_tolerance": "6",
+        }
+        if seed is not None:
+            payload["seed"] = seed
+
+        headers = {
+            "Authorization": f"Key {self._key}",
+            "Content-Type": "application/json",
+        }
+
+        # Submit task
+        def _submit() -> dict[str, str]:
+            resp = httpx.post(
+                FAL_FLUX_PRO_SUBMIT_URL,
+                json=payload,
+                headers=headers,
+                timeout=_HTTP_TIMEOUT,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            return {
+                "request_id": data["request_id"],
+                "status_url": data["status_url"],
+                "response_url": data["response_url"],
+            }
+
+        submit_data = _retry(_submit)
+        request_id = submit_data["request_id"]
+
+        # Poll for completion
+        result_url = submit_data["response_url"]
+        status_url = submit_data["status_url"]
+        deadline = time.monotonic() + self.POLL_TIMEOUT
+
+        while time.monotonic() < deadline:
+            time.sleep(self.POLL_INTERVAL)
+            status_resp = httpx.get(
+                status_url, headers=headers, timeout=_HTTP_TIMEOUT,
+            )
+            status_resp.raise_for_status()
+            status_data = status_resp.json()
+            if status_data.get("status") == "COMPLETED":
+                break
+            if status_data.get("status") == "FAILED":
+                raise RuntimeError(
+                    f"Fal Flux Pro task {request_id} failed: "
+                    f"{status_data.get('error', 'unknown')}"
+                )
+        else:
+            raise TimeoutError(
+                f"Fal Flux Pro task {request_id} timed out after "
+                f"{self.POLL_TIMEOUT}s"
+            )
+
+        # Fetch result
+        result_resp = httpx.get(
+            result_url, headers=headers, timeout=_HTTP_TIMEOUT,
+        )
+        result_resp.raise_for_status()
+        result_data = result_resp.json()
+
+        images = result_data.get("images", [])
+        if not images:
+            raise ValueError("Fal Flux Pro returned no images")
 
         image_url = images[0]["url"]
         img_resp = httpx.get(image_url, timeout=_DOWNLOAD_TIMEOUT)
@@ -811,8 +928,20 @@ class ImageGenPipeline:
                 result.fullbody_path = fullbody_path
             else:
                 try:
-                    logger.info("Step 1: Generating full-body with NovelAI …")
-                    client = NovelAIClient()
+                    # Select text-to-image backend: NovelAI (primary) or Fal (fallback)
+                    if os.environ.get("NOVELAI_TOKEN"):
+                        logger.info("Step 1: Generating full-body with NovelAI …")
+                        client: NovelAIClient | FalTextToImageClient = NovelAIClient()
+                    elif os.environ.get("FAL_KEY"):
+                        logger.info(
+                            "Step 1: Generating full-body with Fal Flux Pro (fallback) …",
+                        )
+                        client = FalTextToImageClient()
+                    else:
+                        raise RuntimeError(
+                            "No image generation API key configured. "
+                            "Set NOVELAI_TOKEN or FAL_KEY."
+                        )
 
                     # ── A: Load style reference for Vibe Transfer ──
                     vibe_image: bytes | None = None

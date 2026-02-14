@@ -137,6 +137,8 @@ class ImageGenConfig(BaseModel):
 
 class AnimaWorksConfig(BaseModel):
     version: int = 1
+    setup_complete: bool = False
+    locale: str = "ja"
     system: SystemConfig = SystemConfig()
     credentials: dict[str, CredentialConfig] = {"anthropic": CredentialConfig()}
     model_modes: dict[str, str] = {}  # モデル名 → "A1"/"A2"/"B"

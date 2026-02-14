@@ -62,10 +62,16 @@ def ensure_runtime_dir(*, skip_persons: bool = False) -> Path:
 
     # Legacy fallback: if not skipping persons and no persons exist,
     # create a blank default person so cmd_start() works out of the box.
+    # Skip when setup is not yet complete — the setup wizard handles
+    # person creation interactively.
     if not skip_persons:
-        persons_dir = data_dir / "persons"
-        if not persons_dir.exists() or not any(persons_dir.iterdir()):
-            _legacy_copy_default_person(data_dir)
+        from core.config import load_config as _load_config
+
+        _cfg = _load_config(data_dir / "config.json") if (data_dir / "config.json").exists() else None
+        if _cfg is not None and _cfg.setup_complete:
+            persons_dir = data_dir / "persons"
+            if not persons_dir.exists() or not any(persons_dir.iterdir()):
+                _legacy_copy_default_person(data_dir)
 
     # Generate default config.json
     _create_default_config(data_dir)

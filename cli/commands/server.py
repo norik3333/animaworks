@@ -135,6 +135,14 @@ def cmd_start(args: argparse.Namespace) -> None:
     _write_pid_file()
     atexit.register(_remove_pid_file)
 
+    from core.config import load_config
+
+    config = load_config()
+    if not config.setup_complete:
+        print(f"First-time setup: open http://{args.host}:{args.port}/setup/")
+    else:
+        print(f"Dashboard: http://{args.host}:{args.port}/")
+
     try:
         app = create_app(get_persons_dir(), get_shared_dir())
         uvicorn.run(app, host=args.host, port=args.port, log_level="info")
