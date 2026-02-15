@@ -81,7 +81,27 @@ function renderAllMessages() {
   }
 
   messagesEl.innerHTML = chatMessages.map(renderBubble).join("");
-  messagesEl.scrollTop = messagesEl.scrollHeight;
+  requestAnimationFrame(() => {
+    const last = messagesEl.lastElementChild;
+    if (last) last.scrollIntoView({ block: "end", behavior: "instant" });
+  });
+}
+
+// ── Streaming update with rAF throttle ──────────────────────
+
+let _chatRafPending = false;
+let _chatLatestStreamingMsg = null;
+
+function scheduleStreamingUpdate(msg) {
+  _chatLatestStreamingMsg = msg;
+  if (_chatRafPending) return;
+  _chatRafPending = true;
+  requestAnimationFrame(() => {
+    _chatRafPending = false;
+    if (_chatLatestStreamingMsg) {
+      updateStreamingBubble(_chatLatestStreamingMsg);
+    }
+  });
 }
 
 function updateStreamingBubble(msg) {
@@ -102,7 +122,9 @@ function updateStreamingBubble(msg) {
   }
 
   bubble.innerHTML = html;
-  messagesEl.scrollTop = messagesEl.scrollHeight;
+  requestAnimationFrame(() => {
+    bubble.scrollIntoView({ block: "end", behavior: "instant" });
+  });
 }
 
 function updateInputState() {
@@ -218,7 +240,7 @@ export async function sendMessage(text) {
         switch (evt.event) {
           case "text_delta":
             streamingMsg.text += evt.data.text;
-            updateStreamingBubble(streamingMsg);
+            scheduleStreamingUpdate(streamingMsg);
             break;
 
           case "tool_start":
