@@ -86,6 +86,34 @@ class TestBuildMessagingSection:
             call_kwargs = mock_lp.call_args[1]
             assert "(まだ他の社員はいません)" in call_kwargs["persons_line"]
 
+    def test_a1_mode_uses_messaging_a1_template(self, tmp_path):
+        """A1 mode should load the messaging_a1 template."""
+        person_dir = tmp_path / "alice"
+        person_dir.mkdir()
+        with patch("core.prompt.builder.load_prompt", return_value="a1 messaging") as mock_lp:
+            result = _build_messaging_section(person_dir, ["bob"], execution_mode="a1")
+            assert result == "a1 messaging"
+            mock_lp.assert_called_once()
+            assert mock_lp.call_args[0][0] == "messaging_a1"
+
+    def test_a2_mode_uses_messaging_template(self, tmp_path):
+        """A2 mode should load the standard messaging template."""
+        person_dir = tmp_path / "alice"
+        person_dir.mkdir()
+        with patch("core.prompt.builder.load_prompt", return_value="a2 messaging") as mock_lp:
+            result = _build_messaging_section(person_dir, ["bob"], execution_mode="a2")
+            assert result == "a2 messaging"
+            mock_lp.assert_called_once()
+            assert mock_lp.call_args[0][0] == "messaging"
+
+    def test_default_mode_uses_a1_template(self, tmp_path):
+        """Default execution_mode should be a1, using messaging_a1 template."""
+        person_dir = tmp_path / "alice"
+        person_dir.mkdir()
+        with patch("core.prompt.builder.load_prompt", return_value="section") as mock_lp:
+            _build_messaging_section(person_dir, ["bob"])
+            assert mock_lp.call_args[0][0] == "messaging_a1"
+
 
 # ── build_system_prompt ───────────────────────────────────
 

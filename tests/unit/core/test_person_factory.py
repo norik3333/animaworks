@@ -15,6 +15,7 @@ from core.person_factory import (
     _extract_name_from_md,
     _init_state_files,
     _place_bootstrap,
+    _place_send_script,
     _should_create_bootstrap,
     create_blank,
     create_from_md,
@@ -342,3 +343,93 @@ class TestCreateFromMd:
              patch("core.person_factory.BOOTSTRAP_TEMPLATE", tmp_path / "no"):
             with pytest.raises(ValueError, match="Could not extract"):
                 create_from_md(persons_dir, md_file)
+
+
+# ── _place_send_script ───────────────────────────────────
+
+
+class TestPlaceSendScript:
+    def test_copies_send_script(self, tmp_path):
+        """Send script is copied from blank template to person dir."""
+        blank_dir = tmp_path / "blank"
+        blank_dir.mkdir()
+        send_src = blank_dir / "send"
+        send_src.write_text("#!/bin/bash\necho send", encoding="utf-8")
+
+        person_dir = tmp_path / "person"
+        person_dir.mkdir()
+
+        with patch("core.person_factory.BLANK_TEMPLATE_DIR", blank_dir):
+            _place_send_script(person_dir)
+
+        dst = person_dir / "send"
+        assert dst.exists()
+        assert dst.read_text(encoding="utf-8") == "#!/bin/bash\necho send"
+        # Check executable permission
+        assert dst.stat().st_mode & 0o755
+
+    def test_does_not_overwrite_existing(self, tmp_path):
+        """If send script already exists in person_dir, don't overwrite."""
+        blank_dir = tmp_path / "blank"
+        blank_dir.mkdir()
+        (blank_dir / "send").write_text("#!/bin/bash\nnew", encoding="utf-8")
+
+        person_dir = tmp_path / "person"
+        person_dir.mkdir()
+        (person_dir / "send").write_text("#!/bin/bash\nold", encoding="utf-8")
+
+        with patch("core.person_factory.BLANK_TEMPLATE_DIR", blank_dir):
+            _place_send_script(person_dir)
+
+        # Should keep the old content
+        assert (person_dir / "send").read_text(encoding="utf-8") == "#!/bin/bash\nold"
+
+    def test_no_source_script(self, tmp_path):
+        """If blank template has no send script, do nothing."""
+        blank_dir = tmp_path / "blank"
+        blank_dir.mkdir()
+        # No send script in blank_dir
+
+        person_dir = tmp_path / "person"
+        person_dir.mkdir()
+
+        with patch("core.person_factory.BLANK_TEMPLATE_DIR", blank_dir):
+            _place_send_script(person_dir)
+
+        assert not (person_dir / "send").exists()
+
+    def test_create_blank_includes_send_script(self, tmp_path):
+        """create_blank() should call _place_send_script."""
+        blank_dir = tmp_path / "blank"
+        blank_dir.mkdir()
+        (blank_dir / "send").write_text("#!/bin/bash\ntest", encoding="utf-8")
+        (blank_dir / "identity.md").write_text("{name}", encoding="utf-8")
+
+        persons_dir = tmp_path / "persons"
+        persons_dir.mkdir()
+
+        with patch("core.person_factory.BLANK_TEMPLATE_DIR", blank_dir), \
+             patch("core.person_factory.BOOTSTRAP_TEMPLATE", tmp_path / "no"):
+            person_dir = create_blank(persons_dir, "alice")
+
+        assert (person_dir / "send").exists()
+
+    def test_create_from_template_includes_send_script(self, tmp_path):
+        """create_from_template() should also include send script."""
+        tpl_dir = tmp_path / "tpl"
+        (tpl_dir / "dev").mkdir(parents=True)
+        (tpl_dir / "dev" / "identity.md").write_text("dev", encoding="utf-8")
+
+        blank_dir = tmp_path / "blank"
+        blank_dir.mkdir()
+        (blank_dir / "send").write_text("#!/bin/bash\ntest", encoding="utf-8")
+
+        persons_dir = tmp_path / "persons"
+        persons_dir.mkdir()
+
+        with patch("core.person_factory.PERSON_TEMPLATES_DIR", tpl_dir), \
+             patch("core.person_factory.BLANK_TEMPLATE_DIR", blank_dir), \
+             patch("core.person_factory.BOOTSTRAP_TEMPLATE", tmp_path / "no"):
+            person_dir = create_from_template(persons_dir, "dev")
+
+        assert (person_dir / "send").exists()

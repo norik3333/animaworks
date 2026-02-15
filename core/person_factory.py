@@ -71,6 +71,7 @@ def create_from_template(
     _ensure_runtime_subdirs(person_dir)
     _init_state_files(person_dir)
     _place_bootstrap(person_dir)
+    _place_send_script(person_dir)
 
     logger.info("Created person '%s' from template '%s'", name, template_name)
     return person_dir
@@ -108,6 +109,7 @@ def create_blank(persons_dir: Path, name: str) -> Path:
     _ensure_runtime_subdirs(person_dir)
     _init_state_files(person_dir)
     _place_bootstrap(person_dir)
+    _place_send_script(person_dir)
 
     logger.info("Created blank person '%s'", name)
     return person_dir
@@ -223,6 +225,16 @@ def _place_bootstrap(person_dir: Path) -> None:
     if BOOTSTRAP_TEMPLATE.exists():
         shutil.copy2(BOOTSTRAP_TEMPLATE, person_dir / "bootstrap.md")
         logger.debug("Placed bootstrap.md in %s", person_dir)
+
+
+def _place_send_script(person_dir: Path) -> None:
+    """Place the send wrapper script in person_dir if not already present."""
+    src = BLANK_TEMPLATE_DIR / "send"
+    dst = person_dir / "send"
+    if src.exists() and not dst.exists():
+        shutil.copy2(src, dst)
+        dst.chmod(0o755)
+        logger.debug("Placed send script in %s", person_dir)
 
 
 def validate_person_name(name: str) -> str | None:

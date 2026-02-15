@@ -138,6 +138,7 @@ def _build_org_context(person_name: str, other_persons: list[str]) -> str:
 def _build_messaging_section(
     person_dir: Path,
     other_persons: list[str],
+    execution_mode: str = "a1",
 ) -> str:
     """Build the messaging instructions with resolved paths."""
     self_name = person_dir.name
@@ -146,8 +147,9 @@ def _build_messaging_section(
         ", ".join(other_persons) if other_persons else "(まだ他の社員はいません)"
     )
 
+    template_name = "messaging_a1" if execution_mode == "a1" else "messaging"
     return load_prompt(
-        "messaging",
+        template_name,
         persons_line=persons_line,
         main_py=main_py,
         self_name=self_name,
@@ -325,7 +327,7 @@ def build_system_prompt(
         parts.append(org_context)
 
     # Messaging instructions
-    parts.append(_build_messaging_section(pd, other_persons))
+    parts.append(_build_messaging_section(pd, other_persons, execution_mode))
 
     # Hiring context: suggest team building when top-level person has no peers
     if not other_persons:
