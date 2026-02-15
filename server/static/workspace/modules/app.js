@@ -315,7 +315,10 @@ function renderConvMessages() {
     return;
   }
   dom.convMessages.innerHTML = chatMessages.map(renderConvBubble).join("");
-  dom.convMessages.scrollTop = dom.convMessages.scrollHeight;
+  requestAnimationFrame(() => {
+    const last = dom.convMessages.lastElementChild;
+    if (last) last.scrollIntoView({ block: "end", behavior: "instant" });
+  });
 }
 
 async function loadAndRenderConvMessages(personName) {
@@ -420,7 +423,7 @@ async function sendConversationMessage() {
       for (const { event: evt, data } of parsed) {
         if (evt === "text_delta" && data.text) {
           streamingMsg.text += data.text;
-          updateStreamingBubble(streamingMsg);
+          scheduleStreamingUpdate(streamingMsg);
         } else if (evt === "tool_start") {
           streamingMsg.activeTool = data.tool_name;
           setExpression("thinking");
@@ -473,6 +476,23 @@ async function sendConversationMessage() {
   }
 }
 
+// ── Streaming update with rAF throttle ──────────────────────
+
+let _convRafPending = false;
+let _convLatestStreamingMsg = null;
+
+function scheduleStreamingUpdate(msg) {
+  _convLatestStreamingMsg = msg;
+  if (_convRafPending) return;
+  _convRafPending = true;
+  requestAnimationFrame(() => {
+    _convRafPending = false;
+    if (_convLatestStreamingMsg) {
+      updateStreamingBubble(_convLatestStreamingMsg);
+    }
+  });
+}
+
 function updateStreamingBubble(msg) {
   if (!dom.convMessages) return;
   const bubble = dom.convMessages.querySelector(".chat-bubble.assistant.streaming");
@@ -488,7 +508,9 @@ function updateStreamingBubble(msg) {
     html += `<div class="tool-indicator"><span class="tool-spinner"></span>${escapeHtml(msg.activeTool)} を実行中...</div>`;
   }
   bubble.innerHTML = html;
-  dom.convMessages.scrollTop = dom.convMessages.scrollHeight;
+  requestAnimationFrame(() => {
+    bubble.scrollIntoView({ block: "end", behavior: "instant" });
+  });
 }
 
 // ── System Status ──────────────────────
