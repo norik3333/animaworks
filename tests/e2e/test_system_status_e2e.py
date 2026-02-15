@@ -36,6 +36,8 @@ def _create_real_app(tmp_path: Path) -> "FastAPI":  # noqa: F821
         # Configure mock supervisor
         supervisor = MagicMock()
         supervisor.get_all_status.return_value = {}
+        supervisor.is_scheduler_running.return_value = False
+        supervisor.scheduler = None
         mock_sup_cls.return_value = supervisor
 
         # Configure mock ws_manager
@@ -84,6 +86,7 @@ class TestSystemStatusE2E:
             encoding="utf-8",
         )
         app.state.person_names = ["alice"]
+        app.state.supervisor.is_scheduler_running.return_value = True
 
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:

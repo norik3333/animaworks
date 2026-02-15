@@ -22,7 +22,12 @@ from pathlib import Path
 from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any, Union
 
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
+
 from core.person import DigitalPerson
+from core.schedule_parser import parse_cron_md, parse_schedule, parse_heartbeat_config
+from core.schemas import CronTask
 from core.supervisor.ipc import IPCServer, IPCRequest, IPCResponse
 
 logger = logging.getLogger(__name__)
@@ -52,6 +57,7 @@ class PersonRunner:
         self.person: DigitalPerson | None = None
         self.ipc_server: IPCServer | None = None
         self.inbox_watcher_task: asyncio.Task | None = None
+        self.scheduler: AsyncIOScheduler | None = None
         self.shutdown_event = asyncio.Event()
         self._ready_event = asyncio.Event()
         self._started_at = datetime.now()
@@ -85,6 +91,9 @@ class PersonRunner:
             )
             self._ready_event.set()
 
+            # Start autonomous scheduler (heartbeat + cron)
+            self._setup_scheduler()
+
             # Start inbox watcher
             self.inbox_watcher_task = asyncio.create_task(
                 self._inbox_watcher_loop()
@@ -103,6 +112,154 @@ class PersonRunner:
 
         finally:
             await self._cleanup()
+
+    # ── Autonomous Scheduler ────────────────────────────────────────
+
+    def _setup_scheduler(self) -> None:
+        """Set up and start the autonomous scheduler for heartbeat and cron."""
+        if not self.person:
+            return
+
+        try:
+            self.scheduler = AsyncIOScheduler(timezone="Asia/Tokyo")
+            self._setup_heartbeat()
+            self._setup_cron_tasks()
+            self.scheduler.start()
+
+            # Wire up hot-reload callback
+            self.person.set_on_schedule_changed(self._reload_schedule)
+
+            job_count = len(self.scheduler.get_jobs())
+            logger.info(
+                "Scheduler started for %s: %d jobs registered",
+                self.person_name, job_count,
+            )
+        except Exception:
+            logger.exception("Failed to setup scheduler for %s", self.person_name)
+            self.scheduler = None
+
+    def _setup_heartbeat(self) -> None:
+        """Register heartbeat job from heartbeat.md."""
+        if not self.person or not self.scheduler:
+            return
+
+        config = self.person.memory.read_heartbeat_config()
+        if not config:
+            return
+
+        interval, active_start, active_end = parse_heartbeat_config(config)
+
+        self.scheduler.add_job(
+            self._heartbeat_tick,
+            CronTrigger(
+                minute=f"*/{interval}",
+                hour=f"{active_start}-{active_end - 1}",
+            ),
+            id=f"{self.person_name}_heartbeat",
+            name=f"{self.person_name} heartbeat",
+            replace_existing=True,
+        )
+        logger.info(
+            "Heartbeat registered: %s every %dmin, active %d:00-%d:00",
+            self.person_name, interval, active_start, active_end,
+        )
+
+    async def _heartbeat_tick(self) -> None:
+        """Execute a scheduled heartbeat."""
+        if not self.person:
+            return
+        try:
+            logger.info("Scheduled heartbeat: %s", self.person_name)
+            await self.person.run_heartbeat()
+        except Exception:
+            logger.exception("Scheduled heartbeat failed: %s", self.person_name)
+
+    def _setup_cron_tasks(self) -> None:
+        """Register cron jobs from cron.md."""
+        if not self.person or not self.scheduler:
+            return
+
+        config = self.person.memory.read_cron_config()
+        if not config:
+            return
+
+        tasks = parse_cron_md(config)
+        for i, task in enumerate(tasks):
+            trigger = parse_schedule(task.schedule)
+            if not trigger:
+                logger.warning(
+                    "Could not parse schedule for cron task '%s': '%s'",
+                    task.name, task.schedule,
+                )
+                continue
+
+            self.scheduler.add_job(
+                self._cron_tick,
+                trigger,
+                id=f"{self.person_name}_cron_{i}",
+                name=f"{self.person_name}: {task.name}",
+                args=[task],
+                replace_existing=True,
+            )
+            logger.info(
+                "Cron registered: %s -> %s (%s) [%s]",
+                self.person_name, task.name, task.schedule, task.type,
+            )
+
+    async def _cron_tick(self, task: CronTask) -> None:
+        """Execute a scheduled cron task."""
+        if not self.person:
+            return
+
+        logger.info("Scheduled cron: %s -> %s [%s]", self.person_name, task.name, task.type)
+        # Run in separate task to avoid blocking other scheduled jobs
+        asyncio.create_task(
+            self._run_cron_task(task),
+            name=f"cron-{self.person_name}-{task.name}",
+        )
+
+    async def _run_cron_task(self, task: CronTask) -> None:
+        """Run a single cron task (LLM or command type)."""
+        if not self.person:
+            return
+        try:
+            if task.type == "llm":
+                await self.person.run_cron_task(task.name, task.description)
+            elif task.type == "command":
+                await self.person.run_cron_command(
+                    task.name,
+                    command=task.command,
+                    tool=task.tool,
+                    args=task.args,
+                )
+            else:
+                logger.warning("Unknown cron type '%s' for task '%s'", task.type, task.name)
+        except Exception:
+            logger.exception("Cron task failed: %s -> %s", self.person_name, task.name)
+
+    def _reload_schedule(self, name: str) -> dict[str, Any]:
+        """Reload heartbeat and cron schedules from disk (hot-reload callback)."""
+        if not self.scheduler:
+            return {"error": "Scheduler not running"}
+
+        # Remove all existing jobs
+        removed = 0
+        for job in self.scheduler.get_jobs():
+            job.remove()
+            removed += 1
+
+        # Re-setup from current files
+        self._setup_heartbeat()
+        self._setup_cron_tasks()
+
+        new_jobs = [j.id for j in self.scheduler.get_jobs()]
+        logger.info(
+            "Schedule reloaded for %s: removed=%d, new_jobs=%s",
+            self.person_name, removed, new_jobs,
+        )
+        return {"reloaded": name, "removed": removed, "new_jobs": new_jobs}
+
+    # ── IPC Handlers ──────────────────────────────────────────────
 
     async def _handle_request(
         self, request: IPCRequest
@@ -348,6 +505,8 @@ class PersonRunner:
             "status": self.person._status,
             "current_task": self.person._current_task or None,
             "needs_bootstrap": self.person.needs_bootstrap,
+            "scheduler_running": self.scheduler.running if self.scheduler else False,
+            "scheduler_jobs": len(self.scheduler.get_jobs()) if self.scheduler else 0,
         }
 
     async def _handle_ping(self, params: dict[str, Any]) -> dict[str, Any]:
@@ -419,6 +578,14 @@ class PersonRunner:
                 await self.inbox_watcher_task
             except asyncio.CancelledError:
                 pass
+
+        # Stop scheduler
+        if self.scheduler:
+            try:
+                self.scheduler.shutdown(wait=False)
+            except Exception:
+                pass  # Scheduler may not have been started
+            logger.info("Scheduler stopped for %s", self.person_name)
 
         # Stop IPC server
         if self.ipc_server:

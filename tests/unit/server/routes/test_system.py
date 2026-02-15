@@ -32,6 +32,8 @@ def _make_test_app(
     supervisor = MagicMock()
     supervisor.get_all_status.return_value = {}
     supervisor.get_process_status.return_value = {"status": "running", "pid": 1234}
+    supervisor.is_scheduler_running.return_value = False
+    supervisor.scheduler = None
     supervisor.start_person = AsyncMock()
     supervisor.stop_person = AsyncMock()
     supervisor.restart_person = AsyncMock()
@@ -121,6 +123,7 @@ class TestSystemStatus:
         )
 
         app = _make_test_app(persons_dir=persons_dir, person_names=["alice"])
+        app.state.supervisor.is_scheduler_running.return_value = True
         app.state.supervisor.get_all_status.return_value = {
             "alice": {"status": "running", "pid": 1234},
         }
@@ -341,7 +344,7 @@ class TestSystemScheduler:
             resp = await client.get("/api/system/scheduler")
         data = resp.json()
         assert data["running"] is False
-        assert data["jobs"] == []
+        assert data["person_jobs"] == []
 
     async def test_no_persons(self, tmp_path):
         """No registered persons -> running=False, empty jobs."""
@@ -354,7 +357,7 @@ class TestSystemScheduler:
             resp = await client.get("/api/system/scheduler")
         data = resp.json()
         assert data["running"] is False
-        assert data["jobs"] == []
+        assert data["person_jobs"] == []
 
     async def test_scheduler_with_cron_jobs(self, tmp_path):
         """cron.md with active jobs -> running=True, jobs populated."""
@@ -370,14 +373,18 @@ class TestSystemScheduler:
         )
 
         app = _make_test_app(persons_dir=persons_dir, person_names=["alice"])
+        app.state.supervisor.is_scheduler_running.return_value = True
+        mock_scheduler = MagicMock()
+        mock_scheduler.get_jobs.return_value = []
+        app.state.supervisor.scheduler = mock_scheduler
 
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.get("/api/system/scheduler")
         data = resp.json()
         assert data["running"] is True
-        assert len(data["jobs"]) == 1
-        job = data["jobs"][0]
+        assert len(data["person_jobs"]) == 1
+        job = data["person_jobs"][0]
         assert job["person"] == "alice"
         assert job["type"] == "llm"
         assert "Morning Report" in job["name"]
@@ -398,14 +405,18 @@ class TestSystemScheduler:
         app = _make_test_app(
             persons_dir=persons_dir, person_names=["alice", "bob"],
         )
+        app.state.supervisor.is_scheduler_running.return_value = True
+        mock_scheduler = MagicMock()
+        mock_scheduler.get_jobs.return_value = []
+        app.state.supervisor.scheduler = mock_scheduler
 
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.get("/api/system/scheduler")
         data = resp.json()
         assert data["running"] is True
-        assert len(data["jobs"]) == 2
-        persons_in_jobs = {j["person"] for j in data["jobs"]}
+        assert len(data["person_jobs"]) == 2
+        persons_in_jobs = {j["person"] for j in data["person_jobs"]}
         assert persons_in_jobs == {"alice", "bob"}
 
     async def test_scheduler_commented_sections_ignored(self, tmp_path):
@@ -430,7 +441,7 @@ class TestSystemScheduler:
             resp = await client.get("/api/system/scheduler")
         data = resp.json()
         assert data["running"] is False
-        assert data["jobs"] == []
+        assert data["person_jobs"] == []
 
     async def test_scheduler_mixed_active_and_commented(self, tmp_path):
         """Active jobs are returned; commented-out ones are skipped."""
@@ -451,14 +462,18 @@ class TestSystemScheduler:
         )
 
         app = _make_test_app(persons_dir=persons_dir, person_names=["alice"])
+        app.state.supervisor.is_scheduler_running.return_value = True
+        mock_scheduler = MagicMock()
+        mock_scheduler.get_jobs.return_value = []
+        app.state.supervisor.scheduler = mock_scheduler
 
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.get("/api/system/scheduler")
         data = resp.json()
         assert data["running"] is True
-        assert len(data["jobs"]) == 1
-        assert "Active Task" in data["jobs"][0]["name"]
+        assert len(data["person_jobs"]) == 1
+        assert "Active Task" in data["person_jobs"][0]["name"]
 
 
 # ── _parse_cron_jobs (unit) ────────────────────────────────

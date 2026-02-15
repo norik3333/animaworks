@@ -42,12 +42,14 @@ def _make_test_app(
 
     # Configure scheduler presence
     if scheduler is ...:
-        # Default: leave whatever MagicMock auto-creates
-        pass
+        # Default: scheduler not running
+        supervisor.is_scheduler_running.return_value = False
     elif scheduler is None:
-        # Explicitly remove scheduler attribute
-        del supervisor.scheduler
+        # Explicitly no scheduler
+        supervisor.is_scheduler_running.return_value = False
+        supervisor.scheduler = None
     else:
+        supervisor.is_scheduler_running.return_value = True
         supervisor.scheduler = scheduler
 
     router = create_system_router()

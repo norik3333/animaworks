@@ -77,19 +77,14 @@ def create_system_router() -> APIRouter:
     async def system_status(request: Request):
         supervisor = request.app.state.supervisor
         person_names = request.app.state.person_names
-        persons_dir = request.app.state.persons_dir
 
         # Get all process statuses
         process_statuses = supervisor.get_all_status()
 
-        # Check if any cron jobs are defined
-        cron_jobs = _parse_cron_jobs(persons_dir, person_names)
-        has_cron = len(cron_jobs) > 0
-
         return {
             "persons": len(person_names),
             "processes": process_statuses,
-            "scheduler_running": has_cron,
+            "scheduler_running": supervisor.is_scheduler_running(),
         }
 
     @router.post("/system/reload")
@@ -175,15 +170,31 @@ def create_system_router() -> APIRouter:
 
     @router.get("/system/scheduler")
     async def system_scheduler(request: Request):
-        """Return scheduler job information from cron.md files."""
+        """Return scheduler status and job information."""
+        supervisor = request.app.state.supervisor
         persons_dir = request.app.state.persons_dir
         person_names = request.app.state.person_names
 
+        # Get configured jobs from cron.md files (for display)
         jobs = _parse_cron_jobs(persons_dir, person_names)
 
+        # Get system scheduler jobs
+        system_jobs = []
+        if supervisor.scheduler:
+            for job in supervisor.scheduler.get_jobs():
+                system_jobs.append({
+                    "id": job.id,
+                    "name": job.name,
+                    "person": "system",
+                    "type": "consolidation",
+                    "schedule": str(job.trigger),
+                    "next_run": job.next_run_time.isoformat() if job.next_run_time else None,
+                })
+
         return {
-            "running": len(jobs) > 0,
-            "jobs": jobs,
+            "running": supervisor.is_scheduler_running(),
+            "system_jobs": system_jobs,
+            "person_jobs": jobs,
         }
 
     # ── Activity ───────────────────────────────────────────

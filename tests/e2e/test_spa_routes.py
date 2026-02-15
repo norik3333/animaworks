@@ -35,6 +35,8 @@ def _create_test_app(tmp_path: Path):
     supervisor.get_all_status.return_value = {}
     supervisor.get_process_status.return_value = {"status": "idle", "pid": None}
     supervisor.processes = {}
+    supervisor.is_scheduler_running.return_value = False
+    supervisor.scheduler = None
 
     # Mock ws_manager
     ws_manager = MagicMock()
@@ -200,7 +202,7 @@ class TestScheduler:
             resp = await c.get("/api/system/scheduler")
         data = resp.json()
         assert data["running"] is False
-        assert data["jobs"] == []
+        assert data["person_jobs"] == []
 
     async def test_with_scheduler_and_jobs(self, tmp_path):
         """When cron.md files exist, report parsed jobs."""
@@ -218,14 +220,17 @@ class TestScheduler:
             encoding="utf-8",
         )
         app.state.person_names = ["alice"]
+        app.state.supervisor.is_scheduler_running.return_value = True
+        app.state.supervisor.scheduler = MagicMock()
+        app.state.supervisor.scheduler.get_jobs.return_value = []
 
         async with _client(app) as c:
             resp = await c.get("/api/system/scheduler")
         data = resp.json()
         assert data["running"] is True
-        assert len(data["jobs"]) == 1
-        assert data["jobs"][0]["person"] == "alice"
-        assert "Morning Planning" in data["jobs"][0]["name"]
+        assert len(data["person_jobs"]) == 1
+        assert data["person_jobs"][0]["person"] == "alice"
+        assert "Morning Planning" in data["person_jobs"][0]["name"]
 
 
 # ── 5. Logs Integration ─────────────────────────────────────────

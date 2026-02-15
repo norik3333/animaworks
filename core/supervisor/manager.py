@@ -13,6 +13,9 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
+
 from core.supervisor.ipc import IPCResponse
 from core.supervisor.process_handle import ProcessHandle, ProcessState
 
@@ -84,6 +87,8 @@ class ProcessSupervisor:
         self._health_check_task: asyncio.Task | None = None
         self._reconciliation_task: asyncio.Task | None = None
         self._shutdown = False
+        self.scheduler: AsyncIOScheduler | None = None
+        self._scheduler_running: bool = False
         self._restart_counts: dict[str, int] = {}
         self._restarting: set[str] = set()
         self._bootstrapping: set[str] = set()
@@ -91,6 +96,10 @@ class ProcessSupervisor:
         # Callbacks for person lifecycle events (set by server/app.py)
         self.on_person_added: Callable[[str], None] | None = None
         self.on_person_removed: Callable[[str], None] | None = None
+
+    def is_scheduler_running(self) -> bool:
+        """Return whether the system scheduler is running."""
+        return self._scheduler_running
 
     async def start_all(self, person_names: list[str]) -> None:
         """
@@ -118,6 +127,9 @@ class ProcessSupervisor:
         self._reconciliation_task = asyncio.create_task(
             self._reconciliation_loop()
         )
+
+        # Start system scheduler (daily/weekly consolidation)
+        self._start_system_scheduler()
 
         logger.info("All processes started")
 
@@ -267,6 +279,12 @@ class ProcessSupervisor:
         """Shutdown all processes gracefully."""
         logger.info("Shutting down all processes")
         self._shutdown = True
+
+        # Stop system scheduler
+        if self.scheduler:
+            self.scheduler.shutdown(wait=False)
+            self._scheduler_running = False
+            logger.info("System scheduler stopped")
 
         # Stop health check
         if self._health_check_task:
@@ -614,6 +632,165 @@ class ProcessSupervisor:
                     logger.exception(
                         "Reconciliation: failed to stop %s", name
                     )
+
+    # ── System Scheduler ────────────────────────────────────────
+
+    def _start_system_scheduler(self) -> None:
+        """Start the system-level scheduler for consolidation crons."""
+        try:
+            self.scheduler = AsyncIOScheduler(timezone="Asia/Tokyo")
+            self._setup_system_crons()
+            self.scheduler.start()
+            self._scheduler_running = True
+            logger.info("System scheduler started")
+        except Exception:
+            logger.exception("Failed to start system scheduler")
+            self.scheduler = None
+            self._scheduler_running = False
+
+    def _setup_system_crons(self) -> None:
+        """Register system-wide cron jobs for memory consolidation."""
+        if not self.scheduler:
+            return
+
+        # Load consolidation config
+        try:
+            from core.config import load_config
+            config = load_config()
+            consolidation_cfg = getattr(config, "consolidation", None)
+        except Exception:
+            consolidation_cfg = None
+
+        # Daily consolidation
+        daily_enabled = True
+        daily_time = "02:00"
+        if consolidation_cfg:
+            daily_enabled = getattr(consolidation_cfg, "daily_enabled", True)
+            daily_time = getattr(consolidation_cfg, "daily_time", "02:00")
+
+        if daily_enabled:
+            hour, minute = (int(x) for x in daily_time.split(":"))
+            self.scheduler.add_job(
+                self._run_daily_consolidation,
+                CronTrigger(hour=hour, minute=minute),
+                id="system_daily_consolidation",
+                name="System: Daily Consolidation",
+                replace_existing=True,
+            )
+            logger.info("System cron: Daily consolidation at %s JST", daily_time)
+
+        # Weekly integration
+        weekly_enabled = True
+        weekly_time = "sun:03:00"
+        if consolidation_cfg:
+            weekly_enabled = getattr(consolidation_cfg, "weekly_enabled", True)
+            weekly_time = getattr(consolidation_cfg, "weekly_time", "sun:03:00")
+
+        if weekly_enabled:
+            parts = weekly_time.split(":")
+            day_of_week = parts[0] if len(parts) == 3 else "sun"
+            time_parts = parts[-2:]
+            hour, minute = int(time_parts[0]), int(time_parts[1])
+            self.scheduler.add_job(
+                self._run_weekly_integration,
+                CronTrigger(day_of_week=day_of_week, hour=hour, minute=minute),
+                id="system_weekly_integration",
+                name="System: Weekly Integration",
+                replace_existing=True,
+            )
+            logger.info("System cron: Weekly integration on %s at %s:%s JST", day_of_week, time_parts[0], time_parts[1])
+
+    async def _run_daily_consolidation(self) -> None:
+        """Run daily consolidation for all persons."""
+        logger.info("Starting system-wide daily consolidation")
+
+        try:
+            from core.config import load_config
+            config = load_config()
+            consolidation_cfg = getattr(config, "consolidation", None)
+        except Exception:
+            consolidation_cfg = None
+
+        model = "anthropic/claude-sonnet-4-20250514"
+        min_episodes = 1
+        if consolidation_cfg:
+            model = getattr(consolidation_cfg, "llm_model", model)
+            min_episodes = getattr(consolidation_cfg, "min_episodes_threshold", 1)
+
+        for person_name in list(self.processes.keys()):
+            try:
+                from core.memory.consolidation import ConsolidationEngine
+
+                person_dir = self.persons_dir / person_name
+                engine = ConsolidationEngine(
+                    person_dir=person_dir,
+                    person_name=person_name,
+                )
+
+                result = await engine.daily_consolidate(
+                    model=model,
+                    min_episodes=min_episodes,
+                )
+
+                logger.info("Daily consolidation for %s: %s", person_name, result)
+
+                if not result.get("skipped"):
+                    await self._broadcast_event(
+                        "system.consolidation",
+                        {"person": person_name, "type": "daily", "result": result},
+                    )
+            except Exception:
+                logger.exception("Daily consolidation failed for %s", person_name)
+
+    async def _run_weekly_integration(self) -> None:
+        """Run weekly integration for all persons."""
+        logger.info("Starting system-wide weekly integration")
+
+        try:
+            from core.config import load_config
+            config = load_config()
+            consolidation_cfg = getattr(config, "consolidation", None)
+        except Exception:
+            consolidation_cfg = None
+
+        model = "anthropic/claude-sonnet-4-20250514"
+        duplicate_threshold = 0.85
+        episode_retention_days = 30
+        if consolidation_cfg:
+            model = getattr(consolidation_cfg, "llm_model", model)
+            duplicate_threshold = getattr(consolidation_cfg, "duplicate_threshold", 0.85)
+            episode_retention_days = getattr(consolidation_cfg, "episode_retention_days", 30)
+
+        for person_name in list(self.processes.keys()):
+            try:
+                from core.memory.consolidation import ConsolidationEngine
+
+                person_dir = self.persons_dir / person_name
+                engine = ConsolidationEngine(
+                    person_dir=person_dir,
+                    person_name=person_name,
+                )
+
+                result = await engine.weekly_integrate(
+                    model=model,
+                    duplicate_threshold=duplicate_threshold,
+                    episode_retention_days=episode_retention_days,
+                )
+
+                logger.info(
+                    "Weekly integration for %s: merged=%d compressed=%d",
+                    person_name,
+                    len(result.get("knowledge_files_merged", [])),
+                    result.get("episodes_compressed", 0),
+                )
+
+                if not result.get("skipped"):
+                    await self._broadcast_event(
+                        "system.consolidation",
+                        {"person": person_name, "type": "weekly", "result": result},
+                    )
+            except Exception:
+                logger.exception("Weekly integration failed for %s", person_name)
 
     # ── Status ───────────────────────────────────────────────────
 

@@ -52,6 +52,8 @@ def _create_app(
             "status": "stopped",
             "pid": None,
         }
+        supervisor.is_scheduler_running.return_value = False
+        supervisor.scheduler = None
         mock_sup_cls.return_value = supervisor
 
         ws_manager = MagicMock()
@@ -118,6 +120,7 @@ class TestSchedulerWithCronMd:
         _write_cron_md(persons_dir, "sakura", CRON_SAKURA)
 
         app = _create_app(tmp_path, person_names=["sakura"])
+        app.state.supervisor.is_scheduler_running.return_value = True
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.get("/api/system/status")
@@ -134,6 +137,9 @@ class TestSchedulerWithCronMd:
         _write_cron_md(persons_dir, "sakura", CRON_SAKURA)
 
         app = _create_app(tmp_path, person_names=["sakura"])
+        app.state.supervisor.is_scheduler_running.return_value = True
+        app.state.supervisor.scheduler = MagicMock()
+        app.state.supervisor.scheduler.get_jobs.return_value = []
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.get("/api/system/scheduler")
@@ -141,14 +147,14 @@ class TestSchedulerWithCronMd:
         assert resp.status_code == 200
         data = resp.json()
         assert data["running"] is True
-        assert len(data["jobs"]) == 2
+        assert len(data["person_jobs"]) == 2
 
         # Verify job fields
-        job_names = [j["name"] for j in data["jobs"]]
+        job_names = [j["name"] for j in data["person_jobs"]]
         assert "Morning Planning (Daily 9:00 JST)" in job_names
         assert "Weekly Review (Friday 17:00 JST)" in job_names
 
-        for job in data["jobs"]:
+        for job in data["person_jobs"]:
             assert "id" in job
             assert "name" in job
             assert "person" in job
@@ -166,12 +172,15 @@ class TestSchedulerWithCronMd:
         _write_cron_md(persons_dir, "sakura", CRON_SAKURA)
 
         app = _create_app(tmp_path, person_names=["sakura"])
+        app.state.supervisor.is_scheduler_running.return_value = True
+        app.state.supervisor.scheduler = MagicMock()
+        app.state.supervisor.scheduler.get_jobs.return_value = []
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.get("/api/system/scheduler")
 
         data = resp.json()
-        schedules = {j["name"]: j["schedule"] for j in data["jobs"]}
+        schedules = {j["name"]: j["schedule"] for j in data["person_jobs"]}
         assert schedules["Morning Planning (Daily 9:00 JST)"] == "Daily 9:00 JST"
         assert schedules["Weekly Review (Friday 17:00 JST)"] == "Friday 17:00 JST"
 
@@ -183,12 +192,15 @@ class TestSchedulerWithCronMd:
         _write_cron_md(persons_dir, "sakura", CRON_SAKURA)
 
         app = _create_app(tmp_path, person_names=["sakura"])
+        app.state.supervisor.is_scheduler_running.return_value = True
+        app.state.supervisor.scheduler = MagicMock()
+        app.state.supervisor.scheduler.get_jobs.return_value = []
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.get("/api/system/scheduler")
 
         data = resp.json()
-        job_names = [j["name"] for j in data["jobs"]]
+        job_names = [j["name"] for j in data["person_jobs"]]
         # "Commented Out" should NOT appear — it is inside <!-- -->
         assert all("Commented Out" not in name for name in job_names)
 
@@ -201,6 +213,9 @@ class TestSchedulerWithCronMd:
         _write_cron_md(persons_dir, "taro", CRON_TARO)
 
         app = _create_app(tmp_path, person_names=["sakura", "taro"])
+        app.state.supervisor.is_scheduler_running.return_value = True
+        app.state.supervisor.scheduler = MagicMock()
+        app.state.supervisor.scheduler.get_jobs.return_value = []
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.get("/api/system/scheduler")
@@ -208,14 +223,14 @@ class TestSchedulerWithCronMd:
         data = resp.json()
         assert data["running"] is True
         # sakura has 2 jobs, taro has 1 = 3 total
-        assert len(data["jobs"]) == 3
+        assert len(data["person_jobs"]) == 3
 
-        persons_in_jobs = {j["person"] for j in data["jobs"]}
+        persons_in_jobs = {j["person"] for j in data["person_jobs"]}
         assert "sakura" in persons_in_jobs
         assert "taro" in persons_in_jobs
 
         # Taro's job should have type "command"
-        taro_jobs = [j for j in data["jobs"] if j["person"] == "taro"]
+        taro_jobs = [j for j in data["person_jobs"] if j["person"] == "taro"]
         assert len(taro_jobs) == 1
         assert taro_jobs[0]["type"] == "command"
         assert taro_jobs[0]["schedule"] == "Monday 10:00 JST"
@@ -263,7 +278,7 @@ class TestSchedulerWithoutCronMd:
         assert resp.status_code == 200
         data = resp.json()
         assert data["running"] is False
-        assert data["jobs"] == []
+        assert data["person_jobs"] == []
 
     async def test_system_scheduler_empty_when_no_persons(
         self, tmp_path: Path,
@@ -277,7 +292,7 @@ class TestSchedulerWithoutCronMd:
         assert resp.status_code == 200
         data = resp.json()
         assert data["running"] is False
-        assert data["jobs"] == []
+        assert data["person_jobs"] == []
 
     async def test_system_status_no_persons_scheduler_false(
         self, tmp_path: Path,
