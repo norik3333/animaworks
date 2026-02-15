@@ -165,6 +165,27 @@ def _load_a2_reflection() -> str:
         return ""
 
 
+def _build_human_notification_guidance() -> str:
+    """Build the human notification instruction for top-level Persons."""
+    return """\
+## 人間への報告
+
+あなたはトップレベルのPersonです（上司なし）。
+重要な事項は `notify_human` ツールで人間の管理者に報告してください。
+
+**報告すべき場合:**
+- 問題・エラー・障害の検出
+- 判断が必要な事項
+- 重要なタスクの完了報告
+- 部下からのエスカレーション
+
+**報告不要な場合:**
+- 定常的な巡回で特に問題がなかった場合
+- 軽微な自動修復が完了した場合
+
+判断に迷う場合は報告してください。"""
+
+
 def build_system_prompt(
     memory: MemoryManager,
     tool_registry: list[str] | None = None,
@@ -328,6 +349,17 @@ def build_system_prompt(
 
     # Messaging instructions
     parts.append(_build_messaging_section(pd, other_persons, execution_mode))
+
+    # Human notification guidance for top-level Persons
+    try:
+        from core.config import load_config as _load_cfg
+        _cfg = _load_cfg()
+        _my_pcfg = _cfg.persons.get(pd.name)
+        _is_top_level = _my_pcfg is None or _my_pcfg.supervisor is None
+        if _is_top_level and _cfg.human_notification.enabled:
+            parts.append(_build_human_notification_guidance())
+    except Exception:
+        logger.debug("Skipped human notification guidance injection", exc_info=True)
 
     # Hiring context: suggest team building when top-level person has no peers
     if not other_persons:

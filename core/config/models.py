@@ -139,6 +139,21 @@ class ImageGenConfig(BaseModel):
     vibe_info_extracted: float = 0.8  # Vibe Transfer information extraction (0.0-1.0)
 
 
+class NotificationChannelConfig(BaseModel):
+    """Configuration for a single human notification channel."""
+
+    type: str  # "slack", "line", "telegram", "chatwork", "ntfy"
+    enabled: bool = True
+    config: dict[str, Any] = {}
+
+
+class HumanNotificationConfig(BaseModel):
+    """Global configuration for human notification from top-level Persons."""
+
+    enabled: bool = False
+    channels: list[NotificationChannelConfig] = []
+
+
 class AnimaWorksConfig(BaseModel):
     version: int = 1
     setup_complete: bool = False
@@ -152,6 +167,7 @@ class AnimaWorksConfig(BaseModel):
     rag: RAGConfig = RAGConfig()
     priming: PrimingConfig = PrimingConfig()
     image_gen: ImageGenConfig = ImageGenConfig()
+    human_notification: HumanNotificationConfig = HumanNotificationConfig()
 
 
 # ---------------------------------------------------------------------------

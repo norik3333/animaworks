@@ -197,6 +197,35 @@ SEARCH_TOOLS: list[dict[str, Any]] = [
     },
 ]
 
+NOTIFICATION_TOOLS: list[dict[str, Any]] = [
+    {
+        "name": "notify_human",
+        "description": (
+            "人間の管理者に通知を送信します。"
+            "重要な報告、問題のエスカレーション、判断が必要な事項がある場合に使用してください。"
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "subject": {
+                    "type": "string",
+                    "description": "通知の件名（簡潔に）",
+                },
+                "body": {
+                    "type": "string",
+                    "description": "通知の本文（詳細な報告内容）",
+                },
+                "priority": {
+                    "type": "string",
+                    "enum": ["low", "normal", "high", "urgent"],
+                    "description": "通知の優先度（デフォルト: normal）",
+                },
+            },
+            "required": ["subject", "body"],
+        },
+    },
+]
+
 DISCOVERY_TOOLS: list[dict[str, Any]] = [
     {
         "name": "discover_tools",
@@ -259,6 +288,7 @@ def build_tool_list(
     include_file_tools: bool = False,
     include_search_tools: bool = False,
     include_discovery_tools: bool = False,
+    include_notification_tools: bool = False,
     external_schemas: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     """Assemble a tool list from canonical definitions.
@@ -267,6 +297,7 @@ def build_tool_list(
         include_file_tools: Include file/command operation tools (for A2 mode).
         include_search_tools: Include search_code/list_directory tools.
         include_discovery_tools: Include discover_tools tool.
+        include_notification_tools: Include notify_human tool (for top-level Persons).
         external_schemas: Additional tool schemas in canonical format.
 
     Returns:
@@ -279,6 +310,8 @@ def build_tool_list(
         tools.extend(SEARCH_TOOLS)
     if include_discovery_tools:
         tools.extend(DISCOVERY_TOOLS)
+    if include_notification_tools:
+        tools.extend(NOTIFICATION_TOOLS)
     if external_schemas:
         tools.extend(external_schemas)
     return tools

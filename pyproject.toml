@@ -23,11 +23,12 @@ dependencies = [
 
 [project.optional-dependencies]
 communication = ["requests>=2.31", "slack-sdk>=3.27"]
+notification = ["line-bot-sdk>=3.0"]
 gmail = ["google-api-python-client>=2.0", "google-auth-oauthlib>=1.0", "google-auth-httplib2>=0.2"]
 transcribe = ["faster-whisper>=1.0"]
 aws = ["boto3>=1.34"]
 rag = ["networkx>=3.0", "watchdog>=3.0.0"]
-all-tools = ["animaworks[communication,gmail,transcribe,aws,rag]"]
+all-tools = ["animaworks[communication,gmail,transcribe,aws,rag,notification]"]
 redis = ["redis>=5.0.0"]
 test = ["pytest>=8.0", "pytest-asyncio>=0.24", "pytest-timeout>=2.2", "psutil>=5.9.0"]
 evaluation = [
@@ -41,7 +42,7 @@ evaluation = [
 
 [tool.setuptools]
 py-modules = ["main"]
-packages = ["cli", "cli.commands", "core", "core.tools", "server"]
+packages = ["cli", "cli.commands", "core", "core.tools", "core.notification", "core.notification.channels", "server"]
 
 [project.scripts]
 animaworks = "cli:cli_main"

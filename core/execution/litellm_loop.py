@@ -108,6 +108,7 @@ class LiteLLMExecutor(BaseExecutor):
             include_file_tools=True,
             include_search_tools=True,
             include_discovery_tools=True,
+            include_notification_tools=self._tool_handler._human_notifier is not None,
         )
         return to_litellm_format(canonical)
 

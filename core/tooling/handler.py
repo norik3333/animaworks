@@ -25,6 +25,7 @@ from typing import Any
 from core.tooling.dispatch import ExternalToolDispatcher
 from core.memory import MemoryManager
 from core.messenger import Messenger
+from core.notification.notifier import HumanNotifier
 
 logger = logging.getLogger("animaworks.tool_handler")
 
@@ -72,6 +73,7 @@ class ToolHandler:
         personal_tools: dict[str, str] | None = None,
         on_message_sent: OnMessageSentFn | None = None,
         on_schedule_changed: Callable[[str], Any] | None = None,
+        human_notifier: HumanNotifier | None = None,
     ) -> None:
         self._person_dir = person_dir
         self._person_name = person_dir.name
@@ -79,6 +81,7 @@ class ToolHandler:
         self._messenger = messenger
         self._on_message_sent = on_message_sent
         self._on_schedule_changed = on_schedule_changed
+        self._human_notifier = human_notifier
         self._replied_to: set[str] = set()
         self._external = ExternalToolDispatcher(
             tool_registry or [],
@@ -149,6 +152,10 @@ class ToolHandler:
             return self._handle_search_code(args)
         if name == "list_directory":
             return self._handle_list_directory(args)
+
+        # Human notification
+        if name == "notify_human":
+            return self._handle_notify_human(args)
 
         # External tool dispatch -- inject person_dir for tools that need it
         ext_args = {**args, "person_dir": str(self._person_dir)}
@@ -232,6 +239,60 @@ class ToolHandler:
                 logger.exception("on_message_sent callback failed")
 
         return f"Message sent to {args['to']} (id: {msg.id}, thread: {msg.thread_id})"
+
+    # ── Human notification handler ────────────────────────────
+
+    def _handle_notify_human(self, args: dict[str, Any]) -> str:
+        if not self._human_notifier:
+            return _error_result(
+                "NotConfigured",
+                "Human notification is not configured",
+                suggestion="Enable human_notification in config.json",
+            )
+        if self._human_notifier.channel_count == 0:
+            return _error_result(
+                "NotConfigured",
+                "No notification channels configured",
+                suggestion="Add channels to human_notification.channels in config.json",
+            )
+
+        import asyncio
+
+        subject = args.get("subject", "")
+        body = args.get("body", "")
+        priority = args.get("priority", "normal")
+
+        if not subject or not body:
+            return _error_result(
+                "InvalidArguments",
+                "subject and body are required",
+            )
+
+        try:
+            coro = self._human_notifier.notify(
+                subject, body, priority,
+                person_name=self._person_name,
+            )
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                loop = None
+
+            if loop is not None:
+                # Already inside an async context — run in a new thread
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor() as pool:
+                    results = pool.submit(asyncio.run, coro).result(timeout=60)
+            else:
+                results = asyncio.run(coro)
+        except Exception as e:
+            return _error_result("NotificationError", f"Failed to send notification: {e}")
+
+        import json as _json
+        return _json.dumps(
+            {"status": "sent", "results": results},
+            ensure_ascii=False,
+        )
 
     # ── File operation handlers ──────────────────────────────
 

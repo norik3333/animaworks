@@ -62,6 +62,9 @@ class AgentCore:
         self._sdk_available = self._check_sdk()
         self._agent_lock = asyncio.Lock()
 
+        # Build human notifier for top-level persons
+        human_notifier = self._build_human_notifier()
+
         # Composable subsystems
         self._tool_handler = ToolHandler(
             person_dir=person_dir,
@@ -69,6 +72,7 @@ class AgentCore:
             messenger=messenger,
             tool_registry=self._tool_registry,
             personal_tools=self._personal_tools,
+            human_notifier=human_notifier,
         )
         self._executor = self._create_executor()
 
@@ -97,6 +101,42 @@ class AgentCore:
     def replied_to(self) -> set[str]:
         """Person names this agent has sent messages to in the current cycle."""
         return self._tool_handler.replied_to
+
+    # ── Human notification ─────────────────────────────────
+
+    def _build_human_notifier(self) -> "HumanNotifier | None":
+        """Build HumanNotifier if this person is top-level and notification is enabled."""
+        try:
+            from core.config import load_config
+            from core.notification.notifier import HumanNotifier
+
+            config = load_config()
+            if not config.human_notification.enabled:
+                return None
+
+            # Only top-level persons (no supervisor) get the notifier
+            person_cfg = config.persons.get(self.person_dir.name)
+            if person_cfg is not None and person_cfg.supervisor is not None:
+                return None
+
+            notifier = HumanNotifier.from_config(config.human_notification)
+            if notifier.channel_count == 0:
+                return None
+
+            logger.info(
+                "HumanNotifier enabled for %s with %d channel(s)",
+                self.person_dir.name,
+                notifier.channel_count,
+            )
+            return notifier
+        except Exception:
+            logger.debug("Failed to build HumanNotifier", exc_info=True)
+            return None
+
+    @property
+    def has_human_notifier(self) -> bool:
+        """True if this agent has a configured human notifier."""
+        return self._tool_handler._human_notifier is not None
 
     # ── Model / mode helpers ───────────────────────────────
 
