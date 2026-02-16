@@ -25,22 +25,9 @@ logger = logging.getLogger(__name__)
 
 # ── Constants ─────────────────────────────────────────────
 
-DAY_MAP = {
-    "月曜": "mon",
-    "火曜": "tue",
-    "水曜": "wed",
-    "木曜": "thu",
-    "金曜": "fri",
-    "土曜": "sat",
-    "日曜": "sun",
-}
-
-NTH_DAY_RANGE = {
-    1: "1-7",
-    2: "8-14",
-    3: "15-21",
-    4: "22-28",
-}
+# Regex for a valid 5-field cron expression.
+# Each field may contain digits, *, /, -, and commas.
+_CRON_EXPR_RE = re.compile(r"^[\d\*\/\-\,]+(\s+[\d\*\/\-\,]+){4}$")
 
 
 # ── Heartbeat parsing ────────────────────────────────────
@@ -71,56 +58,67 @@ def parse_heartbeat_config(content: str) -> tuple[int, int, int]:
 def parse_cron_md(content: str) -> list[CronTask]:
     """Parse cron.md to extract CronTask definitions.
 
-    Supports both LLM-type and command-type tasks:
+    Expected format per section:
 
-    LLM-type:
-        ## Task Name (schedule)
+        ## Task Title
+        schedule: 0 9 * * *
         type: llm
         Description text...
 
-    Command-type (bash):
-        ## Task Name (schedule)
+    Or for command-type:
+
+        ## Deploy Task
+        schedule: 0 2 * * 1-5
         type: command
         command: /path/to/script.sh
 
-    Command-type (tool):
-        ## Task Name (schedule)
+    Or with tool:
+
+        ## Tool Task
+        schedule: */5 * * * *
         type: command
         tool: tool_name
         args:
           key: value
+
+    Format rules:
+        - ``## Title`` — human-readable label (display only)
+        - ``schedule: <cron-expression>`` — standard 5-field cron
+        - ``type: llm|command`` — execution type
+        - ``command: <cmd>`` — for command type only
+        - ``tool: <name>`` — for command type with tool
+        - ``args:`` — YAML block for tool arguments
+        - Remaining text lines become the task description (LLM type)
+        - HTML comments (``<!-- -->``) are stripped before parsing
     """
     # Strip HTML comment blocks before parsing
     content = re.sub(r"<!--.*?-->", "", content, flags=re.DOTALL)
 
     tasks: list[CronTask] = []
     cur_name = ""
-    cur_sched = ""
     cur_lines: list[str] = []
 
     for line in content.splitlines():
         if line.startswith("## "):
             if cur_name:
-                tasks.append(parse_single_cron_task(cur_name, cur_sched, cur_lines))
-            header = line[3:].strip()
-            sm = re.search(r"[（(](.+?)[）)]", header)
-            if sm:
-                cur_sched = sm.group(1)
-                cur_name = header[: header.find("（" if "（" in header else "(")].strip()
-            else:
-                cur_name = header
-                cur_sched = ""
+                tasks.append(_parse_section(cur_name, cur_lines))
+            cur_name = line[3:].strip()
             cur_lines = []
         elif cur_name:
             cur_lines.append(line)
 
     if cur_name:
-        tasks.append(parse_single_cron_task(cur_name, cur_sched, cur_lines))
+        tasks.append(_parse_section(cur_name, cur_lines))
     return tasks
 
 
-def parse_single_cron_task(name: str, schedule: str, lines: list[str]) -> CronTask:
-    """Parse a single cron task definition from body lines."""
+def _parse_section(name: str, lines: list[str]) -> CronTask:
+    """Parse a single cron task section from its body lines.
+
+    Extracts ``schedule:``, ``type:``, ``command:``, ``tool:``, ``args:``
+    directives.  All remaining non-directive lines form the task description.
+    """
+    schedule = ""
     task_type = "llm"
     command = None
     tool = None
@@ -132,7 +130,9 @@ def parse_single_cron_task(name: str, schedule: str, lines: list[str]) -> CronTa
         line = lines[i]
         stripped = line.strip()
 
-        if stripped.startswith("type:"):
+        if stripped.startswith("schedule:"):
+            schedule = stripped[len("schedule:"):].strip()
+        elif stripped.startswith("type:"):
             task_type = stripped[5:].strip()
         elif stripped.startswith("command:"):
             command = stripped[8:].strip()
@@ -177,70 +177,30 @@ def parse_single_cron_task(name: str, schedule: str, lines: list[str]) -> CronTa
 
 
 def parse_schedule(schedule: str) -> CronTrigger | None:
-    """Parse a Japanese or standard cron schedule string into a CronTrigger."""
+    """Parse a standard 5-field cron expression into an APScheduler CronTrigger.
+
+    Args:
+        schedule: A cron expression string, e.g. ``"0 9 * * *"`` or
+            ``"*/5 * * * *"``.
+
+    Returns:
+        CronTrigger if the expression is valid, None otherwise.
+    """
     s = schedule.strip()
-    # Remove trailing timezone markers (JST, UTC, etc.)
-    s = re.sub(r"\s+[A-Z]{2,4}$", "", s)
+    if not s:
+        logger.warning("Empty schedule expression")
+        return None
 
-    # 毎日 9:00
-    m = re.match(r"毎日\s+(\d{1,2}):(\d{2})", s)
-    if m:
-        return CronTrigger(hour=int(m.group(1)), minute=int(m.group(2)))
+    if not _CRON_EXPR_RE.match(s):
+        logger.warning("Invalid cron expression: '%s'", s)
+        return None
 
-    # 平日 9:00
-    m = re.match(r"平日\s+(\d{1,2}):(\d{2})", s)
-    if m:
-        return CronTrigger(
-            day_of_week="mon-fri", hour=int(m.group(1)), minute=int(m.group(2))
-        )
+    parts = s.split()
+    if len(parts) != 5:
+        logger.warning("Cron expression must have exactly 5 fields: '%s'", s)
+        return None
 
-    # 毎週金曜 17:00
-    m = re.match(r"毎週(.+?)\s+(\d{1,2}):(\d{2})", s)
-    if m:
-        day = DAY_MAP.get(m.group(1), "fri")
-        return CronTrigger(
-            day_of_week=day, hour=int(m.group(2)), minute=int(m.group(3))
-        )
-
-    # 隔週金曜 17:00
-    m = re.match(r"隔週(.+?)\s+(\d{1,2}):(\d{2})", s)
-    if m:
-        day = DAY_MAP.get(m.group(1), "fri")
-        return CronTrigger(
-            day_of_week=day, week="*/2", hour=int(m.group(2)), minute=int(m.group(3))
-        )
-
-    # 第2火曜 10:00 (Nth weekday of month)
-    m = re.match(r"第(\d)(.+?)\s+(\d{1,2}):(\d{2})", s)
-    if m:
-        nth = int(m.group(1))
-        day = DAY_MAP.get(m.group(2), "mon")
-        day_range = NTH_DAY_RANGE.get(nth)
-        if day_range:
-            return CronTrigger(
-                day=day_range,
-                day_of_week=day,
-                hour=int(m.group(3)),
-                minute=int(m.group(4)),
-            )
-
-    # 毎月1日 9:00
-    m = re.match(r"毎月(\d{1,2})日\s+(\d{1,2}):(\d{2})", s)
-    if m:
-        return CronTrigger(
-            day=int(m.group(1)), hour=int(m.group(2)), minute=int(m.group(3))
-        )
-
-    # 毎月最終日 18:00
-    m = re.match(r"毎月最終日\s+(\d{1,2}):(\d{2})", s)
-    if m:
-        return CronTrigger(
-            day="last", hour=int(m.group(1)), minute=int(m.group(2))
-        )
-
-    # Standard cron: */5 * * * *
-    if re.match(r"^[\d\*\/\-\,]+(\s+[\d\*\/\-\,]+){4}$", s):
-        parts = s.split()
+    try:
         return CronTrigger(
             minute=parts[0],
             hour=parts[1],
@@ -248,6 +208,6 @@ def parse_schedule(schedule: str) -> CronTrigger | None:
             month=parts[3],
             day_of_week=parts[4],
         )
-
-    logger.warning("Could not parse schedule: '%s'", s)
-    return None
+    except Exception as e:
+        logger.warning("Failed to create CronTrigger from '%s': %s", s, e)
+        return None

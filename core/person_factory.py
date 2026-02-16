@@ -440,6 +440,27 @@ def _place_send_script(person_dir: Path) -> None:
         logger.debug("Placed send script in %s", person_dir)
 
 
+def ensure_send_scripts(persons_dir: Path) -> None:
+    """Ensure every person directory has the send wrapper script.
+
+    Iterates all subdirectories under *persons_dir* that contain an
+    ``identity.md`` file (i.e. valid person directories) and calls
+    :func:`_place_send_script` for each.  Existing send scripts are
+    never overwritten.
+
+    This should be called during server startup so that persons created
+    before the send script feature was added also get the script.
+
+    Args:
+        persons_dir: Runtime persons directory (e.g. ``~/.animaworks/persons/``).
+    """
+    if not persons_dir.exists():
+        return
+    for person_dir in sorted(persons_dir.iterdir()):
+        if person_dir.is_dir() and (person_dir / "identity.md").exists():
+            _place_send_script(person_dir)
+
+
 def validate_person_name(name: str) -> str | None:
     """Validate a person name.  Returns error message or None if valid."""
     if not name:

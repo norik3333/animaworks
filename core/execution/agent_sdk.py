@@ -15,6 +15,7 @@ execution, plus a ``PostToolUse`` hook for context monitoring.
 """
 
 import logging
+import os
 import re
 from collections.abc import AsyncGenerator
 from typing import Any
@@ -164,10 +165,18 @@ class AgentSDKExecutor(BaseExecutor):
         """Build env dict so the child process uses per-person credentials.
 
         Also sets ``ANIMAWORKS_PERSON_DIR`` so that ``animaworks-tool``
-        can discover personal tools in the person's ``tools/`` directory.
+        can discover personal tools in the person's ``tools/`` directory,
+        and prepends ``person_dir`` to ``PATH`` so the ``send`` script is
+        discoverable via ``bash send``.
+        ``ANIMAWORKS_PROJECT_DIR`` is propagated so the send script can
+        locate ``main.py``.
         """
+        from core.paths import PROJECT_DIR
+
         env: dict[str, str] = {
             "ANIMAWORKS_PERSON_DIR": str(self._person_dir),
+            "ANIMAWORKS_PROJECT_DIR": str(PROJECT_DIR),
+            "PATH": f"{self._person_dir}:{os.environ.get('PATH', '/usr/bin:/bin')}",
             "CLAUDE_CODE_DISABLE_SKILL_IMPROVEMENT": "true",
         }
         api_key = self._resolve_api_key()

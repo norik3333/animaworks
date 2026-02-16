@@ -60,7 +60,8 @@ class TestRunnerSchedulerSetup:
         mock_person = MagicMock()
         mock_person.name = "test-person"
         mock_person.memory.read_heartbeat_config.return_value = "30分ごと\n9:00 - 22:00"
-        mock_person.memory.read_cron_config.return_value = """## Task A（毎日 9:00 JST）
+        mock_person.memory.read_cron_config.return_value = """## Task A
+schedule: 0 9 * * *
 type: llm
 Do something
 """
@@ -123,7 +124,8 @@ Do something
         assert initial_jobs == 1  # heartbeat only
 
         # Now add cron config for reload
-        mock_person.memory.read_cron_config.return_value = """## New Task（毎日 10:00 JST）
+        mock_person.memory.read_cron_config.return_value = """## New Task
+schedule: 0 10 * * *
 type: llm
 New task description
 """

@@ -7,10 +7,7 @@ from apscheduler.triggers.cron import CronTrigger
 from core.schedule_parser import (
     parse_heartbeat_config,
     parse_cron_md,
-    parse_single_cron_task,
     parse_schedule,
-    DAY_MAP,
-    NTH_DAY_RANGE,
 )
 
 
@@ -51,26 +48,31 @@ class TestParseHeartbeatConfig:
 
 
 class TestParseCronMd:
-    """Tests for parse_cron_md()."""
+    """Tests for parse_cron_md() with new cron expression format."""
 
     def test_single_llm_task(self):
-        content = """## 毎朝の業務計画（毎日 9:00 JST）
+        content = """\
+## 毎朝の業務計画
+schedule: 0 9 * * *
 type: llm
 長期記憶から昨日の進捗を確認し、今日のタスクを計画する。
 """
         tasks = parse_cron_md(content)
         assert len(tasks) == 1
         assert tasks[0].name == "毎朝の業務計画"
-        assert tasks[0].schedule == "毎日 9:00 JST"
+        assert tasks[0].schedule == "0 9 * * *"
         assert tasks[0].type == "llm"
         assert "長期記憶" in tasks[0].description
 
     def test_multiple_tasks(self):
-        content = """## Task A（毎日 8:00 JST）
+        content = """\
+## Task A
+schedule: 0 8 * * *
 type: llm
 Description A
 
-## Task B（毎週金曜 17:00 JST）
+## Task B
+schedule: 0 17 * * 5
 type: llm
 Description B
 """
@@ -80,7 +82,9 @@ Description B
         assert tasks[1].name == "Task B"
 
     def test_command_type(self):
-        content = """## Backup（毎日 2:00 JST）
+        content = """\
+## Backup
+schedule: 0 2 * * *
 type: command
 command: /usr/bin/backup.sh
 """
@@ -90,7 +94,9 @@ command: /usr/bin/backup.sh
         assert tasks[0].command == "/usr/bin/backup.sh"
 
     def test_default_type_is_llm(self):
-        content = """## Task（毎日 9:00）
+        content = """\
+## Task
+schedule: 0 9 * * *
 Description without type
 """
         tasks = parse_cron_md(content)
@@ -102,7 +108,9 @@ Description without type
         assert tasks == []
 
     def test_tool_type_with_args(self):
-        content = """## Slack通知（平日 9:00 JST）
+        content = """\
+## Slack通知
+schedule: 0 9 * * 1-5
 type: command
 tool: slack_post
 args:
@@ -116,39 +124,31 @@ args:
 
 
 class TestParseSchedule:
-    """Tests for parse_schedule()."""
+    """Tests for parse_schedule() with standard cron expressions."""
 
     def test_daily(self):
-        trigger = parse_schedule("毎日 9:00 JST")
+        trigger = parse_schedule("0 9 * * *")
         assert trigger is not None
         assert isinstance(trigger, CronTrigger)
 
     def test_weekday(self):
-        trigger = parse_schedule("平日 9:00 JST")
+        trigger = parse_schedule("0 9 * * 1-5")
         assert trigger is not None
 
     def test_weekly(self):
-        trigger = parse_schedule("毎週金曜 17:00 JST")
+        trigger = parse_schedule("0 17 * * 5")
         assert trigger is not None
 
-    def test_biweekly(self):
-        trigger = parse_schedule("隔週金曜 17:00 JST")
-        assert trigger is not None
-
-    def test_nth_weekday(self):
-        trigger = parse_schedule("第2火曜 10:00 JST")
-        assert trigger is not None
-
-    def test_monthly_day(self):
-        trigger = parse_schedule("毎月1日 9:00 JST")
-        assert trigger is not None
-
-    def test_monthly_last_day(self):
-        trigger = parse_schedule("毎月最終日 18:00 JST")
-        assert trigger is not None
-
-    def test_standard_cron(self):
+    def test_every_5_minutes(self):
         trigger = parse_schedule("*/5 * * * *")
+        assert trigger is not None
+
+    def test_monthly_first_day(self):
+        trigger = parse_schedule("0 9 1 * *")
+        assert trigger is not None
+
+    def test_complex_cron(self):
+        trigger = parse_schedule("0,30 9-17 * * 1-5")
         assert trigger is not None
 
     def test_invalid_returns_none(self):
@@ -159,15 +159,7 @@ class TestParseSchedule:
         trigger = parse_schedule("")
         assert trigger is None
 
-
-class TestConstants:
-    """Tests for module constants."""
-
-    def test_day_map_completeness(self):
-        assert len(DAY_MAP) == 7
-        assert "月曜" in DAY_MAP
-        assert "日曜" in DAY_MAP
-
-    def test_nth_day_range(self):
-        assert NTH_DAY_RANGE[1] == "1-7"
-        assert NTH_DAY_RANGE[4] == "22-28"
+    def test_japanese_schedule_no_longer_supported(self):
+        """Old Japanese format is not supported by the new parser."""
+        trigger = parse_schedule("毎日 9:00 JST")
+        assert trigger is None

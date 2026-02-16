@@ -8,8 +8,6 @@ import pytest
 
 from core.lifecycle import (
     LifecycleManager,
-    _DAY_MAP,
-    _NTH_DAY_RANGE,
     _parse_cron_md,
     _parse_schedule,
 )
@@ -25,21 +23,24 @@ class TestParseCronMd:
 
     def test_single_task(self):
         content = """\
-## 日次レポート（毎日 9:00 JST）
+## 日次レポート
+schedule: 0 9 * * *
 毎朝の報告を作成する。
 """
         tasks = _parse_cron_md(content)
         assert len(tasks) == 1
         assert tasks[0].name == "日次レポート"
-        assert tasks[0].schedule == "毎日 9:00 JST"
+        assert tasks[0].schedule == "0 9 * * *"
         assert "毎朝の報告" in tasks[0].description
 
     def test_multiple_tasks(self):
         content = """\
-## タスクA（毎日 8:00）
+## タスクA
+schedule: 0 8 * * *
 内容A
 
-## タスクB（平日 17:00）
+## タスクB
+schedule: 0 17 * * 1-5
 内容B
 """
         tasks = _parse_cron_md(content)
@@ -57,19 +58,11 @@ Just a description.
         assert tasks[0].name == "No Schedule Here"
         assert tasks[0].schedule == ""
 
-    def test_parentheses_half_width(self):
-        content = """\
-## Report(毎日 10:00)
-Description
-"""
-        tasks = _parse_cron_md(content)
-        assert len(tasks) == 1
-        assert tasks[0].schedule == "毎日 10:00"
-
     def test_llm_type_explicit(self):
         """Test explicit LLM-type task parsing."""
         content = """\
-## 業務計画（毎日 9:00 JST）
+## 業務計画
+schedule: 0 9 * * *
 type: llm
 長期記憶から昨日の進捗を確認する。
 """
@@ -84,7 +77,8 @@ type: llm
     def test_llm_type_default(self):
         """Test LLM-type task with default type (no explicit type field)."""
         content = """\
-## 日次報告（毎日 17:00）
+## 日次報告
+schedule: 0 17 * * *
 報告書を作成する。
 """
         tasks = _parse_cron_md(content)
@@ -95,7 +89,8 @@ type: llm
     def test_command_type_bash(self):
         """Test command-type task with bash command."""
         content = """\
-## バックアップ実行（毎日 2:00 JST）
+## バックアップ実行
+schedule: 0 2 * * *
 type: command
 command: /usr/local/bin/backup.sh
 """
@@ -109,7 +104,8 @@ command: /usr/local/bin/backup.sh
     def test_command_type_tool_with_args(self):
         """Test command-type task with internal tool and YAML args."""
         content = """\
-## Slack通知（平日 9:00 JST）
+## Slack通知
+schedule: 0 9 * * 1-5
 type: command
 tool: slack_send_message
 args:
@@ -128,15 +124,18 @@ args:
     def test_mixed_types(self):
         """Test parsing multiple tasks with different types."""
         content = """\
-## 業務計画（毎日 9:00）
+## 業務計画
+schedule: 0 9 * * *
 type: llm
 計画を立てる。
 
-## バックアップ（毎日 2:00）
+## バックアップ
+schedule: 0 2 * * *
 type: command
 command: /bin/backup.sh
 
-## 通知送信（平日 10:00）
+## 通知送信
+schedule: 0 10 * * 1-5
 type: command
 tool: send_notification
 args:
@@ -157,56 +156,39 @@ args:
 
 class TestParseSchedule:
     def test_daily(self):
-        trigger = _parse_schedule("毎日 9:00")
-        assert trigger is not None
-
-    def test_daily_with_timezone(self):
-        trigger = _parse_schedule("毎日 9:00 JST")
+        trigger = _parse_schedule("0 9 * * *")
         assert trigger is not None
 
     def test_weekday(self):
-        trigger = _parse_schedule("平日 9:00")
+        trigger = _parse_schedule("0 9 * * 1-5")
         assert trigger is not None
 
     def test_weekly(self):
-        trigger = _parse_schedule("毎週金曜 17:00")
-        assert trigger is not None
-
-    def test_biweekly(self):
-        trigger = _parse_schedule("隔週金曜 17:00")
-        assert trigger is not None
-
-    def test_nth_weekday(self):
-        trigger = _parse_schedule("第2火曜 10:00")
+        trigger = _parse_schedule("0 17 * * 5")
         assert trigger is not None
 
     def test_monthly_day(self):
-        trigger = _parse_schedule("毎月1日 9:00")
+        trigger = _parse_schedule("0 9 1 * *")
         assert trigger is not None
 
-    def test_monthly_last_day(self):
-        trigger = _parse_schedule("毎月最終日 18:00")
-        assert trigger is not None
-
-    def test_standard_cron(self):
+    def test_every_5_minutes(self):
         trigger = _parse_schedule("*/5 * * * *")
+        assert trigger is not None
+
+    def test_every_hour(self):
+        trigger = _parse_schedule("0 * * * *")
         assert trigger is not None
 
     def test_invalid_schedule(self):
         trigger = _parse_schedule("whenever I feel like it")
         assert trigger is None
 
-    def test_all_days_in_day_map(self):
-        for jp_day, en_day in _DAY_MAP.items():
-            trigger = _parse_schedule(f"毎週{jp_day} 10:00")
-            assert trigger is not None
+    def test_japanese_format_rejected(self):
+        trigger = _parse_schedule("毎日 9:00 JST")
+        assert trigger is None
 
-    def test_nth_day_ranges(self):
-        for nth in (1, 2, 3, 4):
-            assert nth in _NTH_DAY_RANGE
-
-    def test_nth_5_returns_none(self):
-        trigger = _parse_schedule("第5月曜 10:00")
+    def test_empty_schedule(self):
+        trigger = _parse_schedule("")
         assert trigger is None
 
 
@@ -293,7 +275,7 @@ class TestCronWrapper:
         # Create CronTask object (LLM type)
         task = CronTask(
             name="daily_report",
-            schedule="毎日 9:00",
+            schedule="0 9 * * *",
             type="llm",
             description="Generate report",
         )
@@ -305,7 +287,7 @@ class TestCronWrapper:
 
     async def test_cron_no_person(self):
         lm = LifecycleManager()
-        task = CronTask(name="task", schedule="毎日 10:00", description="desc")
+        task = CronTask(name="task", schedule="0 10 * * *", description="desc")
         await lm._cron_wrapper("nobody", task)
 
 
@@ -553,7 +535,8 @@ class TestReloadPersonSchedule:
 
         # Add a cron task and reload
         person.memory.read_cron_config.return_value = """\
-## ログチェック（毎日 10:00 JST）
+## ログチェック
+schedule: 0 10 * * *
 type: llm
 サーバーログを確認する。
 """

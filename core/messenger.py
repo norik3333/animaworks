@@ -9,7 +9,9 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import date
 from pathlib import Path
+
 from core.schemas import Message
 
 logger = logging.getLogger("animaworks.messenger")
@@ -70,7 +72,6 @@ class Messenger:
 
     def _append_message_log(self, msg: Message) -> None:
         """Append message event to shared activity log."""
-        from datetime import date
         log_dir = self.shared_dir / "message_log"
         log_dir.mkdir(parents=True, exist_ok=True)
         log_file = log_dir / f"{date.today().isoformat()}.jsonl"
@@ -161,3 +162,82 @@ class Messenger:
             thread_id=thread_id,
             reply_to=reply_to,
         )
+
+
+# ── Message Log Reconciliation ──────────────────────────
+
+
+def reconcile_message_log(shared_dir: Path) -> int:
+    """Reconcile processed inbox messages into the shared message log.
+
+    Scans ``shared/inbox/*/processed/*.json`` for all processed messages
+    and appends any missing entries to ``shared/message_log/{date}.jsonl``.
+
+    Args:
+        shared_dir: Path to the shared runtime directory.
+
+    Returns:
+        Number of newly added log entries.
+    """
+    inbox_dir = shared_dir / "inbox"
+    if not inbox_dir.exists():
+        logger.info("reconcile_message_log: inbox dir does not exist, skipping")
+        return 0
+
+    log_dir = shared_dir / "message_log"
+    log_dir.mkdir(parents=True, exist_ok=True)
+
+    # Collect all known message IDs from existing log files
+    known_ids: set[str] = set()
+    for log_file in log_dir.glob("*.jsonl"):
+        try:
+            for line in log_file.read_text(encoding="utf-8").splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                    mid = entry.get("message_id", "")
+                    if mid:
+                        known_ids.add(mid)
+                except json.JSONDecodeError:
+                    continue
+        except OSError:
+            logger.warning("Failed to read log file: %s", log_file)
+
+    # Scan all processed messages across all person inboxes
+    added = 0
+    for processed_dir in sorted(inbox_dir.glob("*/processed")):
+        for msg_file in sorted(processed_dir.glob("*.json")):
+            try:
+                data = json.loads(msg_file.read_text(encoding="utf-8"))
+                msg = Message(**data)
+            except Exception:
+                logger.warning("Skipping unparseable message: %s", msg_file)
+                continue
+
+            if msg.id in known_ids:
+                continue
+
+            # Build log entry in the same format as _append_message_log
+            log_date = msg.timestamp.date().isoformat()
+            log_file = log_dir / f"{log_date}.jsonl"
+            entry = json.dumps({
+                "timestamp": msg.timestamp.isoformat(),
+                "from_person": msg.from_person,
+                "to_person": msg.to_person,
+                "type": msg.type,
+                "summary": msg.content[:200],
+                "message_id": msg.id,
+                "thread_id": msg.thread_id,
+            }, ensure_ascii=False)
+            try:
+                with log_file.open("a", encoding="utf-8") as f:
+                    f.write(entry + "\n")
+                known_ids.add(msg.id)
+                added += 1
+            except OSError:
+                logger.warning("Failed to append reconciled entry: %s", log_file)
+
+    logger.info("reconcile_message_log: added %d entries", added)
+    return added

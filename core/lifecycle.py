@@ -603,6 +603,4 @@ from core.schedule_parser import (  # noqa: E402
     parse_cron_md as _parse_cron_md,
     parse_schedule as _parse_schedule,
     parse_heartbeat_config as _parse_heartbeat_config,
-    DAY_MAP as _DAY_MAP,
-    NTH_DAY_RANGE as _NTH_DAY_RANGE,
 )

@@ -196,6 +196,7 @@ class PersonRunner:
             id=f"{self.person_name}_heartbeat",
             name=f"{self.person_name} heartbeat",
             replace_existing=True,
+            misfire_grace_time=300,
         )
         logger.info(
             "Heartbeat registered: %s every %dmin, active %d:00-%d:00",
@@ -243,6 +244,7 @@ class PersonRunner:
                 name=f"{self.person_name}: {task.name}",
                 args=[task],
                 replace_existing=True,
+                misfire_grace_time=300,
             )
             logger.info(
                 "Cron registered: %s -> %s (%s) [%s]",
