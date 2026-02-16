@@ -197,7 +197,8 @@ html, body {
 #wsDashboard {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: var(--vh-fallback, 100vh);
+  height: 100svh;
 }
 
 .ws-layout {
@@ -1140,6 +1141,7 @@ html, body {
   border-top: 1px solid #e5e5e5;
   background: #fff;
   flex-shrink: 0;
+  padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
 }
 
 .ws-conv-input {
@@ -1353,6 +1355,7 @@ html, body {
   background: rgba(255,255,255,0.95);
   border-top: 1px solid #ddd;
   backdrop-filter: blur(8px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 .ws-timeline-bar {
@@ -1597,6 +1600,98 @@ html, body {
 
 .ws-conv-sidebar-backdrop.visible {
   display: block;
+}
+
+/* ── iPad (769px - 1024px) ────────────────────────── */
+
+@media (min-width: 769px) and (max-width: 1024px) {
+  /* Use svh for iPad viewport */
+  #wsDashboard {
+    height: var(--vh-fallback, 100vh);
+    height: 100svh;
+  }
+
+  /* Timeline as left sidebar instead of bottom bar */
+  .ws-layout {
+    flex-direction: row;
+  }
+
+  .ws-timeline {
+    position: static;
+    width: 240px;
+    min-width: 48px;
+    height: 100%;
+    border-top: none;
+    border-right: 1px solid #ddd;
+    order: -1; /* Place before office panel */
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    transition: width 0.3s ease;
+    flex-shrink: 0;
+  }
+
+  .ws-timeline.collapsed {
+    width: 48px;
+    overflow: hidden;
+  }
+
+  .ws-timeline.collapsed .ws-timeline-body,
+  .ws-timeline.collapsed .ws-timeline-filters,
+  .ws-timeline.collapsed .timeline-title,
+  .ws-timeline.collapsed .timeline-count {
+    display: none;
+  }
+
+  /* Timeline bar: vertical layout in sidebar mode */
+  .ws-timeline-bar {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 12px;
+    gap: 6px;
+  }
+
+  .ws-timeline.collapsed .ws-timeline-bar {
+    align-items: center;
+    padding: 12px 8px;
+  }
+
+  .ws-timeline-bar .timeline-toggle-btn {
+    margin-left: 0;
+    align-self: flex-end;
+  }
+
+  .ws-timeline.collapsed .ws-timeline-bar .timeline-toggle-btn {
+    align-self: center;
+  }
+
+  /* Timeline body fills remaining height */
+  .ws-timeline-body {
+    max-height: none;
+    flex: 1;
+    overflow-y: auto;
+  }
+
+  /* Filters wrap vertically */
+  .ws-timeline-filters {
+    flex-wrap: wrap;
+    padding: 4px 12px 8px;
+  }
+
+  /* Conversation overlay also needs svh */
+  .ws-conv-overlay {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  /* Header adjustments for iPad */
+  .ws-header {
+    padding: 0 12px;
+  }
+
+  .ws-header-center {
+    flex: 1;
+    min-width: 0;
+  }
 }
 
 /* ── Tablet (< 768px) ────────────────────────── */

@@ -816,6 +816,35 @@ function initTouchGestures() {
   });
 }
 
+/** Set CSS custom property for viewport height fallback (svh-unsupported browsers). */
+function initViewportHeightFallback() {
+  if (CSS.supports && CSS.supports('height', '100svh')) return;
+
+  function setVh() {
+    const vh = window.visualViewport?.height || window.innerHeight;
+    document.documentElement.style.setProperty('--vh-fallback', `${vh}px`);
+  }
+  setVh();
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', setVh);
+  }
+  window.addEventListener('resize', setVh);
+}
+
+/** Toggle timeline sidebar collapse on iPad. */
+function initTimelineCollapseToggle() {
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.timeline-toggle-btn');
+    if (!btn) return;
+    const timeline = btn.closest('.ws-timeline');
+    if (!timeline) return;
+    // Only collapse on iPad-width viewports
+    if (window.innerWidth >= 769 && window.innerWidth <= 1024) {
+      timeline.classList.toggle('collapsed');
+    }
+  });
+}
+
 function initMobileKeyboard() {
   const vv = window.visualViewport;
 
@@ -931,7 +960,9 @@ async function startDashboard() {
   // Auto-init 3D office (always visible now)
   initOfficeIfNeeded();
 
-  // Mobile responsive features
+  // Viewport & mobile responsive features
+  initViewportHeightFallback();
+  initTimelineCollapseToggle();
   initMobileControls();
   initTouchGestures();
   initMobileKeyboard();
