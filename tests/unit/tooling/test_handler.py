@@ -920,3 +920,247 @@ class TestIsProtectedWrite:
     def test_within_person_dir_allowed(self, person_dir: Path):
         result = _is_protected_write(person_dir, person_dir / "episodes" / "log.md")
         assert result is None
+
+
+# ── _check_tool_creation_permission ──────────────────────────
+
+
+class TestToolCreationPermission:
+    """Tests for _check_tool_creation_permission()."""
+
+    def test_no_memory_returns_false(self, person_dir: Path):
+        h = ToolHandler(person_dir=person_dir, memory=None, tool_registry=[])
+        assert h._check_tool_creation_permission("個人ツール") is False
+
+    def test_no_tool_creation_section_returns_false(
+        self, handler: ToolHandler, memory: MagicMock,
+    ):
+        memory.read_permissions.return_value = "## その他\n- something: yes"
+        assert handler._check_tool_creation_permission("個人ツール") is False
+
+    def test_personal_tool_yes(self, handler: ToolHandler, memory: MagicMock):
+        memory.read_permissions.return_value = (
+            "## ツール作成\n- 個人ツール: yes"
+        )
+        assert handler._check_tool_creation_permission("個人ツール") is True
+
+    def test_personal_tool_ok(self, handler: ToolHandler, memory: MagicMock):
+        memory.read_permissions.return_value = (
+            "## ツール作成\n- 個人ツール: OK"
+        )
+        assert handler._check_tool_creation_permission("個人ツール") is True
+
+    def test_shared_tool_yes(self, handler: ToolHandler, memory: MagicMock):
+        memory.read_permissions.return_value = (
+            "## ツール作成\n- 共有ツール: yes"
+        )
+        assert handler._check_tool_creation_permission("共有ツール") is True
+
+    @pytest.mark.parametrize("value", ["YES", "True", "ENABLED", "true", "Yes"])
+    def test_case_insensitive(
+        self, handler: ToolHandler, memory: MagicMock, value: str,
+    ):
+        memory.read_permissions.return_value = (
+            f"## ツール作成\n- 個人ツール: {value}"
+        )
+        assert handler._check_tool_creation_permission("個人ツール") is True
+
+    def test_different_kind_not_matching(
+        self, handler: ToolHandler, memory: MagicMock,
+    ):
+        memory.read_permissions.return_value = (
+            "## ツール作成\n- 共有ツール: yes"
+        )
+        assert handler._check_tool_creation_permission("個人ツール") is False
+
+    def test_bullet_with_asterisk(self, handler: ToolHandler, memory: MagicMock):
+        memory.read_permissions.return_value = (
+            "## ツール作成\n* 個人ツール: yes"
+        )
+        assert handler._check_tool_creation_permission("個人ツール") is True
+
+    def test_bullet_with_dash(self, handler: ToolHandler, memory: MagicMock):
+        memory.read_permissions.return_value = (
+            "## ツール作成\n- 個人ツール: enabled"
+        )
+        assert handler._check_tool_creation_permission("個人ツール") is True
+
+
+# ── write_memory_file tool creation permission ───────────────
+
+
+class TestWriteMemoryFileToolCreation:
+    """Tests for tool creation permission check in _handle_write_memory_file()."""
+
+    def test_writing_tool_py_without_permission_denied(
+        self, handler: ToolHandler, memory: MagicMock,
+    ):
+        memory.read_permissions.return_value = "## その他\n- nothing"
+        result = handler.handle(
+            "write_memory_file",
+            {"path": "tools/my_tool.py", "content": "print('hi')"},
+        )
+        parsed = json.loads(result)
+        assert parsed["error_type"] == "PermissionDenied"
+        assert "ツール作成" in parsed["message"]
+
+    def test_writing_tool_py_with_permission_succeeds(
+        self, handler: ToolHandler, memory: MagicMock, person_dir: Path,
+    ):
+        memory.read_permissions.return_value = (
+            "## ツール作成\n- 個人ツール: yes"
+        )
+        result = handler.handle(
+            "write_memory_file",
+            {"path": "tools/my_tool.py", "content": "print('hi')"},
+        )
+        assert "Written to" in result
+        assert (person_dir / "tools" / "my_tool.py").read_text(encoding="utf-8") == "print('hi')"
+
+    def test_writing_non_tool_file_skips_permission_check(
+        self, handler: ToolHandler, memory: MagicMock, person_dir: Path,
+    ):
+        """Writing knowledge/note.md should not check tool creation permission."""
+        memory.read_permissions.return_value = ""  # No permissions at all
+        result = handler.handle(
+            "write_memory_file",
+            {"path": "knowledge/note.md", "content": "just a note"},
+        )
+        assert "Written to" in result
+        assert (person_dir / "knowledge" / "note.md").read_text(encoding="utf-8") == "just a note"
+
+    def test_writing_tools_readme_not_py_skips_permission(
+        self, handler: ToolHandler, memory: MagicMock, person_dir: Path,
+    ):
+        """Writing tools/readme.md (not .py) should not require tool creation permission."""
+        memory.read_permissions.return_value = ""  # No permissions at all
+        result = handler.handle(
+            "write_memory_file",
+            {"path": "tools/readme.md", "content": "tool docs"},
+        )
+        assert "Written to" in result
+        assert (person_dir / "tools" / "readme.md").read_text(encoding="utf-8") == "tool docs"
+
+
+# ── refresh_tools handler ────────────────────────────────────
+
+
+class TestRefreshTools:
+    """Tests for _handle_refresh_tools()."""
+
+    @patch("core.tooling.handler.ExternalToolDispatcher")
+    def test_no_tools_found(
+        self, _mock_cls: MagicMock, handler: ToolHandler,
+    ):
+        with patch(
+            "core.tools.discover_personal_tools", return_value={},
+        ), patch(
+            "core.tools.discover_common_tools", return_value={},
+        ):
+            result = handler.handle("refresh_tools", {})
+        assert "No personal or common tools found" in result
+
+    @patch("core.tooling.handler.ExternalToolDispatcher")
+    def test_discovered_tools_returned(
+        self, _mock_cls: MagicMock, handler: ToolHandler,
+    ):
+        with patch(
+            "core.tools.discover_personal_tools",
+            return_value={"my_tool": "/path/to/my_tool.py"},
+        ), patch(
+            "core.tools.discover_common_tools",
+            return_value={"shared_util": "/path/to/shared_util.py"},
+        ):
+            result = handler.handle("refresh_tools", {})
+        assert "my_tool" in result
+        assert "shared_util" in result
+        assert "2 discovered" in result
+
+    def test_calls_update_personal_tools(self, handler: ToolHandler):
+        mock_external = MagicMock()
+        handler._external = mock_external
+        with patch(
+            "core.tools.discover_personal_tools",
+            return_value={"tool_a": "/a.py"},
+        ), patch(
+            "core.tools.discover_common_tools",
+            return_value={"tool_b": "/b.py"},
+        ):
+            handler.handle("refresh_tools", {})
+        mock_external.update_personal_tools.assert_called_once_with(
+            {"tool_b": "/b.py", "tool_a": "/a.py"},
+        )
+
+
+# ── share_tool handler ───────────────────────────────────────
+
+
+class TestShareTool:
+    """Tests for _handle_share_tool()."""
+
+    def test_personal_tool_not_found(
+        self, handler: ToolHandler, person_dir: Path,
+    ):
+        result = handler.handle("share_tool", {"tool_name": "nonexistent"})
+        parsed = json.loads(result)
+        assert parsed["error_type"] == "FileNotFound"
+        assert "nonexistent" in parsed["message"]
+
+    def test_permission_denied_without_shared_tool_permission(
+        self, handler: ToolHandler, memory: MagicMock, person_dir: Path,
+    ):
+        # Create the personal tool file so it passes the existence check
+        tools_dir = person_dir / "tools"
+        tools_dir.mkdir(parents=True, exist_ok=True)
+        (tools_dir / "my_tool.py").write_text("print('hi')", encoding="utf-8")
+
+        memory.read_permissions.return_value = ""  # No permission
+        result = handler.handle("share_tool", {"tool_name": "my_tool"})
+        parsed = json.loads(result)
+        assert parsed["error_type"] == "PermissionDenied"
+        assert "共有ツール" in parsed["message"]
+
+    def test_copies_file_when_permitted(
+        self, handler: ToolHandler, memory: MagicMock, person_dir: Path, tmp_path: Path,
+    ):
+        # Create the personal tool file
+        tools_dir = person_dir / "tools"
+        tools_dir.mkdir(parents=True, exist_ok=True)
+        (tools_dir / "my_tool.py").write_text("print('shared')", encoding="utf-8")
+
+        memory.read_permissions.return_value = (
+            "## ツール作成\n- 共有ツール: yes"
+        )
+
+        common_dir = tmp_path / "common_tools"
+        with patch("core.paths.get_data_dir", return_value=tmp_path):
+            result = handler.handle("share_tool", {"tool_name": "my_tool"})
+
+        assert "Shared tool" in result
+        assert (common_dir / "my_tool.py").read_text(encoding="utf-8") == "print('shared')"
+
+    def test_error_when_common_tool_already_exists(
+        self, handler: ToolHandler, memory: MagicMock, person_dir: Path, tmp_path: Path,
+    ):
+        # Create the personal tool file
+        tools_dir = person_dir / "tools"
+        tools_dir.mkdir(parents=True, exist_ok=True)
+        (tools_dir / "my_tool.py").write_text("print('new')", encoding="utf-8")
+
+        # Create existing common tool
+        common_dir = tmp_path / "common_tools"
+        common_dir.mkdir(parents=True, exist_ok=True)
+        (common_dir / "my_tool.py").write_text("print('old')", encoding="utf-8")
+
+        memory.read_permissions.return_value = (
+            "## ツール作成\n- 共有ツール: yes"
+        )
+
+        with patch("core.paths.get_data_dir", return_value=tmp_path):
+            result = handler.handle("share_tool", {"tool_name": "my_tool"})
+
+        parsed = json.loads(result)
+        assert parsed["error_type"] == "FileExists"
+        assert "already exists" in parsed["message"]
+        # Verify original was NOT overwritten
+        assert (common_dir / "my_tool.py").read_text(encoding="utf-8") == "print('old')"

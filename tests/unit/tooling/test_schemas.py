@@ -9,6 +9,7 @@ from core.tooling.schemas import (
     FILE_TOOLS,
     MEMORY_TOOLS,
     SEARCH_TOOLS,
+    TOOL_MANAGEMENT_TOOLS,
     build_tool_list,
     load_external_schemas,
     to_anthropic_format,
@@ -112,6 +113,34 @@ class TestDiscoveryTools:
         assert "category" in schema["parameters"]["properties"]
 
 
+class TestToolManagementTools:
+    def test_tool_management_tools_is_list(self):
+        assert isinstance(TOOL_MANAGEMENT_TOOLS, list)
+        assert len(TOOL_MANAGEMENT_TOOLS) == 2
+
+    def test_contains_refresh_tools(self):
+        names = [t["name"] for t in TOOL_MANAGEMENT_TOOLS]
+        assert "refresh_tools" in names
+
+    def test_contains_share_tool(self):
+        names = [t["name"] for t in TOOL_MANAGEMENT_TOOLS]
+        assert "share_tool" in names
+
+    def test_refresh_tools_schema(self):
+        schema = next(t for t in TOOL_MANAGEMENT_TOOLS if t["name"] == "refresh_tools")
+        assert "description" in schema
+        assert schema["parameters"]["type"] == "object"
+        # refresh_tools has no required parameters
+        assert "required" not in schema["parameters"]
+
+    def test_share_tool_schema(self):
+        schema = next(t for t in TOOL_MANAGEMENT_TOOLS if t["name"] == "share_tool")
+        assert "description" in schema
+        assert schema["parameters"]["type"] == "object"
+        assert "tool_name" in schema["parameters"]["properties"]
+        assert "tool_name" in schema["parameters"]["required"]
+
+
 # ── Format converters ─────────────────────────────────────────
 
 
@@ -209,18 +238,32 @@ class TestBuildToolList:
         names = [t["name"] for t in result]
         assert "discover_tools" in names
 
+    def test_include_tool_management(self):
+        result = build_tool_list(include_tool_management=True)
+        names = [t["name"] for t in result]
+        assert "refresh_tools" in names
+        assert "share_tool" in names
+        # Should still include memory tools
+        assert "search_memory" in names
+        # Should NOT include other optional tools unless requested
+        assert "read_file" not in names
+        assert "discover_tools" not in names
+
     def test_all_flags_combined(self):
         result = build_tool_list(
             include_file_tools=True,
             include_search_tools=True,
             include_discovery_tools=True,
+            include_tool_management=True,
         )
         names = [t["name"] for t in result]
-        # 4 memory + 4 file + 2 search + 1 discovery = 11
-        assert len(result) == 11
+        # 4 memory + 4 file + 2 search + 1 discovery + 2 tool_management = 13
+        assert len(result) == 13
         assert "search_code" in names
         assert "list_directory" in names
         assert "discover_tools" in names
+        assert "refresh_tools" in names
+        assert "share_tool" in names
 
     def test_does_not_mutate_memory_tools(self):
         original_len = len(MEMORY_TOOLS)

@@ -624,5 +624,45 @@ def cli_main(argv: list[str] | None = None) -> None:
             print()
 
 
+# ── Dispatch ──────────────────────────────────────────
+
+
+def dispatch(tool_name: str, args: dict[str, Any]) -> Any:
+    """Dispatch a tool call to the appropriate handler."""
+    if tool_name == "local_llm_generate":
+        client = OllamaClient(
+            server=args.get("server", "auto"),
+            model=args.get("model"),
+            hint=args.get("hint"),
+        )
+        return client.generate(
+            prompt=args["prompt"],
+            system=args.get("system", ""),
+            temperature=args.get("temperature", 0.7),
+            max_tokens=args.get("max_tokens", 4096),
+            think=args.get("think", "off"),
+        )
+    if tool_name == "local_llm_chat":
+        client = OllamaClient(
+            server=args.get("server", "auto"),
+            model=args.get("model"),
+            hint=args.get("hint"),
+        )
+        return client.chat(
+            messages=args["messages"],
+            system=args.get("system", ""),
+            temperature=args.get("temperature", 0.7),
+            max_tokens=args.get("max_tokens", 4096),
+            think=args.get("think", "off"),
+        )
+    if tool_name == "local_llm_models":
+        client = OllamaClient(server=args.get("server", "auto"))
+        return client.list_models()
+    if tool_name == "local_llm_status":
+        client = OllamaClient()
+        return client.server_status()
+    raise ValueError(f"Unknown tool: {tool_name}")
+
+
 if __name__ == "__main__":
     cli_main()

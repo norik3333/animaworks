@@ -66,6 +66,7 @@ class AnthropicFallbackExecutor(BaseExecutor):
             include_file_tools=False,
             include_notification_tools=self._tool_handler._human_notifier is not None,
             include_admin_tools=(self._person_dir / "skills" / "newstaff.md").exists(),
+            include_tool_management=True,
             external_schemas=external,
         )
         return to_anthropic_format(canonical)

@@ -1,15 +1,12 @@
 """Tests for core.tooling.dispatch — ExternalToolDispatcher."""
 from __future__ import annotations
 
+import json
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-import core.tools
-from pathlib import Path
-
-from core.tooling.dispatch import ExternalToolDispatcher, _execute, _handle_generate_character_assets
-import core.tooling.dispatch as _dispatch_mod
+from core.tooling.dispatch import ExternalToolDispatcher
 
 
 # ── Fixtures ──────────────────────────────────────────────────
@@ -33,139 +30,139 @@ class TestDispatch:
         result = empty_dispatcher.dispatch("unknown", {})
         assert result is None
 
-    def test_delegates_to_core_first(self):
+    def test_delegates_to_registry_first(self):
         d = ExternalToolDispatcher(tool_registry=["web_search"])
-        with patch.object(d, "_dispatch_core", return_value="core result") as mock_core:
+        with patch.object(d, "_dispatch_from_registry", return_value="core result") as mock_reg:
             result = d.dispatch("web_search", {"query": "test"})
         assert result == "core result"
+        mock_reg.assert_called_once_with("web_search", {"query": "test"})
 
-    def test_falls_through_to_personal(self):
+    def test_falls_through_to_files(self):
         d = ExternalToolDispatcher(
             tool_registry=[],
             personal_tools={"my_tool": "/path/to/tool.py"},
         )
-        with patch.object(d, "_dispatch_core", return_value=None), \
-             patch.object(d, "_dispatch_personal", return_value="personal result"):
+        with patch.object(d, "_dispatch_from_registry", return_value=None), \
+             patch.object(d, "_dispatch_from_files", return_value="file result"):
             result = d.dispatch("my_fn", {})
-        assert result == "personal result"
+        assert result == "file result"
 
     def test_returns_none_when_both_miss(self):
         d = ExternalToolDispatcher(
             tool_registry=[],
             personal_tools={"my_tool": "/path/to/tool.py"},
         )
-        with patch.object(d, "_dispatch_core", return_value=None), \
-             patch.object(d, "_dispatch_personal", return_value=None):
+        with patch.object(d, "_dispatch_from_registry", return_value=None), \
+             patch.object(d, "_dispatch_from_files", return_value=None):
             result = d.dispatch("unknown", {})
         assert result is None
 
+    def test_does_not_call_files_when_registry_matches(self):
+        d = ExternalToolDispatcher(
+            tool_registry=["web_search"],
+            personal_tools={"my_tool": "/path/to/tool.py"},
+        )
+        with patch.object(d, "_dispatch_from_registry", return_value="core result"), \
+             patch.object(d, "_dispatch_from_files") as mock_files:
+            d.dispatch("web_search", {})
+        mock_files.assert_not_called()
 
-# ── _dispatch_core() ──────────────────────────────────────────
+
+# ── _dispatch_from_registry() ─────────────────────────────────
 
 
-class TestDispatchCore:
+class TestDispatchFromRegistry:
     def test_empty_registry_returns_none(self, empty_dispatcher: ExternalToolDispatcher):
-        result = empty_dispatcher._dispatch_core("web_search", {})
+        result = empty_dispatcher._dispatch_from_registry("web_search", {})
         assert result is None
 
     def test_tool_not_in_registry(self):
         d = ExternalToolDispatcher(tool_registry=["web_search"])
-        with patch.dict(core.tools.TOOL_MODULES, {"slack": "core.tools.slack"}, clear=True):
-            result = d._dispatch_core("slack_send", {})
+        with patch("importlib.import_module") as mock_import:
+            mock_import.return_value = MagicMock()
+            with patch("core.tools.TOOL_MODULES", {"slack": "core.tools.slack"}):
+                result = d._dispatch_from_registry("slack_send", {})
         assert result is None
 
-    def test_dispatches_matching_schema(self):
+    def test_dispatches_matching_schema_via_dispatch(self):
         mock_mod = MagicMock()
         mock_mod.get_tool_schemas.return_value = [
             {"name": "web_search", "description": "Search"},
         ]
+        mock_mod.dispatch.return_value = "search result"
 
         d = ExternalToolDispatcher(tool_registry=["web_search"])
-        with patch.dict(core.tools.TOOL_MODULES, {"web_search": "core.tools.web_search"}, clear=True), \
-             patch("importlib.import_module", return_value=mock_mod), \
-             patch.object(_dispatch_mod, "_execute", return_value="search result"):
-            result = d._dispatch_core("web_search", {"query": "test"})
+        with patch("core.tools.TOOL_MODULES", {"web_search": "core.tools.web_search"}), \
+             patch("importlib.import_module", return_value=mock_mod):
+            result = d._dispatch_from_registry("web_search", {"query": "test"})
 
         assert result == "search result"
 
-    def test_returns_json_for_dict_result(self):
-        mock_mod = MagicMock()
-        mock_mod.get_tool_schemas.return_value = [{"name": "tool1"}]
+    def test_dispatches_matching_schema_via_function_name(self):
+        mock_mod = MagicMock(spec=["get_tool_schemas", "web_search"])
+        mock_mod.get_tool_schemas.return_value = [{"name": "web_search"}]
+        mock_mod.web_search.return_value = "func result"
 
-        d = ExternalToolDispatcher(tool_registry=["t1"])
-        with patch.dict(core.tools.TOOL_MODULES, {"t1": "core.tools.t1"}, clear=True), \
-             patch("importlib.import_module", return_value=mock_mod), \
-             patch.object(_dispatch_mod, "_execute", return_value={"key": "value"}):
-            result = d._dispatch_core("tool1", {})
+        d = ExternalToolDispatcher(tool_registry=["web_search"])
+        with patch("core.tools.TOOL_MODULES", {"web_search": "core.tools.web_search"}), \
+             patch("importlib.import_module", return_value=mock_mod):
+            result = d._dispatch_from_registry("web_search", {"query": "test"})
 
-        assert '"key": "value"' in result
-
-    def test_returns_json_for_list_result(self):
-        mock_mod = MagicMock()
-        mock_mod.get_tool_schemas.return_value = [{"name": "tool1"}]
-
-        d = ExternalToolDispatcher(tool_registry=["t1"])
-        with patch.dict(core.tools.TOOL_MODULES, {"t1": "core.tools.t1"}, clear=True), \
-             patch("importlib.import_module", return_value=mock_mod), \
-             patch.object(_dispatch_mod, "_execute", return_value=[1, 2, 3]):
-            result = d._dispatch_core("tool1", {})
-
-        assert "1" in result
-        assert "2" in result
-
-    def test_returns_no_output_for_none(self):
-        mock_mod = MagicMock()
-        mock_mod.get_tool_schemas.return_value = [{"name": "tool1"}]
-
-        d = ExternalToolDispatcher(tool_registry=["t1"])
-        with patch.dict(core.tools.TOOL_MODULES, {"t1": "core.tools.t1"}, clear=True), \
-             patch("importlib.import_module", return_value=mock_mod), \
-             patch.object(_dispatch_mod, "_execute", return_value=None):
-            result = d._dispatch_core("tool1", {})
-
-        assert result == "(no output)"
+        assert result == "func result"
 
     def test_handles_module_without_get_tool_schemas(self):
         mock_mod = MagicMock(spec=[])  # No get_tool_schemas
 
         d = ExternalToolDispatcher(tool_registry=["web_search"])
-        with patch.dict(core.tools.TOOL_MODULES, {"web_search": "core.tools.web_search"}, clear=True), \
+        with patch("core.tools.TOOL_MODULES", {"web_search": "core.tools.web_search"}), \
              patch("importlib.import_module", return_value=mock_mod):
-            result = d._dispatch_core("web_search", {})
+            result = d._dispatch_from_registry("web_search", {})
 
         assert result is None
-
-    def test_handles_execution_error(self):
-        mock_mod = MagicMock()
-        mock_mod.get_tool_schemas.return_value = [{"name": "web_search"}]
-
-        d = ExternalToolDispatcher(tool_registry=["web_search"])
-        with patch.dict(core.tools.TOOL_MODULES, {"web_search": "core.tools.web_search"}, clear=True), \
-             patch("importlib.import_module", return_value=mock_mod), \
-             patch.object(_dispatch_mod, "_execute", side_effect=RuntimeError("boom")):
-            result = d._dispatch_core("web_search", {})
-
-        assert "Error executing" in result
-        assert "boom" in result
 
     def test_schema_name_not_in_module_schemas(self):
         mock_mod = MagicMock()
         mock_mod.get_tool_schemas.return_value = [{"name": "other_tool"}]
 
         d = ExternalToolDispatcher(tool_registry=["web_search"])
-        with patch.dict(core.tools.TOOL_MODULES, {"web_search": "core.tools.web_search"}, clear=True), \
+        with patch("core.tools.TOOL_MODULES", {"web_search": "core.tools.web_search"}), \
              patch("importlib.import_module", return_value=mock_mod):
-            result = d._dispatch_core("web_search", {})
+            result = d._dispatch_from_registry("web_search", {})
 
         assert result is None
 
+    def test_handles_execution_error(self):
+        mock_mod = MagicMock()
+        mock_mod.get_tool_schemas.return_value = [{"name": "web_search"}]
+        mock_mod.dispatch.side_effect = RuntimeError("boom")
 
-# ── _dispatch_personal() ──────────────────────────────────────
+        d = ExternalToolDispatcher(tool_registry=["web_search"])
+        with patch("core.tools.TOOL_MODULES", {"web_search": "core.tools.web_search"}), \
+             patch("importlib.import_module", return_value=mock_mod):
+            result = d._dispatch_from_registry("web_search", {})
+
+        assert "Error executing" in result
+        assert "boom" in result
+
+    def test_handles_import_error(self):
+        d = ExternalToolDispatcher(tool_registry=["web_search"])
+        with patch("core.tools.TOOL_MODULES", {"web_search": "core.tools.web_search"}), \
+             patch(
+                 "importlib.import_module",
+                 side_effect=ImportError("no module"),
+             ):
+            result = d._dispatch_from_registry("web_search", {})
+
+        assert "Error executing" in result
+        assert "no module" in result
 
 
-class TestDispatchPersonal:
+# ── _dispatch_from_files() ────────────────────────────────────
+
+
+class TestDispatchFromFiles:
     def test_empty_personal_tools(self, empty_dispatcher: ExternalToolDispatcher):
-        result = empty_dispatcher._dispatch_personal("my_fn", {})
+        result = empty_dispatcher._dispatch_from_files("my_fn", {})
         assert result is None
 
     def test_dispatches_via_module_dispatch(self):
@@ -180,7 +177,7 @@ class TestDispatchPersonal:
         )
         with patch("importlib.util.spec_from_file_location", return_value=mock_spec), \
              patch("importlib.util.module_from_spec", return_value=mock_mod):
-            result = d._dispatch_personal("my_fn", {"arg": "val"})
+            result = d._dispatch_from_files("my_fn", {"arg": "val"})
 
         assert result == "dispatched result"
 
@@ -196,24 +193,9 @@ class TestDispatchPersonal:
         )
         with patch("importlib.util.spec_from_file_location", return_value=mock_spec), \
              patch("importlib.util.module_from_spec", return_value=mock_mod):
-            result = d._dispatch_personal("my_fn", {"arg": "val"})
+            result = d._dispatch_from_files("my_fn", {"arg": "val"})
 
         assert result == "func result"
-
-    def test_no_handler_returns_error(self):
-        mock_spec = MagicMock()
-        mock_mod = MagicMock(spec=["get_tool_schemas"])
-        mock_mod.get_tool_schemas.return_value = [{"name": "my_fn"}]
-
-        d = ExternalToolDispatcher(
-            tool_registry=[],
-            personal_tools={"my_tool": "/path/to/tool.py"},
-        )
-        with patch("importlib.util.spec_from_file_location", return_value=mock_spec), \
-             patch("importlib.util.module_from_spec", return_value=mock_mod):
-            result = d._dispatch_personal("my_fn", {})
-
-        assert "no handler" in result
 
     def test_spec_is_none_skips(self):
         d = ExternalToolDispatcher(
@@ -221,7 +203,7 @@ class TestDispatchPersonal:
             personal_tools={"my_tool": "/path/to/tool.py"},
         )
         with patch("importlib.util.spec_from_file_location", return_value=None):
-            result = d._dispatch_personal("my_fn", {})
+            result = d._dispatch_from_files("my_fn", {})
 
         assert result is None
 
@@ -234,7 +216,7 @@ class TestDispatchPersonal:
             personal_tools={"my_tool": "/path/to/tool.py"},
         )
         with patch("importlib.util.spec_from_file_location", return_value=mock_spec):
-            result = d._dispatch_personal("my_fn", {})
+            result = d._dispatch_from_files("my_fn", {})
 
         assert result is None
 
@@ -249,7 +231,21 @@ class TestDispatchPersonal:
         )
         with patch("importlib.util.spec_from_file_location", return_value=mock_spec), \
              patch("importlib.util.module_from_spec", return_value=mock_mod):
-            result = d._dispatch_personal("my_fn", {})
+            result = d._dispatch_from_files("my_fn", {})
+
+        assert result is None
+
+    def test_module_without_get_tool_schemas(self):
+        mock_spec = MagicMock()
+        mock_mod = MagicMock(spec=[])  # No get_tool_schemas
+
+        d = ExternalToolDispatcher(
+            tool_registry=[],
+            personal_tools={"my_tool": "/path/to/tool.py"},
+        )
+        with patch("importlib.util.spec_from_file_location", return_value=mock_spec), \
+             patch("importlib.util.module_from_spec", return_value=mock_mod):
+            result = d._dispatch_from_files("my_fn", {})
 
         assert result is None
 
@@ -265,468 +261,162 @@ class TestDispatchPersonal:
         )
         with patch("importlib.util.spec_from_file_location", return_value=mock_spec), \
              patch("importlib.util.module_from_spec", return_value=mock_mod):
-            result = d._dispatch_personal("my_fn", {})
+            result = d._dispatch_from_files("my_fn", {})
 
-        assert "Error executing personal tool" in result
+        assert "Error executing" in result
+        assert "fail" in result
 
-    def test_dict_result_serialized(self):
-        mock_spec = MagicMock()
-        mock_mod = MagicMock()
-        mock_mod.get_tool_schemas.return_value = [{"name": "my_fn"}]
-        mock_mod.dispatch.return_value = {"status": "ok"}
 
-        d = ExternalToolDispatcher(
-            tool_registry=[],
-            personal_tools={"my_tool": "/path/to/tool.py"},
-        )
-        with patch("importlib.util.spec_from_file_location", return_value=mock_spec), \
-             patch("importlib.util.module_from_spec", return_value=mock_mod):
-            result = d._dispatch_personal("my_fn", {})
+# ── _call_module() ────────────────────────────────────────────
 
-        assert '"status": "ok"' in result
 
-    def test_none_result_returns_no_output(self):
-        mock_spec = MagicMock()
-        mock_mod = MagicMock()
-        mock_mod.get_tool_schemas.return_value = [{"name": "my_fn"}]
-        mock_mod.dispatch.return_value = None
+class TestCallModule:
+    def test_calls_dispatch_if_available(self):
+        mod = MagicMock()
+        mod.dispatch.return_value = "dispatched"
 
-        d = ExternalToolDispatcher(
-            tool_registry=[],
-            personal_tools={"my_tool": "/path/to/tool.py"},
-        )
-        with patch("importlib.util.spec_from_file_location", return_value=mock_spec), \
-             patch("importlib.util.module_from_spec", return_value=mock_mod):
-            result = d._dispatch_personal("my_fn", {})
+        result = ExternalToolDispatcher._call_module(mod, "my_tool", {"a": 1})
+
+        assert result == "dispatched"
+        mod.dispatch.assert_called_once_with("my_tool", {"a": 1})
+
+    def test_falls_to_getattr_when_no_dispatch(self):
+        mod = MagicMock(spec=["my_tool"])
+        mod.my_tool.return_value = "func result"
+
+        result = ExternalToolDispatcher._call_module(mod, "my_tool", {"x": "y"})
+
+        assert result == "func result"
+        mod.my_tool.assert_called_once_with(x="y")
+
+    def test_returns_error_when_neither_dispatch_nor_function(self):
+        mod = MagicMock(spec=[])  # No dispatch, no matching function
+
+        result = ExternalToolDispatcher._call_module(mod, "missing_fn", {})
+
+        assert "Error" in result
+        assert "no handler" in result
+        assert "missing_fn" in result
+
+    def test_serializes_dict_result_to_json(self):
+        mod = MagicMock()
+        mod.dispatch.return_value = {"key": "value", "count": 42}
+
+        result = ExternalToolDispatcher._call_module(mod, "my_tool", {})
+
+        parsed = json.loads(result)
+        assert parsed == {"key": "value", "count": 42}
+
+    def test_serializes_list_result_to_json(self):
+        mod = MagicMock()
+        mod.dispatch.return_value = [1, 2, 3]
+
+        result = ExternalToolDispatcher._call_module(mod, "my_tool", {})
+
+        parsed = json.loads(result)
+        assert parsed == [1, 2, 3]
+
+    def test_returns_no_output_for_none(self):
+        mod = MagicMock()
+        mod.dispatch.return_value = None
+
+        result = ExternalToolDispatcher._call_module(mod, "my_tool", {})
 
         assert result == "(no output)"
 
-    def test_module_without_get_tool_schemas(self):
-        mock_spec = MagicMock()
-        mock_mod = MagicMock(spec=[])  # No get_tool_schemas
+    def test_converts_string_result(self):
+        mod = MagicMock()
+        mod.dispatch.return_value = "plain text"
 
+        result = ExternalToolDispatcher._call_module(mod, "my_tool", {})
+
+        assert result == "plain text"
+
+    def test_converts_non_string_non_collection_to_str(self):
+        mod = MagicMock()
+        mod.dispatch.return_value = 12345
+
+        result = ExternalToolDispatcher._call_module(mod, "my_tool", {})
+
+        assert result == "12345"
+
+    def test_handles_exception_in_dispatch(self):
+        mod = MagicMock()
+        mod.dispatch.side_effect = ValueError("bad input")
+
+        result = ExternalToolDispatcher._call_module(mod, "my_tool", {})
+
+        assert "Error executing" in result
+        assert "bad input" in result
+
+    def test_handles_exception_in_function_call(self):
+        mod = MagicMock(spec=["my_tool"])
+        mod.my_tool.side_effect = TypeError("wrong args")
+
+        result = ExternalToolDispatcher._call_module(mod, "my_tool", {})
+
+        assert "Error executing" in result
+        assert "wrong args" in result
+
+    def test_dispatch_preferred_over_function_name(self):
+        """When both dispatch() and a matching function exist, dispatch() wins."""
+        mod = MagicMock()
+        mod.dispatch.return_value = "from dispatch"
+        mod.my_tool = MagicMock(return_value="from function")
+
+        result = ExternalToolDispatcher._call_module(mod, "my_tool", {})
+
+        assert result == "from dispatch"
+        mod.dispatch.assert_called_once()
+        mod.my_tool.assert_not_called()
+
+
+# ── update_personal_tools() ──────────────────────────────────
+
+
+class TestUpdatePersonalTools:
+    def test_replaces_personal_tools_mapping(self):
         d = ExternalToolDispatcher(
             tool_registry=[],
-            personal_tools={"my_tool": "/path/to/tool.py"},
+            personal_tools={"old_tool": "/old/path.py"},
         )
-        with patch("importlib.util.spec_from_file_location", return_value=mock_spec), \
-             patch("importlib.util.module_from_spec", return_value=mock_mod):
-            result = d._dispatch_personal("my_fn", {})
+        new_mapping = {"new_tool": "/new/path.py", "another": "/another.py"}
+        d.update_personal_tools(new_mapping)
 
-        assert result is None
+        assert d._personal_tools == new_mapping
 
-
-# ── _execute() ────────────────────────────────────────────────
-
-
-class TestExecuteFunction:
-    def test_web_search(self):
-        mod = MagicMock()
-        mod.search.return_value = "search results"
-        result = _execute(mod, schema_name="web_search", args={"query": "test"})
-        assert result == "search results"
-        mod.search.assert_called_once_with(query="test")
-
-    def test_x_search(self):
-        mod = MagicMock()
-        mock_client = MagicMock()
-        mock_client.search_recent.return_value = "tweets"
-        mod.XSearchClient.return_value = mock_client
-
-        result = _execute(mod, schema_name="x_search", args={"query": "test"})
-        assert result == "tweets"
-
-    def test_x_user_tweets(self):
-        mod = MagicMock()
-        mock_client = MagicMock()
-        mock_client.get_user_tweets.return_value = "user tweets"
-        mod.XSearchClient.return_value = mock_client
-
-        result = _execute(mod, schema_name="x_user_tweets", args={"username": "alice"})
-        assert result == "user tweets"
-
-    def test_chatwork_send(self):
-        mod = MagicMock()
-        mock_client = MagicMock()
-        mock_client.resolve_room_id.return_value = "123"
-        mock_client.post_message.return_value = "sent"
-        mod.ChatworkClient.return_value = mock_client
-
-        result = _execute(
-            mod,
-            schema_name="chatwork_send",
-            args={"room": "general", "message": "hi"},
+    def test_replaces_with_empty_mapping(self):
+        d = ExternalToolDispatcher(
+            tool_registry=[],
+            personal_tools={"tool": "/path.py"},
         )
-        assert result == "sent"
+        d.update_personal_tools({})
 
-    def test_chatwork_rooms(self):
-        mod = MagicMock()
-        mock_client = MagicMock()
-        mock_client.rooms.return_value = [{"name": "general"}]
-        mod.ChatworkClient.return_value = mock_client
-
-        result = _execute(mod, schema_name="chatwork_rooms", args={})
-        assert result == [{"name": "general"}]
-
-    def test_slack_send(self):
-        mod = MagicMock()
-        mock_client = MagicMock()
-        mock_client.resolve_channel.return_value = "C123"
-        mock_client.post_message.return_value = "ok"
-        mod.SlackClient.return_value = mock_client
-
-        result = _execute(
-            mod,
-            schema_name="slack_send",
-            args={"channel": "general", "message": "hello"},
-        )
-        assert result == "ok"
-
-    def test_slack_channels(self):
-        mod = MagicMock()
-        mock_client = MagicMock()
-        mock_client.channels.return_value = ["general"]
-        mod.SlackClient.return_value = mock_client
-
-        result = _execute(mod, schema_name="slack_channels", args={})
-        assert result == ["general"]
-
-    def test_gmail_unread(self):
-        mod = MagicMock()
-        mock_client = MagicMock()
-        email = MagicMock()
-        email.id = "1"
-        email.from_addr = "a@b.com"
-        email.subject = "Hi"
-        email.snippet = "Hello"
-        mock_client.get_unread_emails.return_value = [email]
-        mod.GmailClient.return_value = mock_client
-
-        result = _execute(mod, schema_name="gmail_unread", args={})
-        assert len(result) == 1
-        assert result[0]["subject"] == "Hi"
-
-    def test_gmail_read_body(self):
-        mod = MagicMock()
-        mock_client = MagicMock()
-        mock_client.get_email_body.return_value = "email body"
-        mod.GmailClient.return_value = mock_client
-
-        result = _execute(mod, schema_name="gmail_read_body", args={"message_id": "1"})
-        assert result == "email body"
-
-    def test_gmail_draft(self):
-        mod = MagicMock()
-        mock_client = MagicMock()
-        draft_result = MagicMock(success=True, draft_id="d1", error=None)
-        mock_client.create_draft.return_value = draft_result
-        mod.GmailClient.return_value = mock_client
-
-        result = _execute(
-            mod,
-            schema_name="gmail_draft",
-            args={"to": "a@b.com", "subject": "Hi", "body": "Hello"},
-        )
-        assert result["success"] is True
-
-    def test_local_llm_generate(self):
-        mod = MagicMock()
-        mock_client = MagicMock()
-        mock_client.generate.return_value = "generated text"
-        mod.OllamaClient.return_value = mock_client
-
-        result = _execute(
-            mod,
-            schema_name="local_llm_generate",
-            args={"prompt": "test prompt"},
-        )
-        assert result == "generated text"
-
-    def test_local_llm_models(self):
-        mod = MagicMock()
-        mock_client = MagicMock()
-        mock_client.list_models.return_value = ["model1"]
-        mod.OllamaClient.return_value = mock_client
-
-        result = _execute(mod, schema_name="local_llm_models", args={})
-        assert result == ["model1"]
-
-    def test_local_llm_status(self):
-        mod = MagicMock()
-        mock_client = MagicMock()
-        mock_client.server_status.return_value = {"status": "ok"}
-        mod.OllamaClient.return_value = mock_client
-
-        result = _execute(mod, schema_name="local_llm_status", args={})
-        assert result["status"] == "ok"
-
-    def test_github_list_issues(self):
-        mod = MagicMock()
-        mock_client = MagicMock()
-        mock_client.list_issues.return_value = [{"title": "Bug"}]
-        mod.GitHubClient.return_value = mock_client
-
-        result = _execute(mod, schema_name="github_list_issues", args={})
-        assert result == [{"title": "Bug"}]
-
-    def test_github_create_issue(self):
-        mod = MagicMock()
-        mock_client = MagicMock()
-        mock_client.create_issue.return_value = {"id": 1}
-        mod.GitHubClient.return_value = mock_client
-
-        result = _execute(
-            mod,
-            schema_name="github_create_issue",
-            args={"title": "Bug report"},
-        )
-        assert result == {"id": 1}
-
-    def test_unknown_schema_raises(self):
-        mod = MagicMock()
-        with pytest.raises(ValueError, match="No handler"):
-            _execute(mod, schema_name="totally_unknown_schema", args={})
-
-    def test_aws_ecs_status(self):
-        mod = MagicMock()
-        mock_collector = MagicMock()
-        mock_collector.get_ecs_status.return_value = {"status": "running"}
-        mod.AWSCollector.return_value = mock_collector
-
-        result = _execute(
-            mod,
-            schema_name="aws_ecs_status",
-            args={"cluster": "c1", "service": "s1"},
-        )
-        assert result == {"status": "running"}
-
-    def test_transcribe_audio(self):
-        mod = MagicMock()
-        mod.process_audio.return_value = "transcribed text"
-        result = _execute(
-            mod,
-            schema_name="transcribe_audio",
-            args={"audio_path": "/tmp/audio.wav"},
-        )
-        assert result == "transcribed text"
+        assert d._personal_tools == {}
 
 
-# ── _handle_generate_character_assets() ──────────────────────
+# ── registry property ─────────────────────────────────────────
 
 
-class TestHandleGenerateCharacterAssets:
-    def test_passes_image_gen_config_to_pipeline(self):
-        from core.config.models import AnimaWorksConfig, ImageGenConfig
+class TestRegistryProperty:
+    def test_returns_registry_list(self):
+        d = ExternalToolDispatcher(tool_registry=["web_search", "slack"])
+        assert d.registry == ["web_search", "slack"]
 
-        mock_config = AnimaWorksConfig(
-            image_gen=ImageGenConfig(
-                style_prefix="anime, ",
-                vibe_strength=0.7,
-            )
-        )
-        mock_mod = MagicMock()
-        mock_pipeline = MagicMock()
-        mock_result = MagicMock()
-        mock_result.to_dict.return_value = {"fullbody": "/path/to/img.png"}
-        mock_pipeline.generate_all.return_value = mock_result
-        mock_mod.ImageGenPipeline.return_value = mock_pipeline
+    def test_empty_registry(self):
+        d = ExternalToolDispatcher(tool_registry=[])
+        assert d.registry == []
 
-        with patch("core.config.models.load_config", return_value=mock_config):
-            result = _handle_generate_character_assets(
-                mock_mod,
-                {"person_dir": "/tmp/test", "prompt": "1girl"},
-            )
 
-        # Verify ImageGenPipeline was constructed with the config's image_gen
-        call_args = mock_mod.ImageGenPipeline.call_args
-        assert call_args[0][0] == Path("/tmp/test")
-        assert call_args[1]["config"] is mock_config.image_gen
-        assert call_args[1]["config"].style_prefix == "anime, "
-        assert call_args[1]["config"].vibe_strength == 0.7
-        assert result == {"fullbody": "/path/to/img.png"}
+# ── Constructor ───────────────────────────────────────────────
 
-    def test_uses_default_config_when_no_image_gen(self):
-        from core.config.models import AnimaWorksConfig, ImageGenConfig
 
-        mock_config = AnimaWorksConfig()  # default config
-        mock_mod = MagicMock()
-        mock_pipeline = MagicMock()
-        mock_result = MagicMock()
-        mock_result.to_dict.return_value = {}
-        mock_pipeline.generate_all.return_value = mock_result
-        mock_mod.ImageGenPipeline.return_value = mock_pipeline
+class TestConstructor:
+    def test_defaults_personal_tools_to_empty_dict(self):
+        d = ExternalToolDispatcher(tool_registry=["web_search"])
+        assert d._personal_tools == {}
 
-        with patch("core.config.models.load_config", return_value=mock_config):
-            _handle_generate_character_assets(
-                mock_mod,
-                {"person_dir": "/tmp/test", "prompt": "1girl"},
-            )
-
-        call_args = mock_mod.ImageGenPipeline.call_args
-        config_arg = call_args[1]["config"]
-        assert isinstance(config_arg, ImageGenConfig)
-        assert config_arg.style_reference is None
-        assert config_arg.style_prefix == ""
-        assert config_arg.vibe_strength == 0.6
-
-    def test_supervisor_image_used_as_vibe_reference(self, tmp_path):
-        """When supervisor_name is given and fullbody exists, use it as style_reference."""
-        from core.config.models import AnimaWorksConfig, ImageGenConfig
-
-        # Create supervisor's fullbody image
-        supervisor_dir = tmp_path / "persons" / "sakura" / "assets"
-        supervisor_dir.mkdir(parents=True)
-        fullbody = supervisor_dir / "avatar_fullbody.png"
-        fullbody.write_bytes(b"fake-png-data")
-
-        mock_config = AnimaWorksConfig(
-            image_gen=ImageGenConfig(style_prefix="anime, ", vibe_strength=0.7),
-        )
-        mock_mod = MagicMock()
-        mock_pipeline = MagicMock()
-        mock_result = MagicMock()
-        mock_result.to_dict.return_value = {"fullbody": "/path/to/img.png"}
-        mock_pipeline.generate_all.return_value = mock_result
-        mock_mod.ImageGenPipeline.return_value = mock_pipeline
-
-        with patch("core.config.models.load_config", return_value=mock_config), \
-             patch("core.paths.get_persons_dir", return_value=tmp_path / "persons"):
-            result = _handle_generate_character_assets(
-                mock_mod,
-                {
-                    "person_dir": "/tmp/new_person",
-                    "prompt": "1girl",
-                    "supervisor_name": "sakura",
-                },
-            )
-
-        call_args = mock_mod.ImageGenPipeline.call_args
-        config_arg = call_args[1]["config"]
-        assert config_arg.style_reference == str(fullbody)
-        # Original config fields should be preserved
-        assert config_arg.style_prefix == "anime, "
-        assert config_arg.vibe_strength == 0.7
-        assert result == {"fullbody": "/path/to/img.png"}
-
-    def test_supervisor_image_missing_falls_back_to_global(self, tmp_path):
-        """When supervisor_name is given but fullbody doesn't exist, keep global config."""
-        from core.config.models import AnimaWorksConfig, ImageGenConfig
-
-        # No supervisor image created
-        mock_config = AnimaWorksConfig(
-            image_gen=ImageGenConfig(style_reference="/global/style.png"),
-        )
-        mock_mod = MagicMock()
-        mock_pipeline = MagicMock()
-        mock_result = MagicMock()
-        mock_result.to_dict.return_value = {}
-        mock_pipeline.generate_all.return_value = mock_result
-        mock_mod.ImageGenPipeline.return_value = mock_pipeline
-
-        with patch("core.config.models.load_config", return_value=mock_config), \
-             patch("core.paths.get_persons_dir", return_value=tmp_path / "persons"):
-            _handle_generate_character_assets(
-                mock_mod,
-                {
-                    "person_dir": "/tmp/new_person",
-                    "prompt": "1girl",
-                    "supervisor_name": "nonexistent",
-                },
-            )
-
-        call_args = mock_mod.ImageGenPipeline.call_args
-        config_arg = call_args[1]["config"]
-        # Should keep global style_reference unchanged
-        assert config_arg.style_reference == "/global/style.png"
-
-    def test_no_supervisor_name_uses_global_config(self):
-        """When supervisor_name is not provided, use global config as-is."""
-        from core.config.models import AnimaWorksConfig, ImageGenConfig
-
-        mock_config = AnimaWorksConfig(
-            image_gen=ImageGenConfig(style_reference="/global/style.png"),
-        )
-        mock_mod = MagicMock()
-        mock_pipeline = MagicMock()
-        mock_result = MagicMock()
-        mock_result.to_dict.return_value = {}
-        mock_pipeline.generate_all.return_value = mock_result
-        mock_mod.ImageGenPipeline.return_value = mock_pipeline
-
-        with patch("core.config.models.load_config", return_value=mock_config):
-            _handle_generate_character_assets(
-                mock_mod,
-                {"person_dir": "/tmp/new_person", "prompt": "1girl"},
-            )
-
-        call_args = mock_mod.ImageGenPipeline.call_args
-        config_arg = call_args[1]["config"]
-        assert config_arg is mock_config.image_gen
-
-    def test_supervisor_overrides_global_style_reference(self, tmp_path):
-        """Supervisor image takes priority over global style_reference."""
-        from core.config.models import AnimaWorksConfig, ImageGenConfig
-
-        # Create supervisor's fullbody image
-        supervisor_dir = tmp_path / "persons" / "sakura" / "assets"
-        supervisor_dir.mkdir(parents=True)
-        fullbody = supervisor_dir / "avatar_fullbody.png"
-        fullbody.write_bytes(b"fake-png-data")
-
-        mock_config = AnimaWorksConfig(
-            image_gen=ImageGenConfig(
-                style_reference="/global/style.png",
-                vibe_strength=0.5,
-            ),
-        )
-        mock_mod = MagicMock()
-        mock_pipeline = MagicMock()
-        mock_result = MagicMock()
-        mock_result.to_dict.return_value = {}
-        mock_pipeline.generate_all.return_value = mock_result
-        mock_mod.ImageGenPipeline.return_value = mock_pipeline
-
-        with patch("core.config.models.load_config", return_value=mock_config), \
-             patch("core.paths.get_persons_dir", return_value=tmp_path / "persons"):
-            _handle_generate_character_assets(
-                mock_mod,
-                {
-                    "person_dir": "/tmp/new_person",
-                    "prompt": "1girl",
-                    "supervisor_name": "sakura",
-                },
-            )
-
-        call_args = mock_mod.ImageGenPipeline.call_args
-        config_arg = call_args[1]["config"]
-        # Supervisor image should override global style_reference
-        assert config_arg.style_reference == str(fullbody)
-        # Other fields remain unchanged
-        assert config_arg.vibe_strength == 0.5
-
-    def test_supervisor_name_popped_from_args(self, tmp_path):
-        """supervisor_name should be consumed and not passed to generate_all."""
-        from core.config.models import AnimaWorksConfig
-
-        mock_config = AnimaWorksConfig()
-        mock_mod = MagicMock()
-        mock_pipeline = MagicMock()
-        mock_result = MagicMock()
-        mock_result.to_dict.return_value = {}
-        mock_pipeline.generate_all.return_value = mock_result
-        mock_mod.ImageGenPipeline.return_value = mock_pipeline
-
-        with patch("core.config.models.load_config", return_value=mock_config), \
-             patch("core.paths.get_persons_dir", return_value=tmp_path / "persons"):
-            _handle_generate_character_assets(
-                mock_mod,
-                {
-                    "person_dir": "/tmp/new_person",
-                    "prompt": "1girl",
-                    "supervisor_name": "sakura",
-                },
-            )
-
-        # supervisor_name should not appear in generate_all kwargs
-        gen_kwargs = mock_pipeline.generate_all.call_args
-        assert "supervisor_name" not in gen_kwargs.kwargs
+    def test_accepts_personal_tools(self):
+        tools = {"my_tool": "/path/to/tool.py"}
+        d = ExternalToolDispatcher(tool_registry=[], personal_tools=tools)
+        assert d._personal_tools == tools

@@ -23,6 +23,7 @@ from dataclasses import dataclass
 from email.mime.text import MIMEText
 from email.utils import parseaddr
 from pathlib import Path
+from typing import Any
 
 try:
     from google.oauth2.credentials import Credentials
@@ -540,6 +541,33 @@ def cli_main(argv: list[str] | None = None) -> None:
         else:
             print(f"Draft creation failed: {result.error}", file=sys.stderr)
             sys.exit(1)
+
+
+# ── Dispatch ──────────────────────────────────────────
+
+def dispatch(name: str, args: dict[str, Any]) -> Any:
+    """Dispatch a tool call by schema name."""
+    if name == "gmail_unread":
+        client = GmailClient()
+        emails = client.get_unread_emails(max_results=args.get("max_results", 20))
+        return [
+            {"id": e.id, "from": e.from_addr, "subject": e.subject, "snippet": e.snippet}
+            for e in emails
+        ]
+    if name == "gmail_read_body":
+        client = GmailClient()
+        return client.get_email_body(args["message_id"])
+    if name == "gmail_draft":
+        client = GmailClient()
+        result = client.create_draft(
+            to=args["to"],
+            subject=args["subject"],
+            body=args["body"],
+            thread_id=args.get("thread_id"),
+            in_reply_to=args.get("in_reply_to"),
+        )
+        return {"success": result.success, "draft_id": result.draft_id, "error": result.error}
+    raise ValueError(f"Unknown tool: {name}")
 
 
 if __name__ == "__main__":

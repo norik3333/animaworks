@@ -24,6 +24,7 @@ import sys
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Any
 
 from core.tools._async_compat import run_sync
 from core.tools._base import ToolConfigError, get_credential, logger
@@ -739,6 +740,55 @@ def cli_main(argv: list[str] | None = None) -> None:
         for r in rooms:
             ts = _format_timestamp(r.get("last_update_time", 0))
             print(f"{r['room_id']:>12}  {ts}  {r['name']}")
+
+
+# ── Dispatch ──────────────────────────────────────────
+
+def dispatch(name: str, args: dict[str, Any]) -> Any:
+    """Dispatch a tool call by schema name."""
+    if name == "chatwork_send":
+        client = ChatworkClient()
+        room_id = client.resolve_room_id(args["room"])
+        return client.post_message(room_id, args["message"])
+    if name == "chatwork_messages":
+        client = ChatworkClient()
+        room_id = client.resolve_room_id(args["room"])
+        cache = MessageCache()
+        try:
+            msgs = client.get_messages(room_id, force=True)
+            if msgs:
+                cache.upsert_messages(room_id, msgs)
+                cache.update_sync_state(room_id)
+            return cache.get_recent(room_id, limit=args.get("limit", 20))
+        finally:
+            cache.close()
+    if name == "chatwork_search":
+        client = ChatworkClient()
+        cache = MessageCache()
+        try:
+            room_id = None
+            if args.get("room"):
+                room_id = client.resolve_room_id(args["room"])
+            return cache.search(
+                args["keyword"], room_id=room_id, limit=args.get("limit", 50),
+            )
+        finally:
+            cache.close()
+    if name == "chatwork_unreplied":
+        client = ChatworkClient()
+        cache = MessageCache()
+        try:
+            my_info = client.me()
+            my_id = str(my_info["account_id"])
+            return cache.find_unreplied(
+                my_id, exclude_toall=not args.get("include_toall", False),
+            )
+        finally:
+            cache.close()
+    if name == "chatwork_rooms":
+        client = ChatworkClient()
+        return client.rooms()
+    raise ValueError(f"Unknown tool: {name}")
 
 
 if __name__ == "__main__":

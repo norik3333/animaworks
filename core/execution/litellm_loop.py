@@ -113,6 +113,7 @@ class LiteLLMExecutor(BaseExecutor):
             include_discovery_tools=True,
             include_notification_tools=self._tool_handler._human_notifier is not None,
             include_admin_tools=(self._person_dir / "skills" / "newstaff.md").exists(),
+            include_tool_management=True,
         )
         return to_litellm_format(canonical)
 
@@ -151,6 +152,43 @@ class LiteLLMExecutor(BaseExecutor):
             return load_personal_tool_schemas({category: self._personal_tools[category]})
         # Then core tools
         return load_external_schemas([category])
+
+    def _refresh_tools_inline(self, tools: list[dict[str, Any]]) -> str:
+        """Re-discover personal/common tools and update the tools list in-place."""
+        from core.tools import discover_common_tools, discover_personal_tools
+        from core.tooling.schemas import load_personal_tool_schemas
+
+        personal = discover_personal_tools(self._person_dir)
+        common = discover_common_tools()
+        merged = {**common, **personal}
+
+        if not merged:
+            return "No personal or common tools found."
+
+        # Update internal state
+        self._personal_tools = merged
+        self._tool_handler._external.update_personal_tools(merged)
+
+        # Load new schemas and inject into tools list
+        new_schemas = load_personal_tool_schemas(merged)
+        new_litellm = to_litellm_format(new_schemas)
+
+        # Remove old dynamic tool schemas (non-core), then add new ones
+        core_names = set()
+        for cat in self._tool_registry:
+            cat_schemas = load_external_schemas([cat])
+            core_names.update(s["name"] for s in cat_schemas)
+        # Keep core tools + framework tools, replace dynamic tools
+        dynamic_names = {
+            s["name"] for s in new_schemas
+        }
+        tools[:] = [
+            t for t in tools
+            if t.get("function", {}).get("name") not in dynamic_names
+        ] + new_litellm
+
+        names = ", ".join(sorted(merged.keys()))
+        return f"Refreshed tools ({len(merged)} discovered): {names}"
 
     # Tools that use the dedicated background thread pool.
     _BG_POOL_TOOLS = frozenset({
@@ -311,6 +349,16 @@ class LiteLLMExecutor(BaseExecutor):
                             result = f"No tools found for category '{category}'"
                     else:
                         result = f"Category '{category}' is already active"
+                    messages.append({
+                        "role": "tool",
+                        "tool_call_id": tc.id,
+                        "content": result,
+                    })
+                    continue
+
+                # Handle refresh_tools inline — hot-reload personal/common tools
+                if fn_name == "refresh_tools":
+                    result = self._refresh_tools_inline(tools)
                     messages.append({
                         "role": "tool",
                         "tool_call_id": tc.id,

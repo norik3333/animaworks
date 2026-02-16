@@ -24,6 +24,7 @@ import sys
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Any
 
 from core.tools._async_compat import run_sync
 from core.tools._base import ToolConfigError, get_credential, logger
@@ -1161,6 +1162,61 @@ def _run_cli_command(client: SlackClient, args) -> None:
             print(f"\nTotal: {len(member_channels)} channels")
         finally:
             cache.close()
+
+
+# ── Dispatch ──────────────────────────────────────────
+
+def dispatch(name: str, args: dict[str, Any]) -> Any:
+    """Dispatch a tool call by schema name."""
+    if name == "slack_send":
+        client = SlackClient()
+        channel_id = client.resolve_channel(args["channel"])
+        return client.post_message(
+            channel_id,
+            args["message"],
+            thread_ts=args.get("thread_ts"),
+        )
+    if name == "slack_messages":
+        client = SlackClient()
+        channel_id = client.resolve_channel(args["channel"])
+        cache = MessageCache()
+        try:
+            limit = args.get("limit", 20)
+            msgs = client.channel_history(channel_id, limit=limit)
+            if msgs:
+                for m in msgs:
+                    uid = m.get("user", m.get("bot_id", ""))
+                    if uid:
+                        m["user_name"] = client.resolve_user_name(uid)
+                cache.upsert_messages(channel_id, msgs)
+                cache.update_sync_state(channel_id)
+            return cache.get_recent(channel_id, limit=limit)
+        finally:
+            cache.close()
+    if name == "slack_search":
+        client = SlackClient()
+        cache = MessageCache()
+        try:
+            channel_id = None
+            if args.get("channel"):
+                channel_id = client.resolve_channel(args["channel"])
+            return cache.search(
+                args["keyword"], channel_id=channel_id, limit=args.get("limit", 50),
+            )
+        finally:
+            cache.close()
+    if name == "slack_unreplied":
+        client = SlackClient()
+        cache = MessageCache()
+        try:
+            client.auth_test()
+            return cache.find_unreplied(client.my_user_id)
+        finally:
+            cache.close()
+    if name == "slack_channels":
+        client = SlackClient()
+        return client.channels()
+    raise ValueError(f"Unknown tool: {name}")
 
 
 if __name__ == "__main__":

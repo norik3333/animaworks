@@ -1788,3 +1788,183 @@ def cli_main(argv: list[str] | None = None) -> None:
         else:
             for name, path in outputs_anim["animations"].items():
                 print(f"Animation '{name}': {path}")
+
+
+# ── Dispatch ──────────────────────────────────────────
+
+
+def dispatch(tool_name: str, args: dict[str, Any]) -> Any:
+    """Dispatch a tool call to the appropriate handler."""
+    if tool_name == "generate_character_assets":
+        from core.config.models import load_config
+        from core.paths import get_persons_dir
+
+        person_dir = Path(args.pop("person_dir", ""))
+        supervisor_name: str | None = args.pop("supervisor_name", None)
+        config = load_config()
+        image_config = config.image_gen
+
+        # Use supervisor's fullbody image as Vibe Transfer reference
+        if supervisor_name:
+            supervisor_fullbody = (
+                get_persons_dir() / supervisor_name / "assets" / "avatar_fullbody.png"
+            )
+            if supervisor_fullbody.exists():
+                image_config = image_config.model_copy(
+                    update={"style_reference": str(supervisor_fullbody)},
+                )
+                logger.info(
+                    "Using supervisor image as vibe reference: %s",
+                    supervisor_fullbody,
+                )
+
+        pipeline = ImageGenPipeline(person_dir, config=image_config)
+        result = pipeline.generate_all(
+            prompt=args["prompt"],
+            negative_prompt=args.get("negative_prompt", ""),
+            skip_existing=args.get("skip_existing", True),
+            steps=args.get("steps"),
+            animations=args.get("animations"),
+        )
+        return result.to_dict()
+
+    if tool_name == "generate_fullbody":
+        person_dir = Path(args.pop("person_dir", ""))
+        assets_dir = person_dir / "assets"
+        assets_dir.mkdir(parents=True, exist_ok=True)
+        client = NovelAIClient()
+        img = client.generate_fullbody(
+            prompt=args["prompt"],
+            negative_prompt=args.get("negative_prompt", ""),
+            width=args.get("width", 1024),
+            height=args.get("height", 1536),
+            seed=args.get("seed"),
+        )
+        out = assets_dir / "avatar_fullbody.png"
+        out.write_bytes(img)
+        return {"path": str(out), "size": len(img)}
+
+    if tool_name == "generate_bustup":
+        person_dir = Path(args.pop("person_dir", ""))
+        assets_dir = person_dir / "assets"
+        ref_path = assets_dir / "avatar_fullbody.png"
+        if not ref_path.exists():
+            return {"error": "No full-body reference image found"}
+        client = FluxKontextClient()
+        img = client.generate_from_reference(
+            reference_image=ref_path.read_bytes(),
+            prompt=args.get("prompt", _BUSTUP_PROMPT),
+            aspect_ratio="3:4",
+        )
+        out = assets_dir / "avatar_bustup.png"
+        out.write_bytes(img)
+        return {"path": str(out), "size": len(img)}
+
+    if tool_name == "generate_chibi":
+        person_dir = Path(args.pop("person_dir", ""))
+        assets_dir = person_dir / "assets"
+        ref_path = assets_dir / "avatar_fullbody.png"
+        if not ref_path.exists():
+            return {"error": "No full-body reference image found"}
+        client = FluxKontextClient()
+        img = client.generate_from_reference(
+            reference_image=ref_path.read_bytes(),
+            prompt=args.get("prompt", _CHIBI_PROMPT),
+            aspect_ratio="1:1",
+        )
+        out = assets_dir / "avatar_chibi.png"
+        out.write_bytes(img)
+        return {"path": str(out), "size": len(img)}
+
+    if tool_name == "generate_3d_model":
+        person_dir = Path(args.pop("person_dir", ""))
+        assets_dir = person_dir / "assets"
+        chibi_path = assets_dir / "avatar_chibi.png"
+        if not chibi_path.exists():
+            return {"error": "No chibi image found for 3D conversion"}
+        client = MeshyClient()
+        task_id = client.create_task(
+            chibi_path.read_bytes(),
+            ai_model=args.get("ai_model", "meshy-6"),
+            target_polycount=args.get("target_polycount", 30000),
+        )
+        task = client.poll_task(task_id)
+        glb = client.download_model(task, fmt="glb")
+        out = assets_dir / "avatar_chibi.glb"
+        out.write_bytes(glb)
+        return {"path": str(out), "size": len(glb), "task_id": task_id}
+
+    if tool_name == "generate_rigged_model":
+        import httpx as _httpx
+
+        person_dir = Path(args.pop("person_dir", ""))
+        assets_dir = person_dir / "assets"
+        glb_path = assets_dir / "avatar_chibi.glb"
+        if not glb_path.exists():
+            return {"error": "No 3D model found for rigging"}
+        client = MeshyClient()
+        data_uri = _image_to_data_uri(
+            glb_path.read_bytes(), mime="model/gltf-binary",
+        )
+        body = {
+            "model_url": data_uri,
+            "height_meters": args.get("height_meters", 1.0),
+        }
+        resp = _httpx.post(
+            MESHY_RIGGING_URL,
+            json=body,
+            headers=client._headers(),
+            timeout=_HTTP_TIMEOUT,
+        )
+        resp.raise_for_status()
+        rig_task_id = resp.json()["result"]
+        rig_task = client.poll_rigging_task(rig_task_id)
+        rigged = client.download_rigged_model(rig_task, fmt="glb")
+        rigged_path = assets_dir / "avatar_chibi_rigged.glb"
+        rigged_path.write_bytes(rigged)
+        basic_anims = client.download_rigging_animations(rig_task)
+        anim_results: dict[str, str] = {}
+        for anim_name, anim_bytes in basic_anims.items():
+            anim_path = assets_dir / f"anim_{anim_name}.glb"
+            anim_path.write_bytes(anim_bytes)
+            anim_results[anim_name] = str(anim_path)
+        return {
+            "rigged_model": str(rigged_path),
+            "animations": anim_results,
+            "rig_task_id": rig_task_id,
+        }
+
+    if tool_name == "generate_animations":
+        import httpx as _httpx
+
+        person_dir = Path(args.pop("person_dir", ""))
+        assets_dir = person_dir / "assets"
+        glb_path = assets_dir / "avatar_chibi.glb"
+        if not glb_path.exists():
+            return {"error": "No 3D model found for animation"}
+        client = MeshyClient()
+        data_uri = _image_to_data_uri(
+            glb_path.read_bytes(), mime="model/gltf-binary",
+        )
+        body = {"model_url": data_uri, "height_meters": 1.0}
+        resp = _httpx.post(
+            MESHY_RIGGING_URL,
+            json=body,
+            headers=client._headers(),
+            timeout=_HTTP_TIMEOUT,
+        )
+        resp.raise_for_status()
+        rig_task_id = resp.json()["result"]
+        client.poll_rigging_task(rig_task_id)
+        anim_map = args.get("animations") or _DEFAULT_ANIMATIONS
+        anim_results_gen: dict[str, str] = {}
+        for anim_name, action_id in anim_map.items():
+            anim_task_id = client.create_animation_task(rig_task_id, action_id)
+            anim_task = client.poll_animation_task(anim_task_id)
+            anim_bytes = client.download_animation(anim_task, fmt="glb")
+            anim_path = assets_dir / f"anim_{anim_name}.glb"
+            anim_path.write_bytes(anim_bytes)
+            anim_results_gen[anim_name] = str(anim_path)
+        return {"animations": anim_results_gen, "rig_task_id": rig_task_id}
+
+    raise ValueError(f"Unknown tool: {tool_name}")

@@ -446,5 +446,31 @@ def cli_main(argv: list[str] | None = None) -> None:
     print()  # trailing newline
 
 
+# ── Dispatch ──────────────────────────────────────────
+
+
+def dispatch(tool_name: str, args: dict[str, Any]) -> Any:
+    """Dispatch a tool call to the appropriate handler."""
+    if tool_name == "aws_ecs_status":
+        collector = AWSCollector(region=args.get("region"))
+        return collector.get_ecs_status(args["cluster"], args["service"])
+    if tool_name == "aws_error_logs":
+        collector = AWSCollector(region=args.get("region"))
+        return collector.get_error_logs(
+            log_group=args["log_group"],
+            hours=args.get("hours", 1),
+            patterns=args.get("patterns"),
+        )
+    if tool_name == "aws_metrics":
+        collector = AWSCollector(region=args.get("region"))
+        return collector.get_metrics(
+            cluster=args["cluster"],
+            service=args["service"],
+            metric=args.get("metric", "CPUUtilization"),
+            hours=args.get("hours", 1),
+        )
+    raise ValueError(f"Unknown tool: {tool_name}")
+
+
 if __name__ == "__main__":
     cli_main()

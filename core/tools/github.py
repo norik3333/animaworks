@@ -459,5 +459,42 @@ def cli_main(argv: list[str] | None = None) -> None:
     print()  # trailing newline
 
 
+# ── Dispatch ──────────────────────────────────────────
+
+
+def dispatch(tool_name: str, args: dict[str, Any]) -> Any:
+    """Dispatch a tool call to the appropriate handler."""
+    if tool_name == "github_list_issues":
+        client = GitHubClient(repo=args.get("repo"))
+        return client.list_issues(
+            state=args.get("state", "open"),
+            labels=args.get("labels"),
+            limit=args.get("limit", 20),
+        )
+    if tool_name == "github_create_issue":
+        client = GitHubClient(repo=args.get("repo"))
+        return client.create_issue(
+            title=args["title"],
+            body=args.get("body", ""),
+            labels=args.get("labels"),
+        )
+    if tool_name == "github_list_prs":
+        client = GitHubClient(repo=args.get("repo"))
+        return client.list_prs(
+            state=args.get("state", "open"),
+            limit=args.get("limit", 20),
+        )
+    if tool_name == "github_create_pr":
+        client = GitHubClient(repo=args.get("repo"))
+        return client.create_pr(
+            title=args["title"],
+            body=args.get("body", ""),
+            head=args["head"],
+            base=args.get("base", "main"),
+            draft=args.get("draft", False),
+        )
+    raise ValueError(f"Unknown tool: {tool_name}")
+
+
 if __name__ == "__main__":
     cli_main()

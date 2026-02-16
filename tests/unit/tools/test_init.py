@@ -7,7 +7,13 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from core.tools import TOOL_MODULES, discover_personal_tools, cli_dispatch
+from core.tools import (
+    TOOL_MODULES,
+    discover_core_tools,
+    discover_common_tools,
+    discover_personal_tools,
+    cli_dispatch,
+)
 
 
 # ── TOOL_MODULES registry ─────────────────────────────────────────
@@ -164,3 +170,95 @@ class TestCliDispatch:
                 assert exc_info.value.code == 1
         out = capsys.readouterr().out
         assert "has no CLI interface" in out
+
+
+# ── discover_core_tools ──────────────────────────────────────────
+
+
+class TestDiscoverCoreTools:
+    """Tests for discover_core_tools()."""
+
+    def test_returns_dict(self):
+        result = discover_core_tools()
+        assert isinstance(result, dict)
+
+    def test_contains_expected_tools(self):
+        result = discover_core_tools()
+        expected = {"web_search", "slack", "gmail", "chatwork", "github"}
+        for name in expected:
+            assert name in result, f"Expected tool '{name}' not found in discover_core_tools()"
+
+    def test_module_paths_start_with_core_tools(self):
+        result = discover_core_tools()
+        for name, module_path in result.items():
+            assert module_path.startswith("core.tools."), (
+                f"Tool '{name}' module path '{module_path}' does not start with 'core.tools.'"
+            )
+
+    def test_skips_underscore_prefixed_files(self):
+        result = discover_core_tools()
+        for name in result:
+            assert not name.startswith("_"), (
+                f"Tool '{name}' starts with underscore and should have been skipped"
+            )
+
+    def test_matches_tool_modules(self):
+        """discover_core_tools() should produce the same result as TOOL_MODULES."""
+        result = discover_core_tools()
+        assert result == TOOL_MODULES
+
+
+# ── discover_common_tools ────────────────────────────────────────
+
+
+class TestDiscoverCommonTools:
+    """Tests for discover_common_tools()."""
+
+    def test_returns_empty_when_dir_missing(self, tmp_path: Path):
+        # tmp_path exists but has no common_tools/ subdirectory
+        result = discover_common_tools(data_dir=tmp_path)
+        assert result == {}
+
+    def test_discovers_python_files(self, tmp_path: Path):
+        tools_dir = tmp_path / "common_tools"
+        tools_dir.mkdir()
+        (tools_dir / "shared_util.py").write_text("cli_main = lambda: None")
+        (tools_dir / "helper.py").write_text("cli_main = lambda: None")
+
+        result = discover_common_tools(data_dir=tmp_path)
+        assert "shared_util" in result
+        assert "helper" in result
+
+    def test_skips_underscore_prefixed_files(self, tmp_path: Path):
+        tools_dir = tmp_path / "common_tools"
+        tools_dir.mkdir()
+        (tools_dir / "__init__.py").write_text("")
+        (tools_dir / "_internal.py").write_text("")
+        (tools_dir / "valid_tool.py").write_text("")
+
+        result = discover_common_tools(data_dir=tmp_path)
+        assert "__init__" not in result
+        assert "_internal" not in result
+        assert "valid_tool" in result
+
+    def test_skips_shadowed_core_tools(self, tmp_path: Path):
+        tools_dir = tmp_path / "common_tools"
+        tools_dir.mkdir()
+        # "slack" is a core tool name in TOOL_MODULES
+        (tools_dir / "slack.py").write_text("cli_main = lambda: None")
+        (tools_dir / "unique_common.py").write_text("cli_main = lambda: None")
+
+        result = discover_common_tools(data_dir=tmp_path)
+        assert "slack" not in result
+        assert "unique_common" in result
+
+    def test_tool_paths_are_absolute(self, tmp_path: Path):
+        tools_dir = tmp_path / "common_tools"
+        tools_dir.mkdir()
+        (tools_dir / "my_tool.py").write_text("")
+
+        result = discover_common_tools(data_dir=tmp_path)
+        for name, file_path in result.items():
+            assert Path(file_path).is_absolute(), (
+                f"Tool '{name}' path '{file_path}' is not absolute"
+            )

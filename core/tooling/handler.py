@@ -207,6 +207,11 @@ class ToolHandler:
             # Admin tools
             elif name == "create_person":
                 result = self._handle_create_person(args)
+            # Tool management
+            elif name == "refresh_tools":
+                result = self._handle_refresh_tools(args)
+            elif name == "share_tool":
+                result = self._handle_share_tool(args)
             else:
                 # ── Background execution for eligible external tools ──
                 if self._background_manager and self._background_manager.is_eligible(name):
@@ -290,12 +295,21 @@ class ToolHandler:
         return f"File not found: {rel}"
 
     def _handle_write_memory_file(self, args: dict[str, Any]) -> str:
-        path = self._person_dir / args["path"]
+        rel = args["path"]
+        path = self._person_dir / rel
 
         # Security check: block protected files and path traversal
         err = _is_protected_write(self._person_dir, path)
         if err:
             return err
+
+        # Tool creation permission check
+        if rel.startswith("tools/") and rel.endswith(".py"):
+            if not self._check_tool_creation_permission("個人ツール"):
+                return _error_result(
+                    "PermissionDenied",
+                    "ツール作成が許可されていません。permissions.md に「ツール作成」セクションを追加してください。",
+                )
 
         path.parent.mkdir(parents=True, exist_ok=True)
         if args.get("mode") == "append":
@@ -442,6 +456,77 @@ class ToolHandler:
 
         logger.info("create_person: created '%s' at %s", person_dir.name, person_dir)
         return f"Person '{person_dir.name}' created successfully at {person_dir}. Reload the server to activate."
+
+    # ── Tool management handlers ─────────────────────────────
+
+    def _check_tool_creation_permission(self, kind: str) -> bool:
+        """Check if tool creation is permitted via permissions.md."""
+        permissions = self._memory.read_permissions() if self._memory else ""
+        if "ツール作成" not in permissions:
+            return False
+        _perm_re = re.compile(
+            rf"[-*]?\s*{re.escape(kind)}\s*:\s*(OK|yes|enabled|true)\s*$",
+            re.IGNORECASE,
+        )
+        for line in permissions.splitlines():
+            if _perm_re.match(line.strip()):
+                return True
+        return False
+
+    def _handle_refresh_tools(self, args: dict[str, Any]) -> str:
+        """Re-discover personal and common tools, update dispatcher."""
+        from core.tools import discover_common_tools, discover_personal_tools
+
+        personal = discover_personal_tools(self._person_dir)
+        common = discover_common_tools()
+        merged = {**common, **personal}
+        self._external.update_personal_tools(merged)
+
+        if not merged:
+            return "No personal or common tools found."
+
+        names = ", ".join(sorted(merged.keys()))
+        logger.info("refresh_tools: discovered %d tools: %s", len(merged), names)
+        return (
+            f"Refreshed tools ({len(merged)} discovered): {names}\n"
+            "These tools are now available for use."
+        )
+
+    def _handle_share_tool(self, args: dict[str, Any]) -> str:
+        """Copy a personal tool to common_tools/ for all persons."""
+        import shutil
+
+        from core.paths import get_data_dir
+
+        tool_name = args["tool_name"]
+        src = self._person_dir / "tools" / f"{tool_name}.py"
+        if not src.exists():
+            return _error_result(
+                "FileNotFound",
+                f"Personal tool '{tool_name}' not found at {src}",
+                suggestion="Check tool name with refresh_tools first",
+            )
+
+        # Permission check
+        if not self._check_tool_creation_permission("共有ツール"):
+            return _error_result(
+                "PermissionDenied",
+                "共有ツール作成が許可されていません。",
+            )
+
+        common_dir = get_data_dir() / "common_tools"
+        common_dir.mkdir(parents=True, exist_ok=True)
+        dst = common_dir / f"{tool_name}.py"
+        if dst.exists():
+            return _error_result(
+                "FileExists",
+                f"Common tool '{tool_name}' already exists at {dst}",
+                suggestion="Choose a different name or remove the existing tool",
+            )
+
+        shutil.copy2(src, dst)
+        logger.info("share_tool: copied %s → %s", src, dst)
+        return f"Shared tool '{tool_name}' to common_tools/. All persons can now use it after refresh_tools."
 
     # ── File operation handlers ──────────────────────────────
 

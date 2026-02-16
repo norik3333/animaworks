@@ -427,5 +427,21 @@ def cli_main(argv: list[str] | None = None) -> None:
             print(final)
 
 
+# ── Dispatch ──────────────────────────────────────────
+
+
+def dispatch(tool_name: str, args: dict[str, Any]) -> Any:
+    """Dispatch a tool call to the appropriate handler."""
+    if tool_name == "transcribe_audio":
+        return process_audio(
+            audio_path=args["audio_path"],
+            language=args.get("language"),
+            model=args.get("model"),
+            raw_only=args.get("raw_only", False),
+            custom_prompt=args.get("custom_prompt"),
+        )
+    raise ValueError(f"Unknown tool: {tool_name}")
+
+
 if __name__ == "__main__":
     cli_main()

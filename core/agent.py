@@ -243,10 +243,13 @@ class AgentCore:
             return []
 
     def _discover_personal_tools(self) -> dict[str, str]:
-        """Discover personal tool modules in ``{person_dir}/tools/``."""
+        """Discover common and personal tool modules."""
         try:
-            from core.tools import discover_personal_tools
-            return discover_personal_tools(self.person_dir)
+            from core.tools import discover_personal_tools, discover_common_tools
+            common = discover_common_tools()
+            personal = discover_personal_tools(self.person_dir)
+            # Personal overrides common (higher priority)
+            return {**common, **personal}
         except Exception:
             logger.debug("Personal tools discovery skipped", exc_info=True)
             return {}

@@ -278,6 +278,27 @@ def get_tool_schemas() -> list[dict]:
     ]
 
 
+# ── Dispatch ──────────────────────────────────────────
+
+def dispatch(name: str, args: dict[str, Any]) -> Any:
+    """Dispatch a tool call by schema name."""
+    if name == "x_search":
+        client = XSearchClient()
+        return client.search_recent(
+            query=args["query"],
+            max_results=args.get("max_results", 10),
+            days=args.get("days", 7),
+        )
+    if name == "x_user_tweets":
+        client = XSearchClient()
+        return client.get_user_tweets(
+            username=args["username"],
+            max_results=args.get("max_results", 10),
+            days=args.get("days"),
+        )
+    raise ValueError(f"Unknown tool: {name}")
+
+
 # ---------------------------------------------------------------------------
 # CLI entry point
 # ---------------------------------------------------------------------------

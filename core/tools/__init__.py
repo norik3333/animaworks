@@ -13,18 +13,52 @@ from pathlib import Path
 
 logger = logging.getLogger("animaworks.tools")
 
-TOOL_MODULES = {
-    "web_search": "core.tools.web_search",
-    "x_search": "core.tools.x_search",
-    "chatwork": "core.tools.chatwork",
-    "slack": "core.tools.slack",
-    "gmail": "core.tools.gmail",
-    "local_llm": "core.tools.local_llm",
-    "transcribe": "core.tools.transcribe",
-    "aws_collector": "core.tools.aws_collector",
-    "github": "core.tools.github",
-    "image_gen": "core.tools.image_gen",
-}
+
+def discover_core_tools() -> dict[str, str]:
+    """Scan core/tools/ for tool modules.
+
+    Returns: Mapping of tool_name → module path (e.g., "core.tools.web_search").
+    Skips files starting with _ (private/internal modules).
+    """
+    tools_dir = Path(__file__).parent
+    core: dict[str, str] = {}
+    for f in sorted(tools_dir.glob("*.py")):
+        if f.name.startswith("_"):
+            continue
+        tool_name = f.stem
+        core[tool_name] = f"core.tools.{tool_name}"
+    return core
+
+
+# Backward-compatible module-level variable
+TOOL_MODULES = discover_core_tools()
+
+
+def discover_common_tools(data_dir: Path | None = None) -> dict[str, str]:
+    """Scan ~/.animaworks/common_tools/ for shared tool modules.
+
+    Returns: Mapping of tool_name → absolute file path.
+    """
+    if data_dir is None:
+        from core.paths import get_data_dir
+        data_dir = get_data_dir()
+    tools_dir = data_dir / "common_tools"
+    if not tools_dir.is_dir():
+        return {}
+    common: dict[str, str] = {}
+    for f in sorted(tools_dir.glob("*.py")):
+        if f.name.startswith("_"):
+            continue
+        tool_name = f.stem
+        if tool_name in TOOL_MODULES:
+            logger.warning(
+                "Common tool '%s' shadows core tool — skipped", tool_name,
+            )
+            continue
+        common[tool_name] = str(f)
+    if common:
+        logger.info("Discovered common tools: %s", list(common.keys()))
+    return common
 
 
 def discover_personal_tools(person_dir: Path) -> dict[str, str]:
@@ -56,10 +90,14 @@ def discover_personal_tools(person_dir: Path) -> dict[str, str]:
 def cli_dispatch():
     """Entry point for ``animaworks-tool`` CLI command.
 
-    Supports both core tools (from ``TOOL_MODULES``) and personal tools
-    discovered via the ``ANIMAWORKS_PERSON_DIR`` environment variable.
+    Supports core tools (from ``TOOL_MODULES``), common tools
+    (from ``common_tools/``), and personal tools discovered via
+    the ``ANIMAWORKS_PERSON_DIR`` environment variable.
     """
     import os
+
+    # Discover common tools
+    common = discover_common_tools()
 
     # Discover personal tools if person_dir is set
     person_dir_str = os.environ.get("ANIMAWORKS_PERSON_DIR", "")
@@ -67,7 +105,7 @@ def cli_dispatch():
     if person_dir_str:
         personal = discover_personal_tools(Path(person_dir_str))
 
-    all_tools = set(TOOL_MODULES.keys()) | set(personal.keys())
+    all_tools = set(TOOL_MODULES.keys()) | set(common.keys()) | set(personal.keys())
 
     if len(sys.argv) < 2 or sys.argv[1] in ("-h", "--help"):
         tools = ", ".join(sorted(all_tools))
@@ -87,19 +125,21 @@ def cli_dispatch():
         mod.cli_main(sys.argv[2:])
         return
 
-    # Try personal tools
-    if tool_name in personal:
+    # Try common or personal tools (loaded from file path)
+    file_tool = personal.get(tool_name) or common.get(tool_name)
+    if file_tool:
         import importlib.util
+        origin = "personal" if tool_name in personal else "common"
         spec = importlib.util.spec_from_file_location(
-            f"animaworks_personal_tool_{tool_name}", personal[tool_name],
+            f"animaworks_{origin}_tool_{tool_name}", file_tool,
         )
         if spec is None or spec.loader is None:
-            print(f"Cannot load personal tool: {tool_name}")
+            print(f"Cannot load {origin} tool: {tool_name}")
             sys.exit(1)
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)  # type: ignore[union-attr]
         if not hasattr(mod, "cli_main"):
-            print(f"Personal tool '{tool_name}' has no CLI interface")
+            print(f"{origin.capitalize()} tool '{tool_name}' has no CLI interface")
             sys.exit(1)
         mod.cli_main(sys.argv[2:])
         return

@@ -250,6 +250,39 @@ DISCOVERY_TOOLS: list[dict[str, Any]] = [
     },
 ]
 
+TOOL_MANAGEMENT_TOOLS: list[dict[str, Any]] = [
+    {
+        "name": "refresh_tools",
+        "description": (
+            "Re-scan personal and common tool directories to discover "
+            "newly created tools. Call this after creating a new tool "
+            "file to make it immediately available in the current session."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {},
+        },
+    },
+    {
+        "name": "share_tool",
+        "description": (
+            "Copy a personal tool to common_tools/ so all persons can use it. "
+            "The tool file is copied from your tools/ directory to the shared "
+            "common_tools/ directory."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "tool_name": {
+                    "type": "string",
+                    "description": "Tool file name without .py extension",
+                },
+            },
+            "required": ["tool_name"],
+        },
+    },
+]
+
 ADMIN_TOOLS: list[dict[str, Any]] = [
     {
         "name": "create_person",
@@ -316,6 +349,7 @@ def build_tool_list(
     include_discovery_tools: bool = False,
     include_notification_tools: bool = False,
     include_admin_tools: bool = False,
+    include_tool_management: bool = False,
     external_schemas: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     """Assemble a tool list from canonical definitions.
@@ -326,6 +360,7 @@ def build_tool_list(
         include_discovery_tools: Include discover_tools tool.
         include_notification_tools: Include notify_human tool (for top-level Persons).
         include_admin_tools: Include admin tools (create_person etc.).
+        include_tool_management: Include refresh_tools/share_tool tools.
         external_schemas: Additional tool schemas in canonical format.
 
     Returns:
@@ -342,6 +377,8 @@ def build_tool_list(
         tools.extend(NOTIFICATION_TOOLS)
     if include_admin_tools:
         tools.extend(ADMIN_TOOLS)
+    if include_tool_management:
+        tools.extend(TOOL_MANAGEMENT_TOOLS)
     if external_schemas:
         tools.extend(external_schemas)
     return tools

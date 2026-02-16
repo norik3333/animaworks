@@ -175,6 +175,15 @@ def get_tool_schemas() -> list[dict]:
     ]
 
 
+# ── Dispatch ──────────────────────────────────────────
+
+def dispatch(name: str, args: dict[str, Any]) -> Any:
+    """Dispatch a tool call by schema name."""
+    if name == "web_search":
+        return search(**args)
+    raise ValueError(f"Unknown tool: {name}")
+
+
 # ---------------------------------------------------------------------------
 # CLI entry point
 # ---------------------------------------------------------------------------
