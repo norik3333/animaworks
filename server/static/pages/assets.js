@@ -393,7 +393,7 @@ function _showPreviewImage(url) {
     const img = document.createElement("img");
     img.className = "assets-modal-preview-img";
     img.alt = "Preview";
-    img.src = url;
+    img.src = url + (url.includes("?") ? "&" : "?") + "t=" + Date.now();
     img.addEventListener("error", () => {
       previewContainer.innerHTML = '<div class="assets-error">プレビュー画像の読み込みに失敗しました</div>';
       previewContainer.className = "assets-modal-preview-placeholder";
