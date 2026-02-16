@@ -157,6 +157,7 @@ class WebSocketManager:
             try:
                 await conn.send_text(message)
             except Exception:
+                logger.warning("broadcast_failed", exc_info=True)
                 disconnected.append(conn)
         for conn in disconnected:
             self.disconnect(conn)

@@ -7,58 +7,56 @@
 
 """Centralized logging configuration for AnimaWorks.
 
+Uses structlog in stdlib-compatible mode so that existing
+``logging.getLogger()`` calls continue to work while gaining
+structured logging capabilities (context binding, JSON output, etc.).
+
 Provides:
-- RequestIdFilter: contextvars-based request ID injection into all log records
-- JsonFormatter: JSONL file output for machine parsing
-- setup_logging(): one-call configuration for console + file handlers
+- setup_logging(): structlog + stdlib unified setup (console + file)
+- setup_anima_logging(): per-anima daily log rotation
+- set_request_id() / get_request_id(): backward-compatible request ID helpers
 """
 
 from __future__ import annotations
 
-import contextvars
-import json
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 from logging.handlers import RotatingFileHandler, TimedRotatingFileHandler
 from pathlib import Path
 
-_request_id_var: contextvars.ContextVar[str] = contextvars.ContextVar(
-    "request_id", default="-"
-)
+import structlog
+
+# Re-export for backward compatibility with existing imports
+# (e.g. ``from core.logging_config import set_request_id``)
 
 
 def set_request_id(request_id: str) -> None:
-    """Set the current request ID (flows automatically through async calls)."""
-    _request_id_var.set(request_id)
+    """Set the current request ID via structlog contextvars."""
+    structlog.contextvars.bind_contextvars(request_id=request_id)
 
 
 def get_request_id() -> str:
-    """Get the current request ID."""
-    return _request_id_var.get()
+    """Get the current request ID from structlog contextvars."""
+    ctx = structlog.contextvars.get_contextvars()
+    return ctx.get("request_id", "-")
 
 
-class RequestIdFilter(logging.Filter):
-    """Inject request_id from contextvars into every log record."""
-
-    def filter(self, record: logging.LogRecord) -> bool:
-        record.request_id = _request_id_var.get()  # type: ignore[attr-defined]
-        return True
+# ── Shared Processors ──────────────────────────────────────────
 
 
-class JsonFormatter(logging.Formatter):
-    """Format log records as single-line JSON (JSONL)."""
+def _build_shared_processors() -> list:
+    """Build the shared processor chain used by both structlog and stdlib."""
+    return [
+        structlog.contextvars.merge_contextvars,
+        structlog.stdlib.add_log_level,
+        structlog.stdlib.add_logger_name,
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.processors.StackInfoRenderer(),
+        structlog.processors.format_exc_info,
+    ]
 
-    def format(self, record: logging.LogRecord) -> str:
-        entry = {
-            "ts": datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat(),
-            "level": record.levelname,
-            "logger": record.name,
-            "request_id": getattr(record, "request_id", "-"),
-            "msg": record.getMessage(),
-        }
-        if record.exc_info and record.exc_info[0] is not None:
-            entry["exception"] = self.formatException(record.exc_info)
-        return json.dumps(entry, ensure_ascii=False)
+
+# ── Main Setup ─────────────────────────────────────────────────
 
 
 def setup_logging(
@@ -68,35 +66,90 @@ def setup_logging(
 ) -> None:
     """Configure logging for the entire AnimaWorks process.
 
+    Uses structlog's stdlib integration so that existing
+    ``logging.getLogger("animaworks.xxx")`` calls are routed through
+    structlog's processor pipeline automatically.
+
     Args:
         level: Root log level (DEBUG, INFO, WARNING, etc.).
         log_dir: Directory for log files. If None, file logging is disabled.
         json_file: Whether to use JSON format for the file handler.
     """
+    shared_processors = _build_shared_processors()
+
+    # ── Configure structlog itself ──────────────────────────
+    structlog.configure(
+        processors=[
+            *shared_processors,
+            structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
+        ],
+        wrapper_class=structlog.stdlib.BoundLogger,
+        context_class=dict,
+        logger_factory=structlog.stdlib.LoggerFactory(),
+        cache_logger_on_first_use=True,
+    )
+
+    # ── Configure stdlib root logger ────────────────────────
     root = logging.getLogger()
     root.setLevel(getattr(logging, level.upper(), logging.INFO))
-
-    # Clear existing handlers (replaces basicConfig)
     root.handlers.clear()
 
-    req_filter = RequestIdFilter()
+    # foreign_pre_chain: processes stdlib LogRecords through structlog pipeline
+    # so that contextvars (request_id etc.) and timestamps are merged in.
+    foreign_pre_chain = list(shared_processors)
 
-    # Console handler: human-readable
+    # Console handler: human-readable colored output
+    console_formatter = structlog.stdlib.ProcessorFormatter(
+        processors=[
+            structlog.stdlib.ProcessorFormatter.remove_processors_meta,
+            structlog.dev.ConsoleRenderer(),
+        ],
+        foreign_pre_chain=foreign_pre_chain,
+    )
     console = logging.StreamHandler()
     console.setLevel(logging.DEBUG)
-    console.setFormatter(
-        logging.Formatter(
-            "%(asctime)s [%(levelname)s] %(name)s [%(request_id)s]: %(message)s",
-            datefmt="%H:%M:%S",
-        )
-    )
-    console.addFilter(req_filter)
+    console.setFormatter(console_formatter)
     root.addHandler(console)
 
-    # File handler: rotated, optionally JSON
+    # File handler: rotated, JSON (via orjson for performance)
     if log_dir is not None:
         log_dir.mkdir(parents=True, exist_ok=True)
         log_path = log_dir / "animaworks.log"
+
+        if json_file:
+            try:
+                import orjson
+
+                def _orjson_serializer(obj: object, **_kw) -> str:  # noqa: ANN001
+                    return orjson.dumps(obj).decode("utf-8")
+
+                file_formatter = structlog.stdlib.ProcessorFormatter(
+                    processors=[
+                        structlog.stdlib.ProcessorFormatter.remove_processors_meta,
+                        structlog.processors.JSONRenderer(
+                            serializer=_orjson_serializer,
+                        ),
+                    ],
+                    foreign_pre_chain=foreign_pre_chain,
+                )
+            except ImportError:
+                # Fallback if orjson is unavailable
+                file_formatter = structlog.stdlib.ProcessorFormatter(
+                    processors=[
+                        structlog.stdlib.ProcessorFormatter.remove_processors_meta,
+                        structlog.processors.JSONRenderer(),
+                    ],
+                    foreign_pre_chain=foreign_pre_chain,
+                )
+        else:
+            file_formatter = structlog.stdlib.ProcessorFormatter(
+                processors=[
+                    structlog.stdlib.ProcessorFormatter.remove_processors_meta,
+                    structlog.dev.ConsoleRenderer(colors=False),
+                ],
+                foreign_pre_chain=foreign_pre_chain,
+            )
+
         file_handler = RotatingFileHandler(
             log_path,
             maxBytes=10 * 1024 * 1024,  # 10 MB
@@ -104,15 +157,7 @@ def setup_logging(
             encoding="utf-8",
         )
         file_handler.setLevel(logging.DEBUG)
-        if json_file:
-            file_handler.setFormatter(JsonFormatter())
-        else:
-            file_handler.setFormatter(
-                logging.Formatter(
-                    "%(asctime)s [%(levelname)s] %(name)s [%(request_id)s]: %(message)s",
-                )
-            )
-        file_handler.addFilter(req_filter)
+        file_handler.setFormatter(file_formatter)
         root.addHandler(file_handler)
 
     # Reduce noise from third-party libraries
@@ -141,7 +186,7 @@ def setup_anima_logging(
     anima_name: str,
     log_dir: Path,
     level: str = "INFO",
-    also_to_console: bool = True
+    also_to_console: bool = True,
 ) -> None:
     """Configure anima-specific logging with daily rotation.
 
@@ -159,10 +204,10 @@ def setup_anima_logging(
 
     Directory structure created:
         {log_dir}/animas/{anima_name}/
-        ├── current.log -> 20260214.log
-        ├── 20260214.log
-        ├── 20260213.log
-        └── ...
+        |-- current.log -> 20260214.log
+        |-- 20260214.log
+        |-- 20260213.log
+        +-- ...
     """
     # Create anima log directory
     anima_log_dir = log_dir / "animas" / anima_name
@@ -186,13 +231,13 @@ def setup_anima_logging(
         interval=1,
         backupCount=30,  # Keep 30 days
         encoding="utf-8",
-        utc=False
+        utc=False,
     )
     file_handler.setLevel(logging.DEBUG)
     file_handler.setFormatter(
         logging.Formatter(
             fmt="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-            datefmt="%Y-%m-%d %H:%M:%S"
+            datefmt="%Y-%m-%d %H:%M:%S",
         )
     )
     file_handler.addFilter(anima_filter)
@@ -217,7 +262,7 @@ def setup_anima_logging(
         console.setFormatter(
             logging.Formatter(
                 fmt=f"[{anima_name}] %(asctime)s [%(levelname)s] %(name)s: %(message)s",
-                datefmt="%H:%M:%S"
+                datefmt="%H:%M:%S",
             )
         )
         console.addFilter(anima_filter)

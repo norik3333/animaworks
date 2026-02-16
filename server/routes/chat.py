@@ -203,6 +203,7 @@ def create_chat_router() -> APIRouter:
 
     @router.post("/animas/{name}/chat")
     async def chat(name: str, body: ChatRequest, request: Request):
+        logger.info("chat_request anima=%s user=%s msg_len=%d", name, body.from_person, len(body.message))
         supervisor = request.app.state.supervisor
 
         # Guard: reject if anima is bootstrapping
@@ -243,6 +244,7 @@ def create_chat_router() -> APIRouter:
 
             await emit(request, "anima.status", {"name": name, "status": "idle"})
 
+            logger.info("chat_response anima=%s response_len=%d", name, len(clean_response))
             return ChatResponse(response=clean_response, anima=name)
 
         except KeyError:
@@ -313,6 +315,7 @@ def create_chat_router() -> APIRouter:
     @router.post("/animas/{name}/chat/stream")
     async def chat_stream(name: str, body: ChatRequest, request: Request):
         """Stream chat response via SSE over IPC."""
+        logger.info("chat_stream_request anima=%s user=%s msg_len=%d", name, body.from_person, len(body.message))
         supervisor = request.app.state.supervisor
 
         # Verify anima exists before starting the stream

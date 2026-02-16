@@ -850,11 +850,13 @@ class ToolHandler:
             if write:
                 err = _is_protected_write(self._anima_dir, resolved)
                 if err:
+                    logger.warning("permission_denied anima=%s path=%s reason=protected_file", self._anima_name, path)
                     return err
             return None
 
         permissions = self._memory.read_permissions()
         if "ファイル操作" not in permissions:
+            logger.warning("permission_denied anima=%s path=%s reason=file_ops_not_enabled", self._anima_name, path)
             return _error_result("PermissionDenied", "File operations not enabled in permissions.md")
 
         # Parse allowed directory whitelist from permissions.md
@@ -864,12 +866,14 @@ class ToolHandler:
         ]
 
         if not allowed_dirs:
+            logger.warning("permission_denied anima=%s path=%s reason=no_allowed_dirs", self._anima_name, path)
             return _error_result("PermissionDenied", "No allowed paths listed under ファイル操作", suggestion="Add directory paths to permissions.md")
 
         for allowed in allowed_dirs:
             if resolved.is_relative_to(allowed):
                 return None
 
+        logger.warning("permission_denied anima=%s path=%s reason=outside_allowed_dirs", self._anima_name, path)
         return _error_result("PermissionDenied", f"'{path}' is not under any allowed directory", context={"allowed_dirs": [str(d) for d in allowed_dirs]})
 
     def _check_command_permission(self, command: str) -> str | None:
@@ -879,14 +883,17 @@ class ToolHandler:
         Rejects commands containing shell metacharacters to prevent injection.
         """
         if not command or not command.strip():
+            logger.warning("permission_denied anima=%s command=<empty>", self._anima_name)
             return _error_result("PermissionDenied", "Empty command")
 
         # Reject shell metacharacters regardless of permissions
         if _SHELL_METACHAR_RE.search(command):
+            logger.warning("permission_denied anima=%s command=%s reason=shell_metacharacters", self._anima_name, command[:80])
             return _error_result("PermissionDenied", f"Command contains shell metacharacters ({_SHELL_METACHAR_RE.pattern})", suggestion="Use separate tool calls instead of chaining commands")
 
         permissions = self._memory.read_permissions()
         if "コマンド実行" not in permissions:
+            logger.warning("permission_denied anima=%s command=%s reason=cmd_not_enabled", self._anima_name, command[:80])
             return _error_result("PermissionDenied", "Command execution not enabled in permissions.md")
 
         # Parse the command safely
@@ -905,6 +912,7 @@ class ToolHandler:
 
         cmd_base = argv[0]
         if cmd_base not in allowed:
+            logger.warning("permission_denied anima=%s command=%s reason=not_in_allowed_list", self._anima_name, cmd_base)
             return _error_result("PermissionDenied", f"Command '{cmd_base}' not in allowed list", context={"allowed_commands": allowed})
 
         # Block arguments with path traversal targeting other animas

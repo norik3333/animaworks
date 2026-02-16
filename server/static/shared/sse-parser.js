@@ -26,7 +26,10 @@ export function parseConvSSE(buffer) {
     if (dataLines.length > 0) {
       try {
         parsed.push({ event: eventName, data: JSON.parse(dataLines.join("\n")) });
-      } catch { /* skip non-JSON data */ }
+      } catch {
+        const raw = dataLines.join("\n");
+        console.warn("[sse-parser] JSON parse failed for event '%s': %s", eventName, raw.slice(0, 100));
+      }
     }
   }
   return { parsed, remaining };

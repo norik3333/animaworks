@@ -20,6 +20,9 @@ import { initTimeline, addTimelineEvent, loadHistory } from "./timeline.js";
 import { playReveal } from "./reveal.js";
 import { parseConvSSE, getErrorMessage } from "../../shared/sse-parser.js";
 import { SwipeHandler } from "../../modules/touch.js";
+import { createLogger } from "../../shared/logger.js";
+
+const logger = createLogger("ws-app");
 
 // ── Mobile Resource Tracking ────────────
 let _swiperInstance = null;
@@ -213,7 +216,7 @@ async function initOfficeIfNeeded() {
       highlightDesk(selectedAnima);
     }
   } catch (err) {
-    console.error("[office] Failed to initialize 3D office:", err);
+    logger.error("Failed to initialize 3D office", { error: err.message });
     setState({ officeInitialized: false });
   }
 }
@@ -329,7 +332,7 @@ async function triggerGreeting(animaName) {
       setTimeout(() => setExpression("neutral"), 3000);
     }
   } catch (err) {
-    console.error("[greeting] Failed to greet:", err);
+    logger.error("Failed to greet", { anima: animaName, error: err.message });
   } finally {
     _greetingInFlight = false;
   }
@@ -382,7 +385,7 @@ async function loadAndRenderConvMessages(animaName) {
       setState({ chatMessages: [] });
     }
   } catch (err) {
-    console.error("Failed to load conversation:", err);
+    logger.error("Failed to load conversation", { anima: animaName, error: err.message });
     setState({ chatMessages: [] });
   }
   renderConvMessages();
@@ -421,7 +424,10 @@ async function sendConversationMessage() {
       signal: convStreamController.signal,
     });
 
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    if (!resp.ok) {
+      logger.error("Conversation stream request failed", { anima: animaName, status: resp.status });
+      throw new Error(`HTTP ${resp.status}`);
+    }
 
     setTalking(true);
     setExpression("neutral");
@@ -477,7 +483,7 @@ async function sendConversationMessage() {
     renderConvMessages();
   } catch (err) {
     if (err.name === "AbortError") return;
-    console.error("[conversation] Stream error:", err);
+    logger.error("Conversation stream error", { anima: animaName, error: err.message, name: err.name });
     streamingMsg.text = `[エラー] ${err.message}`;
     streamingMsg.streaming = false;
     streamingMsg.activeTool = null;

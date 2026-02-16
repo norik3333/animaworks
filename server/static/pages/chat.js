@@ -2,6 +2,9 @@
 import { api } from "../modules/api.js";
 import { escapeHtml, renderMarkdown, timeStr, statusClass } from "../modules/state.js";
 import { parseConvSSE, getErrorMessage } from "../shared/sse-parser.js";
+import { createLogger } from "../shared/logger.js";
+
+const logger = createLogger("chat-page");
 
 // ── Local State ────────────────────────────
 
@@ -435,8 +438,12 @@ async function _sendChat(message) {
       }
     );
 
-    if (!response.ok) throw new Error(`API ${response.status}: ${response.statusText}`);
+    if (!response.ok) {
+      logger.error("Chat stream request failed", { anima: name, status: response.status, statusText: response.statusText });
+      throw new Error(`API ${response.status}: ${response.statusText}`);
+    }
 
+    logger.info("Chat stream started", { anima: name });
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
@@ -466,6 +473,7 @@ async function _sendChat(message) {
           case "chain_start":
             break;
           case "error":
+            logger.error("SSE error event", { anima: name, code: evt.data?.code, message: getErrorMessage(evt.data) });
             streamingMsg.text += `\n[エラー] ${getErrorMessage(evt.data)}`;
             streamingMsg.streaming = false;
             _renderChat();
@@ -477,6 +485,7 @@ async function _sendChat(message) {
             streamingMsg.activeTool = null;
             _renderChat();
             _addLocalActivity("chat", name, `応答: ${streamingMsg.text.slice(0, 100)}`);
+            logger.info("Chat stream completed", { anima: name });
             break;
           }
         }
@@ -489,6 +498,9 @@ async function _sendChat(message) {
       _renderChat();
     }
   } catch (err) {
+    if (err.name !== "AbortError") {
+      logger.error("Chat stream error", { anima: name, error: err.message, name: err.name });
+    }
     streamingMsg.text = `[エラー] ${err.message}`;
     streamingMsg.streaming = false;
     streamingMsg.activeTool = null;

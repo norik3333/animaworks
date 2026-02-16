@@ -8,14 +8,18 @@ from __future__ import annotations
 
 
 import logging
+import time
+import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+import structlog
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse as StarletteJSONResponse
 
@@ -27,6 +31,51 @@ from server.routes.setup import create_setup_router
 from server.websocket import WebSocketManager
 
 logger = logging.getLogger("animaworks.server")
+
+# Paths to exclude from request logging (noisy health checks, etc.)
+_NOISY_PATHS = frozenset({
+    "/api/system/health",
+    "/api/system/status",
+    "/ws",
+})
+
+
+class RequestLoggingMiddleware(BaseHTTPMiddleware):
+    """Log every HTTP request with method, path, status, and duration.
+
+    Automatically binds a ``request_id`` into structlog contextvars so that
+    all log records emitted during request processing carry the ID.
+    """
+
+    async def dispatch(self, request: Request, call_next):  # type: ignore[override]
+        structlog.contextvars.clear_contextvars()
+        request_id = request.headers.get(
+            "X-Request-ID", uuid.uuid4().hex[:12],
+        )
+        structlog.contextvars.bind_contextvars(
+            request_id=request_id,
+            method=request.method,
+            path=request.url.path,
+        )
+
+        start = time.perf_counter()
+        response = await call_next(request)
+        duration_ms = round((time.perf_counter() - start) * 1000, 1)
+
+        response.headers["X-Request-ID"] = request_id
+
+        # Skip noisy endpoints to reduce log volume
+        if request.url.path not in _NOISY_PATHS:
+            req_logger = logging.getLogger("animaworks.request")
+            req_logger.info(
+                "request %s %s -> %d (%.1fms)",
+                request.method,
+                request.url.path,
+                response.status_code,
+                duration_ms,
+            )
+
+        return response
 
 
 async def _reconcile_assets_at_startup(animas_dir: Path) -> None:
@@ -206,6 +255,10 @@ def create_app(animas_dir: Path, shared_dir: Path) -> FastAPI:
         return StarletteJSONResponse(
             {"error": "Internal server error"}, status_code=500,
         )
+
+    # ── Request logging middleware ─────────────────────────
+    # Added before setup_guard so request_id is available in all handlers.
+    app.add_middleware(RequestLoggingMiddleware)
 
     # ── Setup guard middleware ──────────────────────────────
     @app.middleware("http")

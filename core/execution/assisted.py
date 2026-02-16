@@ -234,6 +234,6 @@ class AssistedExecutor(BaseExecutor):
                         self._model_config.supervisor,
                     )
         except Exception:
-            logger.debug("Post-call processing failed", exc_info=True)
+            logger.warning("Post-call processing failed", exc_info=True)
 
         return ExecutionResult(text=reply)

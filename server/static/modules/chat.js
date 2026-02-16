@@ -3,6 +3,9 @@
 import { state, dom, escapeHtml, renderMarkdown } from "./state.js";
 import { addActivity } from "./activity.js";
 import { parseConvSSE as parseSSEEvents, getErrorMessage } from "../shared/sse-parser.js";
+import { createLogger } from "../shared/logger.js";
+
+const logger = createLogger("chat");
 
 // ── Render ─────────────────────────────────
 
@@ -116,8 +119,12 @@ export async function sendChat(message) {
       }
     );
 
-    if (!response.ok) throw new Error(`API ${response.status}: ${response.statusText}`);
+    if (!response.ok) {
+      logger.error("Chat stream request failed", { anima: name, status: response.status, statusText: response.statusText });
+      throw new Error(`API ${response.status}: ${response.statusText}`);
+    }
 
+    logger.info("Chat stream started", { anima: name });
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
@@ -191,6 +198,9 @@ export async function sendChat(message) {
       renderChat();
     }
   } catch (err) {
+    if (err.name !== "AbortError") {
+      logger.error("Chat stream error", { anima: name, error: err.message, name: err.name });
+    }
     streamingMsg.text = `[エラー] ${err.message}`;
     streamingMsg.streaming = false;
     streamingMsg.activeTool = null;

@@ -6,11 +6,55 @@ from __future__ import annotations
 import json
 import logging
 import re
+from datetime import datetime
+from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
 
 from fastapi import APIRouter, Request
+from fastapi.responses import JSONResponse
 
 logger = logging.getLogger("animaworks.routes.system")
+
+# ── Frontend Log Setup ────────────────────────────────────────
+# Dedicated logger for frontend logs — writes to daily JSONL files.
+
+_frontend_logger: logging.Logger | None = None
+_frontend_log_dir: Path | None = None
+
+
+def _get_frontend_logger() -> logging.Logger:
+    """Lazily initialise and return the frontend file logger."""
+    global _frontend_logger, _frontend_log_dir
+
+    if _frontend_logger is not None:
+        return _frontend_logger
+
+    from core.paths import get_data_dir
+
+    _frontend_log_dir = get_data_dir() / "logs" / "frontend"
+    _frontend_log_dir.mkdir(parents=True, exist_ok=True)
+
+    _frontend_logger = logging.getLogger("animaworks.frontend")
+    _frontend_logger.setLevel(logging.DEBUG)
+    _frontend_logger.propagate = False  # Don't forward to root logger
+
+    today = datetime.now().strftime("%Y%m%d")
+    log_path = _frontend_log_dir / f"{today}.jsonl"
+
+    handler = TimedRotatingFileHandler(
+        filename=log_path,
+        when="midnight",
+        interval=1,
+        backupCount=30,  # 30 days retention
+        encoding="utf-8",
+        utc=False,
+    )
+    handler.suffix = "%Y%m%d.jsonl"
+    # Raw passthrough: message is already a JSON string
+    handler.setFormatter(logging.Formatter("%(message)s"))
+    _frontend_logger.addHandler(handler)
+
+    return _frontend_logger
 
 
 def _parse_cron_jobs(animas_dir: Path, anima_names: list[str]) -> list[dict]:
@@ -413,5 +457,128 @@ def create_system_router() -> APIRouter:
             "limit": limit,
             "has_more": (offset + limit) < total,
         }
+
+    # ── Frontend Log Ingestion ────────────────────────────────
+
+    @router.post("/system/frontend-logs")
+    async def receive_frontend_logs(request: Request):
+        """Receive a batch of frontend log entries and write to daily JSONL."""
+        try:
+            entries = await request.json()
+        except Exception:
+            return JSONResponse({"error": "Invalid JSON"}, status_code=400)
+
+        if not isinstance(entries, list):
+            return JSONResponse({"error": "Expected a JSON array"}, status_code=400)
+
+        fe_logger = _get_frontend_logger()
+        for entry in entries:
+            if isinstance(entry, dict):
+                fe_logger.info(json.dumps(entry, ensure_ascii=False))
+
+        return {"ok": True, "count": len(entries)}
+
+    # ── Frontend Log Viewer ─────────────────────────────────
+
+    @router.get("/system/frontend-logs")
+    async def view_frontend_logs(
+        request: Request,
+        date: str | None = None,
+        level: str | None = None,
+        module: str | None = None,
+        limit: int = 100,
+    ):
+        """Read frontend logs from JSONL files with optional filters.
+
+        Query params:
+            date: YYYYMMDD (defaults to today)
+            level: Filter by log level (DEBUG, INFO, WARN, ERROR)
+            module: Filter by module name
+            limit: Max entries to return (default 100, max 1000)
+        """
+        from core.paths import get_data_dir
+
+        limit = max(1, min(limit, 1000))
+        target_date = date or datetime.now().strftime("%Y%m%d")
+        log_dir = get_data_dir() / "logs" / "frontend"
+        log_path = log_dir / f"{target_date}.jsonl"
+
+        if not log_path.exists():
+            return {"entries": [], "date": target_date, "total": 0}
+
+        entries: list[dict] = []
+        try:
+            for line in log_path.read_text(encoding="utf-8").strip().splitlines():
+                if not line.strip():
+                    continue
+                try:
+                    entry = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+
+                # Apply filters
+                if level and entry.get("level") != level.upper():
+                    continue
+                if module and entry.get("module") != module:
+                    continue
+
+                entries.append(entry)
+        except OSError:
+            return JSONResponse(
+                {"error": f"Failed to read log file for {target_date}"},
+                status_code=500,
+            )
+
+        # Return most recent entries first
+        entries.reverse()
+        total = len(entries)
+        entries = entries[:limit]
+
+        return {"entries": entries, "date": target_date, "total": total, "limit": limit}
+
+    # ── Dynamic Log Level ───────────────────────────────────
+
+    @router.get("/system/log-level")
+    async def get_log_level(request: Request):
+        """Return the current root log level."""
+        root = logging.getLogger()
+        return {"level": logging.getLevelName(root.level)}
+
+    @router.post("/system/log-level")
+    async def set_log_level(request: Request):
+        """Change the log level at runtime (no restart required).
+
+        Body: {"level": "DEBUG"} or {"level": "DEBUG", "logger_name": "animaworks.websocket"}
+        """
+        try:
+            body = await request.json()
+        except Exception:
+            return JSONResponse({"error": "Invalid JSON"}, status_code=400)
+
+        new_level = body.get("level", "").upper()
+        if new_level not in ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"):
+            return JSONResponse(
+                {"error": f"Invalid level: {body.get('level')}. Use DEBUG/INFO/WARNING/ERROR/CRITICAL"},
+                status_code=400,
+            )
+
+        logger_name = body.get("logger_name")
+        if logger_name:
+            target = logging.getLogger(logger_name)
+            target.setLevel(getattr(logging, new_level))
+            logger.info("Log level changed: %s -> %s", logger_name, new_level)
+            return {"logger": logger_name, "level": new_level}
+        else:
+            root = logging.getLogger()
+            root.setLevel(getattr(logging, new_level))
+            logger.info("Root log level changed to %s", new_level)
+            return {"logger": "root", "level": new_level}
+
+    # ── Health Check ────────────────────────────────────────
+
+    @router.get("/system/health")
+    async def health_check():
+        """Simple health check endpoint."""
+        return {"status": "ok"}
 
     return router

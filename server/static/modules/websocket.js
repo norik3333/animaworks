@@ -5,6 +5,9 @@ import { addActivity } from "./activity.js";
 import { renderAnimaDropdown, updateAnimaAvatar, refreshSelectedAnima } from "./animas.js";
 import { updateSystemStatus } from "./status.js";
 import { renderChat } from "./chat.js";
+import { createLogger } from "../shared/logger.js";
+
+const logger = createLogger("websocket");
 
 let ws = null;
 let wsReconnectTimer = null;
@@ -12,6 +15,7 @@ const WS_INITIAL_DELAY = 1000;
 const WS_MAX_DELAY = 30000;
 const WS_BACKOFF_MULTIPLIER = 2;
 let wsReconnectAttempt = 0;
+let wsConnectedAt = null;
 
 export function connectWebSocket() {
   if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
@@ -21,30 +25,40 @@ export function connectWebSocket() {
   const proto = location.protocol === "https:" ? "wss:" : "ws:";
   const url = `${proto}//${location.host}/ws`;
 
+  logger.info("Connecting", { url, attempt: wsReconnectAttempt });
+
   try {
     ws = new WebSocket(url);
   } catch (err) {
-    console.error("WebSocket creation failed:", err);
+    logger.error("WebSocket creation failed", { url, error: err.message });
     scheduleReconnect();
     return;
   }
 
   ws.addEventListener("open", () => {
+    wsConnectedAt = Date.now();
+    logger.info("Connected", { url, attempt: wsReconnectAttempt });
     wsReconnectAttempt = 0;
     state.wsConnected = true;
     updateSystemStatus();
-    console.log("WebSocket connected");
   });
 
-  ws.addEventListener("close", () => {
+  ws.addEventListener("close", (evt) => {
+    const duration = wsConnectedAt ? Date.now() - wsConnectedAt : 0;
+    wsConnectedAt = null;
     state.wsConnected = false;
     updateSystemStatus();
-    console.log("WebSocket closed, reconnecting...");
+    logger.warn("Connection closed", {
+      code: evt.code,
+      reason: evt.reason || "",
+      wasClean: evt.wasClean,
+      duration_ms: duration,
+    });
     scheduleReconnect();
   });
 
   ws.addEventListener("error", (err) => {
-    console.error("WebSocket error:", err);
+    logger.error("Connection error", { readyState: ws?.readyState });
   });
 
   ws.addEventListener("message", (evt) => {
@@ -59,6 +73,7 @@ function scheduleReconnect() {
     WS_MAX_DELAY
   );
   const jitter = Math.random() * 1000;
+  logger.info("Scheduling reconnect", { attempt: wsReconnectAttempt + 1, delay_ms: Math.round(delay + jitter) });
   wsReconnectTimer = setTimeout(() => {
     wsReconnectTimer = null;
     wsReconnectAttempt++;
@@ -305,6 +320,7 @@ function showNotificationToast(animaName, subject, body, priority) {
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") {
     if (!ws || ws.readyState !== WebSocket.OPEN) {
+      logger.info("Page visible, triggering reconnect");
       wsReconnectAttempt = 0;
       scheduleReconnect();
     }

@@ -5,6 +5,9 @@ import { getState, setState } from "./state.js";
 import { sendChatStream, fetchConversationFull } from "./api.js";
 import { escapeHtml, renderSimpleMarkdown } from "./utils.js";
 import { parseConvSSE as parseSSEEvents, getErrorMessage } from "../../shared/sse-parser.js";
+import { createLogger } from "../../shared/logger.js";
+
+const logger = createLogger("ws-chat");
 
 // ── Constants ──────────────────────────────────
 
@@ -221,9 +224,11 @@ export async function sendMessage(text) {
   try {
     const response = await sendChatStream(selectedAnima, trimmed, currentUser || "human");
     if (!response.ok) {
+      logger.error("Chat stream request failed", { anima: selectedAnima, status: response.status, statusText: response.statusText });
       throw new Error(`API ${response.status}: ${response.statusText}`);
     }
 
+    logger.info("Chat stream started", { anima: selectedAnima });
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
@@ -257,6 +262,7 @@ export async function sendMessage(text) {
             break;
 
           case "error":
+            logger.error("SSE error event", { anima: selectedAnima, code: evt.data?.code, message: getErrorMessage(evt.data) });
             streamingMsg.text += `\n[エラー] ${getErrorMessage(evt.data)}`;
             streamingMsg.streaming = false;
             streamingMsg.activeTool = null;
@@ -276,6 +282,7 @@ export async function sendMessage(text) {
             streamingMsg.activeTool = null;
             setState({ chatMessages: [...getState().chatMessages] });
             renderAllMessages();
+            logger.info("Chat stream completed", { anima: selectedAnima });
             break;
           }
         }
@@ -290,6 +297,9 @@ export async function sendMessage(text) {
       renderAllMessages();
     }
   } catch (err) {
+    if (err.name !== "AbortError") {
+      logger.error("Chat stream error", { anima: selectedAnima, error: err.message, name: err.name });
+    }
     streamingMsg.text = `[エラー] ${err.message}`;
     streamingMsg.streaming = false;
     streamingMsg.activeTool = null;
@@ -338,7 +348,7 @@ export async function loadConversation() {
       setState({ chatMessages: [] });
     }
   } catch (err) {
-    console.error("Failed to load conversation:", err);
+    logger.error("Failed to load conversation", { anima: selectedAnima, error: err.message });
     setState({ chatMessages: [] });
   }
 

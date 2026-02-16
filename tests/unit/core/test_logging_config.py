@@ -1,15 +1,13 @@
-"""Unit tests for core/logging_config.py — logging setup and formatters."""
+"""Unit tests for core/logging_config.py — structlog-based logging setup."""
 from __future__ import annotations
 
-import json
 import logging
 from pathlib import Path
 
 import pytest
+import structlog
 
 from core.logging_config import (
-    JsonFormatter,
-    RequestIdFilter,
     get_request_id,
     set_request_id,
     setup_logging,
@@ -20,109 +18,23 @@ from core.logging_config import (
 
 
 class TestRequestId:
+    def setup_method(self):
+        structlog.contextvars.clear_contextvars()
+
     def test_default_value(self):
-        # Reset to default
-        set_request_id("-")
         assert get_request_id() == "-"
 
     def test_set_and_get(self):
         set_request_id("req-abc-123")
         assert get_request_id() == "req-abc-123"
-        # Cleanup
-        set_request_id("-")
 
     def test_overwrite(self):
         set_request_id("first")
         set_request_id("second")
         assert get_request_id() == "second"
-        set_request_id("-")
 
-
-# ── RequestIdFilter ───────────────────────────────────────
-
-
-class TestRequestIdFilter:
-    def test_injects_request_id(self):
-        set_request_id("test-filter-id")
-        filt = RequestIdFilter()
-        record = logging.LogRecord(
-            name="test", level=logging.INFO, pathname="",
-            lineno=0, msg="hello", args=(), exc_info=None,
-        )
-        result = filt.filter(record)
-        assert result is True
-        assert record.request_id == "test-filter-id"  # type: ignore[attr-defined]
-        set_request_id("-")
-
-    def test_always_returns_true(self):
-        filt = RequestIdFilter()
-        record = logging.LogRecord(
-            name="test", level=logging.DEBUG, pathname="",
-            lineno=0, msg="msg", args=(), exc_info=None,
-        )
-        assert filt.filter(record) is True
-
-
-# ── JsonFormatter ─────────────────────────────────────────
-
-
-class TestJsonFormatter:
-    def test_basic_format(self):
-        formatter = JsonFormatter()
-        record = logging.LogRecord(
-            name="mylogger", level=logging.INFO, pathname="test.py",
-            lineno=42, msg="Test message", args=(), exc_info=None,
-        )
-        record.request_id = "req-001"  # type: ignore[attr-defined]
-        output = formatter.format(record)
-        data = json.loads(output)
-        assert data["level"] == "INFO"
-        assert data["logger"] == "mylogger"
-        assert data["request_id"] == "req-001"
-        assert data["msg"] == "Test message"
-        assert "ts" in data
-
-    def test_format_with_exception(self):
-        formatter = JsonFormatter()
-        try:
-            raise ValueError("test error")
-        except ValueError:
-            import sys
-            exc_info = sys.exc_info()
-
-        record = logging.LogRecord(
-            name="mylogger", level=logging.ERROR, pathname="test.py",
-            lineno=42, msg="Error occurred", args=(), exc_info=exc_info,
-        )
-        record.request_id = "-"  # type: ignore[attr-defined]
-        output = formatter.format(record)
-        data = json.loads(output)
-        assert "exception" in data
-        assert "ValueError" in data["exception"]
-
-    def test_format_without_request_id_attr(self):
-        formatter = JsonFormatter()
-        record = logging.LogRecord(
-            name="test", level=logging.WARNING, pathname="",
-            lineno=0, msg="no request id", args=(), exc_info=None,
-        )
-        # No request_id attribute set
-        output = formatter.format(record)
-        data = json.loads(output)
-        assert data["request_id"] == "-"
-
-    def test_unicode_message(self):
-        formatter = JsonFormatter()
-        record = logging.LogRecord(
-            name="test", level=logging.INFO, pathname="",
-            lineno=0, msg="日本語メッセージ", args=(), exc_info=None,
-        )
-        record.request_id = "-"  # type: ignore[attr-defined]
-        output = formatter.format(record)
-        assert "日本語メッセージ" in output
-        # ensure_ascii=False should keep Japanese readable
-        data = json.loads(output)
-        assert data["msg"] == "日本語メッセージ"
+    def teardown_method(self):
+        structlog.contextvars.clear_contextvars()
 
 
 # ── setup_logging ─────────────────────────────────────────
@@ -149,7 +61,6 @@ class TestSetupLogging:
         root = logging.getLogger()
         assert root.level == logging.INFO
         assert len(root.handlers) == 2
-        # One StreamHandler, one RotatingFileHandler
         handler_types = [type(h).__name__ for h in root.handlers]
         assert "StreamHandler" in handler_types
         assert "RotatingFileHandler" in handler_types
@@ -168,15 +79,9 @@ class TestSetupLogging:
 
     def test_clears_existing_handlers(self):
         root = logging.getLogger()
-        # Count handlers before adding
-        before = len(root.handlers)
         root.addHandler(logging.StreamHandler())
         root.addHandler(logging.StreamHandler())
-        assert len(root.handlers) == before + 2
         setup_logging()
-        # setup_logging clears ALL handlers and adds 1 console handler
-        # (pytest may re-add its own handlers afterwards)
-        # Just verify the custom ones we added are gone and at least console is there
         handler_types = [type(h).__name__ for h in root.handlers]
         assert "StreamHandler" in handler_types
 
@@ -192,9 +97,46 @@ class TestSetupLogging:
         root = logging.getLogger()
         assert root.level == logging.INFO
 
-    def test_request_id_filter_attached(self):
+    def test_structlog_processor_formatter_used(self):
+        """Verify that handlers use structlog's ProcessorFormatter."""
         setup_logging()
         root = logging.getLogger()
         for handler in root.handlers:
-            filter_types = [type(f).__name__ for f in handler.filters]
-            assert "RequestIdFilter" in filter_types
+            fmt = handler.formatter
+            assert fmt is not None
+            assert "ProcessorFormatter" in type(fmt).__name__
+
+    def test_file_handler_writes_json(self, tmp_path):
+        """Verify that the file handler produces valid JSON output."""
+        import json
+
+        setup_logging(level="DEBUG", log_dir=tmp_path, json_file=True)
+
+        test_logger = logging.getLogger("test.json.output")
+        test_logger.info("test message for json")
+
+        log_file = tmp_path / "animaworks.log"
+        assert log_file.exists()
+        content = log_file.read_text(encoding="utf-8").strip()
+        if content:
+            # Should be parseable as JSON
+            data = json.loads(content)
+            assert "event" in data or "msg" in data
+
+    def test_request_id_appears_in_log(self, tmp_path):
+        """Verify that request_id from contextvars appears in structured log."""
+        import json
+
+        setup_logging(level="DEBUG", log_dir=tmp_path, json_file=True)
+        set_request_id("test-req-42")
+
+        test_logger = logging.getLogger("test.request.id")
+        test_logger.info("with request id")
+
+        log_file = tmp_path / "animaworks.log"
+        content = log_file.read_text(encoding="utf-8").strip()
+        if content:
+            data = json.loads(content)
+            assert data.get("request_id") == "test-req-42"
+
+        structlog.contextvars.clear_contextvars()

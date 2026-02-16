@@ -1,15 +1,26 @@
 // ── API Client ──────────────────────
 // Thin fetch wrapper for all REST endpoints.
 
+import { createLogger } from "../../shared/logger.js";
+
+const logger = createLogger("ws-api");
 const BASE = "";
 
 async function request(path, opts = {}) {
-  const res = await fetch(`${BASE}${path}`, opts);
-  if (!res.ok) {
-    const text = await res.text().catch(() => res.statusText);
-    throw new Error(`API ${res.status}: ${text}`);
+  try {
+    const res = await fetch(`${BASE}${path}`, opts);
+    if (!res.ok) {
+      const text = await res.text().catch(() => res.statusText);
+      logger.error("API request failed", { url: path, status: res.status, detail: text.slice(0, 200) });
+      throw new Error(`API ${res.status}: ${text}`);
+    }
+    return res.json();
+  } catch (err) {
+    if (err.message && !err.message.startsWith("API ")) {
+      logger.error("Network error", { url: path, error: err.message });
+    }
+    throw err;
   }
-  return res.json();
 }
 
 function post(path, body) {
