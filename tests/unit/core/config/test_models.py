@@ -154,9 +154,77 @@ class TestInvalidateCache:
         from core.config import models
         models._config = AnimaWorksConfig()
         models._config_path = Path("/fake")
+        models._config_mtime = 99.0
         invalidate_cache()
         assert models._config is None
         assert models._config_path is None
+        assert models._config_mtime == 0.0
+
+
+# ── mtime-based cache reload ─────────────────────────────
+
+
+class TestLoadConfigMtimeReload:
+    """Tests for mtime-based automatic cache invalidation."""
+
+    @pytest.fixture(autouse=True)
+    def _clear(self):
+        invalidate_cache()
+        yield
+        invalidate_cache()
+
+    @staticmethod
+    def _write_config(path: Path, **overrides) -> None:
+        data = {"version": 1, "credentials": {"anthropic": {"api_key": ""}}}
+        data.update(overrides)
+        path.write_text(json.dumps(data), encoding="utf-8")
+
+    def test_cache_hit_when_mtime_unchanged(self, tmp_path):
+        """Same mtime → returns the cached object."""
+        path = tmp_path / "config.json"
+        self._write_config(path)
+        c1 = load_config(path)
+        c2 = load_config(path)
+        assert c1 is c2
+
+    def test_reload_when_mtime_changed(self, tmp_path):
+        """Changed mtime → reloads from disk, returns a new object."""
+        path = tmp_path / "config.json"
+        self._write_config(path)
+        c1 = load_config(path)
+
+        # Bump mtime by rewriting with different content
+        import time
+        time.sleep(0.05)
+        self._write_config(path, animas={"bob": {"model": "gpt-4o"}})
+        os.utime(path)
+
+        c2 = load_config(path)
+        assert c1 is not c2
+        assert "bob" in c2.animas
+
+    def test_stat_oserror_returns_cached(self, tmp_path):
+        """If stat() fails after initial load, return cached config."""
+        path = tmp_path / "config.json"
+        self._write_config(path)
+        c1 = load_config(path)
+
+        # Remove file — stat() will fail
+        path.unlink()
+        from core.config import models
+        # Set mtime to 0.0 to simulate OSError path matching
+        models._config_mtime = 0.0
+        c2 = load_config(path)
+        # disk_mtime=0.0 == _config_mtime=0.0 → cache hit
+        assert c1 is c2
+
+    def test_save_config_records_mtime(self, tmp_path):
+        """save_config() stores the file's mtime in _config_mtime."""
+        from core.config import models
+        path = tmp_path / "config.json"
+        save_config(AnimaWorksConfig(), path)
+        assert models._config_mtime > 0.0
+        assert models._config_mtime == path.stat().st_mtime
 
 
 # ── get_config_path ───────────────────────────────────────
