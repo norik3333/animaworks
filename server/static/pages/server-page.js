@@ -80,7 +80,7 @@ async function _loadStatus() {
     }
 
     const rows = [];
-    rows.push(["パーソン数", data.persons ?? 0]);
+    rows.push(["Anima数", data.animas ?? 0]);
     rows.push(["スケジューラ", data.scheduler_running ? "稼働中" : "停止"]);
 
     if (data.processes) {
@@ -164,7 +164,7 @@ async function _loadScheduler() {
             ${jobs.map(j => `
               <tr>
                 <td style="font-weight:500;">${escapeHtml(j.name || j.id || "--")}</td>
-                <td>${escapeHtml(j.person || "--")}</td>
+                <td>${escapeHtml(j.anima || "--")}</td>
                 <td><code>${escapeHtml(j.schedule || j.trigger || "--")}</code></td>
                 <td>${escapeHtml(j.last_run ? timeStr(j.last_run) : "--")}</td>
                 <td>${escapeHtml(j.next_run ? timeStr(j.next_run) : "--")}</td>

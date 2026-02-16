@@ -13,9 +13,9 @@ from core.supervisor.process_handle import ProcessState
 
 
 @pytest.mark.asyncio
-async def test_health_check_loop(data_dir: Path, make_person):
+async def test_health_check_loop(data_dir: Path, make_anima):
     """Test health check loop pings processes."""
-    make_person("test-person")
+    make_anima("test-anima")
 
     # Short ping interval for testing
     health_config = HealthConfig(
@@ -26,7 +26,7 @@ async def test_health_check_loop(data_dir: Path, make_person):
     )
 
     supervisor = ProcessSupervisor(
-        persons_dir=data_dir / "persons",
+        animas_dir=data_dir / "animas",
         shared_dir=data_dir / "shared",
         run_dir=data_dir / "run",
         log_dir=data_dir / "logs",
@@ -34,14 +34,14 @@ async def test_health_check_loop(data_dir: Path, make_person):
     )
 
     try:
-        # Start person
-        await supervisor.start_all(["test-person"])
+        # Start anima
+        await supervisor.start_all(["test-anima"])
 
         # Wait for health check loop to run a few times
         await asyncio.sleep(3.0)
 
         # Verify ping stats updated
-        handle = supervisor.processes.get("test-person")
+        handle = supervisor.processes.get("test-anima")
         assert handle is not None
         assert handle.stats.last_ping_at is not None
         assert handle.stats.missed_pings == 0
@@ -51,9 +51,9 @@ async def test_health_check_loop(data_dir: Path, make_person):
 
 
 @pytest.mark.asyncio
-async def test_process_crash_detection(data_dir: Path, make_person):
+async def test_process_crash_detection(data_dir: Path, make_anima):
     """Test detection when process crashes."""
-    make_person("test-person")
+    make_anima("test-anima")
 
     restart_policy = RestartPolicy(
         max_retries=1,  # Allow one restart
@@ -62,7 +62,7 @@ async def test_process_crash_detection(data_dir: Path, make_person):
     )
 
     supervisor = ProcessSupervisor(
-        persons_dir=data_dir / "persons",
+        animas_dir=data_dir / "animas",
         shared_dir=data_dir / "shared",
         run_dir=data_dir / "run",
         log_dir=data_dir / "logs",
@@ -70,9 +70,9 @@ async def test_process_crash_detection(data_dir: Path, make_person):
     )
 
     try:
-        await supervisor.start_person("test-person")
+        await supervisor.start_anima("test-anima")
 
-        handle = supervisor.processes.get("test-person")
+        handle = supervisor.processes.get("test-anima")
         original_pid = handle.get_pid()
 
         # Kill the process forcibly
@@ -83,7 +83,7 @@ async def test_process_crash_detection(data_dir: Path, make_person):
         await asyncio.sleep(3.0)
 
         # Verify process was restarted
-        handle = supervisor.processes.get("test-person")
+        handle = supervisor.processes.get("test-anima")
         if handle:
             new_pid = handle.get_pid()
             # Note: In actual implementation, supervisor needs to monitor
@@ -95,20 +95,20 @@ async def test_process_crash_detection(data_dir: Path, make_person):
 
 
 @pytest.mark.asyncio
-async def test_missed_pings_tracking(data_dir: Path, make_person):
+async def test_missed_pings_tracking(data_dir: Path, make_anima):
     """Test tracking of missed pings."""
-    make_person("test-person")
+    make_anima("test-anima")
 
     supervisor = ProcessSupervisor(
-        persons_dir=data_dir / "persons",
+        animas_dir=data_dir / "animas",
         shared_dir=data_dir / "shared",
         run_dir=data_dir / "run",
         log_dir=data_dir / "logs"
     )
 
     try:
-        await supervisor.start_person("test-person")
-        handle = supervisor.processes.get("test-person")
+        await supervisor.start_anima("test-anima")
+        handle = supervisor.processes.get("test-anima")
 
         # First ping should succeed
         success = await handle.ping(timeout=5.0)

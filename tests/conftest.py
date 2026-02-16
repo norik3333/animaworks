@@ -20,7 +20,7 @@ from dotenv import load_dotenv
 logger = logging.getLogger(__name__)
 
 from tests.helpers.filesystem import (
-    create_person_dir,
+    create_anima_dir,
     create_test_data_dir,
 )
 
@@ -167,20 +167,20 @@ def _kill_orphan_runners_pgrep(data_dir_str: str) -> None:
 
 
 @pytest.fixture
-def make_person(data_dir: Path):
-    """Factory fixture to create person directories within the test data_dir.
+def make_anima(data_dir: Path):
+    """Factory fixture to create anima directories within the test data_dir.
 
-    Returns a callable that creates a person directory and updates config.json.
+    Returns a callable that creates an anima directory and updates config.json.
     """
     from core.config import invalidate_cache
 
     def _make(
-        name: str = "test-person",
+        name: str = "test-anima",
         **kwargs: Any,
     ) -> Path:
-        person_dir = create_person_dir(data_dir, name, **kwargs)
+        anima_dir = create_anima_dir(data_dir, name, **kwargs)
         # Invalidate config cache after changing config.json
         invalidate_cache()
-        return person_dir
+        return anima_dir
 
     return _make

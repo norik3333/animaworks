@@ -1,7 +1,7 @@
 [project]
 name = "animaworks"
 version = "0.2.0"
-description = "AnimaWorks - Digital Person Framework with library-type memory"
+description = "AnimaWorks - Digital Anima Framework with library-type memory"
 license = "AGPL-3.0-or-later"
 license-files = ["LICENSE", "LICENSES/*.txt"]
 requires-python = ">=3.12"

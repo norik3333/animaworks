@@ -17,7 +17,7 @@ from httpx import ASGITransport, AsyncClient
 
 # ── Test Helpers ─────────────────────────────────────────────
 
-PERSON_NAME = "test-person"
+ANIMA_NAME = "test-anima"
 
 
 def _make_test_app():
@@ -30,7 +30,7 @@ def _make_test_app():
     app.state.ws_manager.broadcast = AsyncMock()
 
     supervisor = MagicMock()
-    supervisor.processes = {PERSON_NAME: True}
+    supervisor.processes = {ANIMA_NAME: True}
     supervisor.is_bootstrapping.return_value = False
     app.state.supervisor = supervisor
 
@@ -69,7 +69,7 @@ async def _stream_request(app, message="テスト"):
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         resp = await client.post(
-            f"/api/persons/{PERSON_NAME}/chat/stream",
+            f"/api/animas/{ANIMA_NAME}/chat/stream",
             json={"message": message, "from_person": "human"},
         )
     return resp, _parse_sse_events(resp.text)

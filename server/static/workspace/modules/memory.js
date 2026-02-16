@@ -99,10 +99,10 @@ export async function loadMemoryTab(tab) {
   const { fileList } = findNodes();
   if (!fileList) return;
 
-  const { selectedPerson } = getState();
+  const { selectedAnima } = getState();
 
-  if (!selectedPerson) {
-    fileList.innerHTML = '<div class="loading-placeholder">Person を選択してください</div>';
+  if (!selectedAnima) {
+    fileList.innerHTML = '<div class="loading-placeholder">Anima を選択してください</div>';
     return;
   }
 
@@ -110,9 +110,9 @@ export async function loadMemoryTab(tab) {
 
   try {
     let data;
-    if (tab === "episodes") data = await api.fetchEpisodes(selectedPerson);
-    else if (tab === "knowledge") data = await api.fetchKnowledge(selectedPerson);
-    else data = await api.fetchProcedures(selectedPerson);
+    if (tab === "episodes") data = await api.fetchEpisodes(selectedAnima);
+    else if (tab === "knowledge") data = await api.fetchKnowledge(selectedAnima);
+    else data = await api.fetchProcedures(selectedAnima);
 
     const files = data.files || [];
     if (files.length === 0) {
@@ -140,8 +140,8 @@ export async function loadMemoryTab(tab) {
 
 /** Load and display a single memory file. */
 async function loadMemoryContent(tab, file) {
-  const { selectedPerson } = getState();
-  if (!selectedPerson) return;
+  const { selectedAnima } = getState();
+  if (!selectedAnima) return;
 
   const { contentTitle, contentBody } = findNodes();
   if (!contentTitle || !contentBody) return;
@@ -152,9 +152,9 @@ async function loadMemoryContent(tab, file) {
 
   try {
     let data;
-    if (tab === "episodes") data = await api.fetchEpisode(selectedPerson, file);
-    else if (tab === "knowledge") data = await api.fetchKnowledgeTopic(selectedPerson, file);
-    else data = await api.fetchProcedure(selectedPerson, file);
+    if (tab === "episodes") data = await api.fetchEpisode(selectedAnima, file);
+    else if (tab === "knowledge") data = await api.fetchKnowledgeTopic(selectedAnima, file);
+    else data = await api.fetchProcedure(selectedAnima, file);
 
     contentBody.textContent = data.content || "(内容なし)";
   } catch (err) {

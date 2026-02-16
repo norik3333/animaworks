@@ -46,7 +46,7 @@ async function _loadChecklist() {
 
   let initData = null;
   let systemData = null;
-  let persons = [];
+  let animas = [];
 
   // Try init-status endpoint first
   try {
@@ -59,7 +59,7 @@ async function _loadChecklist() {
   } catch { /* ignore */ }
 
   try {
-    persons = await api("/api/persons");
+    animas = await api("/api/animas");
   } catch { /* ignore */ }
 
   const checks = [];
@@ -85,7 +85,7 @@ async function _loadChecklist() {
   } else {
     // Infer status
     checks.push({ label: "サーバー稼働中", ok: !!systemData });
-    checks.push({ label: "パーソンディレクトリ", ok: persons.length > 0 });
+    checks.push({ label: "パーソンディレクトリ", ok: animas.length > 0 });
     checks.push({ label: "スケジューラ", ok: systemData?.scheduler_running ?? false });
   }
 

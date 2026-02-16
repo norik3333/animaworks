@@ -40,7 +40,7 @@ def gateway_request(
     Args:
         args: Parsed CLI namespace (used to resolve gateway URL).
         method: HTTP method (``GET``, ``POST``, etc.).
-        path: URL path appended to the gateway base (e.g. ``/api/persons``).
+        path: URL path appended to the gateway base (e.g. ``/api/animas``).
         json: Optional JSON body for the request.
         timeout: Request timeout in seconds.
 

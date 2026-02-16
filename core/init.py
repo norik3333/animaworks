@@ -1,4 +1,4 @@
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
@@ -18,18 +18,18 @@ from core.paths import TEMPLATES_DIR, get_data_dir
 logger = logging.getLogger("animaworks.init")
 
 # Directories under templates/ that are infrastructure (always copied).
-# person_templates/ is NOT included — persons are created separately.
+# anima_templates/ is NOT included — animas are created separately.
 _INFRASTRUCTURE_DIRS = {"prompts", "company", "common_skills", "common_knowledge"}
 
 
-def ensure_runtime_dir(*, skip_persons: bool = False) -> Path:
+def ensure_runtime_dir(*, skip_animas: bool = False) -> Path:
     """Ensure the runtime data directory exists, seeding from templates if needed.
 
     Args:
-        skip_persons: If True (used by interactive init), only copy
+        skip_animas: If True (used by interactive init), only copy
             infrastructure templates.  If False (default for server startup),
-            fall back to legacy behaviour that creates a blank default person
-            when no persons exist yet.
+            fall back to legacy behaviour that creates a blank default anima
+            when no animas exist yet.
 
     Returns the runtime data directory path.
     """
@@ -40,6 +40,13 @@ def ensure_runtime_dir(*, skip_persons: bool = False) -> Path:
     # but not be fully initialized yet.
     config_json = data_dir / "config.json"
     if config_json.exists():
+        # Run Person→Anima rename migration before any other access
+        try:
+            from core.config.migrate import migrate_person_to_anima
+
+            migrate_person_to_anima(data_dir)
+        except Exception:
+            logger.exception("Person-to-Anima migration failed")
         _maybe_migrate_config(data_dir)
         logger.debug("Runtime directory already initialized: %s", data_dir)
         return data_dir
@@ -60,18 +67,18 @@ def ensure_runtime_dir(*, skip_persons: bool = False) -> Path:
     # Create runtime-only directories that have no template
     _ensure_runtime_only_dirs(data_dir)
 
-    # Legacy fallback: if not skipping persons and no persons exist,
-    # create a blank default person so cmd_start() works out of the box.
+    # Legacy fallback: if not skipping animas and no animas exist,
+    # create a blank default anima so cmd_start() works out of the box.
     # Skip when setup is not yet complete — the setup wizard handles
-    # person creation interactively.
-    if not skip_persons:
+    # anima creation interactively.
+    if not skip_animas:
         from core.config import load_config as _load_config
 
         _cfg = _load_config(data_dir / "config.json") if (data_dir / "config.json").exists() else None
         if _cfg is not None and _cfg.setup_complete:
-            persons_dir = data_dir / "persons"
-            if not persons_dir.exists() or not any(persons_dir.iterdir()):
-                _legacy_copy_default_person(data_dir)
+            animas_dir = data_dir / "animas"
+            if not animas_dir.exists() or not any(animas_dir.iterdir()):
+                _legacy_copy_default_anima(data_dir)
 
     # Generate default config.json
     _create_default_config(data_dir)
@@ -83,31 +90,31 @@ def ensure_runtime_dir(*, skip_persons: bool = False) -> Path:
 def _copy_infrastructure(data_dir: Path) -> None:
     """Copy only infrastructure templates (prompts, company, etc.) to data_dir."""
     for item in TEMPLATES_DIR.iterdir():
-        if item.name == "person_templates":
+        if item.name == "anima_templates":
             continue
         target = data_dir / item.name
         if item.is_dir():
             if item.name in _INFRASTRUCTURE_DIRS:
                 shutil.copytree(item, target, dirs_exist_ok=True)
         else:
-            # bootstrap.md is only placed per-person, not at data root
+            # bootstrap.md is only placed per-anima, not at data root
             if item.name == "bootstrap.md":
                 continue
             shutil.copy2(item, target)
 
 
-def _legacy_copy_default_person(data_dir: Path) -> None:
-    """Legacy fallback: create a blank person when auto-initialising for server."""
-    from core.person_factory import create_blank
+def _legacy_copy_default_anima(data_dir: Path) -> None:
+    """Legacy fallback: create a blank anima when auto-initialising for server."""
+    from core.anima_factory import create_blank
 
     default_name = "default"
-    persons_dir = data_dir / "persons"
-    persons_dir.mkdir(parents=True, exist_ok=True)
+    animas_dir = data_dir / "animas"
+    animas_dir.mkdir(parents=True, exist_ok=True)
     try:
-        create_blank(persons_dir, default_name)
-        logger.info("Legacy fallback: created blank default person '%s'", default_name)
+        create_blank(animas_dir, default_name)
+        logger.info("Legacy fallback: created blank default anima '%s'", default_name)
     except Exception:
-        logger.warning("Could not create default person", exc_info=True)
+        logger.warning("Could not create default anima", exc_info=True)
 
 
 def merge_templates(data_dir: Path) -> list[str]:
@@ -115,7 +122,7 @@ def merge_templates(data_dir: Path) -> list[str]:
 
     Walks the infrastructure templates tree and copies any file that is missing
     from the runtime data directory.  Existing files are never overwritten.
-    person_templates/ is skipped (persons are managed separately).
+    anima_templates/ is skipped (animas are managed separately).
 
     Returns a list of newly added file paths (relative to data_dir).
     """
@@ -130,9 +137,9 @@ def merge_templates(data_dir: Path) -> list[str]:
         if src.is_symlink() or src.is_dir():
             continue
         rel = src.relative_to(TEMPLATES_DIR)
-        # Skip person_templates/ and bootstrap.md (per-person only)
+        # Skip anima_templates/ and bootstrap.md (per-anima only)
         parts = rel.parts
-        if parts[0] == "person_templates":
+        if parts[0] == "anima_templates":
             continue
         if rel.name == "bootstrap.md" and len(parts) == 1:
             continue
@@ -151,7 +158,7 @@ def merge_templates(data_dir: Path) -> list[str]:
     return added
 
 
-def reset_runtime_dir(data_dir: Path, *, skip_persons: bool = False) -> Path:
+def reset_runtime_dir(data_dir: Path, *, skip_animas: bool = False) -> Path:
     """Delete the runtime directory entirely and re-initialize from templates.
 
     This is a destructive operation — all user data (episodes, knowledge,
@@ -161,12 +168,12 @@ def reset_runtime_dir(data_dir: Path, *, skip_persons: bool = False) -> Path:
     if data_dir.exists():
         shutil.rmtree(data_dir)
         logger.info("Removed runtime directory: %s", data_dir)
-    return ensure_runtime_dir(skip_persons=skip_persons)
+    return ensure_runtime_dir(skip_animas=skip_animas)
 
 
 def _ensure_runtime_only_dirs(data_dir: Path) -> None:
     """Create runtime-only directories that have no template counterpart."""
-    (data_dir / "persons").mkdir(parents=True, exist_ok=True)
+    (data_dir / "animas").mkdir(parents=True, exist_ok=True)
     (data_dir / "shared" / "inbox").mkdir(parents=True, exist_ok=True)
     (data_dir / "shared" / "users").mkdir(parents=True, exist_ok=True)
     (data_dir / "tmp" / "attachments").mkdir(parents=True, exist_ok=True)
@@ -192,7 +199,7 @@ def _create_default_config(data_dir: Path) -> None:
         DEFAULT_MODEL_MODE_PATTERNS,
         AnimaWorksConfig,
         CredentialConfig,
-        PersonModelConfig,
+        AnimaModelConfig,
         save_config,
     )
 
@@ -201,12 +208,12 @@ def _create_default_config(data_dir: Path) -> None:
         model_modes=dict(DEFAULT_MODEL_MODE_PATTERNS),
     )
 
-    # Auto-detect persons from the just-copied templates
-    persons_dir = data_dir / "persons"
-    if persons_dir.exists():
-        for d in sorted(persons_dir.iterdir()):
+    # Auto-detect animas from the just-copied templates
+    animas_dir = data_dir / "animas"
+    if animas_dir.exists():
+        for d in sorted(animas_dir.iterdir()):
             if d.is_dir() and (d / "identity.md").exists():
-                config.persons[d.name] = PersonModelConfig()
+                config.animas[d.name] = AnimaModelConfig()
 
     save_config(config, data_dir / "config.json")
     logger.info("Default config.json created at %s", data_dir / "config.json")
@@ -218,13 +225,13 @@ def _maybe_migrate_config(data_dir: Path) -> None:
     if config_path.exists():
         return
 
-    persons_dir = data_dir / "persons"
-    if not persons_dir.exists():
+    animas_dir = data_dir / "animas"
+    if not animas_dir.exists():
         return
 
     has_legacy = any(
         (d / "config.md").exists()
-        for d in persons_dir.iterdir()
+        for d in animas_dir.iterdir()
         if d.is_dir()
     )
     if not has_legacy:

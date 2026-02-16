@@ -1,4 +1,4 @@
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
@@ -607,7 +607,7 @@ class MessageCache(BaseMessageCache):
 
         Detection patterns:
         1. <@USER_ID> in message text
-        2. All messages in DM channels from the other person
+        2. All messages in DM channels from the other anima
         3. Messages in watch_channels from other users
         """
         if config is None:
@@ -636,7 +636,7 @@ class MessageCache(BaseMessageCache):
                 seen.add(key)
                 results.append(d)
 
-        # 2) DM channels: all messages from the other person
+        # 2) DM channels: all messages from the other anima
         if unreplied_cfg.get("include_direct_messages", True):
             dm_rows = self.conn.execute(
                 "SELECT channel_id FROM channels WHERE type = 'im'"

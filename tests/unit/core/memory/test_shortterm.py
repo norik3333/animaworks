@@ -14,15 +14,15 @@ from core.memory.shortterm import (
 
 
 @pytest.fixture
-def person_dir(tmp_path: Path) -> Path:
-    d = tmp_path / "person"
+def anima_dir(tmp_path: Path) -> Path:
+    d = tmp_path / "anima"
     (d / "shortterm" / "archive").mkdir(parents=True)
     return d
 
 
 @pytest.fixture
-def stm(person_dir: Path) -> ShortTermMemory:
-    return ShortTermMemory(person_dir)
+def stm(anima_dir: Path) -> ShortTermMemory:
+    return ShortTermMemory(anima_dir)
 
 
 # ── SessionState ──────────────────────────────────────────
@@ -62,11 +62,11 @@ class TestSessionState:
 
 
 class TestHasPending:
-    def test_no_pending(self, stm, person_dir):
+    def test_no_pending(self, stm, anima_dir):
         assert stm.has_pending() is False
 
-    def test_has_pending(self, stm, person_dir):
-        (person_dir / "shortterm" / "session_state.json").write_text(
+    def test_has_pending(self, stm, anima_dir):
+        (anima_dir / "shortterm" / "session_state.json").write_text(
             "{}", encoding="utf-8"
         )
         assert stm.has_pending() is True
@@ -76,7 +76,7 @@ class TestHasPending:
 
 
 class TestSave:
-    def test_saves_json_and_md(self, stm, person_dir):
+    def test_saves_json_and_md(self, stm, anima_dir):
         state = SessionState(
             session_id="sess-1",
             timestamp="2026-01-15T10:00:00",
@@ -88,8 +88,8 @@ class TestSave:
         )
         result_path = stm.save(state)
         assert result_path.exists()
-        assert (person_dir / "shortterm" / "session_state.json").exists()
-        assert (person_dir / "shortterm" / "session_state.md").exists()
+        assert (anima_dir / "shortterm" / "session_state.json").exists()
+        assert (anima_dir / "shortterm" / "session_state.md").exists()
 
         # Verify JSON content
         data = json.loads(result_path.read_text(encoding="utf-8"))
@@ -97,42 +97,42 @@ class TestSave:
         assert data["turn_count"] == 3
 
         # Verify Markdown content
-        md = (person_dir / "shortterm" / "session_state.md").read_text(encoding="utf-8")
+        md = (anima_dir / "shortterm" / "session_state.md").read_text(encoding="utf-8")
         assert "sess-1" in md
         assert "Test prompt" in md
 
-    def test_archives_existing_before_save(self, stm, person_dir):
+    def test_archives_existing_before_save(self, stm, anima_dir):
         # Save first state
         stm.save(SessionState(session_id="first"))
         # Save second state
         stm.save(SessionState(session_id="second"))
         # First should be archived
-        archive_files = list((person_dir / "shortterm" / "archive").glob("*.json"))
+        archive_files = list((anima_dir / "shortterm" / "archive").glob("*.json"))
         assert len(archive_files) >= 1
         # Current should be "second"
         data = json.loads(
-            (person_dir / "shortterm" / "session_state.json").read_text(encoding="utf-8")
+            (anima_dir / "shortterm" / "session_state.json").read_text(encoding="utf-8")
         )
         assert data["session_id"] == "second"
 
     def test_creates_dirs(self, tmp_path):
-        person_dir = tmp_path / "new_person"
-        stm = ShortTermMemory(person_dir)
+        anima_dir = tmp_path / "new_anima"
+        stm = ShortTermMemory(anima_dir)
         stm.save(SessionState(session_id="test"))
-        assert (person_dir / "shortterm" / "session_state.json").exists()
+        assert (anima_dir / "shortterm" / "session_state.json").exists()
 
 
 # ── save_if_not_exists ────────────────────────────────────
 
 
 class TestSaveIfNotExists:
-    def test_saves_when_no_md(self, stm, person_dir):
+    def test_saves_when_no_md(self, stm, anima_dir):
         result = stm.save_if_not_exists(SessionState(session_id="fallback"))
         assert result is not None
         assert result.exists()
 
-    def test_skips_when_md_exists(self, stm, person_dir):
-        (person_dir / "shortterm" / "session_state.md").write_text(
+    def test_skips_when_md_exists(self, stm, anima_dir):
+        (anima_dir / "shortterm" / "session_state.md").write_text(
             "Agent wrote this", encoding="utf-8"
         )
         result = stm.save_if_not_exists(SessionState(session_id="fallback"))
@@ -143,7 +143,7 @@ class TestSaveIfNotExists:
 
 
 class TestLoad:
-    def test_load_existing(self, stm, person_dir):
+    def test_load_existing(self, stm, anima_dir):
         stm.save(SessionState(
             session_id="sess-1",
             trigger="test",
@@ -157,15 +157,15 @@ class TestLoad:
     def test_load_nonexistent(self, stm):
         assert stm.load() is None
 
-    def test_load_malformed(self, stm, person_dir):
-        (person_dir / "shortterm" / "session_state.json").write_text(
+    def test_load_malformed(self, stm, anima_dir):
+        (anima_dir / "shortterm" / "session_state.json").write_text(
             "not json", encoding="utf-8"
         )
         assert stm.load() is None
 
 
 class TestLoadMarkdown:
-    def test_load_existing(self, stm, person_dir):
+    def test_load_existing(self, stm, anima_dir):
         stm.save(SessionState(session_id="test"))
         md = stm.load_markdown()
         assert "短期記憶" in md
@@ -178,13 +178,13 @@ class TestLoadMarkdown:
 
 
 class TestClear:
-    def test_clears_and_archives(self, stm, person_dir):
+    def test_clears_and_archives(self, stm, anima_dir):
         stm.save(SessionState(session_id="to-clear"))
         assert stm.has_pending()
         stm.clear()
         assert not stm.has_pending()
         # Should be archived
-        archive_files = list((person_dir / "shortterm" / "archive").glob("*.json"))
+        archive_files = list((anima_dir / "shortterm" / "archive").glob("*.json"))
         assert len(archive_files) >= 1
 
     def test_clear_empty(self, stm):
@@ -195,13 +195,13 @@ class TestClear:
 
 
 class TestArchiveExisting:
-    def test_archives_both_files(self, stm, person_dir):
-        (person_dir / "shortterm" / "session_state.json").write_text("{}", encoding="utf-8")
-        (person_dir / "shortterm" / "session_state.md").write_text("md", encoding="utf-8")
+    def test_archives_both_files(self, stm, anima_dir):
+        (anima_dir / "shortterm" / "session_state.json").write_text("{}", encoding="utf-8")
+        (anima_dir / "shortterm" / "session_state.md").write_text("md", encoding="utf-8")
         stm._archive_existing()
-        assert not (person_dir / "shortterm" / "session_state.json").exists()
-        assert not (person_dir / "shortterm" / "session_state.md").exists()
-        archive = person_dir / "shortterm" / "archive"
+        assert not (anima_dir / "shortterm" / "session_state.json").exists()
+        assert not (anima_dir / "shortterm" / "session_state.md").exists()
+        archive = anima_dir / "shortterm" / "archive"
         assert len(list(archive.glob("*.json"))) == 1
         assert len(list(archive.glob("*.md"))) == 1
 
@@ -210,8 +210,8 @@ class TestArchiveExisting:
 
 
 class TestPruneArchive:
-    def test_prunes_excess(self, stm, person_dir):
-        archive = person_dir / "shortterm" / "archive"
+    def test_prunes_excess(self, stm, anima_dir):
+        archive = anima_dir / "shortterm" / "archive"
         # Create 110 files
         for i in range(110):
             (archive / f"{i:04d}.json").write_text("{}", encoding="utf-8")
@@ -219,8 +219,8 @@ class TestPruneArchive:
         remaining = list(archive.glob("*.json"))
         assert len(remaining) == 100
 
-    def test_no_prune_when_under_limit(self, stm, person_dir):
-        archive = person_dir / "shortterm" / "archive"
+    def test_no_prune_when_under_limit(self, stm, anima_dir):
+        archive = anima_dir / "shortterm" / "archive"
         for i in range(5):
             (archive / f"{i:04d}.json").write_text("{}", encoding="utf-8")
         stm._prune_archive(max_files=100)

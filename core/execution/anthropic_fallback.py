@@ -1,5 +1,5 @@
 from __future__ import annotations
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
@@ -47,13 +47,13 @@ class AnthropicFallbackExecutor(BaseExecutor):
     def __init__(
         self,
         model_config: ModelConfig,
-        person_dir: Path,
+        anima_dir: Path,
         tool_handler: ToolHandler,
         tool_registry: list[str],
         memory: MemoryManager,
         personal_tools: dict[str, str] | None = None,
     ) -> None:
-        super().__init__(model_config, person_dir)
+        super().__init__(model_config, anima_dir)
         self._tool_handler = tool_handler
         self._tool_registry = tool_registry
         self._memory = memory
@@ -65,7 +65,7 @@ class AnthropicFallbackExecutor(BaseExecutor):
         canonical = build_tool_list(
             include_file_tools=False,
             include_notification_tools=self._tool_handler._human_notifier is not None,
-            include_admin_tools=(self._person_dir / "skills" / "newstaff.md").exists(),
+            include_admin_tools=(self._anima_dir / "skills" / "newstaff.md").exists(),
             include_tool_management=True,
             external_schemas=external,
         )

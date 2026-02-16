@@ -1,4 +1,4 @@
-"""Unit tests for Person birth reveal animation integration.
+"""Unit tests for Anima birth reveal animation integration.
 
 Validates that the workspace frontend files contain the required
 reveal overlay elements, CSS classes, and JS module wiring.

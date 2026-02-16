@@ -1,4 +1,4 @@
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
@@ -122,62 +122,62 @@ def setup_logging(
     logging.getLogger("apscheduler").setLevel(logging.WARNING)
 
 
-# ── Person-specific Logging ────────────────────────────────────────────
+# ── Anima-specific Logging ────────────────────────────────────────────
 
 
-class PersonNameFilter(logging.Filter):
-    """Inject person name into log records."""
+class AnimaNameFilter(logging.Filter):
+    """Inject anima name into log records."""
 
-    def __init__(self, person_name: str):
+    def __init__(self, anima_name: str):
         super().__init__()
-        self.person_name = person_name
+        self.anima_name = anima_name
 
     def filter(self, record: logging.LogRecord) -> bool:
-        record.person_name = self.person_name  # type: ignore[attr-defined]
+        record.anima_name = self.anima_name  # type: ignore[attr-defined]
         return True
 
 
-def setup_person_logging(
-    person_name: str,
+def setup_anima_logging(
+    anima_name: str,
     log_dir: Path,
     level: str = "INFO",
     also_to_console: bool = True
 ) -> None:
-    """Configure person-specific logging with daily rotation.
+    """Configure anima-specific logging with daily rotation.
 
-    Creates a dedicated log directory for the person with:
+    Creates a dedicated log directory for the anima with:
     - Daily log rotation (YYYYMMDD.log format)
     - 30-day retention
     - current.log symlink to the current log file
     - Optional console output
 
     Args:
-        person_name: Name of the person (used for log directory and prefix)
+        anima_name: Name of the anima (used for log directory and prefix)
         log_dir: Base log directory (e.g., ~/.animaworks/logs)
         level: Log level (DEBUG, INFO, WARNING, etc.)
         also_to_console: Whether to also log to console
 
     Directory structure created:
-        {log_dir}/persons/{person_name}/
+        {log_dir}/animas/{anima_name}/
         ├── current.log -> 20260214.log
         ├── 20260214.log
         ├── 20260213.log
         └── ...
     """
-    # Create person log directory
-    person_log_dir = log_dir / "persons" / person_name
-    person_log_dir.mkdir(parents=True, exist_ok=True)
+    # Create anima log directory
+    anima_log_dir = log_dir / "animas" / anima_name
+    anima_log_dir.mkdir(parents=True, exist_ok=True)
 
     # Main log file with daily rotation
-    log_file = person_log_dir / f"{datetime.now().strftime('%Y%m%d')}.log"
+    log_file = anima_log_dir / f"{datetime.now().strftime('%Y%m%d')}.log"
 
     # Setup root logger
     root = logging.getLogger()
     root.setLevel(getattr(logging, level.upper(), logging.INFO))
     root.handlers.clear()
 
-    # Create person name filter
-    person_filter = PersonNameFilter(person_name)
+    # Create anima name filter
+    anima_filter = AnimaNameFilter(anima_name)
 
     # File handler with timed rotation
     file_handler = TimedRotatingFileHandler(
@@ -195,12 +195,12 @@ def setup_person_logging(
             datefmt="%Y-%m-%d %H:%M:%S"
         )
     )
-    file_handler.addFilter(person_filter)
+    file_handler.addFilter(anima_filter)
     file_handler.suffix = "%Y%m%d.log"  # Match filename format
     root.addHandler(file_handler)
 
     # Create/update current.log symlink
-    current_link = person_log_dir / "current.log"
+    current_link = anima_log_dir / "current.log"
     if current_link.exists() or current_link.is_symlink():
         current_link.unlink()
     try:
@@ -216,11 +216,11 @@ def setup_person_logging(
         console.setLevel(logging.DEBUG)
         console.setFormatter(
             logging.Formatter(
-                fmt=f"[{person_name}] %(asctime)s [%(levelname)s] %(name)s: %(message)s",
+                fmt=f"[{anima_name}] %(asctime)s [%(levelname)s] %(name)s: %(message)s",
                 datefmt="%H:%M:%S"
             )
         )
-        console.addFilter(person_filter)
+        console.addFilter(anima_filter)
         root.addHandler(console)
 
     # Reduce noise from third-party libraries
@@ -229,4 +229,4 @@ def setup_person_logging(
     logging.getLogger("anthropic").setLevel(logging.WARNING)
 
     logger = logging.getLogger(__name__)
-    logger.info(f"Person logging configured: {person_name} -> {log_file}")
+    logger.info(f"Anima logging configured: {anima_name} -> {log_file}")

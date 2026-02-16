@@ -3,7 +3,7 @@
 Tests the complete SSE streaming flow to verify:
 1. The done event provides clean summary + emotion for frontend consumption
 2. text_delta events stream raw text (frontend strips emotion tags)
-3. person.status WebSocket events are emitted with correct structure
+3. anima.status WebSocket events are emitted with correct structure
 """
 from __future__ import annotations
 
@@ -96,7 +96,7 @@ class TestWorkspaceEmotionStreamE2E:
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.post(
-                "/api/persons/sakura/chat/stream",
+                "/api/animas/sakura/chat/stream",
                 json={"message": "何か楽しいことない？", "from_person": "user"},
             )
 
@@ -147,7 +147,7 @@ class TestWorkspaceEmotionStreamE2E:
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.post(
-                "/api/persons/kotoha/chat/stream",
+                "/api/animas/kotoha/chat/stream",
                 json={"message": "最新ニュースを調べて"},
             )
 
@@ -175,7 +175,7 @@ class TestWorkspaceEmotionStreamE2E:
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.post(
-                "/api/persons/sakura/chat/stream",
+                "/api/animas/sakura/chat/stream",
                 json={"message": "テスト"},
             )
 
@@ -189,7 +189,7 @@ class TestWorkspaceEmotionStreamE2E:
 
 
 class TestWorkspaceStatusEventsE2E:
-    """E2E: Verify person.status WebSocket events emitted during chat,
+    """E2E: Verify anima.status WebSocket events emitted during chat,
     testing the structure the frontend deduplication relies on."""
 
     async def test_stream_emits_thinking_then_idle(self):
@@ -211,16 +211,16 @@ class TestWorkspaceStatusEventsE2E:
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             await client.post(
-                "/api/persons/sakura/chat/stream",
+                "/api/animas/sakura/chat/stream",
                 json={"message": "Hello"},
             )
 
-        # Collect all person.status broadcasts
+        # Collect all anima.status broadcasts
         ws = app.state.ws_manager
         status_events = []
         for call in ws.broadcast.call_args_list:
             payload = call[0][0] if call[0] else {}
-            if isinstance(payload, dict) and payload.get("type") == "person.status":
+            if isinstance(payload, dict) and payload.get("type") == "anima.status":
                 status_events.append(payload["data"])
 
         assert len(status_events) == 2
@@ -230,7 +230,7 @@ class TestWorkspaceStatusEventsE2E:
         assert status_events[1]["status"] == "idle"
 
     async def test_status_events_have_name_and_status_fields(self):
-        """Each person.status event must have name and status for dedup."""
+        """Each anima.status event must have name and status for dedup."""
         app = _make_test_app()
 
         async def mock_stream(*args, **kwargs):
@@ -248,17 +248,17 @@ class TestWorkspaceStatusEventsE2E:
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             await client.post(
-                "/api/persons/kotoha/chat/stream",
+                "/api/animas/kotoha/chat/stream",
                 json={"message": "Hi"},
             )
 
         ws = app.state.ws_manager
         for call in ws.broadcast.call_args_list:
             payload = call[0][0] if call[0] else {}
-            if isinstance(payload, dict) and payload.get("type") == "person.status":
+            if isinstance(payload, dict) and payload.get("type") == "anima.status":
                 data = payload["data"]
-                assert "name" in data, "person.status event must have 'name'"
-                assert "status" in data, "person.status event must have 'status'"
+                assert "name" in data, "anima.status event must have 'name'"
+                assert "status" in data, "anima.status event must have 'status'"
 
     async def test_non_streaming_chat_also_emits_status_pair(self):
         """Non-streaming /chat endpoint should also emit thinking → idle."""
@@ -271,7 +271,7 @@ class TestWorkspaceStatusEventsE2E:
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.post(
-                "/api/persons/sakura/chat",
+                "/api/animas/sakura/chat",
                 json={"message": "Question"},
             )
 
@@ -281,7 +281,7 @@ class TestWorkspaceStatusEventsE2E:
         status_events = []
         for call in ws.broadcast.call_args_list:
             payload = call[0][0] if call[0] else {}
-            if isinstance(payload, dict) and payload.get("type") == "person.status":
+            if isinstance(payload, dict) and payload.get("type") == "anima.status":
                 status_events.append(payload["data"])
 
         assert len(status_events) == 2

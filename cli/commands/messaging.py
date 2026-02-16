@@ -12,7 +12,7 @@ logger = logging.getLogger("animaworks")
 
 
 def cmd_send(args: argparse.Namespace) -> None:
-    """Send a message from one person to another (filesystem based)."""
+    """Send a message from one anima to another (filesystem based)."""
     from core.init import ensure_runtime_dir
     from core.messenger import Messenger
     from core.paths import get_shared_dir
@@ -30,7 +30,7 @@ def cmd_send(args: argparse.Namespace) -> None:
 
 
 def _notify_server_message_sent(
-    from_person: str, to_person: str, content: str
+    from_anima: str, to_anima: str, content: str
 ) -> None:
     """Notify the running server about a CLI-sent message.
 
@@ -50,14 +50,14 @@ def _notify_server_message_sent(
         resp = httpx.post(
             f"{server_url}/api/internal/message-sent",
             json={
-                "from_person": from_person,
-                "to_person": to_person,
+                "from_person": from_anima,
+                "to_person": to_anima,
                 "content": content[:200],
             },
             timeout=5.0,
         )
         if resp.status_code == 200:
-            logger.debug("Server notified of CLI send: %s -> %s", from_person, to_person)
+            logger.debug("Server notified of CLI send: %s -> %s", from_anima, to_anima)
         else:
             logger.debug("Server notification failed: %s", resp.status_code)
     except Exception:
@@ -68,14 +68,14 @@ def _notify_server_message_sent(
 
 
 def cmd_list(args: argparse.Namespace) -> None:
-    """List all persons (from gateway or filesystem)."""
+    """List all animas (from gateway or filesystem)."""
     if args.local:
         _list_local()
     else:
         from cli._gateway import gateway_request_or_none
 
         data = gateway_request_or_none(
-            args, "GET", "/api/persons", timeout=10.0
+            args, "GET", "/api/animas", timeout=10.0
         )
         if data is None:
             print("Gateway not reachable, falling back to filesystem...")
@@ -91,14 +91,14 @@ def cmd_list(args: argparse.Namespace) -> None:
 
 def _list_local() -> None:
     from core.init import ensure_runtime_dir
-    from core.paths import get_persons_dir
+    from core.paths import get_animas_dir
 
     ensure_runtime_dir()
-    persons_dir = get_persons_dir()
-    if not persons_dir.exists():
-        print("No persons directory found.")
+    animas_dir = get_animas_dir()
+    if not animas_dir.exists():
+        print("No animas directory found.")
         return
-    for d in sorted(persons_dir.iterdir()):
+    for d in sorted(animas_dir.iterdir()):
         if d.is_dir() and (d / "identity.md").exists():
             print(f"  {d.name}")
 
@@ -112,7 +112,7 @@ def cmd_status(args: argparse.Namespace) -> None:
 
     data = gateway_request(args, "GET", "/api/system/status", timeout=10.0)
     if isinstance(data, dict):
-        print(f"Persons: {data.get('persons', 0)}")
+        print(f"Animas: {data.get('animas', 0)}")
         print(f"Scheduler: {'running' if data.get('scheduler_running') else 'stopped'}")
         for j in data.get("jobs", []):
             print(f"  [{j['id']}] {j['name']} -> next: {j['next_run']}")

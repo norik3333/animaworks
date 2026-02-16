@@ -90,7 +90,7 @@ class TestStreamingMultiLineSSE:
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.post(
-                "/api/persons/sakura/chat/stream",
+                "/api/animas/sakura/chat/stream",
                 json={"message": "今日の天気は？", "from_person": "user"},
             )
 
@@ -119,7 +119,7 @@ class TestStreamingMultiLineSSE:
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.post(
-                "/api/persons/sakura/chat/stream", json={"message": "テスト"},
+                "/api/animas/sakura/chat/stream", json={"message": "テスト"},
             )
 
         done_events = [e for e in _parse_sse_events(resp.text) if e["event"] == "done"]
@@ -152,7 +152,7 @@ class TestStreamingMultiLineSSE:
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.post(
-                "/api/persons/kotoha/chat/stream", json={"message": "詳しく教えて"},
+                "/api/animas/kotoha/chat/stream", json={"message": "詳しく教えて"},
             )
 
         deltas = [e for e in _parse_sse_events(resp.text) if e["event"] == "text_delta"]
@@ -262,7 +262,7 @@ class TestStreamingScrollIntegration:
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.post(
-                "/api/persons/sakura/chat/stream",
+                "/api/animas/sakura/chat/stream",
                 json={"message": "最新ニュースを調べて"},
             )
 
@@ -303,7 +303,7 @@ class TestStreamingScrollIntegration:
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.post(
-                "/api/persons/sakura/chat/stream", json={"message": "詳細に回答して"},
+                "/api/animas/sakura/chat/stream", json={"message": "詳細に回答して"},
             )
 
         deltas = [e for e in _parse_sse_events(resp.text) if e["event"] == "text_delta"]
@@ -328,7 +328,7 @@ class TestStreamingScrollIntegration:
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.post(
-                "/api/persons/sakura/chat/stream", json={"message": "テスト"},
+                "/api/animas/sakura/chat/stream", json={"message": "テスト"},
             )
 
         assert resp.status_code == 200

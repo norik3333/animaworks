@@ -41,8 +41,8 @@ def notification_config() -> HumanNotificationConfig:
 
 
 @pytest.fixture
-def person_dir(tmp_path: Path) -> Path:
-    d = tmp_path / "persons" / "e2e-leader"
+def anima_dir(tmp_path: Path) -> Path:
+    d = tmp_path / "animas" / "e2e-leader"
     d.mkdir(parents=True)
     (d / "permissions.md").write_text("", encoding="utf-8")
     return d
@@ -67,12 +67,12 @@ class TestNotificationE2EFlow:
         assert notifier.channel_count == 1
 
     def test_config_to_handler_to_notify(
-        self, notification_config, person_dir, memory,
+        self, notification_config, anima_dir, memory,
     ):
         """Full flow: config → notifier → handler → notify_human tool call."""
         notifier = HumanNotifier.from_config(notification_config)
         handler = ToolHandler(
-            person_dir=person_dir,
+            anima_dir=anima_dir,
             memory=memory,
             human_notifier=notifier,
         )
@@ -103,7 +103,7 @@ class TestNotificationE2EFlow:
         assert call_args[1]["headers"]["Priority"] == "4"  # "high" → 4
         assert "(from e2e-leader)" in call_args[1]["headers"]["Title"]
 
-    def test_multi_channel_e2e(self, person_dir, memory, monkeypatch):
+    def test_multi_channel_e2e(self, anima_dir, memory, monkeypatch):
         """Test notification to multiple channels simultaneously."""
         monkeypatch.setenv("CHATWORK_API_TOKEN", "cw-test-token")
 
@@ -135,7 +135,7 @@ class TestNotificationE2EFlow:
         assert notifier.channel_count == 3
 
         handler = ToolHandler(
-            person_dir=person_dir,
+            anima_dir=anima_dir,
             memory=memory,
             human_notifier=notifier,
         )
@@ -165,7 +165,7 @@ class TestNotificationE2EFlow:
         assert parsed["status"] == "sent"
         assert len(parsed["results"]) == 3
 
-    def test_disabled_channels_skipped(self, person_dir, memory):
+    def test_disabled_channels_skipped(self, anima_dir, memory):
         """Disabled channels in config are not included in the notifier."""
         config = HumanNotificationConfig(
             enabled=True,
@@ -189,9 +189,9 @@ class TestNotificationE2EFlow:
 class TestNotificationPromptIntegration:
     """Test that the prompt builder correctly injects notification guidance."""
 
-    def test_top_level_person_gets_notification_guidance(self, data_dir, make_person):
-        """Top-level Person with notification enabled gets guidance in prompt."""
-        person_dir = make_person("top-leader")
+    def test_top_level_anima_gets_notification_guidance(self, data_dir, make_anima):
+        """Top-level Anima with notification enabled gets guidance in prompt."""
+        anima_dir = make_anima("top-leader")
 
         # Enable human_notification in config
         config_path = data_dir / "config.json"
@@ -213,16 +213,16 @@ class TestNotificationPromptIntegration:
         from core.memory import MemoryManager
         from core.prompt.builder import build_system_prompt
 
-        memory = MemoryManager(person_dir)
+        memory = MemoryManager(anima_dir)
         prompt = build_system_prompt(memory)
 
         assert "notify_human" in prompt
         assert "人間への報告" in prompt
 
-    def test_supervised_person_no_notification_guidance(self, data_dir, make_person):
-        """Person with supervisor does NOT get notification guidance."""
-        make_person("boss")
-        person_dir = make_person("worker", supervisor="boss")
+    def test_supervised_anima_no_notification_guidance(self, data_dir, make_anima):
+        """Anima with supervisor does NOT get notification guidance."""
+        make_anima("boss")
+        anima_dir = make_anima("worker", supervisor="boss")
 
         # Enable human_notification in config
         config_path = data_dir / "config.json"
@@ -244,15 +244,15 @@ class TestNotificationPromptIntegration:
         from core.memory import MemoryManager
         from core.prompt.builder import build_system_prompt
 
-        memory = MemoryManager(person_dir)
+        memory = MemoryManager(anima_dir)
         prompt = build_system_prompt(memory)
 
-        # Supervised person should not have the human notification section
+        # Supervised anima should not have the human notification section
         assert "人間への報告" not in prompt
 
-    def test_notification_disabled_no_guidance(self, data_dir, make_person):
-        """Top-level Person with notification disabled gets no guidance."""
-        person_dir = make_person("top-leader-disabled")
+    def test_notification_disabled_no_guidance(self, data_dir, make_anima):
+        """Top-level Anima with notification disabled gets no guidance."""
+        anima_dir = make_anima("top-leader-disabled")
 
         # human_notification disabled (default)
         from core.config import invalidate_cache
@@ -261,7 +261,7 @@ class TestNotificationPromptIntegration:
         from core.memory import MemoryManager
         from core.prompt.builder import build_system_prompt
 
-        memory = MemoryManager(person_dir)
+        memory = MemoryManager(anima_dir)
         prompt = build_system_prompt(memory)
 
         assert "人間への報告" not in prompt

@@ -392,7 +392,7 @@ async def test_ipc_streaming_many_chunks():
 
 @pytest.mark.asyncio
 async def test_ipc_streaming_json_chunks():
-    """Test streaming with JSON-encoded chunks (as used by PersonRunner)."""
+    """Test streaming with JSON-encoded chunks (as used by AnimaRunner)."""
     with TemporaryDirectory() as tmpdir:
         socket_path = Path(tmpdir) / "json_chunks.sock"
 

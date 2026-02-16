@@ -1,4 +1,4 @@
-"""Unit tests for PersonRunner autonomous scheduler."""
+"""Unit tests for AnimaRunner autonomous scheduler."""
 from __future__ import annotations
 
 import asyncio
@@ -9,24 +9,24 @@ import pytest
 
 
 class TestRunnerSchedulerSetup:
-    """Tests for PersonRunner scheduler initialization."""
+    """Tests for AnimaRunner scheduler initialization."""
 
     def _make_runner(self, tmp_path: Path):
-        from core.supervisor.runner import PersonRunner
+        from core.supervisor.runner import AnimaRunner
 
-        persons_dir = tmp_path / "persons"
-        persons_dir.mkdir(exist_ok=True)
-        person_dir = persons_dir / "test-person"
-        person_dir.mkdir(exist_ok=True)
-        (person_dir / "identity.md").write_text("test")
+        animas_dir = tmp_path / "animas"
+        animas_dir.mkdir(exist_ok=True)
+        anima_dir = animas_dir / "test-anima"
+        anima_dir.mkdir(exist_ok=True)
+        (anima_dir / "identity.md").write_text("test")
         shared_dir = tmp_path / "shared"
         shared_dir.mkdir(exist_ok=True)
         socket_path = tmp_path / "test.sock"
 
-        return PersonRunner(
-            person_name="test-person",
+        return AnimaRunner(
+            anima_name="test-anima",
             socket_path=socket_path,
-            persons_dir=persons_dir,
+            animas_dir=animas_dir,
             shared_dir=shared_dir,
         )
 
@@ -37,11 +37,11 @@ class TestRunnerSchedulerSetup:
     @pytest.mark.asyncio
     async def test_setup_scheduler_creates_scheduler(self, tmp_path):
         runner = self._make_runner(tmp_path)
-        mock_person = MagicMock()
-        mock_person.memory.read_heartbeat_config.return_value = "5分ごと\n8:00 - 23:00"
-        mock_person.memory.read_cron_config.return_value = ""
-        mock_person.set_on_schedule_changed = MagicMock()
-        runner.person = mock_person
+        mock_anima = MagicMock()
+        mock_anima.memory.read_heartbeat_config.return_value = "5分ごと\n8:00 - 23:00"
+        mock_anima.memory.read_cron_config.return_value = ""
+        mock_anima.set_on_schedule_changed = MagicMock()
+        runner.anima = mock_anima
 
         runner._setup_scheduler()
 
@@ -57,23 +57,23 @@ class TestRunnerSchedulerSetup:
     @pytest.mark.asyncio
     async def test_setup_scheduler_with_cron_tasks(self, tmp_path):
         runner = self._make_runner(tmp_path)
-        mock_person = MagicMock()
-        mock_person.name = "test-person"
-        mock_person.memory.read_heartbeat_config.return_value = "30分ごと\n9:00 - 22:00"
-        mock_person.memory.read_cron_config.return_value = """## Task A
+        mock_anima = MagicMock()
+        mock_anima.name = "test-anima"
+        mock_anima.memory.read_heartbeat_config.return_value = "30分ごと\n9:00 - 22:00"
+        mock_anima.memory.read_cron_config.return_value = """## Task A
 schedule: 0 9 * * *
 type: llm
 Do something
 """
-        mock_person.set_on_schedule_changed = MagicMock()
-        runner.person = mock_person
+        mock_anima.set_on_schedule_changed = MagicMock()
+        runner.anima = mock_anima
 
         runner._setup_scheduler()
 
         jobs = runner.scheduler.get_jobs()
         job_ids = [j.id for j in jobs]
-        assert "test-person_heartbeat" in job_ids
-        assert "test-person_cron_0" in job_ids
+        assert "test-anima_heartbeat" in job_ids
+        assert "test-anima_cron_0" in job_ids
 
         runner.scheduler.shutdown(wait=False)
 
@@ -81,11 +81,11 @@ Do something
     async def test_setup_scheduler_no_heartbeat_config(self, tmp_path):
         """Scheduler should start even without heartbeat.md content."""
         runner = self._make_runner(tmp_path)
-        mock_person = MagicMock()
-        mock_person.memory.read_heartbeat_config.return_value = ""
-        mock_person.memory.read_cron_config.return_value = ""
-        mock_person.set_on_schedule_changed = MagicMock()
-        runner.person = mock_person
+        mock_anima = MagicMock()
+        mock_anima.memory.read_heartbeat_config.return_value = ""
+        mock_anima.memory.read_cron_config.return_value = ""
+        mock_anima.set_on_schedule_changed = MagicMock()
+        runner.anima = mock_anima
 
         runner._setup_scheduler()
 
@@ -100,9 +100,9 @@ Do something
     async def test_setup_scheduler_handles_error_gracefully(self, tmp_path):
         """Scheduler setup should not crash on errors."""
         runner = self._make_runner(tmp_path)
-        mock_person = MagicMock()
-        mock_person.memory.read_heartbeat_config.side_effect = Exception("file error")
-        runner.person = mock_person
+        mock_anima = MagicMock()
+        mock_anima.memory.read_heartbeat_config.side_effect = Exception("file error")
+        runner.anima = mock_anima
 
         # Should not raise
         runner._setup_scheduler()
@@ -113,23 +113,23 @@ Do something
     async def test_reload_schedule(self, tmp_path):
         """Test hot-reload of schedule from disk."""
         runner = self._make_runner(tmp_path)
-        mock_person = MagicMock()
-        mock_person.memory.read_heartbeat_config.return_value = "5分ごと\n8:00 - 23:00"
-        mock_person.memory.read_cron_config.return_value = ""
-        mock_person.set_on_schedule_changed = MagicMock()
-        runner.person = mock_person
+        mock_anima = MagicMock()
+        mock_anima.memory.read_heartbeat_config.return_value = "5分ごと\n8:00 - 23:00"
+        mock_anima.memory.read_cron_config.return_value = ""
+        mock_anima.set_on_schedule_changed = MagicMock()
+        runner.anima = mock_anima
 
         runner._setup_scheduler()
         initial_jobs = len(runner.scheduler.get_jobs())
         assert initial_jobs == 1  # heartbeat only
 
         # Now add cron config for reload
-        mock_person.memory.read_cron_config.return_value = """## New Task
+        mock_anima.memory.read_cron_config.return_value = """## New Task
 schedule: 0 10 * * *
 type: llm
 New task description
 """
-        result = runner._reload_schedule("test-person")
+        result = runner._reload_schedule("test-anima")
         assert result["removed"] == 1
         assert len(result["new_jobs"]) == 2  # heartbeat + cron
 
@@ -139,14 +139,14 @@ New task description
     async def test_get_status_includes_scheduler_info(self, tmp_path):
         """get_status should include scheduler_running and scheduler_jobs."""
         runner = self._make_runner(tmp_path)
-        mock_person = MagicMock()
-        mock_person._status = "idle"
-        mock_person._current_task = None
-        mock_person.needs_bootstrap = False
-        mock_person.memory.read_heartbeat_config.return_value = "5分ごと\n8:00 - 23:00"
-        mock_person.memory.read_cron_config.return_value = ""
-        mock_person.set_on_schedule_changed = MagicMock()
-        runner.person = mock_person
+        mock_anima = MagicMock()
+        mock_anima._status = "idle"
+        mock_anima._current_task = None
+        mock_anima.needs_bootstrap = False
+        mock_anima.memory.read_heartbeat_config.return_value = "5分ごと\n8:00 - 23:00"
+        mock_anima.memory.read_cron_config.return_value = ""
+        mock_anima.set_on_schedule_changed = MagicMock()
+        runner.anima = mock_anima
 
         runner._setup_scheduler()
 
@@ -161,31 +161,31 @@ class TestRunnerSchedulerCleanup:
     """Tests for scheduler cleanup on shutdown."""
 
     def _make_runner(self, tmp_path: Path):
-        from core.supervisor.runner import PersonRunner
+        from core.supervisor.runner import AnimaRunner
 
-        persons_dir = tmp_path / "persons"
-        persons_dir.mkdir(exist_ok=True)
-        (persons_dir / "test-person").mkdir(exist_ok=True)
-        (persons_dir / "test-person" / "identity.md").write_text("test")
+        animas_dir = tmp_path / "animas"
+        animas_dir.mkdir(exist_ok=True)
+        (animas_dir / "test-anima").mkdir(exist_ok=True)
+        (animas_dir / "test-anima" / "identity.md").write_text("test")
         shared_dir = tmp_path / "shared"
         shared_dir.mkdir(exist_ok=True)
         socket_path = tmp_path / "test.sock"
 
-        return PersonRunner(
-            person_name="test-person",
+        return AnimaRunner(
+            anima_name="test-anima",
             socket_path=socket_path,
-            persons_dir=persons_dir,
+            animas_dir=animas_dir,
             shared_dir=shared_dir,
         )
 
     @pytest.mark.asyncio
     async def test_cleanup_shuts_down_scheduler(self, tmp_path):
         runner = self._make_runner(tmp_path)
-        mock_person = MagicMock()
-        mock_person.memory.read_heartbeat_config.return_value = "5分ごと\n8:00 - 23:00"
-        mock_person.memory.read_cron_config.return_value = ""
-        mock_person.set_on_schedule_changed = MagicMock()
-        runner.person = mock_person
+        mock_anima = MagicMock()
+        mock_anima.memory.read_heartbeat_config.return_value = "5分ごと\n8:00 - 23:00"
+        mock_anima.memory.read_cron_config.return_value = ""
+        mock_anima.set_on_schedule_changed = MagicMock()
+        runner.anima = mock_anima
 
         runner._setup_scheduler()
         assert runner.scheduler.running

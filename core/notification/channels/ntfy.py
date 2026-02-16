@@ -1,5 +1,5 @@
 from __future__ import annotations
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
@@ -37,7 +37,7 @@ class NtfyChannel(NotificationChannel):
         body: str,
         priority: str = "normal",
         *,
-        person_name: str = "",
+        anima_name: str = "",
     ) -> str:
         server_url = self._config.get("server_url", "https://ntfy.sh")
         topic = self._config.get("topic", "")
@@ -46,7 +46,7 @@ class NtfyChannel(NotificationChannel):
 
         url = f"{server_url.rstrip('/')}/{topic}"
 
-        sender = f" (from {person_name})" if person_name else ""
+        sender = f" (from {anima_name})" if anima_name else ""
         title = f"{subject}{sender}"[:256]
         headers: dict[str, str] = {
             "Title": title,

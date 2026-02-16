@@ -1,10 +1,10 @@
-"""Unit tests for the person notification feature.
+"""Unit tests for the anima notification feature.
 
 Tests the notification pipeline:
   ToolHandler._handle_notify_human  ->  queue in _pending_notifications
   ToolHandler.drain_notifications   ->  return & clear
   AgentCore.drain_notifications     ->  passthrough
-  DigitalPerson.drain_notifications ->  passthrough
+  DigitalAnima.drain_notifications ->  passthrough
   WebSocketManager.broadcast_notification  ->  queue / broadcast
   WebSocketManager.flush_notification_queue -> flush on connect
 """
@@ -40,12 +40,12 @@ def _make_tool_handler(
     notifier: MagicMock | None = None,
 ) -> ToolHandler:
     """Create a ToolHandler with a mock memory and optional notifier."""
-    person_dir = tmp_path / "persons" / "test-person"
-    person_dir.mkdir(parents=True, exist_ok=True)
+    anima_dir = tmp_path / "animas" / "test-anima"
+    anima_dir.mkdir(parents=True, exist_ok=True)
     memory = MagicMock()
     memory.read_permissions.return_value = ""
     return ToolHandler(
-        person_dir=person_dir,
+        anima_dir=anima_dir,
         memory=memory,
         human_notifier=notifier,
     )
@@ -72,7 +72,7 @@ class TestToolHandlerNotifyHumanQueues:
         # Verify the notification was queued
         assert len(handler._pending_notifications) == 1
         notif = handler._pending_notifications[0]
-        assert notif["person"] == "test-person"
+        assert notif["anima"] == "test-anima"
         assert notif["subject"] == "Test Alert"
         assert notif["body"] == "Something happened"
         assert notif["priority"] == "high"
@@ -211,18 +211,18 @@ class TestToolHandlerNotifyHumanNoQueueOnFailure:
 
 
 class TestAgentCoreDrainNotifications:
-    def test_passthrough(self, data_dir, make_person):
+    def test_passthrough(self, data_dir, make_anima):
         """AgentCore.drain_notifications delegates to ToolHandler."""
-        person_dir = make_person("alice")
+        anima_dir = make_anima("alice")
         shared_dir = data_dir / "shared"
 
-        with patch("core.person.AgentCore") as MockAgent, \
-             patch("core.person.MemoryManager") as MockMM, \
-             patch("core.person.Messenger"):
+        with patch("core.anima.AgentCore") as MockAgent, \
+             patch("core.anima.MemoryManager") as MockMM, \
+             patch("core.anima.Messenger"):
             MockMM.return_value.read_model_config.return_value = MagicMock()
 
-            from core.person import DigitalPerson
-            dp = DigitalPerson(person_dir, shared_dir)
+            from core.anima import DigitalAnima
+            dp = DigitalAnima(anima_dir, shared_dir)
 
             # The agent is a mock from patching AgentCore; verify the method exists
             mock_drain = MagicMock(return_value=[{"subject": "test"}])
@@ -233,22 +233,22 @@ class TestAgentCoreDrainNotifications:
             assert result == [{"subject": "test"}]
 
 
-# ── DigitalPerson.drain_notifications passes through ──────────
+# ── DigitalAnima.drain_notifications passes through ──────────
 
 
-class TestDigitalPersonDrainNotifications:
-    def test_passthrough(self, data_dir, make_person):
-        """DigitalPerson.drain_notifications delegates to agent.drain_notifications."""
-        person_dir = make_person("bob")
+class TestDigitalAnimaDrainNotifications:
+    def test_passthrough(self, data_dir, make_anima):
+        """DigitalAnima.drain_notifications delegates to agent.drain_notifications."""
+        anima_dir = make_anima("bob")
         shared_dir = data_dir / "shared"
 
-        with patch("core.person.AgentCore") as MockAgent, \
-             patch("core.person.MemoryManager") as MockMM, \
-             patch("core.person.Messenger"):
+        with patch("core.anima.AgentCore") as MockAgent, \
+             patch("core.anima.MemoryManager") as MockMM, \
+             patch("core.anima.Messenger"):
             MockMM.return_value.read_model_config.return_value = MagicMock()
 
-            from core.person import DigitalPerson
-            dp = DigitalPerson(person_dir, shared_dir)
+            from core.anima import DigitalAnima
+            dp = DigitalAnima(anima_dir, shared_dir)
 
             expected = [{"subject": "alert", "body": "test body"}]
             dp.agent.drain_notifications = MagicMock(return_value=expected)
@@ -257,18 +257,18 @@ class TestDigitalPersonDrainNotifications:
             dp.agent.drain_notifications.assert_called_once()
             assert result == expected
 
-    def test_empty_passthrough(self, data_dir, make_person):
-        """DigitalPerson.drain_notifications returns [] when no notifications."""
-        person_dir = make_person("charlie")
+    def test_empty_passthrough(self, data_dir, make_anima):
+        """DigitalAnima.drain_notifications returns [] when no notifications."""
+        anima_dir = make_anima("charlie")
         shared_dir = data_dir / "shared"
 
-        with patch("core.person.AgentCore"), \
-             patch("core.person.MemoryManager") as MockMM, \
-             patch("core.person.Messenger"):
+        with patch("core.anima.AgentCore"), \
+             patch("core.anima.MemoryManager") as MockMM, \
+             patch("core.anima.Messenger"):
             MockMM.return_value.read_model_config.return_value = MagicMock()
 
-            from core.person import DigitalPerson
-            dp = DigitalPerson(person_dir, shared_dir)
+            from core.anima import DigitalAnima
+            dp = DigitalAnima(anima_dir, shared_dir)
 
             dp.agent.drain_notifications = MagicMock(return_value=[])
             assert dp.drain_notifications() == []
@@ -283,12 +283,12 @@ class TestWebSocketManagerBroadcastQueue:
         manager = WebSocketManager()
         assert manager.active_connections == []
 
-        data = {"person": "alice", "subject": "Alert", "body": "test"}
+        data = {"anima": "alice", "subject": "Alert", "body": "test"}
         await manager.broadcast_notification(data)
 
         assert len(manager._notification_queue) == 1
         event = manager._notification_queue[0]
-        assert event["type"] == "person.notification"
+        assert event["type"] == "anima.notification"
         assert event["data"] == data
 
     async def test_queue_respects_max_size(self):
@@ -326,7 +326,7 @@ class TestWebSocketManagerBroadcastImmediate:
         mock_ws = AsyncMock()
         manager.active_connections.append(mock_ws)
 
-        data = {"person": "alice", "subject": "Alert"}
+        data = {"anima": "alice", "subject": "Alert"}
         await manager.broadcast_notification(data)
 
         # Should NOT go to queue
@@ -335,7 +335,7 @@ class TestWebSocketManagerBroadcastImmediate:
         # Should have been broadcast via send_text
         mock_ws.send_text.assert_called_once()
         sent = json.loads(mock_ws.send_text.call_args[0][0])
-        assert sent["type"] == "person.notification"
+        assert sent["type"] == "anima.notification"
         assert sent["data"] == data
 
     async def test_broadcasts_to_multiple_clients(self):
@@ -346,7 +346,7 @@ class TestWebSocketManagerBroadcastImmediate:
         ws2 = AsyncMock()
         manager.active_connections.extend([ws1, ws2])
 
-        data = {"person": "bob", "subject": "Update"}
+        data = {"anima": "bob", "subject": "Update"}
         await manager.broadcast_notification(data)
 
         assert ws1.send_text.call_count == 1
@@ -428,5 +428,5 @@ class TestWebSocketManagerFlushQueue:
         # send_text called once for the flushed notification
         assert mock_ws.send_text.call_count == 1
         sent = json.loads(mock_ws.send_text.call_args[0][0])
-        assert sent["type"] == "person.notification"
+        assert sent["type"] == "anima.notification"
         assert sent["data"]["subject"] == "queued"

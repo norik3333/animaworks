@@ -1,12 +1,12 @@
 from __future__ import annotations
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 """Vector store abstraction and ChromaDB implementation.
 
 Provides persistent vector storage for memory embeddings with:
-- Person-isolated collections
+- Anima-isolated collections
 - Metadata filtering (date, memory_type, importance, tags)
 - Batch upsert and query operations
 """

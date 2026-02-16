@@ -23,7 +23,7 @@ class TestMessagingTemplates:
     def test_messaging_a1_has_placeholders(self):
         """A1 template must have the required format placeholders."""
         content = (PROMPTS_DIR / "messaging_a1.md").read_text(encoding="utf-8")
-        assert "{persons_line}" in content
+        assert "{animas_line}" in content
 
     def test_messaging_a2_template_exists(self):
         """Standard messaging template (for A2) must still exist."""

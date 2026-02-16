@@ -17,15 +17,15 @@ async def demo_priming():
     print("=" * 70)
     print()
 
-    # Create temporary person directory with sample data
+    # Create temporary anima directory with sample data
     with tempfile.TemporaryDirectory() as tmpdir:
-        person_dir = Path(tmpdir) / "persons" / "sakura"
-        person_dir.mkdir(parents=True)
+        anima_dir = Path(tmpdir) / "animas" / "sakura"
+        anima_dir.mkdir(parents=True)
 
         # Create memory directories
-        (person_dir / "episodes").mkdir()
-        (person_dir / "knowledge").mkdir()
-        (person_dir / "skills").mkdir()
+        (anima_dir / "episodes").mkdir()
+        (anima_dir / "knowledge").mkdir()
+        (anima_dir / "skills").mkdir()
 
         # Create shared directory for user profiles
         shared_dir = Path(tmpdir) / "shared"
@@ -37,7 +37,7 @@ async def demo_priming():
         print()
 
         # Episode
-        today_episode = person_dir / "episodes" / f"{date.today().isoformat()}.md"
+        today_episode = anima_dir / "episodes" / f"{date.today().isoformat()}.md"
         today_episode.write_text(
             f"# {date.today().isoformat()} 行動ログ\n\n"
             "## 09:00 — 朝のタスク確認\n\n"
@@ -63,7 +63,7 @@ async def demo_priming():
         )
 
         # Knowledge
-        knowledge_file = person_dir / "knowledge" / "priming-layer.md"
+        knowledge_file = anima_dir / "knowledge" / "priming-layer.md"
         knowledge_file.write_text(
             "# プライミングレイヤー設計\n\n"
             "## 概要\n\n"
@@ -82,7 +82,7 @@ async def demo_priming():
         )
 
         # Skill
-        skill_file = person_dir / "skills" / "python_coding.md"
+        skill_file = anima_dir / "skills" / "python_coding.md"
         skill_file.write_text(
             "# Python コーディングスキル\n\n"
             "## 概要\n"
@@ -117,7 +117,7 @@ async def demo_priming():
         print()
 
         # Initialize priming engine
-        engine = PrimingEngine(person_dir)
+        engine = PrimingEngine(anima_dir)
 
         # Mock get_shared_dir to use our temp directory
         from unittest.mock import patch

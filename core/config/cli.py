@@ -1,4 +1,4 @@
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
@@ -16,13 +16,13 @@ from typing import Any
 from core.config.models import (
     AnimaWorksConfig,
     CredentialConfig,
-    PersonModelConfig,
+    AnimaModelConfig,
     load_config,
     save_config,
     get_config_path,
     invalidate_cache,
 )
-from core.paths import get_persons_dir
+from core.paths import get_animas_dir
 
 
 # ---------------------------------------------------------------------------
@@ -151,11 +151,11 @@ def cmd_config_set(args: argparse.Namespace) -> None:
 
     parts = key.split(".")
 
-    # Auto-create scaffold for new person entries (e.g. "persons.newperson.model")
-    if len(parts) >= 3 and parts[0] == "persons":
-        person_name = parts[1]
-        if person_name not in data.get("persons", {}):
-            data.setdefault("persons", {})[person_name] = PersonModelConfig().model_dump()
+    # Auto-create scaffold for new anima entries (e.g. "animas.newperson.model")
+    if len(parts) >= 3 and parts[0] == "animas":
+        anima_name = parts[1]
+        if anima_name not in data.get("animas", {}):
+            data.setdefault("animas", {})[anima_name] = AnimaModelConfig().model_dump()
 
     # Auto-create scaffold for new credential entries
     if len(parts) >= 3 and parts[0] == "credentials":
@@ -256,23 +256,23 @@ def _interactive_setup() -> None:
 
     config.credentials = credentials
 
-    # Step 3: Person configuration
+    # Step 3: Anima configuration
     print()
-    print("Step 3: Person configuration")
+    print("Step 3: Anima configuration")
     print("-" * 40)
 
-    persons_dir = get_persons_dir()
-    detected_persons: list[str] = []
-    if persons_dir.is_dir():
-        detected_persons = sorted(
-            d.name for d in persons_dir.iterdir() if d.is_dir()
+    animas_dir = get_animas_dir()
+    detected_animas: list[str] = []
+    if animas_dir.is_dir():
+        detected_animas = sorted(
+            d.name for d in animas_dir.iterdir() if d.is_dir()
         )
 
     cred_names = list(credentials.keys())
 
-    for person_name in detected_persons:
-        print(f"\n  Person: {person_name}")
-        existing = config.persons.get(person_name, PersonModelConfig())
+    for anima_name in detected_animas:
+        print(f"\n  Anima: {anima_name}")
+        existing = config.animas.get(anima_name, AnimaModelConfig())
 
         model = input(
             f"    Model [{existing.model or '(use default)'}]: "
@@ -288,7 +288,7 @@ def _interactive_setup() -> None:
         if cred:
             existing.credential = cred
 
-        config.persons[person_name] = existing
+        config.animas[anima_name] = existing
 
     # Step 4: Save
     print()

@@ -240,7 +240,7 @@ class TestPipelineResult:
 class TestImageGenPipeline:
     def test_init(self, tmp_path: Path):
         pipe = ImageGenPipeline(tmp_path)
-        assert pipe._person_dir == tmp_path
+        assert pipe._anima_dir == tmp_path
 
     def test_generate_all_skips_existing(self, tmp_path: Path):
         assets = tmp_path / "assets"

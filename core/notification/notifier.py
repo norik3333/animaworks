@@ -1,5 +1,5 @@
 from __future__ import annotations
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
@@ -45,7 +45,7 @@ class NotificationChannel(ABC):
         body: str,
         priority: str = "normal",
         *,
-        person_name: str = "",
+        anima_name: str = "",
     ) -> str:
         """Send a notification. Returns a status message."""
 
@@ -116,7 +116,7 @@ class HumanNotifier:
         body: str,
         priority: str = "normal",
         *,
-        person_name: str = "",
+        anima_name: str = "",
     ) -> list[str]:
         """Send notification to all channels in parallel.
 
@@ -131,7 +131,7 @@ class HumanNotifier:
 
         results = await asyncio.gather(
             *[
-                ch.send(subject, body, priority, person_name=person_name)
+                ch.send(subject, body, priority, anima_name=anima_name)
                 for ch in self._channels
             ],
             return_exceptions=True,

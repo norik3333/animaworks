@@ -1,5 +1,5 @@
 from __future__ import annotations
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
@@ -41,7 +41,7 @@ class SlackChannel(NotificationChannel):
         body: str,
         priority: str = "normal",
         *,
-        person_name: str = "",
+        anima_name: str = "",
     ) -> str:
         # Try bot token mode first
         bot_token = self._config.get("bot_token", "")
@@ -49,7 +49,7 @@ class SlackChannel(NotificationChannel):
             bot_token = self._resolve_env("bot_token_env")
 
         if bot_token:
-            return await self._send_via_bot(bot_token, subject, body, priority, person_name)
+            return await self._send_via_bot(bot_token, subject, body, priority, anima_name)
 
         # Fall back to webhook mode
         webhook_url = self._config.get("webhook_url", "")
@@ -58,12 +58,12 @@ class SlackChannel(NotificationChannel):
         if not webhook_url:
             return "slack: ERROR - neither bot_token nor webhook_url configured"
 
-        return await self._send_via_webhook(webhook_url, subject, body, priority, person_name)
+        return await self._send_via_webhook(webhook_url, subject, body, priority, anima_name)
 
     @staticmethod
-    def _build_text(subject: str, body: str, priority: str, person_name: str) -> str:
+    def _build_text(subject: str, body: str, priority: str, anima_name: str) -> str:
         prefix = f"[{priority.upper()}] " if priority in ("high", "urgent") else ""
-        sender = f" (from {person_name})" if person_name else ""
+        sender = f" (from {anima_name})" if anima_name else ""
         return f"{prefix}*{subject}*{sender}\n{body}"[:40000]
 
     async def _send_via_bot(
@@ -72,13 +72,13 @@ class SlackChannel(NotificationChannel):
         subject: str,
         body: str,
         priority: str,
-        person_name: str,
+        anima_name: str,
     ) -> str:
         channel = self._config.get("channel", "")
         if not channel:
             return "slack: ERROR - channel not configured for bot token mode"
 
-        text = self._build_text(subject, body, priority, person_name)
+        text = self._build_text(subject, body, priority, anima_name)
 
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
@@ -109,9 +109,9 @@ class SlackChannel(NotificationChannel):
         subject: str,
         body: str,
         priority: str,
-        person_name: str,
+        anima_name: str,
     ) -> str:
-        text = self._build_text(subject, body, priority, person_name)
+        text = self._build_text(subject, body, priority, anima_name)
 
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:

@@ -1,4 +1,4 @@
-"""E2E-specific fixtures for constructing AgentCore and DigitalPerson instances."""
+"""E2E-specific fixtures for constructing AgentCore and DigitalAnima instances."""
 
 from __future__ import annotations
 
@@ -10,33 +10,33 @@ import pytest
 from core.agent import AgentCore
 from core.memory import MemoryManager
 from core.messenger import Messenger
-from core.person import DigitalPerson
+from core.anima import DigitalAnima
 
 
 @pytest.fixture
-def make_agent_core(data_dir: Path, make_person):
+def make_agent_core(data_dir: Path, make_anima):
     """Factory to create an AgentCore instance with isolated filesystem.
 
-    Bypasses DigitalPerson to test AgentCore directly.
+    Bypasses DigitalAnima to test AgentCore directly.
     """
 
     def _make(name: str = "test-agent", **kwargs: Any) -> AgentCore:
-        person_dir = make_person(name, **kwargs)
-        memory = MemoryManager(person_dir)
+        anima_dir = make_anima(name, **kwargs)
+        memory = MemoryManager(anima_dir)
         model_config = memory.read_model_config()
         messenger = Messenger(data_dir / "shared", name)
-        return AgentCore(person_dir, memory, model_config, messenger)
+        return AgentCore(anima_dir, memory, model_config, messenger)
 
     return _make
 
 
 @pytest.fixture
-def make_digital_person(data_dir: Path, make_person):
-    """Factory to create a DigitalPerson instance with isolated filesystem."""
+def make_digital_anima(data_dir: Path, make_anima):
+    """Factory to create a DigitalAnima instance with isolated filesystem."""
 
-    def _make(name: str = "test-person", **kwargs: Any) -> DigitalPerson:
-        person_dir = make_person(name, **kwargs)
+    def _make(name: str = "test-anima", **kwargs: Any) -> DigitalAnima:
+        anima_dir = make_anima(name, **kwargs)
         shared_dir = data_dir / "shared"
-        return DigitalPerson(person_dir, shared_dir)
+        return DigitalAnima(anima_dir, shared_dir)
 
     return _make

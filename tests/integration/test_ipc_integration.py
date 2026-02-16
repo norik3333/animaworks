@@ -12,20 +12,20 @@ from core.supervisor.process_handle import ProcessState
 
 
 @pytest.mark.asyncio
-async def test_ping_pong(data_dir: Path, make_person):
+async def test_ping_pong(data_dir: Path, make_anima):
     """Test ping/pong IPC communication."""
-    make_person("test-person")
+    make_anima("test-anima")
 
     supervisor = ProcessSupervisor(
-        persons_dir=data_dir / "persons",
+        animas_dir=data_dir / "animas",
         shared_dir=data_dir / "shared",
         run_dir=data_dir / "run",
         log_dir=data_dir / "logs"
     )
 
     try:
-        await supervisor.start_person("test-person")
-        handle = supervisor.processes.get("test-person")
+        await supervisor.start_anima("test-anima")
+        handle = supervisor.processes.get("test-anima")
 
         # Send ping
         pong = await handle.ping(timeout=5.0)
@@ -40,22 +40,22 @@ async def test_ping_pong(data_dir: Path, make_person):
 
 
 @pytest.mark.asyncio
-async def test_get_status(data_dir: Path, make_person):
+async def test_get_status(data_dir: Path, make_anima):
     """Test get_status IPC request."""
-    make_person("test-person")
+    make_anima("test-anima")
 
     supervisor = ProcessSupervisor(
-        persons_dir=data_dir / "persons",
+        animas_dir=data_dir / "animas",
         shared_dir=data_dir / "shared",
         run_dir=data_dir / "run",
         log_dir=data_dir / "logs"
     )
 
     try:
-        await supervisor.start_person("test-person")
+        await supervisor.start_anima("test-anima")
 
         # Send get_status request
-        result = await supervisor.send_request("test-person", "get_status", {})
+        result = await supervisor.send_request("test-anima", "get_status", {})
 
         # Verify response
         assert "status" in result
@@ -67,27 +67,27 @@ async def test_get_status(data_dir: Path, make_person):
 
 @pytest.mark.asyncio
 @pytest.mark.live
-async def test_process_message(data_dir: Path, make_person):
+async def test_process_message(data_dir: Path, make_anima):
     """Test process_message IPC request (requires API key)."""
-    make_person(
-        "test-person",
+    make_anima(
+        "test-anima",
         model="anthropic/claude-sonnet-4",
         identity="You are a helpful test assistant."
     )
 
     supervisor = ProcessSupervisor(
-        persons_dir=data_dir / "persons",
+        animas_dir=data_dir / "animas",
         shared_dir=data_dir / "shared",
         run_dir=data_dir / "run",
         log_dir=data_dir / "logs"
     )
 
     try:
-        await supervisor.start_person("test-person")
+        await supervisor.start_anima("test-anima")
 
         # Send message
         result = await supervisor.send_request(
-            "test-person",
+            "test-anima",
             "process_message",
             {"message": "Say hello in exactly 3 words.", "stream": False},
             timeout=60.0
@@ -103,23 +103,23 @@ async def test_process_message(data_dir: Path, make_person):
 
 
 @pytest.mark.asyncio
-async def test_heartbeat_request(data_dir: Path, make_person):
+async def test_heartbeat_request(data_dir: Path, make_anima):
     """Test run_heartbeat IPC request."""
-    make_person("test-person")
+    make_anima("test-anima")
 
     supervisor = ProcessSupervisor(
-        persons_dir=data_dir / "persons",
+        animas_dir=data_dir / "animas",
         shared_dir=data_dir / "shared",
         run_dir=data_dir / "run",
         log_dir=data_dir / "logs"
     )
 
     try:
-        await supervisor.start_person("test-person")
+        await supervisor.start_anima("test-anima")
 
         # Send heartbeat request
         result = await supervisor.send_request(
-            "test-person",
+            "test-anima",
             "run_heartbeat",
             {},
             timeout=30.0
@@ -134,23 +134,23 @@ async def test_heartbeat_request(data_dir: Path, make_person):
 
 
 @pytest.mark.asyncio
-async def test_concurrent_requests(data_dir: Path, make_person):
+async def test_concurrent_requests(data_dir: Path, make_anima):
     """Test multiple concurrent IPC requests to same process."""
-    make_person("test-person")
+    make_anima("test-anima")
 
     supervisor = ProcessSupervisor(
-        persons_dir=data_dir / "persons",
+        animas_dir=data_dir / "animas",
         shared_dir=data_dir / "shared",
         run_dir=data_dir / "run",
         log_dir=data_dir / "logs"
     )
 
     try:
-        await supervisor.start_person("test-person")
+        await supervisor.start_anima("test-anima")
 
         # Send multiple pings concurrently
         tasks = [
-            supervisor.send_request("test-person", "get_status", {})
+            supervisor.send_request("test-anima", "get_status", {})
             for _ in range(5)
         ]
 
@@ -166,24 +166,24 @@ async def test_concurrent_requests(data_dir: Path, make_person):
 
 
 @pytest.mark.asyncio
-async def test_request_timeout(data_dir: Path, make_person):
+async def test_request_timeout(data_dir: Path, make_anima):
     """Test IPC request timeout handling."""
-    make_person("test-person")
+    make_anima("test-anima")
 
     supervisor = ProcessSupervisor(
-        persons_dir=data_dir / "persons",
+        animas_dir=data_dir / "animas",
         shared_dir=data_dir / "shared",
         run_dir=data_dir / "run",
         log_dir=data_dir / "logs"
     )
 
     try:
-        await supervisor.start_person("test-person")
+        await supervisor.start_anima("test-anima")
 
         # Send request with very short timeout
         # (Should succeed since ping is fast)
         result = await supervisor.send_request(
-            "test-person",
+            "test-anima",
             "ping",
             {},
             timeout=1.0

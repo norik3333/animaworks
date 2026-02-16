@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
@@ -31,33 +31,33 @@ async def main():
 
     # Get data directory
     data_dir = get_data_dir()
-    persons_dir = data_dir / "persons"
+    animas_dir = data_dir / "animas"
 
-    if not persons_dir.exists():
-        print(f"Error: No persons directory found at {persons_dir}")
+    if not animas_dir.exists():
+        print(f"Error: No animas directory found at {animas_dir}")
         print("Please run 'animaworks init' first.")
         return
 
-    # List available persons
-    person_dirs = [d for d in persons_dir.iterdir() if d.is_dir()]
+    # List available animas
+    anima_dirs = [d for d in animas_dir.iterdir() if d.is_dir()]
 
-    if not person_dirs:
-        print("Error: No persons found.")
-        print("Please create a person first with 'animaworks person create <name>'")
+    if not anima_dirs:
+        print("Error: No animas found.")
+        print("Please create an anima first with 'animaworks anima create <name>'")
         return
 
-    print("Available persons:")
-    for i, person_dir in enumerate(person_dirs):
-        print(f"  {i + 1}. {person_dir.name}")
+    print("Available animas:")
+    for i, anima_dir in enumerate(anima_dirs):
+        print(f"  {i + 1}. {anima_dir.name}")
 
-    # Use first person for demo
-    person_dir = person_dirs[0]
-    person_name = person_dir.name
+    # Use first anima for demo
+    anima_dir = anima_dirs[0]
+    anima_name = anima_dir.name
 
-    print(f"\nUsing person: {person_name}")
+    print(f"\nUsing anima: {anima_name}")
 
     # Create sample episode if none exist
-    episodes_dir = person_dir / "episodes"
+    episodes_dir = anima_dir / "episodes"
     episodes_dir.mkdir(parents=True, exist_ok=True)
 
     today = datetime.now().date()
@@ -107,10 +107,10 @@ async def main():
     print(f"\nEpisode file: {episode_file}")
 
     # Create consolidation engine
-    print(f"\nInitializing ConsolidationEngine for {person_name}...")
+    print(f"\nInitializing ConsolidationEngine for {anima_name}...")
     engine = ConsolidationEngine(
-        person_dir=person_dir,
-        person_name=person_name,
+        anima_dir=anima_dir,
+        anima_name=anima_name,
     )
 
     # Check episode count
@@ -155,7 +155,7 @@ async def main():
         if result['knowledge_files_created']:
             print("\nNewly created knowledge files:")
             for filename in result['knowledge_files_created']:
-                filepath = person_dir / "knowledge" / filename
+                filepath = anima_dir / "knowledge" / filename
                 print(f"\n  {filename}")
                 print("  " + "-" * 40)
                 if filepath.exists():
@@ -179,7 +179,7 @@ async def main():
 
     print("\n=== Demo Complete ===")
     print(f"\nYou can view the knowledge files at:")
-    print(f"  {person_dir / 'knowledge'}")
+    print(f"  {anima_dir / 'knowledge'}")
 
 
 if __name__ == "__main__":

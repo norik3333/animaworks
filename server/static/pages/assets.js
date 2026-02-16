@@ -3,8 +3,8 @@ import { api } from "../modules/api.js";
 import { escapeHtml } from "../modules/state.js";
 
 let _container = null;
-let _persons = [];
-let _selectedPerson = null;
+let _animas = [];
+let _selectedAnima = null;
 let _metadata = null;
 let _previewBackupId = null;
 let _previewGenerated = false;
@@ -14,7 +14,7 @@ let _rebuildInProgress = false;
 
 export async function render(container) {
   _container = container;
-  _selectedPerson = null;
+  _selectedAnima = null;
   _metadata = null;
   _previewBackupId = null;
   _previewGenerated = false;
@@ -28,23 +28,23 @@ export async function render(container) {
       <p>キャラクターアセットの閲覧とリメイク</p>
     </div>
 
-    <div class="assets-person-selector" id="assetsPersonSelector">
-      <div class="loading-placeholder">パーソン一覧を読み込み中...</div>
+    <div class="assets-anima-selector" id="assetsAnimaSelector">
+      <div class="loading-placeholder">Anima一覧を読み込み中...</div>
     </div>
 
     <div id="assetsGalleryContent">
-      <div class="loading-placeholder">パーソンを選択してください</div>
+      <div class="loading-placeholder">Animaを選択してください</div>
     </div>
   `;
 
-  await _loadPersonList();
+  await _loadAnimaList();
 }
 
 export function destroy() {
   _removeWsHandler();
   _container = null;
-  _persons = [];
-  _selectedPerson = null;
+  _animas = [];
+  _selectedAnima = null;
   _metadata = null;
   _previewBackupId = null;
   _previewGenerated = false;
@@ -63,57 +63,57 @@ function _removeWsHandler() {
 
 function _handleWsEvent(eventType, data) {
   switch (eventType) {
-    case "person.remake_preview_ready":
+    case "anima.remake_preview_ready":
       _onPreviewReady(data);
       break;
-    case "person.remake_progress":
+    case "anima.remake_progress":
       _onRemakeProgress(data);
       break;
-    case "person.remake_complete":
+    case "anima.remake_complete":
       _onRemakeComplete(data);
       break;
   }
 }
 
-// ── Person Selector ─────────────────────────
+// ── Anima Selector ─────────────────────────
 
-async function _loadPersonList() {
-  const selector = document.getElementById("assetsPersonSelector");
+async function _loadAnimaList() {
+  const selector = document.getElementById("assetsAnimaSelector");
   if (!selector) return;
 
   try {
-    _persons = await api("/api/persons");
+    _animas = await api("/api/animas");
 
-    if (_persons.length === 0) {
-      selector.innerHTML = '<div class="loading-placeholder">パーソンが登録されていません</div>';
+    if (_animas.length === 0) {
+      selector.innerHTML = '<div class="loading-placeholder">Animaが登録されていません</div>';
       return;
     }
 
     selector.innerHTML = "";
-    for (const p of _persons) {
+    for (const p of _animas) {
       const btn = document.createElement("button");
-      btn.className = "assets-person-btn";
+      btn.className = "assets-anima-btn";
       btn.dataset.name = p.name;
       btn.textContent = p.name;
-      btn.addEventListener("click", () => _selectPerson(p.name));
+      btn.addEventListener("click", () => _selectAnima(p.name));
       selector.appendChild(btn);
     }
   } catch (err) {
-    selector.innerHTML = `<div class="loading-placeholder">パーソン取得失敗: ${escapeHtml(err.message)}</div>`;
+    selector.innerHTML = `<div class="loading-placeholder">Anima取得失敗: ${escapeHtml(err.message)}</div>`;
   }
 }
 
-function _selectPerson(name) {
-  _selectedPerson = name;
+function _selectAnima(name) {
+  _selectedAnima = name;
   _metadata = null;
   _previewBackupId = null;
   _previewGenerated = false;
 
   // Update active button state
-  const selector = document.getElementById("assetsPersonSelector");
+  const selector = document.getElementById("assetsAnimaSelector");
   if (selector) {
-    selector.querySelectorAll(".assets-person-btn").forEach(btn => {
-      btn.classList.toggle("assets-person-btn--active", btn.dataset.name === name);
+    selector.querySelectorAll(".assets-anima-btn").forEach(btn => {
+      btn.classList.toggle("assets-anima-btn--active", btn.dataset.name === name);
     });
   }
 
@@ -124,14 +124,14 @@ function _selectPerson(name) {
 
 async function _loadGallery() {
   const content = document.getElementById("assetsGalleryContent");
-  if (!content || !_selectedPerson) return;
+  if (!content || !_selectedAnima) return;
 
   content.innerHTML = '<div class="loading-placeholder">アセットを読み込み中...</div>';
 
-  const enc = encodeURIComponent(_selectedPerson);
+  const enc = encodeURIComponent(_selectedAnima);
 
   try {
-    _metadata = await api(`/api/persons/${enc}/assets/metadata`);
+    _metadata = await api(`/api/animas/${enc}/assets/metadata`);
   } catch (err) {
     content.innerHTML = `<div class="loading-placeholder">アセット情報の取得に失敗しました: ${escapeHtml(err.message)}</div>`;
     return;
@@ -211,19 +211,19 @@ function _renderThumbnail(label, assetInfo) {
 // ── Remake Modal ────────────────────────────
 
 function _openRemakeModal() {
-  if (!_selectedPerson || !_metadata) return;
+  if (!_selectedAnima || !_metadata) return;
 
   // Remove existing modal if any
   _closeRemakeModal(false);
 
-  const enc = encodeURIComponent(_selectedPerson);
+  const enc = encodeURIComponent(_selectedAnima);
   const assets = _metadata.assets || {};
   const currentFullbodyUrl = assets.avatar_fullbody?.url || "";
 
-  // Build style-from options (other persons)
+  // Build style-from options (other animas)
   let styleOptions = '<option value="">-- 選択してください --</option>';
-  for (const p of _persons) {
-    if (p.name !== _selectedPerson) {
+  for (const p of _animas) {
+    if (p.name !== _selectedAnima) {
       styleOptions += `<option value="${escapeHtml(p.name)}">${escapeHtml(p.name)}</option>`;
     }
   }
@@ -234,7 +234,7 @@ function _openRemakeModal() {
   overlay.innerHTML = `
     <div class="assets-modal">
       <div class="assets-modal-header">
-        <h3>Remake Assets - ${escapeHtml(_selectedPerson)}</h3>
+        <h3>Remake Assets - ${escapeHtml(_selectedAnima)}</h3>
         <button class="assets-modal-close" id="assetsModalCloseBtn">&times;</button>
       </div>
 
@@ -331,14 +331,14 @@ function _openRemakeModal() {
 }
 
 async function _generatePreview() {
-  if (!_selectedPerson) return;
+  if (!_selectedAnima) return;
 
   const styleFrom = document.getElementById("assetsStyleFrom")?.value;
   const vibeStrength = parseFloat(document.getElementById("assetsVibeStrength")?.value || "0.6");
   const infoExtracted = parseFloat(document.getElementById("assetsInfoExtract")?.value || "0.8");
 
   if (!styleFrom) {
-    _showModalError("Style Fromのパーソンを選択してください");
+    _showModalError("Style FromのAnimaを選択してください");
     return;
   }
 
@@ -356,10 +356,10 @@ async function _generatePreview() {
     previewContainer.className = "assets-modal-preview-placeholder";
   }
 
-  const enc = encodeURIComponent(_selectedPerson);
+  const enc = encodeURIComponent(_selectedAnima);
 
   try {
-    const result = await api(`/api/persons/${enc}/assets/remake-preview`, {
+    const result = await api(`/api/animas/${enc}/assets/remake-preview`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -375,7 +375,7 @@ async function _generatePreview() {
     if (result.preview_url) {
       _showPreviewImage(result.preview_url);
     }
-    // Otherwise, wait for WebSocket event (person.remake_preview_ready)
+    // Otherwise, wait for WebSocket event (anima.remake_preview_ready)
 
   } catch (err) {
     if (previewContainer) {
@@ -423,7 +423,7 @@ function _showModalError(message) {
 }
 
 async function _acceptAndRebuild() {
-  if (!_selectedPerson || !_previewBackupId) return;
+  if (!_selectedAnima || !_previewBackupId) return;
 
   const acceptBtn = document.getElementById("assetsAcceptBtn");
   const retryBtn = document.getElementById("assetsRetryBtn");
@@ -439,10 +439,10 @@ async function _acceptAndRebuild() {
   const progressSection = document.getElementById("assetsProgressSection");
   if (progressSection) { progressSection.style.display = ""; }
 
-  const enc = encodeURIComponent(_selectedPerson);
+  const enc = encodeURIComponent(_selectedAnima);
 
   try {
-    const result = await api(`/api/persons/${enc}/assets/remake-confirm`, {
+    const result = await api(`/api/animas/${enc}/assets/remake-confirm`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ backup_id: _previewBackupId }),
@@ -467,10 +467,10 @@ async function _acceptAndRebuild() {
 async function _cancelRemake() {
   if (_rebuildInProgress) return; // Don't close during active rebuild
 
-  if (_selectedPerson && _previewBackupId) {
-    const enc = encodeURIComponent(_selectedPerson);
+  if (_selectedAnima && _previewBackupId) {
+    const enc = encodeURIComponent(_selectedAnima);
     try {
-      await fetch(`/api/persons/${enc}/assets/remake-preview`, { method: "DELETE" });
+      await fetch(`/api/animas/${enc}/assets/remake-preview`, { method: "DELETE" });
     } catch {
       // Ignore cleanup errors
     }
@@ -554,8 +554,8 @@ function _updateProgressStep(stepName, percent, status) {
 // ── WebSocket Event Handlers ────────────────
 
 function _onPreviewReady(data) {
-  const personName = data.name || data.person;
-  if (personName !== _selectedPerson) return;
+  const animaName = data.name || data.anima;
+  if (animaName !== _selectedAnima) return;
 
   const previewUrl = data.preview_url || data.url;
   if (previewUrl) {
@@ -565,8 +565,8 @@ function _onPreviewReady(data) {
 }
 
 function _onRemakeProgress(data) {
-  const personName = data.name || data.person;
-  if (personName !== _selectedPerson) return;
+  const animaName = data.name || data.anima;
+  if (animaName !== _selectedAnima) return;
 
   // Show progress section if hidden
   const progressSection = document.getElementById("assetsProgressSection");
@@ -580,8 +580,8 @@ function _onRemakeProgress(data) {
 }
 
 function _onRemakeComplete(data) {
-  const personName = data.name || data.person;
-  if (personName !== _selectedPerson) return;
+  const animaName = data.name || data.anima;
+  if (animaName !== _selectedAnima) return;
 
   _rebuildInProgress = false;
 

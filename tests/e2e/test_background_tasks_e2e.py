@@ -45,14 +45,14 @@ def _write_task_json(
     *,
     status: str = "completed",
     tool_name: str = "image_generation",
-    person_name: str = "test-person",
+    anima_name: str = "test-anima",
     completed_at: float | None = None,
 ) -> Path:
     """Write a background task JSON file to disk for API endpoint tests."""
     bg_dir.mkdir(parents=True, exist_ok=True)
     data = {
         "task_id": task_id,
-        "person_name": person_name,
+        "anima_name": anima_name,
         "tool_name": tool_name,
         "tool_args": {"prompt": "test"},
         "status": status,
@@ -77,9 +77,9 @@ class TestBackgroundTaskManagerLifecycle:
 
     async def test_submit_transitions_to_completed(self, tmp_path: Path) -> None:
         """Submit a tool call with a mock handler; verify RUNNING -> COMPLETED."""
-        person_dir = tmp_path / "persons" / "bg-test"
-        person_dir.mkdir(parents=True)
-        (person_dir / "state").mkdir()
+        anima_dir = tmp_path / "animas" / "bg-test"
+        anima_dir.mkdir(parents=True)
+        (anima_dir / "state").mkdir()
 
         callback_called = asyncio.Event()
         callback_task: list[BackgroundTask] = []
@@ -89,7 +89,7 @@ class TestBackgroundTaskManagerLifecycle:
             callback_called.set()
 
         mgr = BackgroundTaskManager(
-            person_dir, person_name="bg-test",
+            anima_dir, anima_name="bg-test",
             eligible_tools={"slow_tool": 5},
         )
         mgr.on_complete = on_complete
@@ -114,7 +114,7 @@ class TestBackgroundTaskManagerLifecycle:
         assert task.error is None
 
         # Verify disk persistence
-        disk_path = person_dir / "state" / "background_tasks" / f"{task_id}.json"
+        disk_path = anima_dir / "state" / "background_tasks" / f"{task_id}.json"
         assert disk_path.exists()
         disk_data = json.loads(disk_path.read_text(encoding="utf-8"))
         assert disk_data["status"] == "completed"
@@ -136,9 +136,9 @@ class TestBackgroundTaskManagerFailurePath:
         self, tmp_path: Path,
     ) -> None:
         """Submit a task with a failing handler; verify FAILED status."""
-        person_dir = tmp_path / "persons" / "bg-fail"
-        person_dir.mkdir(parents=True)
-        (person_dir / "state").mkdir()
+        anima_dir = tmp_path / "animas" / "bg-fail"
+        anima_dir.mkdir(parents=True)
+        (anima_dir / "state").mkdir()
 
         callback_called = asyncio.Event()
         callback_task: list[BackgroundTask] = []
@@ -148,7 +148,7 @@ class TestBackgroundTaskManagerFailurePath:
             callback_called.set()
 
         mgr = BackgroundTaskManager(
-            person_dir, person_name="bg-fail",
+            anima_dir, anima_name="bg-fail",
             eligible_tools={"bad_tool": 5},
         )
         mgr.on_complete = on_complete
@@ -167,7 +167,7 @@ class TestBackgroundTaskManagerFailurePath:
         assert task.completed_at is not None
 
         # Verify disk persistence records the failure
-        disk_path = person_dir / "state" / "background_tasks" / f"{task_id}.json"
+        disk_path = anima_dir / "state" / "background_tasks" / f"{task_id}.json"
         assert disk_path.exists()
         disk_data = json.loads(disk_path.read_text(encoding="utf-8"))
         assert disk_data["status"] == "failed"
@@ -188,21 +188,21 @@ class TestToolHandlerBackgroundDispatch:
         self, tmp_path: Path,
     ) -> None:
         """handle() for an eligible tool should return JSON with status=background."""
-        person_dir = tmp_path / "persons" / "handler-test"
-        person_dir.mkdir(parents=True)
-        (person_dir / "state").mkdir()
-        (person_dir / "permissions.md").write_text("", encoding="utf-8")
+        anima_dir = tmp_path / "animas" / "handler-test"
+        anima_dir.mkdir(parents=True)
+        (anima_dir / "state").mkdir()
+        (anima_dir / "permissions.md").write_text("", encoding="utf-8")
 
         memory = MagicMock()
         memory.read_permissions.return_value = ""
 
         bg_mgr = BackgroundTaskManager(
-            person_dir, person_name="handler-test",
+            anima_dir, anima_name="handler-test",
             eligible_tools={"image_generation": 30},
         )
 
         handler = ToolHandler(
-            person_dir=person_dir,
+            anima_dir=anima_dir,
             memory=memory,
             background_manager=bg_mgr,
         )
@@ -224,15 +224,15 @@ class TestToolHandlerBackgroundDispatch:
         self, tmp_path: Path,
     ) -> None:
         """handle() for a non-eligible tool should NOT go to background."""
-        person_dir = tmp_path / "persons" / "handler-test2"
-        person_dir.mkdir(parents=True)
-        (person_dir / "state").mkdir()
+        anima_dir = tmp_path / "animas" / "handler-test2"
+        anima_dir.mkdir(parents=True)
+        (anima_dir / "state").mkdir()
 
         memory = MagicMock()
         memory.read_permissions.return_value = ""
 
         bg_mgr = BackgroundTaskManager(
-            person_dir, person_name="handler-test2",
+            anima_dir, anima_name="handler-test2",
             eligible_tools={"image_generation": 30},
         )
 
@@ -241,7 +241,7 @@ class TestToolHandlerBackgroundDispatch:
         mock_external.dispatch.return_value = "direct-result"
 
         handler = ToolHandler(
-            person_dir=person_dir,
+            anima_dir=anima_dir,
             memory=memory,
             background_manager=bg_mgr,
         )
@@ -258,29 +258,29 @@ class TestToolHandlerBackgroundDispatch:
 
 
 class TestBackgroundTaskAPIEndpoint:
-    """Test /persons/{name}/background-tasks REST endpoints."""
+    """Test /animas/{name}/background-tasks REST endpoints."""
 
     async def test_list_background_tasks_endpoint(
         self, tmp_path: Path,
     ) -> None:
-        """GET /persons/{name}/background-tasks returns task list from disk."""
-        persons_dir = tmp_path / "persons"
-        person_dir = persons_dir / "api-person"
-        person_dir.mkdir(parents=True)
-        (person_dir / "identity.md").write_text("# API Person", encoding="utf-8")
+        """GET /animas/{name}/background-tasks returns task list from disk."""
+        animas_dir = tmp_path / "animas"
+        anima_dir = animas_dir / "api-anima"
+        anima_dir.mkdir(parents=True)
+        (anima_dir / "identity.md").write_text("# API Anima", encoding="utf-8")
 
-        bg_dir = person_dir / "state" / "background_tasks"
+        bg_dir = anima_dir / "state" / "background_tasks"
         _write_task_json(bg_dir, "task001", status="completed")
         _write_task_json(bg_dir, "task002", status="failed")
         _write_task_json(bg_dir, "task003", status="running")
 
-        app = _create_test_app(tmp_path, person_names=["api-person"])
+        app = _create_test_app(tmp_path, anima_names=["api-anima"])
 
         from httpx import ASGITransport, AsyncClient
 
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            resp = await client.get("/api/persons/api-person/background-tasks")
+            resp = await client.get("/api/animas/api-anima/background-tasks")
 
         assert resp.status_code == 200
         data = resp.json()
@@ -293,23 +293,23 @@ class TestBackgroundTaskAPIEndpoint:
     async def test_get_single_background_task(
         self, tmp_path: Path,
     ) -> None:
-        """GET /persons/{name}/background-tasks/{task_id} returns single task."""
-        persons_dir = tmp_path / "persons"
-        person_dir = persons_dir / "api-person"
-        person_dir.mkdir(parents=True)
-        (person_dir / "identity.md").write_text("# API Person", encoding="utf-8")
+        """GET /animas/{name}/background-tasks/{task_id} returns single task."""
+        animas_dir = tmp_path / "animas"
+        anima_dir = animas_dir / "api-anima"
+        anima_dir.mkdir(parents=True)
+        (anima_dir / "identity.md").write_text("# API Anima", encoding="utf-8")
 
-        bg_dir = person_dir / "state" / "background_tasks"
+        bg_dir = anima_dir / "state" / "background_tasks"
         _write_task_json(bg_dir, "single001", status="completed")
 
-        app = _create_test_app(tmp_path, person_names=["api-person"])
+        app = _create_test_app(tmp_path, anima_names=["api-anima"])
 
         from httpx import ASGITransport, AsyncClient
 
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.get(
-                "/api/persons/api-person/background-tasks/single001",
+                "/api/animas/api-anima/background-tasks/single001",
             )
 
         assert resp.status_code == 200
@@ -321,19 +321,19 @@ class TestBackgroundTaskAPIEndpoint:
         self, tmp_path: Path,
     ) -> None:
         """GET for a missing task_id returns 404."""
-        persons_dir = tmp_path / "persons"
-        person_dir = persons_dir / "api-person"
-        person_dir.mkdir(parents=True)
-        (person_dir / "identity.md").write_text("# API Person", encoding="utf-8")
+        animas_dir = tmp_path / "animas"
+        anima_dir = animas_dir / "api-anima"
+        anima_dir.mkdir(parents=True)
+        (anima_dir / "identity.md").write_text("# API Anima", encoding="utf-8")
 
-        app = _create_test_app(tmp_path, person_names=["api-person"])
+        app = _create_test_app(tmp_path, anima_names=["api-anima"])
 
         from httpx import ASGITransport, AsyncClient
 
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.get(
-                "/api/persons/api-person/background-tasks/nonexistent",
+                "/api/animas/api-anima/background-tasks/nonexistent",
             )
 
         assert resp.status_code == 404
@@ -342,18 +342,18 @@ class TestBackgroundTaskAPIEndpoint:
         self, tmp_path: Path,
     ) -> None:
         """GET returns empty list when no background_tasks dir exists."""
-        persons_dir = tmp_path / "persons"
-        person_dir = persons_dir / "api-person"
-        person_dir.mkdir(parents=True)
-        (person_dir / "identity.md").write_text("# API Person", encoding="utf-8")
+        animas_dir = tmp_path / "animas"
+        anima_dir = animas_dir / "api-anima"
+        anima_dir.mkdir(parents=True)
+        (anima_dir / "identity.md").write_text("# API Anima", encoding="utf-8")
 
-        app = _create_test_app(tmp_path, person_names=["api-person"])
+        app = _create_test_app(tmp_path, anima_names=["api-anima"])
 
         from httpx import ASGITransport, AsyncClient
 
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            resp = await client.get("/api/persons/api-person/background-tasks")
+            resp = await client.get("/api/animas/api-anima/background-tasks")
 
         assert resp.status_code == 200
         data = resp.json()
@@ -362,11 +362,11 @@ class TestBackgroundTaskAPIEndpoint:
 
 def _create_test_app(
     tmp_path: Path,
-    person_names: list[str] | None = None,
+    anima_names: list[str] | None = None,
 ) -> Any:
     """Build a FastAPI app with mocked externals for API endpoint testing."""
-    persons_dir = tmp_path / "persons"
-    persons_dir.mkdir(parents=True, exist_ok=True)
+    animas_dir = tmp_path / "animas"
+    animas_dir.mkdir(parents=True, exist_ok=True)
     shared_dir = tmp_path / "shared"
     shared_dir.mkdir(parents=True, exist_ok=True)
 
@@ -395,10 +395,10 @@ def _create_test_app(
 
         from server.app import create_app
 
-        app = create_app(persons_dir, shared_dir)
+        app = create_app(animas_dir, shared_dir)
 
-    if person_names is not None:
-        app.state.person_names = person_names
+    if anima_names is not None:
+        app.state.anima_names = anima_names
 
     return app
 
@@ -413,9 +413,9 @@ class TestBackgroundTaskWSNotification:
         self, tmp_path: Path,
     ) -> None:
         """When a background task completes, _ws_broadcast is invoked."""
-        person_dir = tmp_path / "persons" / "ws-test"
-        person_dir.mkdir(parents=True)
-        (person_dir / "state").mkdir()
+        anima_dir = tmp_path / "animas" / "ws-test"
+        anima_dir.mkdir(parents=True)
+        (anima_dir / "state").mkdir()
         shared_dir = tmp_path / "shared"
         shared_dir.mkdir(parents=True)
 
@@ -424,7 +424,7 @@ class TestBackgroundTaskWSNotification:
         async def mock_broadcast(payload: dict) -> None:
             broadcast_payloads.append(payload)
 
-        # Build DigitalPerson with mocked dependencies
+        # Build DigitalAnima with mocked dependencies
         with (
             patch("core.agent.AgentCore._init_tool_registry", return_value=[]),
             patch("core.agent.AgentCore._discover_personal_tools", return_value={}),
@@ -433,19 +433,19 @@ class TestBackgroundTaskWSNotification:
             patch(
                 "core.agent.AgentCore._build_background_manager",
                 return_value=BackgroundTaskManager(
-                    person_dir, person_name="ws-test",
+                    anima_dir, anima_name="ws-test",
                     eligible_tools={"slow_tool": 5},
                 ),
             ),
             patch("core.agent.AgentCore._create_executor"),
         ):
-            from core.person import DigitalPerson
+            from core.anima import DigitalAnima
 
-            person = DigitalPerson(person_dir, shared_dir)
-            person.set_ws_broadcast(mock_broadcast)
+            anima = DigitalAnima(anima_dir, shared_dir)
+            anima.set_ws_broadcast(mock_broadcast)
 
         # The on_complete callback should be wired
-        mgr = person.agent.background_manager
+        mgr = anima.agent.background_manager
         assert mgr is not None
         assert mgr.on_complete is not None
 
@@ -466,7 +466,7 @@ class TestBackgroundTaskWSNotification:
         assert len(broadcast_payloads) == 1
         payload = broadcast_payloads[0]
         assert payload["type"] == "background_task.done"
-        assert payload["data"]["person"] == "ws-test"
+        assert payload["data"]["anima"] == "ws-test"
         assert payload["data"]["tool_name"] == "slow_tool"
         assert payload["data"]["status"] == "completed"
         assert "result_summary" in payload["data"]
@@ -475,9 +475,9 @@ class TestBackgroundTaskWSNotification:
         self, tmp_path: Path,
     ) -> None:
         """WebSocket broadcast fires even when the task fails."""
-        person_dir = tmp_path / "persons" / "ws-fail"
-        person_dir.mkdir(parents=True)
-        (person_dir / "state").mkdir()
+        anima_dir = tmp_path / "animas" / "ws-fail"
+        anima_dir.mkdir(parents=True)
+        (anima_dir / "state").mkdir()
         shared_dir = tmp_path / "shared"
         shared_dir.mkdir(parents=True)
 
@@ -494,18 +494,18 @@ class TestBackgroundTaskWSNotification:
             patch(
                 "core.agent.AgentCore._build_background_manager",
                 return_value=BackgroundTaskManager(
-                    person_dir, person_name="ws-fail",
+                    anima_dir, anima_name="ws-fail",
                     eligible_tools={"bad_tool": 5},
                 ),
             ),
             patch("core.agent.AgentCore._create_executor"),
         ):
-            from core.person import DigitalPerson
+            from core.anima import DigitalAnima
 
-            person = DigitalPerson(person_dir, shared_dir)
-            person.set_ws_broadcast(mock_broadcast)
+            anima = DigitalAnima(anima_dir, shared_dir)
+            anima.set_ws_broadcast(mock_broadcast)
 
-        mgr = person.agent.background_manager
+        mgr = anima.agent.background_manager
         assert mgr is not None
 
         callback_done = asyncio.Event()
@@ -582,16 +582,16 @@ class TestBackgroundTaskCleanup:
 
     def test_removes_expired_completed_tasks(self, tmp_path: Path) -> None:
         """Completed tasks older than max_age_hours are removed from disk."""
-        person_dir = tmp_path / "persons" / "cleanup-test"
-        person_dir.mkdir(parents=True)
-        (person_dir / "state").mkdir()
+        anima_dir = tmp_path / "animas" / "cleanup-test"
+        anima_dir.mkdir(parents=True)
+        (anima_dir / "state").mkdir()
 
         mgr = BackgroundTaskManager(
-            person_dir, person_name="cleanup-test",
+            anima_dir, anima_name="cleanup-test",
             eligible_tools={"some_tool": 5},
         )
 
-        bg_dir = person_dir / "state" / "background_tasks"
+        bg_dir = anima_dir / "state" / "background_tasks"
 
         # Write an old completed task (48 hours ago)
         _write_task_json(
@@ -627,16 +627,16 @@ class TestBackgroundTaskCleanup:
 
     def test_removes_expired_failed_tasks(self, tmp_path: Path) -> None:
         """Failed tasks older than max_age_hours are also removed."""
-        person_dir = tmp_path / "persons" / "cleanup-fail"
-        person_dir.mkdir(parents=True)
-        (person_dir / "state").mkdir()
+        anima_dir = tmp_path / "animas" / "cleanup-fail"
+        anima_dir.mkdir(parents=True)
+        (anima_dir / "state").mkdir()
 
         mgr = BackgroundTaskManager(
-            person_dir, person_name="cleanup-fail",
+            anima_dir, anima_name="cleanup-fail",
             eligible_tools={"some_tool": 5},
         )
 
-        bg_dir = person_dir / "state" / "background_tasks"
+        bg_dir = anima_dir / "state" / "background_tasks"
 
         _write_task_json(
             bg_dir, "old-fail",
@@ -652,16 +652,16 @@ class TestBackgroundTaskCleanup:
         self, tmp_path: Path,
     ) -> None:
         """cleanup_old_tasks returns 0 when no tasks are expired."""
-        person_dir = tmp_path / "persons" / "cleanup-none"
-        person_dir.mkdir(parents=True)
-        (person_dir / "state").mkdir()
+        anima_dir = tmp_path / "animas" / "cleanup-none"
+        anima_dir.mkdir(parents=True)
+        (anima_dir / "state").mkdir()
 
         mgr = BackgroundTaskManager(
-            person_dir, person_name="cleanup-none",
+            anima_dir, anima_name="cleanup-none",
             eligible_tools={"some_tool": 5},
         )
 
-        bg_dir = person_dir / "state" / "background_tasks"
+        bg_dir = anima_dir / "state" / "background_tasks"
         _write_task_json(
             bg_dir, "fresh-task",
             status="completed",
@@ -676,16 +676,16 @@ class TestBackgroundTaskCleanup:
         self, tmp_path: Path,
     ) -> None:
         """cleanup_old_tasks also removes the task from the in-memory dict."""
-        person_dir = tmp_path / "persons" / "cleanup-mem"
-        person_dir.mkdir(parents=True)
-        (person_dir / "state").mkdir()
+        anima_dir = tmp_path / "animas" / "cleanup-mem"
+        anima_dir.mkdir(parents=True)
+        (anima_dir / "state").mkdir()
 
         mgr = BackgroundTaskManager(
-            person_dir, person_name="cleanup-mem",
+            anima_dir, anima_name="cleanup-mem",
             eligible_tools={"some_tool": 5},
         )
 
-        bg_dir = person_dir / "state" / "background_tasks"
+        bg_dir = anima_dir / "state" / "background_tasks"
         task_id = "mem-task"
         _write_task_json(
             bg_dir, task_id,
@@ -696,7 +696,7 @@ class TestBackgroundTaskCleanup:
         # Pre-populate in-memory cache
         mgr._tasks[task_id] = BackgroundTask(
             task_id=task_id,
-            person_name="cleanup-mem",
+            anima_name="cleanup-mem",
             tool_name="some_tool",
             tool_args={},
             status=TaskStatus.COMPLETED,

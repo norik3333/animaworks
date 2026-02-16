@@ -1,5 +1,5 @@
 from __future__ import annotations
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
@@ -94,11 +94,11 @@ class PrimingEngine:
       D. Skill matching (filename pattern match)
     """
 
-    def __init__(self, person_dir: Path) -> None:
-        self.person_dir = person_dir
-        self.episodes_dir = person_dir / "episodes"
-        self.knowledge_dir = person_dir / "knowledge"
-        self.skills_dir = person_dir / "skills"
+    def __init__(self, anima_dir: Path) -> None:
+        self.anima_dir = anima_dir
+        self.episodes_dir = anima_dir / "episodes"
+        self.knowledge_dir = anima_dir / "knowledge"
+        self.skills_dir = anima_dir / "skills"
 
     # ── Main entry point ────────────────────────────────────────
 
@@ -270,20 +270,20 @@ class PrimingEngine:
             # Initialize RAG components if not already done
             if not hasattr(self, "_retriever"):
                 vector_store = get_vector_store()
-                person_name = self.person_dir.name
-                indexer = MemoryIndexer(vector_store, person_name, self.person_dir)
+                anima_name = self.anima_dir.name
+                indexer = MemoryIndexer(vector_store, anima_name, self.anima_dir)
                 self._retriever = MemoryRetriever(
                     vector_store, indexer, self.knowledge_dir
                 )
 
             # Build query from keywords
             query = " ".join(keywords[:5])
-            person_name = self.person_dir.name
+            anima_name = self.anima_dir.name
 
             # Vector search (personal + shared common_knowledge)
             results = self._retriever.search(
                 query=query,
-                person_name=person_name,
+                anima_name=anima_name,
                 memory_type="knowledge",
                 top_k=3,
                 include_shared=True,
@@ -291,12 +291,12 @@ class PrimingEngine:
 
             if results:
                 # Record access (Hebbian LTP: memories that fire together wire together)
-                self._retriever.record_access(results, person_name)
+                self._retriever.record_access(results, anima_name)
 
                 # Format results
                 parts = []
                 for i, result in enumerate(results):
-                    source_label = result.metadata.get("person", person_name)
+                    source_label = result.metadata.get("anima", anima_name)
                     label = "shared" if source_label == "shared" else "personal"
                     parts.append(
                         f"--- Result {i + 1} [{label}] "

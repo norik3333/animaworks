@@ -1,5 +1,5 @@
 from __future__ import annotations
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
@@ -24,7 +24,7 @@ class MockVectorStore:
         return [
             QueryResult(
                 document=Document(
-                    id=f"person/knowledge/related{i}.md#0",
+                    id=f"anima/knowledge/related{i}.md#0",
                     content=f"Related content {i}",
                     embedding=embedding,
                     metadata={"source_file": f"knowledge/related{i}.md"},
@@ -39,7 +39,7 @@ class MockIndexer:
     """Mock indexer for testing."""
 
     def __init__(self):
-        self.person_name = "test_person"
+        self.anima_name = "test_anima"
 
     def _generate_embeddings(self, texts):
         """Mock embedding generation."""
@@ -74,7 +74,7 @@ def test_graph_construction(temp_knowledge_dir):
     indexer = MockIndexer()
 
     graph_builder = KnowledgeGraph(vector_store, indexer)
-    graph = graph_builder.build_graph("test_person", temp_knowledge_dir)
+    graph = graph_builder.build_graph("test_anima", temp_knowledge_dir)
 
     # Check nodes
     assert graph.number_of_nodes() == 3
@@ -98,7 +98,7 @@ def test_personalized_pagerank(temp_knowledge_dir):
     indexer = MockIndexer()
 
     graph_builder = KnowledgeGraph(vector_store, indexer)
-    graph_builder.build_graph("test_person", temp_knowledge_dir)
+    graph_builder.build_graph("test_anima", temp_knowledge_dir)
 
     # Compute PageRank from file1
     scores = graph_builder.personalized_pagerank(["file1"])
@@ -121,12 +121,12 @@ def test_spreading_activation(temp_knowledge_dir):
     indexer = MockIndexer()
 
     graph_builder = KnowledgeGraph(vector_store, indexer)
-    graph_builder.build_graph("test_person", temp_knowledge_dir)
+    graph_builder.build_graph("test_anima", temp_knowledge_dir)
 
     # Create initial results
     initial_results = [
         RetrievalResult(
-            doc_id="test_person/knowledge/file1.md#0",
+            doc_id="test_anima/knowledge/file1.md#0",
             content="File 1 content",
             score=0.9,
             metadata={"source_file": "knowledge/file1.md"},
@@ -154,7 +154,7 @@ def test_empty_graph():
         indexer = MockIndexer()
 
         graph_builder = KnowledgeGraph(vector_store, indexer)
-        graph = graph_builder.build_graph("test_person", empty_dir)
+        graph = graph_builder.build_graph("test_anima", empty_dir)
 
         assert graph.number_of_nodes() == 0
         assert graph.number_of_edges() == 0
@@ -175,12 +175,12 @@ def test_expand_results_real_content(temp_knowledge_dir):
     indexer = MockIndexer()
 
     graph_builder = KnowledgeGraph(vector_store, indexer)
-    graph_builder.build_graph("test_person", temp_knowledge_dir)
+    graph_builder.build_graph("test_anima", temp_knowledge_dir)
 
     # Create initial results referencing file1
     initial_results = [
         RetrievalResult(
-            doc_id="test_person/knowledge/file1.md#0",
+            doc_id="test_anima/knowledge/file1.md#0",
             content="File 1 content",
             score=0.9,
             metadata={"source_file": "knowledge/file1.md"},
@@ -204,7 +204,7 @@ def test_graph_save_and_load(temp_knowledge_dir):
 
     # Build and save
     graph_builder = KnowledgeGraph(vector_store, indexer)
-    graph_builder.build_graph("test_person", temp_knowledge_dir)
+    graph_builder.build_graph("test_anima", temp_knowledge_dir)
 
     with tempfile.TemporaryDirectory() as cache_dir:
         cache_path = Path(cache_dir)
@@ -254,7 +254,7 @@ def test_graph_incremental_update(temp_knowledge_dir):
 
     # Build initial graph
     graph_builder = KnowledgeGraph(vector_store, indexer)
-    graph_builder.build_graph("test_person", temp_knowledge_dir)
+    graph_builder.build_graph("test_anima", temp_knowledge_dir)
 
     initial_nodes = graph_builder.graph.number_of_nodes()
     assert initial_nodes == 3
@@ -267,7 +267,7 @@ def test_graph_incremental_update(temp_knowledge_dir):
     graph_builder.graph.add_node("file4", path=str(new_file))
 
     # Incremental update
-    graph_builder.update_graph_incremental([new_file], "test_person")
+    graph_builder.update_graph_incremental([new_file], "test_anima")
 
     # Should now have 4 nodes
     assert graph_builder.graph.number_of_nodes() == 4
@@ -284,7 +284,7 @@ def test_graph_incremental_update_file_deletion(temp_knowledge_dir):
 
     # Build initial graph
     graph_builder = KnowledgeGraph(vector_store, indexer)
-    graph_builder.build_graph("test_person", temp_knowledge_dir)
+    graph_builder.build_graph("test_anima", temp_knowledge_dir)
 
     assert "file3" in graph_builder.graph
 
@@ -293,7 +293,7 @@ def test_graph_incremental_update_file_deletion(temp_knowledge_dir):
     deleted_file.unlink()
 
     # Incremental update for deleted file
-    graph_builder.update_graph_incremental([deleted_file], "test_person")
+    graph_builder.update_graph_incremental([deleted_file], "test_anima")
 
     # file3 should be removed from graph
     assert "file3" not in graph_builder.graph
@@ -309,7 +309,7 @@ def test_pagerank_with_edge_weights(temp_knowledge_dir):
     indexer = MockIndexer()
 
     graph_builder = KnowledgeGraph(vector_store, indexer)
-    graph_builder.build_graph("test_person", temp_knowledge_dir)
+    graph_builder.build_graph("test_anima", temp_knowledge_dir)
 
     # Verify explicit edges have similarity=1.0
     for u, v, data in graph_builder.graph.edges(data=True):
@@ -336,7 +336,7 @@ def test_graph_invalidation_on_file_change(temp_knowledge_dir):
 
     # Build initial graph
     graph_builder = KnowledgeGraph(vector_store, indexer)
-    graph_builder.build_graph("test_person", temp_knowledge_dir)
+    graph_builder.build_graph("test_anima", temp_knowledge_dir)
 
     # file1 initially links to file2
     assert graph_builder.graph.has_edge("file1", "file2")
@@ -346,7 +346,7 @@ def test_graph_invalidation_on_file_change(temp_knowledge_dir):
     file1.write_text("# File 1 Updated\n\nNow links to [[file3]].\n")
 
     # Incremental update
-    graph_builder.update_graph_incremental([file1], "test_person")
+    graph_builder.update_graph_incremental([file1], "test_anima")
 
     # file1 -> file2 explicit link should be gone (only old link)
     # file1 -> file3 should now exist

@@ -12,8 +12,8 @@ from core.config.models import (
     CredentialConfig,
     GatewaySystemConfig,
     ImageGenConfig,
-    PersonDefaults,
-    PersonModelConfig,
+    AnimaDefaults,
+    AnimaModelConfig,
     SystemConfig,
     WorkerSystemConfig,
     _match_pattern_table,
@@ -22,10 +22,10 @@ from core.config.models import (
     invalidate_cache,
     load_config,
     load_model_config,
-    read_person_supervisor,
-    register_person_in_config,
+    read_anima_supervisor,
+    register_anima_in_config,
     resolve_execution_mode,
-    resolve_person_config,
+    resolve_anima_config,
     save_config,
 )
 
@@ -71,9 +71,9 @@ class TestCredentialConfig:
         assert cc.base_url == "http://localhost"
 
 
-class TestPersonModelConfig:
+class TestAnimaModelConfig:
     def test_all_none_by_default(self):
-        pmc = PersonModelConfig()
+        pmc = AnimaModelConfig()
         assert pmc.model is None
         assert pmc.fallback_model is None
         assert pmc.max_tokens is None
@@ -86,9 +86,9 @@ class TestPersonModelConfig:
         assert pmc.speciality is None
 
 
-class TestPersonDefaults:
+class TestAnimaDefaults:
     def test_defaults(self):
-        pd = PersonDefaults()
+        pd = AnimaDefaults()
         assert pd.model == "claude-sonnet-4-20250514"
         assert pd.max_tokens == 4096
         assert pd.max_turns == 20
@@ -104,14 +104,14 @@ class TestAnimaWorksConfig:
         assert config.version == 1
         assert isinstance(config.system, SystemConfig)
         assert "anthropic" in config.credentials
-        assert config.persons == {}
+        assert config.animas == {}
 
     def test_roundtrip_json(self):
         config = AnimaWorksConfig()
-        config.persons["alice"] = PersonModelConfig(model="gpt-4o")
+        config.animas["alice"] = AnimaModelConfig(model="gpt-4o")
         data = config.model_dump(mode="json")
         restored = AnimaWorksConfig.model_validate(data)
-        assert restored.persons["alice"].model == "gpt-4o"
+        assert restored.animas["alice"].model == "gpt-4o"
 
 
 class TestImageGenConfig:
@@ -203,22 +203,22 @@ class TestLoadConfig:
         with pytest.raises(json.JSONDecodeError):
             load_config(bad)
 
-    def test_load_with_persons(self, data_dir):
-        # Write a config with a person
+    def test_load_with_animas(self, data_dir):
+        # Write a config with an anima
         config_data = {
             "version": 1,
             "system": {"mode": "server", "log_level": "INFO"},
             "credentials": {"anthropic": {"api_key": ""}},
-            "person_defaults": {"model": "claude-sonnet-4-20250514", "credential": "anthropic"},
-            "persons": {"alice": {"model": "gpt-4o"}},
+            "anima_defaults": {"model": "claude-sonnet-4-20250514", "credential": "anthropic"},
+            "animas": {"alice": {"model": "gpt-4o"}},
         }
         (data_dir / "config.json").write_text(
             json.dumps(config_data), encoding="utf-8"
         )
         invalidate_cache()
         config = load_config(data_dir / "config.json")
-        assert "alice" in config.persons
-        assert config.persons["alice"].model == "gpt-4o"
+        assert "alice" in config.animas
+        assert config.animas["alice"].model == "gpt-4o"
 
 
 # ── save_config ───────────────────────────────────────────
@@ -271,24 +271,24 @@ class TestSaveConfig:
         assert text.endswith("\n")
 
 
-# ── resolve_person_config ─────────────────────────────────
+# ── resolve_anima_config ─────────────────────────────────
 
 
-class TestResolvePersonConfig:
-    def test_defaults_when_no_person_entry(self):
+class TestResolveAnimaConfig:
+    def test_defaults_when_no_anima_entry(self):
         config = AnimaWorksConfig()
-        resolved, cred = resolve_person_config(config, "unknown")
+        resolved, cred = resolve_anima_config(config, "unknown")
         assert resolved.model == "claude-sonnet-4-20250514"
         assert resolved.credential == "anthropic"
         assert cred.api_key == ""
 
-    def test_person_override(self):
+    def test_anima_override(self):
         config = AnimaWorksConfig()
-        config.persons["alice"] = PersonModelConfig(
+        config.animas["alice"] = AnimaModelConfig(
             model="gpt-4o",
             max_tokens=8192,
         )
-        resolved, cred = resolve_person_config(config, "alice")
+        resolved, cred = resolve_anima_config(config, "alice")
         assert resolved.model == "gpt-4o"
         assert resolved.max_tokens == 8192
         # Non-overridden fields use defaults
@@ -297,25 +297,25 @@ class TestResolvePersonConfig:
     def test_custom_credential(self):
         config = AnimaWorksConfig()
         config.credentials["openai"] = CredentialConfig(api_key="sk-openai")
-        config.persons["alice"] = PersonModelConfig(credential="openai")
-        resolved, cred = resolve_person_config(config, "alice")
+        config.animas["alice"] = AnimaModelConfig(credential="openai")
+        resolved, cred = resolve_anima_config(config, "alice")
         assert resolved.credential == "openai"
         assert cred.api_key == "sk-openai"
 
     def test_missing_credential_raises(self):
         config = AnimaWorksConfig()
-        config.persons["alice"] = PersonModelConfig(credential="nonexistent")
+        config.animas["alice"] = AnimaModelConfig(credential="nonexistent")
         # Remove default anthropic to ensure it fails
         config.credentials = {}
         with pytest.raises(KeyError, match="nonexistent"):
-            resolve_person_config(config, "alice")
+            resolve_anima_config(config, "alice")
 
     def test_partial_overrides(self):
         config = AnimaWorksConfig()
-        config.persons["bob"] = PersonModelConfig(
+        config.animas["bob"] = AnimaModelConfig(
             supervisor="alice",
         )
-        resolved, _ = resolve_person_config(config, "bob")
+        resolved, _ = resolve_anima_config(config, "bob")
         assert resolved.supervisor == "alice"
 
 
@@ -454,44 +454,44 @@ class TestLoadModelConfig:
     def test_returns_model_config(self, data_dir):
         from core.schemas import ModelConfig
 
-        person_dir = data_dir / "persons" / "test-person"
-        person_dir.mkdir(parents=True, exist_ok=True)
+        anima_dir = data_dir / "animas" / "test-anima"
+        anima_dir.mkdir(parents=True, exist_ok=True)
 
-        mc = load_model_config(person_dir)
+        mc = load_model_config(anima_dir)
         assert isinstance(mc, ModelConfig)
-        # Should use default model from person_defaults
+        # Should use default model from anima_defaults
         assert mc.model == "claude-sonnet-4-20250514"
 
     def test_inherits_defaults(self, data_dir):
-        person_dir = data_dir / "persons" / "unknown"
-        person_dir.mkdir(parents=True, exist_ok=True)
+        anima_dir = data_dir / "animas" / "unknown"
+        anima_dir.mkdir(parents=True, exist_ok=True)
 
-        mc = load_model_config(person_dir)
-        # Values come from DEFAULT_TEST_CONFIG, not PersonDefaults class defaults
+        mc = load_model_config(anima_dir)
+        # Values come from DEFAULT_TEST_CONFIG, not AnimaDefaults class defaults
         assert mc.max_tokens == 1024
         assert mc.max_turns == 5
         assert mc.context_threshold == 0.50
         assert mc.conversation_history_threshold == 0.30
 
-    def test_person_override(self, data_dir):
+    def test_anima_override(self, data_dir):
         import json as _json
 
-        # Write config with person override
+        # Write config with anima override
         config_data = {
             "version": 1,
             "credentials": {"anthropic": {"api_key": "sk-test"}},
-            "person_defaults": {"model": "claude-sonnet-4-20250514", "credential": "anthropic"},
-            "persons": {"alice": {"model": "openai/gpt-4o", "max_tokens": 8192}},
+            "anima_defaults": {"model": "claude-sonnet-4-20250514", "credential": "anthropic"},
+            "animas": {"alice": {"model": "openai/gpt-4o", "max_tokens": 8192}},
         }
         (data_dir / "config.json").write_text(
             _json.dumps(config_data), encoding="utf-8",
         )
         invalidate_cache()
 
-        person_dir = data_dir / "persons" / "alice"
-        person_dir.mkdir(parents=True, exist_ok=True)
+        anima_dir = data_dir / "animas" / "alice"
+        anima_dir.mkdir(parents=True, exist_ok=True)
 
-        mc = load_model_config(person_dir)
+        mc = load_model_config(anima_dir)
         assert mc.model == "openai/gpt-4o"
         assert mc.max_tokens == 8192
         # Non-overridden field uses default
@@ -506,110 +506,110 @@ class TestLoadModelConfig:
                 "anthropic": {"api_key": ""},
                 "openai": {"api_key": "sk-openai", "base_url": "https://api.openai.com"},
             },
-            "person_defaults": {"model": "claude-sonnet-4-20250514", "credential": "anthropic"},
-            "persons": {"bob": {"credential": "openai"}},
+            "anima_defaults": {"model": "claude-sonnet-4-20250514", "credential": "anthropic"},
+            "animas": {"bob": {"credential": "openai"}},
         }
         (data_dir / "config.json").write_text(
             _json.dumps(config_data), encoding="utf-8",
         )
         invalidate_cache()
 
-        person_dir = data_dir / "persons" / "bob"
-        person_dir.mkdir(parents=True, exist_ok=True)
+        anima_dir = data_dir / "animas" / "bob"
+        anima_dir.mkdir(parents=True, exist_ok=True)
 
-        mc = load_model_config(person_dir)
+        mc = load_model_config(anima_dir)
         assert mc.api_key == "sk-openai"
         assert mc.api_base_url == "https://api.openai.com"
 
 
-# ── read_person_supervisor ────────────────────────────────
+# ── read_anima_supervisor ────────────────────────────────
 
 
-class TestReadPersonSupervisor:
-    """Tests for read_person_supervisor helper."""
+class TestReadAnimaSupervisor:
+    """Tests for read_anima_supervisor helper."""
 
     def test_from_status_json(self, tmp_path: Path) -> None:
         """Reads supervisor from status.json."""
-        person_dir = tmp_path / "alice"
-        person_dir.mkdir()
-        (person_dir / "status.json").write_text(
+        anima_dir = tmp_path / "alice"
+        anima_dir.mkdir()
+        (anima_dir / "status.json").write_text(
             json.dumps({"supervisor": "bob"}), encoding="utf-8",
         )
-        assert read_person_supervisor(person_dir) == "bob"
+        assert read_anima_supervisor(anima_dir) == "bob"
 
     def test_from_identity_md(self, tmp_path: Path) -> None:
         """Falls back to identity.md table when no status.json."""
-        person_dir = tmp_path / "alice"
-        person_dir.mkdir()
-        (person_dir / "identity.md").write_text(
+        anima_dir = tmp_path / "alice"
+        anima_dir.mkdir()
+        (anima_dir / "identity.md").write_text(
             "| 上司 | charlie |\n", encoding="utf-8",
         )
-        assert read_person_supervisor(person_dir) == "charlie"
+        assert read_anima_supervisor(anima_dir) == "charlie"
 
     def test_status_json_takes_priority(self, tmp_path: Path) -> None:
         """status.json supervisor wins over identity.md."""
-        person_dir = tmp_path / "alice"
-        person_dir.mkdir()
-        (person_dir / "status.json").write_text(
+        anima_dir = tmp_path / "alice"
+        anima_dir.mkdir()
+        (anima_dir / "status.json").write_text(
             json.dumps({"supervisor": "bob"}), encoding="utf-8",
         )
-        (person_dir / "identity.md").write_text(
+        (anima_dir / "identity.md").write_text(
             "| 上司 | charlie |\n", encoding="utf-8",
         )
-        assert read_person_supervisor(person_dir) == "bob"
+        assert read_anima_supervisor(anima_dir) == "bob"
 
     def test_nashi_returns_none(self, tmp_path: Path) -> None:
         """Supervisor value 'なし' is treated as no supervisor."""
-        person_dir = tmp_path / "alice"
-        person_dir.mkdir()
-        (person_dir / "status.json").write_text(
+        anima_dir = tmp_path / "alice"
+        anima_dir.mkdir()
+        (anima_dir / "status.json").write_text(
             json.dumps({"supervisor": "なし"}), encoding="utf-8",
         )
-        assert read_person_supervisor(person_dir) is None
+        assert read_anima_supervisor(anima_dir) is None
 
     def test_empty_dir_returns_none(self, tmp_path: Path) -> None:
-        """Returns None when person dir has no status.json or identity.md."""
-        person_dir = tmp_path / "alice"
-        person_dir.mkdir()
-        assert read_person_supervisor(person_dir) is None
+        """Returns None when anima dir has no status.json or identity.md."""
+        anima_dir = tmp_path / "alice"
+        anima_dir.mkdir()
+        assert read_anima_supervisor(anima_dir) is None
 
     def test_japanese_name_with_parens(self, tmp_path: Path) -> None:
         """Japanese name with parenthesised English name is resolved."""
-        person_dir = tmp_path / "hinata"
-        person_dir.mkdir()
-        (person_dir / "identity.md").write_text(
+        anima_dir = tmp_path / "hinata"
+        anima_dir.mkdir()
+        (anima_dir / "identity.md").write_text(
             "| 上司 | 琴葉（kotoha） |\n", encoding="utf-8",
         )
-        assert read_person_supervisor(person_dir) == "kotoha"
+        assert read_anima_supervisor(anima_dir) == "kotoha"
 
     def test_invalid_json_falls_back(self, tmp_path: Path) -> None:
         """Falls back to identity.md when status.json is invalid JSON."""
-        person_dir = tmp_path / "alice"
-        person_dir.mkdir()
-        (person_dir / "status.json").write_text("bad json", encoding="utf-8")
-        (person_dir / "identity.md").write_text(
+        anima_dir = tmp_path / "alice"
+        anima_dir.mkdir()
+        (anima_dir / "status.json").write_text("bad json", encoding="utf-8")
+        (anima_dir / "identity.md").write_text(
             "| 上司 | bob |\n", encoding="utf-8",
         )
-        assert read_person_supervisor(person_dir) == "bob"
+        assert read_anima_supervisor(anima_dir) == "bob"
 
     def test_empty_supervisor_in_status(self, tmp_path: Path) -> None:
         """Empty supervisor in status.json falls back to identity.md."""
-        person_dir = tmp_path / "alice"
-        person_dir.mkdir()
-        (person_dir / "status.json").write_text(
+        anima_dir = tmp_path / "alice"
+        anima_dir.mkdir()
+        (anima_dir / "status.json").write_text(
             json.dumps({"supervisor": ""}), encoding="utf-8",
         )
-        (person_dir / "identity.md").write_text(
+        (anima_dir / "identity.md").write_text(
             "| 上司 | bob |\n", encoding="utf-8",
         )
-        assert read_person_supervisor(person_dir) == "bob"
+        assert read_anima_supervisor(anima_dir) == "bob"
 
 
-# ── register_person_in_config ─────────────────────────────
+# ── register_anima_in_config ─────────────────────────────
 
 
-class TestRegisterPersonInConfig:
-    """Tests for register_person_in_config helper."""
+class TestRegisterAnimaInConfig:
+    """Tests for register_anima_in_config helper."""
 
     @pytest.fixture(autouse=True)
     def _clear(self):
@@ -617,65 +617,65 @@ class TestRegisterPersonInConfig:
         yield
         invalidate_cache()
 
-    def test_registers_new_person_with_supervisor(self, tmp_path: Path) -> None:
-        """New person is added to config.json with supervisor from status.json."""
+    def test_registers_new_anima_with_supervisor(self, tmp_path: Path) -> None:
+        """New anima is added to config.json with supervisor from status.json."""
         data_dir = tmp_path
         config_path = data_dir / "config.json"
         save_config(AnimaWorksConfig(), config_path)
         invalidate_cache()
 
-        person_dir = data_dir / "persons" / "alice"
-        person_dir.mkdir(parents=True)
-        (person_dir / "status.json").write_text(
+        anima_dir = data_dir / "animas" / "alice"
+        anima_dir.mkdir(parents=True)
+        (anima_dir / "status.json").write_text(
             json.dumps({"supervisor": "bob"}), encoding="utf-8",
         )
 
-        register_person_in_config(data_dir, "alice")
+        register_anima_in_config(data_dir, "alice")
 
         invalidate_cache()
         cfg = load_config(config_path)
-        assert "alice" in cfg.persons
-        assert cfg.persons["alice"].supervisor == "bob"
+        assert "alice" in cfg.animas
+        assert cfg.animas["alice"].supervisor == "bob"
 
     def test_does_not_overwrite_existing(self, tmp_path: Path) -> None:
-        """Existing person entry is not overwritten."""
+        """Existing anima entry is not overwritten."""
         data_dir = tmp_path
         config_path = data_dir / "config.json"
         cfg = AnimaWorksConfig()
-        cfg.persons["alice"] = PersonModelConfig(
+        cfg.animas["alice"] = AnimaModelConfig(
             model="openai/gpt-4o", supervisor="charlie",
         )
         save_config(cfg, config_path)
         invalidate_cache()
 
-        person_dir = data_dir / "persons" / "alice"
-        person_dir.mkdir(parents=True)
-        (person_dir / "status.json").write_text(
+        anima_dir = data_dir / "animas" / "alice"
+        anima_dir.mkdir(parents=True)
+        (anima_dir / "status.json").write_text(
             json.dumps({"supervisor": "bob"}), encoding="utf-8",
         )
 
-        register_person_in_config(data_dir, "alice")
+        register_anima_in_config(data_dir, "alice")
 
         invalidate_cache()
         cfg = load_config(config_path)
-        assert cfg.persons["alice"].supervisor == "charlie"  # unchanged
-        assert cfg.persons["alice"].model == "openai/gpt-4o"  # unchanged
+        assert cfg.animas["alice"].supervisor == "charlie"  # unchanged
+        assert cfg.animas["alice"].model == "openai/gpt-4o"  # unchanged
 
     def test_no_config_file_noop(self, tmp_path: Path) -> None:
         """Does nothing when config.json does not exist."""
-        register_person_in_config(tmp_path, "alice")
+        register_anima_in_config(tmp_path, "alice")
         # Should not raise
 
-    def test_no_person_dir_registers_none_supervisor(self, tmp_path: Path) -> None:
-        """Person dir doesn't exist — registers with supervisor=None."""
+    def test_no_anima_dir_registers_none_supervisor(self, tmp_path: Path) -> None:
+        """Anima dir doesn't exist — registers with supervisor=None."""
         data_dir = tmp_path
         config_path = data_dir / "config.json"
         save_config(AnimaWorksConfig(), config_path)
         invalidate_cache()
 
-        register_person_in_config(data_dir, "alice")
+        register_anima_in_config(data_dir, "alice")
 
         invalidate_cache()
         cfg = load_config(config_path)
-        assert "alice" in cfg.persons
-        assert cfg.persons["alice"].supervisor is None
+        assert "alice" in cfg.animas
+        assert cfg.animas["alice"].supervisor is None

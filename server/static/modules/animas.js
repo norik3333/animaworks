@@ -1,4 +1,4 @@
-/* ── Person Dropdown, Selection, Avatar ────── */
+/* ── Anima Dropdown, Selection, Avatar ────── */
 
 import { state, dom, escapeHtml } from "./state.js";
 import { api } from "./api.js";
@@ -6,36 +6,36 @@ import { renderChat } from "./chat.js";
 import { loadMemoryTab } from "./memory.js";
 import { hideHistoryDetail, loadSessionList } from "./history.js";
 
-export async function loadPersons() {
+export async function loadAnimas() {
   try {
-    state.persons = await api("/api/persons");
-    renderPersonDropdown();
-    if (state.persons.length > 0 && !state.selectedPerson) {
-      selectPerson(state.persons[0].name);
+    state.animas = await api("/api/animas");
+    renderAnimaDropdown();
+    if (state.animas.length > 0 && !state.selectedAnima) {
+      selectAnima(state.animas[0].name);
     }
   } catch (err) {
-    console.error("Failed to load persons:", err);
+    console.error("Failed to load animas:", err);
   }
 }
 
-// ── Person State Class Helper ──────────────────
-export function personStateClass(person) {
-  if (person.status === "bootstrapping" || person.bootstrapping) {
-    return "person-item--loading";
+// ── Anima State Class Helper ──────────────────
+export function animaStateClass(anima) {
+  if (anima.status === "bootstrapping" || anima.bootstrapping) {
+    return "anima-item--loading";
   }
-  if (person.status === "not_found" || person.status === "stopped") {
-    return "person-item--sleeping";
+  if (anima.status === "not_found" || anima.status === "stopped") {
+    return "anima-item--sleeping";
   }
   return "";
 }
 
-export function renderPersonDropdown() {
-  const dropdown = dom.personDropdown || document.getElementById("personDropdown");
-  if (!dropdown) return; // Person dropdown not in DOM (page not active)
+export function renderAnimaDropdown() {
+  const dropdown = dom.animaDropdown || document.getElementById("animaDropdown");
+  if (!dropdown) return; // Anima dropdown not in DOM (page not active)
 
-  let html = '<option value="" disabled>パーソンを選択...</option>';
-  for (const p of state.persons) {
-    const selected = p.name === state.selectedPerson ? " selected" : "";
+  let html = '<option value="" disabled>Animaを選択...</option>';
+  for (const p of state.animas) {
+    const selected = p.name === state.selectedAnima ? " selected" : "";
     if (p.status === "bootstrapping" || p.bootstrapping) {
       html += `<option value="${escapeHtml(p.name)}"${selected} disabled>\u23F3 ${escapeHtml(p.name)} (制作中...)</option>`;
     } else if (p.status === "not_found" || p.status === "stopped") {
@@ -48,25 +48,25 @@ export function renderPersonDropdown() {
   dropdown.innerHTML = html;
 }
 
-export async function selectPerson(name) {
-  // Check if person is sleeping — offer to start
-  const person = state.persons.find((p) => p.name === name);
-  if (person && (person.status === "not_found" || person.status === "stopped")) {
+export async function selectAnima(name) {
+  // Check if anima is sleeping — offer to start
+  const anima = state.animas.find((p) => p.name === name);
+  if (anima && (anima.status === "not_found" || anima.status === "stopped")) {
     const ok = confirm(`${name} は現在停止中です。起動しますか？`);
     if (!ok) return;
     try {
-      await api(`/api/persons/${encodeURIComponent(name)}/start`, { method: "POST" });
+      await api(`/api/animas/${encodeURIComponent(name)}/start`, { method: "POST" });
     } catch (err) {
-      console.error("Failed to start person:", err);
+      console.error("Failed to start anima:", err);
     }
     // Status update will come via WebSocket
     return;
   }
 
-  state.selectedPerson = name;
+  state.selectedAnima = name;
 
   // Update dropdown
-  const dropdown = dom.personDropdown || document.getElementById("personDropdown");
+  const dropdown = dom.animaDropdown || document.getElementById("animaDropdown");
   if (dropdown) dropdown.value = name;
 
   // Enable chat
@@ -78,12 +78,12 @@ export async function selectPerson(name) {
   }
   if (chatSendBtn) chatSendBtn.disabled = false;
 
-  // Load conversation history + person detail in parallel
+  // Load conversation history + anima detail in parallel
   const needConv = !state.chatHistories[name] || state.chatHistories[name].length === 0;
   const convPromise = needConv
-    ? api(`/api/persons/${encodeURIComponent(name)}/conversation/full?limit=20`).catch(() => null)
+    ? api(`/api/animas/${encodeURIComponent(name)}/conversation/full?limit=20`).catch(() => null)
     : Promise.resolve(null);
-  const detailPromise = api(`/api/persons/${encodeURIComponent(name)}`).catch(() => null);
+  const detailPromise = api(`/api/animas/${encodeURIComponent(name)}`).catch(() => null);
 
   const [conv, detail] = await Promise.all([convPromise, detailPromise]);
 
@@ -98,20 +98,20 @@ export async function selectPerson(name) {
   // Render chat history
   renderChat();
 
-  // Apply person detail
+  // Apply anima detail
   if (detail) {
-    state.personDetail = detail;
-    renderPersonState();
+    state.animaDetail = detail;
+    renderAnimaState();
   } else {
-    state.personDetail = null;
-    const stateContent = dom.personStateContent || document.getElementById("personStateContent");
+    state.animaDetail = null;
+    const stateContent = dom.animaStateContent || document.getElementById("animaStateContent");
     if (stateContent) stateContent.textContent = "詳細の読み込み失敗";
     const memoryList = dom.memoryFileList || document.getElementById("memoryFileList");
     if (memoryList) memoryList.innerHTML = '<div class="loading-placeholder">詳細の読み込み失敗</div>';
   }
 
   // Load memory, session list, and avatar in parallel
-  const secondaryPromises = [loadMemoryTab(state.activeMemoryTab), updatePersonAvatar()];
+  const secondaryPromises = [loadMemoryTab(state.activeMemoryTab), updateAnimaAvatar()];
   if (state.activeRightTab === "history") {
     hideHistoryDetail();
     secondaryPromises.push(loadSessionList());
@@ -119,13 +119,13 @@ export async function selectPerson(name) {
   await Promise.all(secondaryPromises);
 }
 
-// ── Person Avatar ───────────────────────────
+// ── Anima Avatar ───────────────────────────
 
-export async function updatePersonAvatar() {
-  const container = dom.personAvatar || document.getElementById("personAvatar");
+export async function updateAnimaAvatar() {
+  const container = dom.animaAvatar || document.getElementById("animaAvatar");
   if (!container) return;
 
-  const name = state.selectedPerson;
+  const name = state.selectedAnima;
   if (!name) {
     container.innerHTML = "";
     return;
@@ -134,27 +134,27 @@ export async function updatePersonAvatar() {
   // Try bust-up first, then chibi
   const candidates = ["avatar_bustup.png", "avatar_chibi.png"];
   for (const filename of candidates) {
-    const url = `/api/persons/${encodeURIComponent(name)}/assets/${encodeURIComponent(filename)}`;
+    const url = `/api/animas/${encodeURIComponent(name)}/assets/${encodeURIComponent(filename)}`;
     try {
       const resp = await fetch(url, { method: "HEAD" });
       if (resp.ok) {
-        container.innerHTML = `<img src="${escapeHtml(url)}" alt="${escapeHtml(name)}" class="person-avatar-img">`;
+        container.innerHTML = `<img src="${escapeHtml(url)}" alt="${escapeHtml(name)}" class="anima-avatar-img">`;
         return;
       }
     } catch { /* try next */ }
   }
 
   // Fallback: initial letter
-  container.innerHTML = `<div class="person-avatar-placeholder">${escapeHtml(name.charAt(0).toUpperCase())}</div>`;
+  container.innerHTML = `<div class="anima-avatar-placeholder">${escapeHtml(name.charAt(0).toUpperCase())}</div>`;
 }
 
-// ── Person State ───────────────────────────
+// ── Anima State ───────────────────────────
 
-export function renderPersonState() {
-  const stateContent = dom.personStateContent || document.getElementById("personStateContent");
+export function renderAnimaState() {
+  const stateContent = dom.animaStateContent || document.getElementById("animaStateContent");
   if (!stateContent) return; // State panel not in DOM
 
-  const d = state.personDetail;
+  const d = state.animaDetail;
   if (!d || !d.state) {
     stateContent.textContent = "状態情報なし";
     return;
@@ -163,11 +163,11 @@ export function renderPersonState() {
   stateContent.textContent = stateText;
 }
 
-export async function refreshSelectedPerson() {
-  if (!state.selectedPerson) return;
+export async function refreshSelectedAnima() {
+  if (!state.selectedAnima) return;
   try {
-    state.personDetail = await api(`/api/persons/${encodeURIComponent(state.selectedPerson)}`);
-    renderPersonState();
+    state.animaDetail = await api(`/api/animas/${encodeURIComponent(state.selectedAnima)}`);
+    renderAnimaState();
   } catch {
     // Silently ignore refresh errors
   }

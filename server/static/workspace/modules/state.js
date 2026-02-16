@@ -3,9 +3,9 @@
 
 let state = {
   currentUser: localStorage.getItem("animaworks_user") || null,
-  persons: [],
-  selectedPerson: null,
-  personDetail: null,
+  animas: [],
+  selectedAnima: null,
+  animaDetail: null,
   chatMessages: [],
   wsConnected: false,
   activeRightTab: "state",
@@ -13,8 +13,8 @@ let state = {
   sessionList: null,
   officeInitialized: false,      // Whether 3D office has been initialized
   conversationOpen: false,       // Whether conversation panel is open in right sidebar
-  conversationPerson: null,      // Person name shown in conversation panel
-  characterStates: {},           // Map: personName → animationState (idle/working/thinking/error/sleeping)
+  conversationAnima: null,      // Anima name shown in conversation panel
+  characterStates: {},           // Map: animaName → animationState (idle/working/thinking/error/sleeping)
 };
 
 const listeners = new Set();

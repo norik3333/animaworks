@@ -1,4 +1,4 @@
-// ── Person Management ───────────────────────
+// ── Anima Management ───────────────────────
 import { api } from "../modules/api.js";
 import { escapeHtml, statusClass, renderMarkdown } from "../modules/state.js";
 
@@ -26,21 +26,21 @@ async function _renderList() {
 
   _container.innerHTML = `
     <div class="page-header">
-      <h2>パーソン管理</h2>
+      <h2>Anima管理</h2>
     </div>
-    <div id="personsListContent">
+    <div id="animasListContent">
       <div class="loading-placeholder">読み込み中...</div>
     </div>
   `;
 
-  const content = document.getElementById("personsListContent");
+  const content = document.getElementById("animasListContent");
   if (!content) return;
 
   try {
-    const persons = await api("/api/persons");
+    const animas = await api("/api/animas");
 
-    if (persons.length === 0) {
-      content.innerHTML = '<div class="loading-placeholder">パーソンが登録されていません</div>';
+    if (animas.length === 0) {
+      content.innerHTML = '<div class="loading-placeholder">Animaが登録されていません</div>';
       return;
     }
 
@@ -55,12 +55,12 @@ async function _renderList() {
             <th>操作</th>
           </tr>
         </thead>
-        <tbody id="personsTableBody"></tbody>
+        <tbody id="animasTableBody"></tbody>
       </table>
     `;
 
-    const tbody = document.getElementById("personsTableBody");
-    for (const p of persons) {
+    const tbody = document.getElementById("animasTableBody");
+    for (const p of animas) {
       const dotClass = statusClass(p.status);
       const statusLabel = p.status || "offline";
       const uptime = p.uptime_sec ? _formatUptime(p.uptime_sec) : "--";
@@ -69,16 +69,16 @@ async function _renderList() {
       // Determine visual state class
       let stateClass = "";
       if (p.status === "bootstrapping" || p.bootstrapping) {
-        stateClass = "person-item person-item--loading";
+        stateClass = "anima-item anima-item--loading";
       } else if (p.status === "not_found" || p.status === "stopped") {
-        stateClass = "person-item person-item--sleeping";
+        stateClass = "anima-item anima-item--sleeping";
       } else {
-        stateClass = "person-item";
+        stateClass = "anima-item";
       }
 
       const tr = document.createElement("tr");
       tr.className = stateClass;
-      tr.dataset.person = p.name;
+      tr.dataset.anima = p.name;
       tr.style.cursor = "pointer";
       tr.innerHTML = `
         <td style="font-weight:600;">${escapeHtml(p.name)}</td>
@@ -89,13 +89,13 @@ async function _renderList() {
         <td>${escapeHtml(String(pid))}</td>
         <td>${escapeHtml(uptime)}</td>
         <td>
-          <button class="btn-secondary person-detail-btn" data-name="${escapeHtml(p.name)}" style="font-size:0.8rem; padding:0.25rem 0.5rem;">詳細</button>
-          <button class="btn-primary person-trigger-btn" data-name="${escapeHtml(p.name)}" style="font-size:0.8rem; padding:0.25rem 0.5rem;">Heartbeat</button>
+          <button class="btn-secondary anima-detail-btn" data-name="${escapeHtml(p.name)}" style="font-size:0.8rem; padding:0.25rem 0.5rem;">詳細</button>
+          <button class="btn-primary anima-trigger-btn" data-name="${escapeHtml(p.name)}" style="font-size:0.8rem; padding:0.25rem 0.5rem;">Heartbeat</button>
         </td>
       `;
 
       tr.addEventListener("click", (e) => {
-        if (e.target.classList.contains("person-trigger-btn")) return;
+        if (e.target.classList.contains("anima-trigger-btn")) return;
         _showDetail(p.name);
       });
 
@@ -103,14 +103,14 @@ async function _renderList() {
     }
 
     // Bind trigger buttons
-    content.querySelectorAll(".person-trigger-btn").forEach(btn => {
+    content.querySelectorAll(".anima-trigger-btn").forEach(btn => {
       btn.addEventListener("click", async (e) => {
         e.stopPropagation();
         const name = btn.dataset.name;
         btn.disabled = true;
         btn.textContent = "実行中...";
         try {
-          await fetch(`/api/persons/${encodeURIComponent(name)}/trigger`, { method: "POST" });
+          await fetch(`/api/animas/${encodeURIComponent(name)}/trigger`, { method: "POST" });
           btn.textContent = "完了";
           setTimeout(() => { btn.textContent = "Heartbeat"; btn.disabled = false; }, 2000);
         } catch {
@@ -134,31 +134,31 @@ async function _showDetail(name) {
 
   _container.innerHTML = `
     <div class="page-header" style="display:flex; align-items:center; gap:1rem;">
-      <button class="btn-secondary" id="personsBackBtn" style="font-size:0.85rem;">&larr; 一覧に戻る</button>
+      <button class="btn-secondary" id="animasBackBtn" style="font-size:0.85rem;">&larr; 一覧に戻る</button>
       <h2>${escapeHtml(name)}</h2>
     </div>
-    <div id="personsDetailContent">
+    <div id="animasDetailContent">
       <div class="loading-placeholder">読み込み中...</div>
     </div>
   `;
 
-  document.getElementById("personsBackBtn").addEventListener("click", () => {
+  document.getElementById("animasBackBtn").addEventListener("click", () => {
     _viewMode = "list";
     _selectedName = null;
     _renderList();
   });
 
-  const content = document.getElementById("personsDetailContent");
+  const content = document.getElementById("animasDetailContent");
   if (!content) return;
 
   try {
-    const detail = await api(`/api/persons/${encodeURIComponent(name)}`);
+    const detail = await api(`/api/animas/${encodeURIComponent(name)}`);
 
     // Try optional endpoints
-    let personConfig = null;
+    let animaConfig = null;
     let memoryStats = null;
-    try { personConfig = await api(`/api/persons/${encodeURIComponent(name)}/config`); } catch { /* 404 ok */ }
-    try { memoryStats = await api(`/api/persons/${encodeURIComponent(name)}/memory/stats`); } catch { /* 404 ok */ }
+    try { animaConfig = await api(`/api/animas/${encodeURIComponent(name)}/config`); } catch { /* 404 ok */ }
+    try { memoryStats = await api(`/api/animas/${encodeURIComponent(name)}/memory/stats`); } catch { /* 404 ok */ }
 
     let html = '<div class="card-grid" style="grid-template-columns: 1fr 1fr; margin-bottom: 1.5rem;">';
 
@@ -234,12 +234,12 @@ async function _showDetail(name) {
     `;
 
     // Model config
-    if (personConfig) {
+    if (animaConfig) {
       html += `
         <div class="card" style="margin-bottom: 1.5rem;">
           <div class="card-header">モデル設定</div>
           <div class="card-body">
-            <pre style="white-space:pre-wrap; margin:0;">${escapeHtml(JSON.stringify(personConfig, null, 2))}</pre>
+            <pre style="white-space:pre-wrap; margin:0;">${escapeHtml(JSON.stringify(animaConfig, null, 2))}</pre>
           </div>
         </div>
       `;
@@ -248,19 +248,19 @@ async function _showDetail(name) {
     // Action buttons
     html += `
       <div style="display:flex; gap:0.75rem;">
-        <button class="btn-primary" id="personDetailTrigger">Heartbeatトリガー</button>
+        <button class="btn-primary" id="animaDetailTrigger">Heartbeatトリガー</button>
       </div>
     `;
 
     content.innerHTML = html;
 
     // Bind trigger button
-    document.getElementById("personDetailTrigger")?.addEventListener("click", async (e) => {
+    document.getElementById("animaDetailTrigger")?.addEventListener("click", async (e) => {
       const btn = e.target;
       btn.disabled = true;
       btn.textContent = "実行中...";
       try {
-        await fetch(`/api/persons/${encodeURIComponent(name)}/trigger`, { method: "POST" });
+        await fetch(`/api/animas/${encodeURIComponent(name)}/trigger`, { method: "POST" });
         btn.textContent = "完了";
         setTimeout(() => { btn.textContent = "Heartbeatトリガー"; btn.disabled = false; }, 2000);
       } catch {

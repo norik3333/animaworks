@@ -41,12 +41,12 @@ class TestInternalMessageSent:
         ws = app.state.ws_manager
         ws.broadcast.assert_awaited_once()
         call_data = ws.broadcast.call_args[0][0]
-        assert call_data["type"] == "person.interaction"
+        assert call_data["type"] == "anima.interaction"
         assert call_data["data"]["from_person"] == "alice"
         assert call_data["data"]["to_person"] == "bob"
 
-    async def test_message_sent_no_person_match(self):
-        """Non-managed person as sender should not crash."""
+    async def test_message_sent_no_anima_match(self):
+        """Non-managed anima as sender should not crash."""
         app = _make_test_app()
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:

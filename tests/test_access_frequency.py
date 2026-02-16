@@ -1,5 +1,5 @@
 from __future__ import annotations
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
@@ -63,13 +63,13 @@ def _make_result(
     access_count: int = 0,
     updated_at: str | None = None,
     memory_type: str = "knowledge",
-    person: str = "test_person",
+    anima: str = "test_anima",
     **extra_metadata,
 ) -> RetrievalResult:
     """Helper to create a RetrievalResult with common defaults."""
     metadata: dict = {
         "memory_type": memory_type,
-        "person": person,
+        "anima": anima,
         "access_count": access_count,
         "last_accessed_at": "",
     }
@@ -186,7 +186,7 @@ class TestRecordAccess:
         """
         result = _make_result(
             doc_id="doc1", access_count=3,
-            memory_type="knowledge", person="test_person",
+            memory_type="knowledge", anima="test_anima",
         )
 
         with patch("core.memory.rag.retriever.datetime") as mock_dt:
@@ -194,7 +194,7 @@ class TestRecordAccess:
             mock_dt.now.return_value = fixed_now
             mock_dt.fromisoformat = datetime.fromisoformat
 
-            retriever.record_access([result], "test_person")
+            retriever.record_access([result], "test_anima")
 
         mock_vector_store.update_metadata.assert_called_once()
         call_args = mock_vector_store.update_metadata.call_args
@@ -202,7 +202,7 @@ class TestRecordAccess:
         ids_arg = call_args[0][1]
         metas_arg = call_args[0][2]
 
-        assert collection_arg == "test_person_knowledge"
+        assert collection_arg == "test_anima_knowledge"
         assert ids_arg == ["doc1"]
         assert len(metas_arg) == 1
         assert metas_arg[0]["access_count"] == 4  # 3 + 1
@@ -216,14 +216,14 @@ class TestRecordAccess:
         """
         knowledge_result = _make_result(
             doc_id="k1", access_count=0,
-            memory_type="knowledge", person="test_person",
+            memory_type="knowledge", anima="test_anima",
         )
         episode_result = _make_result(
             doc_id="e1", access_count=2,
-            memory_type="episodes", person="test_person",
+            memory_type="episodes", anima="test_anima",
         )
 
-        retriever.record_access([knowledge_result, episode_result], "test_person")
+        retriever.record_access([knowledge_result, episode_result], "test_anima")
 
         # Should have been called twice: once for knowledge, once for episodes
         assert mock_vector_store.update_metadata.call_count == 2
@@ -233,8 +233,8 @@ class TestRecordAccess:
         for call in mock_vector_store.update_metadata.call_args_list:
             collections_called.add(call[0][0])
 
-        assert "test_person_knowledge" in collections_called
-        assert "test_person_episodes" in collections_called
+        assert "test_anima_knowledge" in collections_called
+        assert "test_anima_episodes" in collections_called
 
     def test_record_access_handles_errors_gracefully(self, retriever, mock_vector_store):
         """Test that record_access doesn't propagate errors.
@@ -246,18 +246,18 @@ class TestRecordAccess:
 
         result = _make_result(
             doc_id="doc1", access_count=0,
-            memory_type="knowledge", person="test_person",
+            memory_type="knowledge", anima="test_anima",
         )
 
         # Should not raise
-        retriever.record_access([result], "test_person")
+        retriever.record_access([result], "test_anima")
 
         # Verify the call was attempted
         mock_vector_store.update_metadata.assert_called_once()
 
     def test_record_access_empty_results(self, retriever, mock_vector_store):
         """Test that record_access returns early for empty list."""
-        retriever.record_access([], "test_person")
+        retriever.record_access([], "test_anima")
 
         mock_vector_store.update_metadata.assert_not_called()
 
@@ -274,9 +274,9 @@ class TestIndexerMetadata:
         """
         from core.memory.rag.indexer import MemoryIndexer
 
-        person_dir = tmp_path / "test_person"
-        person_dir.mkdir()
-        knowledge_dir = person_dir / "knowledge"
+        anima_dir = tmp_path / "test_anima"
+        anima_dir.mkdir()
+        knowledge_dir = anima_dir / "knowledge"
         knowledge_dir.mkdir()
 
         test_file = knowledge_dir / "test.md"
@@ -288,8 +288,8 @@ class TestIndexerMetadata:
 
         indexer = MemoryIndexer(
             vector_store=mock_store,
-            person_name="test_person",
-            person_dir=person_dir,
+            anima_name="test_anima",
+            anima_dir=anima_dir,
             embedding_model=mock_embedding_model,
         )
 
@@ -311,7 +311,7 @@ class TestIndexerMetadata:
 
         # Verify standard fields are also present
         assert metadata["memory_type"] == "knowledge"
-        assert metadata["person"] == "test_person"
+        assert metadata["anima"] == "test_anima"
         assert "importance" in metadata
 
 

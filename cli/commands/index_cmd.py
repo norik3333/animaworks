@@ -1,5 +1,5 @@
 from __future__ import annotations
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
@@ -22,9 +22,9 @@ def setup_index_command(subparsers: argparse._SubParsersAction) -> None:
         description="Index memory files into vector database for hybrid search.",
     )
     parser.add_argument(
-        "--person",
+        "--anima",
         type=str,
-        help="Index only this person's memories (default: all persons)",
+        help="Index only this anima's memories (default: all animas)",
     )
     parser.add_argument(
         "--full",
@@ -51,24 +51,24 @@ def index_command(args: argparse.Namespace) -> None:
         return
 
     base_dir = get_data_dir()
-    persons_dir = base_dir / "persons"
+    animas_dir = base_dir / "animas"
 
-    if not persons_dir.is_dir():
-        logger.error("Persons directory not found: %s", persons_dir)
+    if not animas_dir.is_dir():
+        logger.error("Animas directory not found: %s", animas_dir)
         logger.info("Run 'animaworks init' first to set up the environment")
         return
 
-    # Determine which persons to index
-    if args.person:
-        person_dirs = [persons_dir / args.person]
-        if not person_dirs[0].is_dir():
-            logger.error("Person not found: %s", args.person)
+    # Determine which animas to index
+    if args.anima:
+        anima_dirs = [animas_dir / args.anima]
+        if not anima_dirs[0].is_dir():
+            logger.error("Anima not found: %s", args.anima)
             return
     else:
-        person_dirs = [p for p in sorted(persons_dir.iterdir()) if p.is_dir()]
+        anima_dirs = [p for p in sorted(animas_dir.iterdir()) if p.is_dir()]
 
-    if not person_dirs:
-        logger.warning("No persons found to index")
+    if not anima_dirs:
+        logger.warning("No animas found to index")
         return
 
     # Initialize vector store
@@ -80,23 +80,23 @@ def index_command(args: argparse.Namespace) -> None:
         for collection in vector_store.list_collections():
             vector_store.delete_collection(collection)
 
-    # Index each person
+    # Index each anima
     total_chunks = 0
-    for person_dir in person_dirs:
-        person_name = person_dir.name
+    for anima_dir in anima_dirs:
+        anima_name = anima_dir.name
         logger.info("=" * 60)
-        logger.info("Indexing person: %s", person_name)
+        logger.info("Indexing anima: %s", anima_name)
         logger.info("=" * 60)
 
         # Initialize indexer
-        indexer = MemoryIndexer(vector_store, person_name, person_dir)
+        indexer = MemoryIndexer(vector_store, anima_name, anima_dir)
 
         # Index each memory type
         memory_types = [
-            ("knowledge", person_dir / "knowledge"),
-            ("episodes", person_dir / "episodes"),
-            ("procedures", person_dir / "procedures"),
-            ("skills", person_dir / "skills"),
+            ("knowledge", anima_dir / "knowledge"),
+            ("episodes", anima_dir / "episodes"),
+            ("procedures", anima_dir / "procedures"),
+            ("skills", anima_dir / "skills"),
         ]
 
         for memory_type, memory_dir in memory_types:
@@ -122,13 +122,13 @@ def index_command(args: argparse.Namespace) -> None:
 
     # Index shared user memories
     shared_users_dir = base_dir / "shared" / "users"
-    if shared_users_dir.is_dir() and not args.person:
+    if shared_users_dir.is_dir() and not args.anima:
         logger.info("=" * 60)
         logger.info("Indexing shared user memories")
         logger.info("=" * 60)
 
-        # Use a dummy person name for shared memories
-        # (each person will access the same shared_users collection)
+        # Use a dummy anima name for shared memories
+        # (each anima will access the same shared_users collection)
         indexer = MemoryIndexer(
             vector_store, "shared", shared_users_dir.parent
         )

@@ -16,17 +16,17 @@ from core.tooling.dispatch import _handle_generate_character_assets
 
 
 @pytest.fixture
-def persons_dir(data_dir: Path) -> Path:
-    """Return the persons directory within the test data_dir."""
-    d = data_dir / "persons"
+def animas_dir(data_dir: Path) -> Path:
+    """Return the animas directory within the test data_dir."""
+    d = data_dir / "animas"
     d.mkdir(parents=True, exist_ok=True)
     return d
 
 
 @pytest.fixture
-def supervisor_with_image(persons_dir: Path) -> Path:
-    """Create a supervisor person with a fullbody avatar image."""
-    supervisor_dir = persons_dir / "sakura"
+def supervisor_with_image(animas_dir: Path) -> Path:
+    """Create a supervisor anima with a fullbody avatar image."""
+    supervisor_dir = animas_dir / "sakura"
     assets_dir = supervisor_dir / "assets"
     assets_dir.mkdir(parents=True)
     fullbody = assets_dir / "avatar_fullbody.png"
@@ -35,17 +35,17 @@ def supervisor_with_image(persons_dir: Path) -> Path:
 
 
 @pytest.fixture
-def supervisor_without_image(persons_dir: Path) -> Path:
-    """Create a supervisor person without avatar assets."""
-    supervisor_dir = persons_dir / "mio"
+def supervisor_without_image(animas_dir: Path) -> Path:
+    """Create a supervisor anima without avatar assets."""
+    supervisor_dir = animas_dir / "mio"
     supervisor_dir.mkdir(parents=True)
     return supervisor_dir
 
 
 @pytest.fixture
-def subordinate_dir(persons_dir: Path) -> Path:
-    """Create a subordinate person directory."""
-    d = persons_dir / "rin"
+def subordinate_dir(animas_dir: Path) -> Path:
+    """Create a subordinate anima directory."""
+    d = animas_dir / "rin"
     d.mkdir(parents=True, exist_ok=True)
     return d
 
@@ -88,7 +88,7 @@ class TestSupervisorVibeReferenceE2E:
             result = _handle_generate_character_assets(
                 mock_pipeline,
                 {
-                    "person_dir": str(subordinate_dir),
+                    "anima_dir": str(subordinate_dir),
                     "prompt": "1girl, short hair, blue eyes",
                     "negative_prompt": "lowres",
                     "supervisor_name": "sakura",
@@ -137,7 +137,7 @@ class TestSupervisorVibeReferenceE2E:
             _handle_generate_character_assets(
                 mock_pipeline,
                 {
-                    "person_dir": str(subordinate_dir),
+                    "anima_dir": str(subordinate_dir),
                     "prompt": "1girl",
                     "supervisor_name": "mio",
                 },
@@ -163,7 +163,7 @@ class TestSupervisorVibeReferenceE2E:
             _handle_generate_character_assets(
                 mock_pipeline,
                 {
-                    "person_dir": str(subordinate_dir),
+                    "anima_dir": str(subordinate_dir),
                     "prompt": "1girl",
                 },
             )
@@ -190,7 +190,7 @@ class TestSupervisorVibeReferenceE2E:
             _handle_generate_character_assets(
                 mock_pipeline,
                 {
-                    "person_dir": str(subordinate_dir),
+                    "anima_dir": str(subordinate_dir),
                     "prompt": "1girl",
                     "supervisor_name": "sakura",
                 },
@@ -222,7 +222,7 @@ class TestSupervisorVibeReferenceE2E:
             _handle_generate_character_assets(
                 mock_pipeline,
                 {
-                    "person_dir": str(subordinate_dir),
+                    "anima_dir": str(subordinate_dir),
                     "prompt": "1girl",
                     "supervisor_name": "sakura",
                 },
@@ -245,7 +245,7 @@ class TestSupervisorVibeReferenceE2E:
         self,
         data_dir: Path,
         supervisor_with_image: Path,
-        persons_dir: Path,
+        animas_dir: Path,
         mock_pipeline: MagicMock,
     ):
         """Multiple subordinates created by the same supervisor get same vibe reference."""
@@ -264,14 +264,14 @@ class TestSupervisorVibeReferenceE2E:
 
         subordinates = ["rin", "yui", "hana"]
         for name in subordinates:
-            sub_dir = persons_dir / name
+            sub_dir = animas_dir / name
             sub_dir.mkdir(parents=True, exist_ok=True)
 
             with patch("core.config.models.load_config", return_value=config):
                 _handle_generate_character_assets(
                     mock_pipeline,
                     {
-                        "person_dir": str(sub_dir),
+                        "anima_dir": str(sub_dir),
                         "prompt": "1girl",
                         "supervisor_name": "sakura",
                     },

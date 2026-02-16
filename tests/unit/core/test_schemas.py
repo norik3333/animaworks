@@ -10,8 +10,8 @@ from core.schemas import (
     CycleResult,
     Message,
     ModelConfig,
-    PersonConfig,
-    PersonStatus,
+    AnimaConfig,
+    AnimaStatus,
 )
 
 
@@ -67,12 +67,12 @@ class TestModelConfig:
         assert mc.supervisor == "boss"
 
 
-# ── PersonConfig ──────────────────────────────────────────
+# ── AnimaConfig ──────────────────────────────────────────
 
 
-class TestPersonConfig:
+class TestAnimaConfig:
     def test_defaults(self, tmp_path):
-        pc = PersonConfig(name="alice", base_dir=tmp_path)
+        pc = AnimaConfig(name="alice", base_dir=tmp_path)
         assert pc.name == "alice"
         assert pc.base_dir == tmp_path
         assert pc.identity == ""
@@ -85,7 +85,7 @@ class TestPersonConfig:
 
     def test_with_cron_tasks(self, tmp_path):
         tasks = [CronTask(name="t1", schedule="毎日 9:00", description="daily")]
-        pc = PersonConfig(name="bob", base_dir=tmp_path, cron_tasks=tasks)
+        pc = AnimaConfig(name="bob", base_dir=tmp_path, cron_tasks=tasks)
         assert len(pc.cron_tasks) == 1
         assert pc.cron_tasks[0].name == "t1"
 
@@ -184,12 +184,12 @@ class TestCycleResult:
         assert d["summary"] == "s"
 
 
-# ── PersonStatus ──────────────────────────────────────────
+# ── AnimaStatus ──────────────────────────────────────────
 
 
-class TestPersonStatus:
+class TestAnimaStatus:
     def test_defaults(self):
-        ps = PersonStatus(name="alice")
+        ps = AnimaStatus(name="alice")
         assert ps.name == "alice"
         assert ps.status == "idle"
         assert ps.current_task == ""
@@ -199,7 +199,7 @@ class TestPersonStatus:
 
     def test_custom_values(self):
         now = datetime.now()
-        ps = PersonStatus(
+        ps = AnimaStatus(
             name="bob",
             status="thinking",
             current_task="Responding to human",

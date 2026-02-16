@@ -1,5 +1,5 @@
 from __future__ import annotations
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
@@ -53,7 +53,7 @@ _SEND_PATTERNS = [
 
 # ── A1 mode security ──────────────────────────────────────────
 
-# Files that persons cannot modify themselves (identity/privilege protection).
+# Files that animas cannot modify themselves (identity/privilege protection).
 _PROTECTED_FILES = frozenset({
     "permissions.md",
     "identity.md",
@@ -67,7 +67,7 @@ _WRITE_COMMANDS = frozenset({
 
 
 def _check_a1_file_access(
-    file_path: str, person_dir: Path, *, write: bool,
+    file_path: str, anima_dir: Path, *, write: bool,
 ) -> str | None:
     """Check if a file path is allowed for A1 mode tools.
 
@@ -77,24 +77,24 @@ def _check_a1_file_access(
         return None
 
     resolved = Path(file_path).resolve()
-    person_resolved = person_dir.resolve()
-    persons_root = person_resolved.parent
+    anima_resolved = anima_dir.resolve()
+    animas_root = anima_resolved.parent
 
-    # Block access to other persons' directories
-    if resolved.is_relative_to(persons_root):
-        if not resolved.is_relative_to(person_resolved):
-            return f"Access to other person's directory is not allowed: {file_path}"
+    # Block access to other animas' directories
+    if resolved.is_relative_to(animas_root):
+        if not resolved.is_relative_to(anima_resolved):
+            return f"Access to other anima's directory is not allowed: {file_path}"
 
         # Block writes to protected files within own directory
         if write:
-            rel = str(resolved.relative_to(person_resolved))
+            rel = str(resolved.relative_to(anima_resolved))
             if rel in _PROTECTED_FILES:
                 return f"'{rel}' is a protected file and cannot be modified"
 
     return None
 
 
-def _check_a1_bash_command(command: str, person_dir: Path) -> str | None:
+def _check_a1_bash_command(command: str, anima_dir: Path) -> str | None:
     """Check bash commands for obvious file operation violations.
 
     This is a best-effort heuristic — not a complete sandbox.
@@ -113,18 +113,18 @@ def _check_a1_bash_command(command: str, person_dir: Path) -> str | None:
 
     # Check file-writing commands for path violations
     if cmd_base in _WRITE_COMMANDS:
-        persons_root = str(person_dir.parent.resolve())
-        person_resolved = str(person_dir.resolve())
+        animas_root = str(anima_dir.parent.resolve())
+        anima_resolved = str(anima_dir.resolve())
         for arg in argv[1:]:
             if arg.startswith("-"):
                 continue
             try:
                 resolved = str(Path(arg).resolve())
-                # Writing to other person's directory
-                if resolved.startswith(persons_root) and not resolved.startswith(
-                    person_resolved
+                # Writing to other anima's directory
+                if resolved.startswith(animas_root) and not resolved.startswith(
+                    anima_resolved
                 ):
-                    return f"Command targets other person's directory: {arg}"
+                    return f"Command targets other anima's directory: {arg}"
             except (ValueError, OSError):
                 pass
 
@@ -142,11 +142,11 @@ class AgentSDKExecutor(BaseExecutor):
     def __init__(
         self,
         model_config: ModelConfig,
-        person_dir: Path,
+        anima_dir: Path,
         tool_registry: list[str] | None = None,
         personal_tools: dict[str, str] | None = None,
     ) -> None:
-        super().__init__(model_config, person_dir)
+        super().__init__(model_config, anima_dir)
         self._tool_registry = tool_registry or []
         self._personal_tools = personal_tools or {}
 
@@ -162,11 +162,11 @@ class AgentSDKExecutor(BaseExecutor):
         return m
 
     def _build_env(self) -> dict[str, str]:
-        """Build env dict so the child process uses per-person credentials.
+        """Build env dict so the child process uses per-anima credentials.
 
-        Also sets ``ANIMAWORKS_PERSON_DIR`` so that ``animaworks-tool``
-        can discover personal tools in the person's ``tools/`` directory,
-        and prepends ``person_dir`` to ``PATH`` so the ``send`` script is
+        Also sets ``ANIMAWORKS_ANIMA_DIR`` so that ``animaworks-tool``
+        can discover personal tools in the anima's ``tools/`` directory,
+        and prepends ``anima_dir`` to ``PATH`` so the ``send`` script is
         discoverable via ``bash send``.
         ``ANIMAWORKS_PROJECT_DIR`` is propagated so the send script can
         locate ``main.py``.
@@ -174,9 +174,9 @@ class AgentSDKExecutor(BaseExecutor):
         from core.paths import PROJECT_DIR
 
         env: dict[str, str] = {
-            "ANIMAWORKS_PERSON_DIR": str(self._person_dir),
+            "ANIMAWORKS_ANIMA_DIR": str(self._anima_dir),
             "ANIMAWORKS_PROJECT_DIR": str(PROJECT_DIR),
-            "PATH": f"{self._person_dir}:{os.environ.get('PATH', '/usr/bin:/bin')}",
+            "PATH": f"{self._anima_dir}:{os.environ.get('PATH', '/usr/bin:/bin')}",
             "CLAUDE_CODE_DISABLE_SKILL_IMPROVEMENT": "true",
         }
         api_key = self._resolve_api_key()
@@ -285,7 +285,7 @@ class AgentSDKExecutor(BaseExecutor):
             if tool_name in ("Write", "Edit"):
                 file_path = tool_input.get("file_path", "")
                 violation = _check_a1_file_access(
-                    file_path, self._person_dir, write=True,
+                    file_path, self._anima_dir, write=True,
                 )
                 if violation:
                     return SyncHookJSONOutput(
@@ -296,11 +296,11 @@ class AgentSDKExecutor(BaseExecutor):
                         )
                     )
 
-            # Read: check for path traversal to other persons
+            # Read: check for path traversal to other animas
             if tool_name == "Read":
                 file_path = tool_input.get("file_path", "")
                 violation = _check_a1_file_access(
-                    file_path, self._person_dir, write=False,
+                    file_path, self._anima_dir, write=False,
                 )
                 if violation:
                     return SyncHookJSONOutput(
@@ -314,7 +314,7 @@ class AgentSDKExecutor(BaseExecutor):
             # Bash: inspect command for file operation patterns
             if tool_name == "Bash":
                 command = tool_input.get("command", "")
-                violation = _check_a1_bash_command(command, self._person_dir)
+                violation = _check_a1_bash_command(command, self._anima_dir)
                 if violation:
                     return SyncHookJSONOutput(
                         hookSpecificOutput=PreToolUseHookSpecificOutput(
@@ -330,7 +330,7 @@ class AgentSDKExecutor(BaseExecutor):
             system_prompt=system_prompt,
             allowed_tools=["Read", "Write", "Edit", "Bash", "Grep", "Glob"],
             permission_mode="acceptEdits",
-            cwd=str(self._person_dir),
+            cwd=str(self._anima_dir),
             max_turns=self._model_config.max_turns,
             model=self._resolve_agent_sdk_model(),
             env=self._build_env(),
@@ -453,7 +453,7 @@ class AgentSDKExecutor(BaseExecutor):
             if tool_name in ("Write", "Edit"):
                 file_path = tool_input.get("file_path", "")
                 violation = _check_a1_file_access(
-                    file_path, self._person_dir, write=True,
+                    file_path, self._anima_dir, write=True,
                 )
                 if violation:
                     return SyncHookJSONOutput(
@@ -464,11 +464,11 @@ class AgentSDKExecutor(BaseExecutor):
                         )
                     )
 
-            # Read: check for path traversal to other persons
+            # Read: check for path traversal to other animas
             if tool_name == "Read":
                 file_path = tool_input.get("file_path", "")
                 violation = _check_a1_file_access(
-                    file_path, self._person_dir, write=False,
+                    file_path, self._anima_dir, write=False,
                 )
                 if violation:
                     return SyncHookJSONOutput(
@@ -482,7 +482,7 @@ class AgentSDKExecutor(BaseExecutor):
             # Bash: inspect command for file operation patterns
             if tool_name == "Bash":
                 command = tool_input.get("command", "")
-                violation = _check_a1_bash_command(command, self._person_dir)
+                violation = _check_a1_bash_command(command, self._anima_dir)
                 if violation:
                     return SyncHookJSONOutput(
                         hookSpecificOutput=PreToolUseHookSpecificOutput(
@@ -498,7 +498,7 @@ class AgentSDKExecutor(BaseExecutor):
             system_prompt=system_prompt,
             allowed_tools=["Read", "Write", "Edit", "Bash", "Grep", "Glob"],
             permission_mode="acceptEdits",
-            cwd=str(self._person_dir),
+            cwd=str(self._anima_dir),
             max_turns=self._model_config.max_turns,
             model=self._resolve_agent_sdk_model(),
             env=self._build_env(),

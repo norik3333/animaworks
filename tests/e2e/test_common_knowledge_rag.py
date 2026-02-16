@@ -1,5 +1,5 @@
 from __future__ import annotations
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
@@ -33,23 +33,23 @@ pytest.importorskip(
 
 @pytest.fixture
 def temp_dirs():
-    """Create temporary person_dir and common_knowledge dir with sample files.
+    """Create temporary anima_dir and common_knowledge dir with sample files.
 
-    Yields a (person_dir, common_knowledge_dir, data_dir) tuple.
+    Yields a (anima_dir, common_knowledge_dir, data_dir) tuple.
     All directories are cleaned up after the test.
     """
     tmpdir = Path(tempfile.mkdtemp())
     data_dir = tmpdir / "data"
     data_dir.mkdir()
 
-    # ── Person directory ──────────────────────────
-    person_dir = data_dir / "persons" / "test_person"
-    person_dir.mkdir(parents=True)
+    # ── Anima directory ──────────────────────────
+    anima_dir = data_dir / "animas" / "test_anima"
+    anima_dir.mkdir(parents=True)
 
     for sub in ("knowledge", "episodes", "procedures", "skills", "state"):
-        (person_dir / sub).mkdir()
+        (anima_dir / sub).mkdir()
 
-    (person_dir / "knowledge" / "internal-policy.md").write_text(
+    (anima_dir / "knowledge" / "internal-policy.md").write_text(
         """# 社内ポリシー
 
 ## 概要
@@ -61,7 +61,7 @@ def temp_dirs():
         encoding="utf-8",
     )
 
-    (person_dir / "knowledge" / "project-alpha.md").write_text(
+    (anima_dir / "knowledge" / "project-alpha.md").write_text(
         """# プロジェクトアルファ
 
 ## 概要
@@ -118,7 +118,7 @@ Contains sample content for verification.
         encoding="utf-8",
     )
 
-    yield person_dir, common_knowledge_dir, data_dir
+    yield anima_dir, common_knowledge_dir, data_dir
 
     shutil.rmtree(tmpdir)
 
@@ -126,11 +126,11 @@ Contains sample content for verification.
 @pytest.fixture
 def vector_store(temp_dirs):
     """Create a temporary ChromaDB vector store."""
-    person_dir, _, _ = temp_dirs
+    anima_dir, _, _ = temp_dirs
 
     from core.memory.rag.store import ChromaVectorStore
 
-    vectordb_dir = person_dir.parent.parent / "vectordb"
+    vectordb_dir = anima_dir.parent.parent / "vectordb"
     vectordb_dir.mkdir(parents=True, exist_ok=True)
 
     return ChromaVectorStore(persist_dir=vectordb_dir)
@@ -147,22 +147,22 @@ def test_shared_knowledge_indexing_and_retrieval(temp_dirs, vector_store):
     - Indexed documents are retrievable via MemoryRetriever.search(include_shared=True)
     - Shared results appear in merged results alongside personal results
     """
-    person_dir, common_knowledge_dir, data_dir = temp_dirs
+    anima_dir, common_knowledge_dir, data_dir = temp_dirs
 
     from core.memory.rag.indexer import MemoryIndexer
     from core.memory.rag.retriever import MemoryRetriever
 
     # 1. Index personal knowledge
     personal_indexer = MemoryIndexer(
-        vector_store, "test_person", person_dir,
+        vector_store, "test_anima", anima_dir,
     )
     personal_chunks = personal_indexer.index_directory(
-        person_dir / "knowledge", "knowledge",
+        anima_dir / "knowledge", "knowledge",
     )
     assert personal_chunks > 0, "Personal knowledge should produce chunks"
 
-    # 2. Index shared (common_knowledge) — uses data_dir as person_dir
-    #    so that file_path.relative_to(person_dir) resolves correctly.
+    # 2. Index shared (common_knowledge) — uses data_dir as anima_dir
+    #    so that file_path.relative_to(anima_dir) resolves correctly.
     shared_indexer = MemoryIndexer(
         vector_store,
         "shared",
@@ -179,20 +179,20 @@ def test_shared_knowledge_indexing_and_retrieval(temp_dirs, vector_store):
     assert "shared_common_knowledge" in collections, (
         f"Expected 'shared_common_knowledge' in {collections}"
     )
-    assert "test_person_knowledge" in collections, (
-        f"Expected 'test_person_knowledge' in {collections}"
+    assert "test_anima_knowledge" in collections, (
+        f"Expected 'test_anima_knowledge' in {collections}"
     )
 
     # 4. Create retriever and search with include_shared=True
     retriever = MemoryRetriever(
         vector_store,
         personal_indexer,
-        person_dir / "knowledge",
+        anima_dir / "knowledge",
     )
 
     results = retriever.search(
         query="コーディング規約",
-        person_name="test_person",
+        anima_name="test_anima",
         memory_type="knowledge",
         top_k=5,
         include_shared=True,
@@ -200,10 +200,10 @@ def test_shared_knowledge_indexing_and_retrieval(temp_dirs, vector_store):
 
     assert len(results) > 0, "Search should return results"
 
-    # 5. Verify shared results appear in results (check metadata person=shared)
+    # 5. Verify shared results appear in results (check metadata anima=shared)
     shared_results = [
         r for r in results
-        if r.metadata.get("person") == "shared"
+        if r.metadata.get("anima") == "shared"
     ]
     assert len(shared_results) > 0, (
         "Shared common_knowledge results should appear in merged results"
@@ -221,15 +221,15 @@ def test_hybrid_search_common_knowledge(temp_dirs, vector_store, monkeypatch):
     - Vector search augments keyword results when RAG is available
     - scope='common_knowledge' correctly targets common_knowledge dir
     """
-    person_dir, common_knowledge_dir, data_dir = temp_dirs
+    anima_dir, common_knowledge_dir, data_dir = temp_dirs
 
     from core.memory.rag.indexer import MemoryIndexer
 
     # Index personal knowledge
     personal_indexer = MemoryIndexer(
-        vector_store, "test_person", person_dir,
+        vector_store, "test_anima", anima_dir,
     )
-    personal_indexer.index_directory(person_dir / "knowledge", "knowledge")
+    personal_indexer.index_directory(anima_dir / "knowledge", "knowledge")
 
     # Index shared common_knowledge
     shared_indexer = MemoryIndexer(
@@ -266,7 +266,7 @@ def test_hybrid_search_common_knowledge(temp_dirs, vector_store, monkeypatch):
 
     from core.memory.manager import MemoryManager
 
-    mm = MemoryManager(person_dir, base_dir=data_dir)
+    mm = MemoryManager(anima_dir, base_dir=data_dir)
 
     # Inject our pre-built indexer so MemoryManager uses the temp vector store
     mm._indexer = personal_indexer
@@ -290,7 +290,7 @@ def test_hybrid_search_scope_all_includes_common(temp_dirs, vector_store, monkey
     Verifies that searching with scope='all' returns results from
     both personal knowledge and common_knowledge directories.
     """
-    person_dir, common_knowledge_dir, data_dir = temp_dirs
+    anima_dir, common_knowledge_dir, data_dir = temp_dirs
 
     # Patch path helpers
     monkeypatch.setattr(
@@ -316,7 +316,7 @@ def test_hybrid_search_scope_all_includes_common(temp_dirs, vector_store, monkey
 
     from core.memory.manager import MemoryManager
 
-    mm = MemoryManager(person_dir, base_dir=data_dir)
+    mm = MemoryManager(anima_dir, base_dir=data_dir)
     # Disable RAG indexer to test pure keyword search
     mm._indexer = None
 
@@ -342,7 +342,7 @@ async def test_priming_with_shared_knowledge(temp_dirs, vector_store, monkeypatc
     - related_knowledge in PrimingResult contains shared results
     - [shared] label appears in the formatted output
     """
-    person_dir, common_knowledge_dir, data_dir = temp_dirs
+    anima_dir, common_knowledge_dir, data_dir = temp_dirs
 
     from core.memory.rag.indexer import MemoryIndexer
     from core.memory.rag.retriever import MemoryRetriever
@@ -350,9 +350,9 @@ async def test_priming_with_shared_knowledge(temp_dirs, vector_store, monkeypatc
 
     # Index personal knowledge
     personal_indexer = MemoryIndexer(
-        vector_store, "test_person", person_dir,
+        vector_store, "test_anima", anima_dir,
     )
-    personal_indexer.index_directory(person_dir / "knowledge", "knowledge")
+    personal_indexer.index_directory(anima_dir / "knowledge", "knowledge")
 
     # Index shared common_knowledge
     shared_indexer = MemoryIndexer(
@@ -364,13 +364,13 @@ async def test_priming_with_shared_knowledge(temp_dirs, vector_store, monkeypatc
     shared_indexer.index_directory(common_knowledge_dir, "common_knowledge")
 
     # Create priming engine
-    engine = PrimingEngine(person_dir)
+    engine = PrimingEngine(anima_dir)
 
     # Inject retriever that uses our temp vector store
     engine._retriever = MemoryRetriever(
         vector_store,
         personal_indexer,
-        person_dir / "knowledge",
+        anima_dir / "knowledge",
     )
 
     # Patch path helpers — priming.py uses local imports from core.paths
@@ -413,7 +413,7 @@ async def test_priming_personal_and_shared_merged(temp_dirs, vector_store, monke
     Verifies that results from both collections appear when the query
     matches content in both personal knowledge and common_knowledge.
     """
-    person_dir, common_knowledge_dir, data_dir = temp_dirs
+    anima_dir, common_knowledge_dir, data_dir = temp_dirs
 
     from core.memory.rag.indexer import MemoryIndexer
     from core.memory.rag.retriever import MemoryRetriever
@@ -421,9 +421,9 @@ async def test_priming_personal_and_shared_merged(temp_dirs, vector_store, monke
 
     # Index personal knowledge
     personal_indexer = MemoryIndexer(
-        vector_store, "test_person", person_dir,
+        vector_store, "test_anima", anima_dir,
     )
-    personal_indexer.index_directory(person_dir / "knowledge", "knowledge")
+    personal_indexer.index_directory(anima_dir / "knowledge", "knowledge")
 
     # Index shared common_knowledge
     shared_indexer = MemoryIndexer(
@@ -435,11 +435,11 @@ async def test_priming_personal_and_shared_merged(temp_dirs, vector_store, monke
     shared_indexer.index_directory(common_knowledge_dir, "common_knowledge")
 
     # Create priming engine with injected retriever
-    engine = PrimingEngine(person_dir)
+    engine = PrimingEngine(anima_dir)
     engine._retriever = MemoryRetriever(
         vector_store,
         personal_indexer,
-        person_dir / "knowledge",
+        anima_dir / "knowledge",
     )
 
     monkeypatch.setattr(
@@ -481,7 +481,7 @@ def test_read_memory_file_common_knowledge_prefix(temp_dirs, monkeypatch):
     - File content is returned correctly
     - Non-existent files return 'File not found' message
     """
-    person_dir, common_knowledge_dir, data_dir = temp_dirs
+    anima_dir, common_knowledge_dir, data_dir = temp_dirs
 
     # Patch get_common_knowledge_dir — used by both ToolHandler (local import
     # from core.paths) and MemoryManager (module-level import).
@@ -513,8 +513,8 @@ def test_read_memory_file_common_knowledge_prefix(temp_dirs, monkeypatch):
     from core.memory.manager import MemoryManager
     from core.tooling.handler import ToolHandler
 
-    memory = MemoryManager(person_dir, base_dir=data_dir)
-    handler = ToolHandler(person_dir, memory)
+    memory = MemoryManager(anima_dir, base_dir=data_dir)
+    handler = ToolHandler(anima_dir, memory)
 
     # Read a file via common_knowledge/ prefix
     result = handler.handle(
@@ -548,9 +548,9 @@ def test_read_memory_file_personal_path_still_works(temp_dirs, monkeypatch):
     """ToolHandler.read_memory_file still works for personal (non-prefixed) paths.
 
     Verifies that the common_knowledge/ prefix logic does not break
-    the default behavior of reading relative to person_dir.
+    the default behavior of reading relative to anima_dir.
     """
-    person_dir, common_knowledge_dir, data_dir = temp_dirs
+    anima_dir, common_knowledge_dir, data_dir = temp_dirs
 
     monkeypatch.setattr(
         "core.memory.manager.get_common_knowledge_dir",
@@ -576,8 +576,8 @@ def test_read_memory_file_personal_path_still_works(temp_dirs, monkeypatch):
     from core.memory.manager import MemoryManager
     from core.tooling.handler import ToolHandler
 
-    memory = MemoryManager(person_dir, base_dir=data_dir)
-    handler = ToolHandler(person_dir, memory)
+    memory = MemoryManager(anima_dir, base_dir=data_dir)
+    handler = ToolHandler(anima_dir, memory)
 
     # Read personal knowledge file (no common_knowledge/ prefix)
     result = handler.handle(

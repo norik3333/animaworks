@@ -1,7 +1,7 @@
 """E2E tests for workspace character scale and hierarchy bug fixes.
 
 Bug 1: Validates character.js bone-based bounding box via static file serving.
-Bug 2: Validates /api/persons returns correct 3-level hierarchy with the
+Bug 2: Validates /api/animas returns correct 3-level hierarchy with the
        expected supervisor relationships:
        sakura (root) -> kotoha -> chatwork_checker
        sakura (root) -> rin -> aoi
@@ -23,12 +23,12 @@ _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 def _create_app_with_config(
     tmp_path: Path,
-    person_names: list[str],
+    anima_names: list[str],
     config_data: dict,
 ):
     """Build a real FastAPI app with a concrete config.json on disk."""
-    persons_dir = tmp_path / "persons"
-    persons_dir.mkdir(parents=True, exist_ok=True)
+    animas_dir = tmp_path / "animas"
+    animas_dir.mkdir(parents=True, exist_ok=True)
     shared_dir = tmp_path / "shared"
     shared_dir.mkdir(parents=True, exist_ok=True)
 
@@ -65,17 +65,17 @@ def _create_app_with_config(
 
         from server.app import create_app
 
-        app = create_app(persons_dir, shared_dir)
+        app = create_app(animas_dir, shared_dir)
 
-    app.state.person_names = person_names
+    app.state.anima_names = anima_names
 
     from core.config.models import invalidate_cache, load_config as real_load_config
 
     invalidate_cache()
     real_config = real_load_config(config_path)
 
-    import server.routes.persons as persons_module
-    persons_module.load_config = lambda *a, **kw: real_config
+    import server.routes.animas as animas_module
+    animas_module.load_config = lambda *a, **kw: real_config
 
     return app
 
@@ -131,19 +131,19 @@ class TestCharacterScaleFix:
 
 @pytest.mark.e2e
 class TestOrganizationHierarchyFix:
-    """E2E: Verify /api/persons returns correct 3-level hierarchy."""
+    """E2E: Verify /api/animas returns correct 3-level hierarchy."""
 
     @pytest.fixture(autouse=True)
     def _cleanup(self):
         yield
         from core.config.models import invalidate_cache
         invalidate_cache()
-        import server.routes.persons as persons_module
+        import server.routes.animas as animas_module
         from core.config.models import load_config
-        persons_module.load_config = load_config
+        animas_module.load_config = load_config
 
     async def test_full_animaworks_hierarchy(self, tmp_path: Path) -> None:
-        """Verify the complete AnimaWorks hierarchy with all 5 persons.
+        """Verify the complete AnimaWorks hierarchy with all 5 animas.
 
         Expected tree:
         sakura (root)
@@ -155,7 +155,7 @@ class TestOrganizationHierarchyFix:
         config_data = {
             "version": 1,
             "setup_complete": True,
-            "persons": {
+            "animas": {
                 "sakura": {},
                 "kotoha": {"supervisor": "sakura"},
                 "chatwork_checker": {"supervisor": "kotoha"},
@@ -166,13 +166,13 @@ class TestOrganizationHierarchyFix:
 
         app = _create_app_with_config(
             tmp_path,
-            person_names=["sakura", "kotoha", "chatwork_checker", "rin", "aoi"],
+            anima_names=["sakura", "kotoha", "chatwork_checker", "rin", "aoi"],
             config_data=config_data,
         )
 
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            resp = await client.get("/api/persons")
+            resp = await client.get("/api/animas")
 
         assert resp.status_code == 200
         data = resp.json()
@@ -195,7 +195,7 @@ class TestOrganizationHierarchyFix:
         config_data = {
             "version": 1,
             "setup_complete": True,
-            "persons": {
+            "animas": {
                 "sakura": {},
                 "kotoha": {"supervisor": "sakura"},
                 "chatwork_checker": {"supervisor": "kotoha"},
@@ -206,19 +206,19 @@ class TestOrganizationHierarchyFix:
 
         app = _create_app_with_config(
             tmp_path,
-            person_names=["sakura", "kotoha", "chatwork_checker", "rin", "aoi"],
+            anima_names=["sakura", "kotoha", "chatwork_checker", "rin", "aoi"],
             config_data=config_data,
         )
 
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            resp = await client.get("/api/persons")
+            resp = await client.get("/api/animas")
 
-        persons = resp.json()
+        animas = resp.json()
 
         # Simulate buildOrgTree from office3d.js
         node_map = {}
-        for p in persons:
+        for p in animas:
             node_map[p["name"]] = {
                 "name": p["name"],
                 "supervisor": p.get("supervisor"),
@@ -265,12 +265,12 @@ class TestOrganizationHierarchyFix:
     ) -> None:
         """Simulate buildConnectors from office3d.js.
 
-        Verify that 4 connector lines are drawn for the 5-person hierarchy.
+        Verify that 4 connector lines are drawn for the 5-anima hierarchy.
         """
         config_data = {
             "version": 1,
             "setup_complete": True,
-            "persons": {
+            "animas": {
                 "sakura": {},
                 "kotoha": {"supervisor": "sakura"},
                 "chatwork_checker": {"supervisor": "kotoha"},
@@ -281,21 +281,21 @@ class TestOrganizationHierarchyFix:
 
         app = _create_app_with_config(
             tmp_path,
-            person_names=["sakura", "kotoha", "chatwork_checker", "rin", "aoi"],
+            anima_names=["sakura", "kotoha", "chatwork_checker", "rin", "aoi"],
             config_data=config_data,
         )
 
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            resp = await client.get("/api/persons")
+            resp = await client.get("/api/animas")
 
-        persons = resp.json()
+        animas = resp.json()
 
-        # Simulate buildConnectors: draw line for each person with supervisor
-        person_names = {p["name"] for p in persons}
+        # Simulate buildConnectors: draw line for each anima with supervisor
+        anima_names = {p["name"] for p in animas}
         connectors = []
-        for p in persons:
-            if p.get("supervisor") and p["supervisor"] in person_names:
+        for p in animas:
+            if p.get("supervisor") and p["supervisor"] in anima_names:
                 connectors.append((p["supervisor"], p["name"]))
 
         connectors.sort()
@@ -313,7 +313,7 @@ class TestOrganizationHierarchyFix:
 
 @pytest.mark.e2e
 class TestSupervisorDataRepair:
-    """E2E: Verify org-sync can repair supervisor for old-flow persons."""
+    """E2E: Verify org-sync can repair supervisor for old-flow animas."""
 
     def test_sync_repairs_rin_aoi_scenario(self, tmp_path: Path) -> None:
         """Simulate the exact rin/aoi scenario: identity.md has 上司 row
@@ -321,7 +321,7 @@ class TestSupervisorDataRepair:
         """
         from core.config.models import (
             AnimaWorksConfig,
-            PersonModelConfig,
+            AnimaModelConfig,
             invalidate_cache,
             load_config,
             save_config,
@@ -330,27 +330,27 @@ class TestSupervisorDataRepair:
 
         data_dir = tmp_path / "animaworks"
         data_dir.mkdir()
-        persons_dir = data_dir / "persons"
-        persons_dir.mkdir()
+        animas_dir = data_dir / "animas"
+        animas_dir.mkdir()
         config_path = data_dir / "config.json"
 
         # Initial buggy state: rin and aoi have null supervisors
         cfg = AnimaWorksConfig(
             setup_complete=True,
-            persons={
-                "sakura": PersonModelConfig(supervisor=None),
-                "kotoha": PersonModelConfig(supervisor="sakura"),
-                "chatwork_checker": PersonModelConfig(supervisor="kotoha"),
-                "rin": PersonModelConfig(supervisor=None),
-                "aoi": PersonModelConfig(supervisor=None),
+            animas={
+                "sakura": AnimaModelConfig(supervisor=None),
+                "kotoha": AnimaModelConfig(supervisor="sakura"),
+                "chatwork_checker": AnimaModelConfig(supervisor="kotoha"),
+                "rin": AnimaModelConfig(supervisor=None),
+                "aoi": AnimaModelConfig(supervisor=None),
             },
         )
         save_config(cfg, config_path)
         invalidate_cache()
 
-        # Create person directories with identity.md
+        # Create anima directories with identity.md
         # rin: now has the repaired 上司 row
-        rin_dir = persons_dir / "rin"
+        rin_dir = animas_dir / "rin"
         rin_dir.mkdir(parents=True)
         (rin_dir / "identity.md").write_text(
             "# Identity: rin\n\n"
@@ -363,7 +363,7 @@ class TestSupervisorDataRepair:
         )
 
         # aoi: now has the repaired 上司 row
-        aoi_dir = persons_dir / "aoi"
+        aoi_dir = animas_dir / "aoi"
         aoi_dir.mkdir(parents=True)
         (aoi_dir / "identity.md").write_text(
             "# Identity: aoi\n\n"
@@ -375,14 +375,14 @@ class TestSupervisorDataRepair:
             encoding="utf-8",
         )
 
-        # Other persons (minimal)
+        # Other animas (minimal)
         for name in ("sakura", "kotoha", "chatwork_checker"):
-            d = persons_dir / name
+            d = animas_dir / name
             d.mkdir(parents=True)
             (d / "identity.md").write_text(f"# {name}\n", encoding="utf-8")
 
         # Run org-sync
-        result = sync_org_structure(persons_dir, config_path)
+        result = sync_org_structure(animas_dir, config_path)
 
         # rin's supervisor should now be resolved to "sakura"
         assert result["rin"] == "sakura", (
@@ -396,5 +396,5 @@ class TestSupervisorDataRepair:
         # Verify config.json was updated
         invalidate_cache()
         updated_cfg = load_config(config_path)
-        assert updated_cfg.persons["rin"].supervisor == "sakura"
-        assert updated_cfg.persons["aoi"].supervisor == "rin"
+        assert updated_cfg.animas["rin"].supervisor == "sakura"
+        assert updated_cfg.animas["aoi"].supervisor == "rin"

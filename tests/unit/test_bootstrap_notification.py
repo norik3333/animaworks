@@ -25,83 +25,83 @@ class TestProcessMessageStreamBootstrapGuard:
     async def test_bootstrap_busy_yields_immediately(self, tmp_path: Path):
         """When needs_bootstrap=True and lock is held, stream should
         yield a single bootstrap_busy chunk and return."""
-        from core.person import DigitalPerson
+        from core.anima import DigitalAnima
 
-        person_dir = tmp_path / "persons" / "test-person"
-        person_dir.mkdir(parents=True)
-        (person_dir / "identity.md").write_text("# Test", encoding="utf-8")
-        (person_dir / "bootstrap.md").write_text("# Bootstrap", encoding="utf-8")
+        anima_dir = tmp_path / "animas" / "test-anima"
+        anima_dir.mkdir(parents=True)
+        (anima_dir / "identity.md").write_text("# Test", encoding="utf-8")
+        (anima_dir / "bootstrap.md").write_text("# Bootstrap", encoding="utf-8")
         for sub in [
             "episodes", "knowledge", "procedures", "skills",
             "state", "shortterm", "shortterm/archive", "transcripts",
         ]:
-            (person_dir / sub).mkdir(parents=True, exist_ok=True)
-        (person_dir / "state" / "current_task.md").write_text(
+            (anima_dir / sub).mkdir(parents=True, exist_ok=True)
+        (anima_dir / "state" / "current_task.md").write_text(
             "status: idle\n", encoding="utf-8",
         )
-        (person_dir / "state" / "pending.md").write_text("", encoding="utf-8")
+        (anima_dir / "state" / "pending.md").write_text("", encoding="utf-8")
 
         shared_dir = tmp_path / "shared"
         shared_dir.mkdir(parents=True)
-        (shared_dir / "inbox" / "test-person").mkdir(parents=True)
+        (shared_dir / "inbox" / "test-anima").mkdir(parents=True)
         (shared_dir / "users").mkdir(parents=True)
 
         with (
-            patch("core.person.MemoryManager"),
-            patch("core.person.AgentCore"),
-            patch("core.person.Messenger"),
+            patch("core.anima.MemoryManager"),
+            patch("core.anima.AgentCore"),
+            patch("core.anima.Messenger"),
         ):
-            person = DigitalPerson(person_dir, shared_dir)
+            dp = DigitalAnima(anima_dir, shared_dir)
 
         # Verify bootstrap file exists
-        assert person.needs_bootstrap is True
+        assert dp.needs_bootstrap is True
 
         # Acquire lock to simulate ongoing bootstrap
-        await person._lock.acquire()
+        await dp._lock.acquire()
 
         try:
             chunks: list[dict] = []
-            async for chunk in person.process_message_stream("hello"):
+            async for chunk in dp.process_message_stream("hello"):
                 chunks.append(chunk)
 
             assert len(chunks) == 1
             assert chunks[0]["type"] == "bootstrap_busy"
             assert "初期化中" in chunks[0]["message"]
         finally:
-            person._lock.release()
+            dp._lock.release()
 
     async def test_no_bootstrap_file_proceeds_normally(self, tmp_path: Path):
         """When needs_bootstrap=False, stream should proceed normally
         even if the lock is held (waits for lock)."""
-        from core.person import DigitalPerson
+        from core.anima import DigitalAnima
 
-        person_dir = tmp_path / "persons" / "test-person"
-        person_dir.mkdir(parents=True)
-        (person_dir / "identity.md").write_text("# Test", encoding="utf-8")
+        anima_dir = tmp_path / "animas" / "test-anima"
+        anima_dir.mkdir(parents=True)
+        (anima_dir / "identity.md").write_text("# Test", encoding="utf-8")
         # No bootstrap.md
         for sub in [
             "episodes", "knowledge", "procedures", "skills",
             "state", "shortterm", "shortterm/archive", "transcripts",
         ]:
-            (person_dir / sub).mkdir(parents=True, exist_ok=True)
-        (person_dir / "state" / "current_task.md").write_text(
+            (anima_dir / sub).mkdir(parents=True, exist_ok=True)
+        (anima_dir / "state" / "current_task.md").write_text(
             "status: idle\n", encoding="utf-8",
         )
-        (person_dir / "state" / "pending.md").write_text("", encoding="utf-8")
+        (anima_dir / "state" / "pending.md").write_text("", encoding="utf-8")
 
         shared_dir = tmp_path / "shared"
         shared_dir.mkdir(parents=True)
-        (shared_dir / "inbox" / "test-person").mkdir(parents=True)
+        (shared_dir / "inbox" / "test-anima").mkdir(parents=True)
         (shared_dir / "users").mkdir(parents=True)
 
         with (
-            patch("core.person.MemoryManager"),
-            patch("core.person.AgentCore") as mock_agent_cls,
-            patch("core.person.Messenger"),
+            patch("core.anima.MemoryManager"),
+            patch("core.anima.AgentCore") as mock_agent_cls,
+            patch("core.anima.Messenger"),
         ):
-            person = DigitalPerson(person_dir, shared_dir)
+            dp = DigitalAnima(anima_dir, shared_dir)
 
-        assert person.needs_bootstrap is False
+        assert dp.needs_bootstrap is False
 
         # Mock run_cycle_streaming to yield a quick done
         async def _mock_stream(prompt, trigger=""):
@@ -111,14 +111,14 @@ class TestProcessMessageStreamBootstrapGuard:
                 "cycle_result": {"summary": "hi"},
             }
 
-        person.agent.run_cycle_streaming = _mock_stream
-        person.memory.read_model_config = MagicMock(return_value={
+        dp.agent.run_cycle_streaming = _mock_stream
+        dp.memory.read_model_config = MagicMock(return_value={
             "model": "test", "max_tokens": 100, "context_threshold": 0.5,
             "conversation_history_threshold": 0.3,
         })
 
         # Patch ConversationMemory to avoid file ops
-        with patch("core.person.ConversationMemory") as mock_conv:
+        with patch("core.anima.ConversationMemory") as mock_conv:
             mock_conv_inst = MagicMock()
             mock_conv_inst.compress_if_needed = AsyncMock()
             mock_conv_inst.build_chat_prompt = MagicMock(return_value="prompt")
@@ -128,7 +128,7 @@ class TestProcessMessageStreamBootstrapGuard:
             mock_conv.return_value = mock_conv_inst
 
             chunks: list[dict] = []
-            async for chunk in person.process_message_stream("hello"):
+            async for chunk in dp.process_message_stream("hello"):
                 chunks.append(chunk)
 
         types = [c["type"] for c in chunks]
@@ -177,7 +177,7 @@ class TestHandleChunkBootstrap:
         assert text == ""
 
     async def test_bootstrap_start_emits_websocket_event(self):
-        """When request and person_name are provided, bootstrap_start
+        """When request and anima_name are provided, bootstrap_start
         should trigger a WebSocket emit."""
         from server.routes.chat import _handle_chunk
 
@@ -189,13 +189,13 @@ class TestHandleChunkBootstrap:
         frame, _ = _handle_chunk(
             {"type": "bootstrap_start"},
             request=mock_request,
-            person_name="alice",
+            anima_name="alice",
         )
         assert frame is not None
         assert "event: bootstrap" in frame
 
     async def test_bootstrap_complete_emits_websocket_event(self):
-        """When request and person_name are provided, bootstrap_complete
+        """When request and anima_name are provided, bootstrap_complete
         should trigger a WebSocket emit."""
         from server.routes.chat import _handle_chunk
 
@@ -207,7 +207,7 @@ class TestHandleChunkBootstrap:
         frame, _ = _handle_chunk(
             {"type": "bootstrap_complete"},
             request=mock_request,
-            person_name="alice",
+            anima_name="alice",
         )
         assert frame is not None
         assert "event: bootstrap" in frame
@@ -264,36 +264,36 @@ class TestStatusClassBootstrapping:
         assert status_class(None) == "status-offline"
 
 
-# ── PersonRunner bootstrap notification ─────────────────────────
+# ── AnimaRunner bootstrap notification ─────────────────────────
 
 
-class TestPersonRunnerBootstrapNotification:
+class TestAnimaRunnerBootstrapNotification:
     """Test that _handle_process_message_stream emits bootstrap_start
     and bootstrap_complete chunks when appropriate."""
 
     async def test_bootstrap_start_emitted(self, tmp_path: Path):
         """When needs_bootstrap is True at stream start, a bootstrap_start
-        chunk should be emitted before any person stream chunks."""
-        from core.supervisor.runner import PersonRunner
+        chunk should be emitted before any anima stream chunks."""
+        from core.supervisor.runner import AnimaRunner
         from core.supervisor.ipc import IPCRequest
 
-        runner = PersonRunner(
-            person_name="test",
+        runner = AnimaRunner(
+            anima_name="test",
             socket_path=tmp_path / "test.sock",
-            persons_dir=tmp_path / "persons",
+            animas_dir=tmp_path / "animas",
             shared_dir=tmp_path / "shared",
         )
 
-        # Create mock person
-        mock_person = MagicMock()
-        mock_person.needs_bootstrap = True
+        # Create mock anima
+        mock_anima = MagicMock()
+        mock_anima.needs_bootstrap = True
 
         async def mock_stream(msg, from_person="human"):
             yield {"type": "text_delta", "text": "hello"}
             yield {"type": "cycle_done", "cycle_result": {"summary": "hello"}}
 
-        mock_person.process_message_stream = mock_stream
-        runner.person = mock_person
+        mock_anima.process_message_stream = mock_stream
+        runner.anima = mock_anima
 
         request = IPCRequest(
             id="test_001",
@@ -313,20 +313,20 @@ class TestPersonRunnerBootstrapNotification:
     async def test_bootstrap_complete_emitted_when_finished(self, tmp_path: Path):
         """When needs_bootstrap transitions from True to False during the
         stream, a bootstrap_complete chunk should be emitted."""
-        from core.supervisor.runner import PersonRunner
+        from core.supervisor.runner import AnimaRunner
         from core.supervisor.ipc import IPCRequest
 
-        runner = PersonRunner(
-            person_name="test",
+        runner = AnimaRunner(
+            anima_name="test",
             socket_path=tmp_path / "test.sock",
-            persons_dir=tmp_path / "persons",
+            animas_dir=tmp_path / "animas",
             shared_dir=tmp_path / "shared",
         )
 
-        mock_person = MagicMock()
+        mock_anima = MagicMock()
         # Start as True, then switch to False after stream
         bootstrap_values = [True, False]  # needs_bootstrap changes
-        type(mock_person).needs_bootstrap = property(
+        type(mock_anima).needs_bootstrap = property(
             lambda self: bootstrap_values[0] if bootstrap_values else False,
         )
 
@@ -336,8 +336,8 @@ class TestPersonRunnerBootstrapNotification:
             bootstrap_values[0] = False
             yield {"type": "cycle_done", "cycle_result": {"summary": "hello"}}
 
-        mock_person.process_message_stream = mock_stream
-        runner.person = mock_person
+        mock_anima.process_message_stream = mock_stream
+        runner.anima = mock_anima
 
         request = IPCRequest(
             id="test_002",
@@ -360,25 +360,25 @@ class TestPersonRunnerBootstrapNotification:
 
     async def test_no_bootstrap_events_when_not_bootstrapping(self, tmp_path: Path):
         """When needs_bootstrap is False, no bootstrap events should appear."""
-        from core.supervisor.runner import PersonRunner
+        from core.supervisor.runner import AnimaRunner
         from core.supervisor.ipc import IPCRequest
 
-        runner = PersonRunner(
-            person_name="test",
+        runner = AnimaRunner(
+            anima_name="test",
             socket_path=tmp_path / "test.sock",
-            persons_dir=tmp_path / "persons",
+            animas_dir=tmp_path / "animas",
             shared_dir=tmp_path / "shared",
         )
 
-        mock_person = MagicMock()
-        mock_person.needs_bootstrap = False
+        mock_anima = MagicMock()
+        mock_anima.needs_bootstrap = False
 
         async def mock_stream(msg, from_person="human"):
             yield {"type": "text_delta", "text": "hello"}
             yield {"type": "cycle_done", "cycle_result": {"summary": "hello"}}
 
-        mock_person.process_message_stream = mock_stream
-        runner.person = mock_person
+        mock_anima.process_message_stream = mock_stream
+        runner.anima = mock_anima
 
         request = IPCRequest(
             id="test_003",

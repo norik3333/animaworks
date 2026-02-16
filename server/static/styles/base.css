@@ -1,5 +1,5 @@
 /* ============================================
-   Digital Person — Base Styles
+   Digital Anima — Base Styles
    ============================================ */
 
 /* --- Reset & Base --- */
@@ -182,14 +182,14 @@ body {
   flex-shrink: 0;
 }
 
-.person-selector {
+.anima-selector {
   flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.person-dropdown {
+.anima-dropdown {
   min-width: 220px;
   max-width: 360px;
   width: 100%;
@@ -205,8 +205,8 @@ body {
   transition: border-color 0.15s;
 }
 
-.person-dropdown:focus,
-.person-dropdown:focus-visible {
+.anima-dropdown:focus,
+.anima-dropdown:focus-visible {
   border-color: #2563eb;
   outline: 2px solid #2563eb;
   outline-offset: 2px;
@@ -252,15 +252,15 @@ body {
   50% { opacity: 0.5; transform: scale(1.3); }
 }
 
-/* ── Person Visual States ──────────────────── */
+/* ── Anima Visual States ──────────────────── */
 
 /* Sleeping State (stopped / not_found) */
-.person-item--sleeping {
+.anima-item--sleeping {
     opacity: 0.45;
     filter: grayscale(0.85) brightness(0.8);
 }
 
-.person-item--sleeping .person-avatar-img {
+.anima-item--sleeping .anima-avatar-img {
     animation: breathe 4s ease-in-out infinite;
 }
 
@@ -269,45 +269,45 @@ body {
     50%      { opacity: 0.7; }
 }
 
-.person-item--sleeping .person-avatar-placeholder {
+.anima-item--sleeping .anima-avatar-placeholder {
     filter: grayscale(1);
     opacity: 0.4;
 }
 
-.person-item--sleeping .person-status {
+.anima-item--sleeping .anima-status {
     background: rgba(255, 255, 255, 0.06);
     color: rgba(255, 255, 255, 0.4);
 }
 
 /* Bootstrapping State (loading) */
-.person-item--loading {
+.anima-item--loading {
     opacity: 0.75;
     pointer-events: none;
 }
 
-.person-avatar-wrapper {
+.anima-avatar-wrapper {
     position: relative;
 }
 
-.person-avatar-spinner {
+.anima-avatar-spinner {
     display: none;
     position: absolute;
     inset: -4px;
     border-radius: 50%;
     border: 3px solid rgba(245, 158, 11, 0.2);
     border-top-color: #f59e0b;
-    animation: person-spin 1.2s linear infinite;
+    animation: anima-spin 1.2s linear infinite;
 }
 
-.person-item--loading .person-avatar-spinner {
+.anima-item--loading .anima-avatar-spinner {
     display: block;
 }
 
-@keyframes person-spin {
+@keyframes anima-spin {
     to { transform: rotate(360deg); }
 }
 
-.person-progress {
+.anima-progress {
     display: none;
     height: 3px;
     border-radius: 2px;
@@ -316,11 +316,11 @@ body {
     margin-top: 4px;
 }
 
-.person-item--loading .person-progress {
+.anima-item--loading .anima-progress {
     display: block;
 }
 
-.person-progress-bar {
+.anima-progress-bar {
     width: 40%;
     height: 100%;
     background: #f59e0b;
@@ -333,17 +333,17 @@ body {
     100% { transform: translateX(350%); }
 }
 
-.person-item--loading .person-status {
+.anima-item--loading .anima-status {
     background: rgba(245, 158, 11, 0.12);
     color: #f59e0b;
 }
 
 /* State Transitions */
-.person-item {
+.anima-item {
     transition: opacity 0.4s ease, filter 0.4s ease, transform 0.3s ease;
 }
 
-.person-item--just-activated {
+.anima-item--just-activated {
     animation: activate-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
 
@@ -354,14 +354,14 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .person-item--sleeping .person-avatar-img {
+    .anima-item--sleeping .anima-avatar-img {
         animation: none;
     }
-    .person-avatar-spinner,
-    .person-progress-bar {
+    .anima-avatar-spinner,
+    .anima-progress-bar {
         animation: none;
     }
-    .person-item--just-activated {
+    .anima-item--just-activated {
         animation: none;
     }
 }

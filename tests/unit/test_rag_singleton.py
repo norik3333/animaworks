@@ -238,15 +238,15 @@ class TestMemoryIndexerEmbeddingInjection:
         mock_store = MagicMock()
         mock_model = MagicMock()
 
-        person_dir = tmp_path / "test-person"
-        person_dir.mkdir(parents=True)
+        anima_dir = tmp_path / "test-anima"
+        anima_dir.mkdir(parents=True)
 
         from core.memory.rag.indexer import MemoryIndexer
 
         indexer = MemoryIndexer(
             vector_store=mock_store,
-            person_name="test-person",
-            person_dir=person_dir,
+            anima_name="test-anima",
+            anima_dir=anima_dir,
             embedding_model=mock_model,
         )
 
@@ -257,8 +257,8 @@ class TestMemoryIndexerEmbeddingInjection:
         mock_store = MagicMock()
         mock_model = MagicMock()
 
-        person_dir = tmp_path / "test-person"
-        person_dir.mkdir(parents=True)
+        anima_dir = tmp_path / "test-anima"
+        anima_dir.mkdir(parents=True)
 
         with patch(
             "core.memory.rag.indexer.MemoryIndexer._init_embedding_model"
@@ -267,8 +267,8 @@ class TestMemoryIndexerEmbeddingInjection:
 
             MemoryIndexer(
                 vector_store=mock_store,
-                person_name="test-person",
-                person_dir=person_dir,
+                anima_name="test-anima",
+                anima_dir=anima_dir,
                 embedding_model=mock_model,
             )
 
@@ -282,8 +282,8 @@ class TestMemoryIndexerEmbeddingInjection:
         mock_store = MagicMock()
         mock_model = MagicMock()
 
-        person_dir = tmp_path / "test-person"
-        person_dir.mkdir(parents=True)
+        anima_dir = tmp_path / "test-anima"
+        anima_dir.mkdir(parents=True)
 
         with patch(
             "core.memory.rag.singleton.get_embedding_model",
@@ -293,8 +293,8 @@ class TestMemoryIndexerEmbeddingInjection:
 
             indexer = MemoryIndexer(
                 vector_store=mock_store,
-                person_name="test-person",
-                person_dir=person_dir,
+                anima_name="test-anima",
+                anima_dir=anima_dir,
             )
 
             mock_get.assert_called_once()

@@ -1,5 +1,5 @@
 from __future__ import annotations
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
@@ -34,17 +34,17 @@ class ConsolidationEngine:
     - Weekly integration: Knowledge merging and episode compression
     """
 
-    def __init__(self, person_dir: Path, person_name: str) -> None:
+    def __init__(self, anima_dir: Path, anima_name: str) -> None:
         """Initialize consolidation engine.
 
         Args:
-            person_dir: Path to person's directory (~/.animaworks/persons/{name})
-            person_name: Name of the person for logging
+            anima_dir: Path to anima's directory (~/.animaworks/animas/{name})
+            anima_name: Name of the anima for logging
         """
-        self.person_dir = person_dir
-        self.person_name = person_name
-        self.episodes_dir = person_dir / "episodes"
-        self.knowledge_dir = person_dir / "knowledge"
+        self.anima_dir = anima_dir
+        self.anima_name = anima_name
+        self.episodes_dir = anima_dir / "episodes"
+        self.knowledge_dir = anima_dir / "knowledge"
         self.episodes_dir.mkdir(parents=True, exist_ok=True)
         self.knowledge_dir.mkdir(parents=True, exist_ok=True)
 
@@ -71,16 +71,16 @@ class ConsolidationEngine:
             - knowledge_files_updated: List of updated knowledge files
             - skipped: True if consolidation was skipped
         """
-        logger.info("Starting daily consolidation for person=%s", self.person_name)
+        logger.info("Starting daily consolidation for anima=%s", self.anima_name)
 
         # Collect recent episodes
         episode_entries = self._collect_recent_episodes(hours=24)
 
         if len(episode_entries) < min_episodes:
             logger.info(
-                "Skipping daily consolidation for person=%s: "
+                "Skipping daily consolidation for anima=%s: "
                 "only %d episodes found (min=%d)",
-                self.person_name, len(episode_entries), min_episodes
+                self.anima_name, len(episode_entries), min_episodes
             )
             return {
                 "episodes_processed": 0,
@@ -90,8 +90,8 @@ class ConsolidationEngine:
             }
 
         logger.info(
-            "Consolidating %d episode entries for person=%s",
-            len(episode_entries), self.person_name
+            "Consolidating %d episode entries for anima=%s",
+            len(episode_entries), self.anima_name
         )
 
         # Get existing knowledge files for context
@@ -114,7 +114,7 @@ class ConsolidationEngine:
         downscaling_result: dict[str, Any] = {}
         try:
             from core.memory.forgetting import ForgettingEngine
-            forgetter = ForgettingEngine(self.person_dir, self.person_name)
+            forgetter = ForgettingEngine(self.anima_dir, self.anima_name)
             downscaling_result = forgetter.synaptic_downscaling()
             logger.info(
                 "Synaptic downscaling: scanned=%d, marked=%d",
@@ -122,12 +122,12 @@ class ConsolidationEngine:
                 downscaling_result.get("marked_low", 0),
             )
         except Exception:
-            logger.exception("Synaptic downscaling failed for person=%s", self.person_name)
+            logger.exception("Synaptic downscaling failed for anima=%s", self.anima_name)
 
         logger.info(
-            "Daily consolidation complete for person=%s: "
+            "Daily consolidation complete for anima=%s: "
             "created=%d updated=%d",
-            self.person_name, len(files_created), len(files_updated)
+            self.anima_name, len(files_created), len(files_updated)
         )
 
         return {
@@ -241,7 +241,7 @@ class ConsolidationEngine:
             knowledge_list = "(まだ知識ファイルはありません)"
 
         # Build consolidation prompt
-        prompt = f"""以下は{self.person_name}の過去24時間のエピソード記録です。
+        prompt = f"""以下は{self.anima_name}の過去24時間のエピソード記録です。
 
 【エピソード】
 {episodes_text}
@@ -291,7 +291,7 @@ class ConsolidationEngine:
             result = response.choices[0].message.content or ""
             logger.info(
                 "Consolidation LLM response for %s (%d chars): %.500s",
-                self.person_name, len(result), result,
+                self.anima_name, len(result), result,
             )
             return result
 
@@ -318,7 +318,7 @@ class ConsolidationEngine:
         if not consolidation_result.strip():
             logger.warning(
                 "Empty consolidation LLM response for %s",
-                self.person_name,
+                self.anima_name,
             )
             return files_created, files_updated
 
@@ -405,7 +405,7 @@ class ConsolidationEngine:
                 "No knowledge files extracted from consolidation for %s "
                 "(response length=%d chars). "
                 "LLM may have judged episodes as non-extractable.",
-                self.person_name, len(consolidation_result),
+                self.anima_name, len(consolidation_result),
             )
 
         return files_created, files_updated
@@ -424,7 +424,7 @@ class ConsolidationEngine:
             from core.memory.rag.singleton import get_vector_store
 
             vector_store = get_vector_store()
-            indexer = MemoryIndexer(vector_store, self.person_name, self.person_dir)
+            indexer = MemoryIndexer(vector_store, self.anima_name, self.anima_dir)
 
             for filename in filenames:
                 filepath = self.knowledge_dir / filename
@@ -458,7 +458,7 @@ class ConsolidationEngine:
             - episodes_compressed: Number of episodes compressed
             - skipped: True if integration was skipped
         """
-        logger.info("Starting weekly integration for person=%s", self.person_name)
+        logger.info("Starting weekly integration for anima=%s", self.anima_name)
 
         results = {
             "knowledge_files_merged": [],
@@ -471,16 +471,16 @@ class ConsolidationEngine:
             duplicates = await self._detect_duplicates(threshold=duplicate_threshold)
             if duplicates:
                 logger.info(
-                    "Found %d duplicate knowledge file pairs for person=%s",
-                    len(duplicates), self.person_name
+                    "Found %d duplicate knowledge file pairs for anima=%s",
+                    len(duplicates), self.anima_name
                 )
                 merged_files = await self._merge_knowledge_files(duplicates, model)
                 results["knowledge_files_merged"] = merged_files
             else:
-                logger.info("No duplicate knowledge files found for person=%s", self.person_name)
+                logger.info("No duplicate knowledge files found for anima=%s", self.anima_name)
 
         except Exception:
-            logger.exception("Failed to merge knowledge files for person=%s", self.person_name)
+            logger.exception("Failed to merge knowledge files for anima=%s", self.anima_name)
 
         # Step 2: Compress old episodes
         try:
@@ -490,23 +490,23 @@ class ConsolidationEngine:
             )
             results["episodes_compressed"] = compressed_count
             logger.info(
-                "Compressed %d old episodes for person=%s",
-                compressed_count, self.person_name
+                "Compressed %d old episodes for anima=%s",
+                compressed_count, self.anima_name
             )
 
         except Exception:
-            logger.exception("Failed to compress old episodes for person=%s", self.person_name)
+            logger.exception("Failed to compress old episodes for anima=%s", self.anima_name)
 
         # Step 3: Rebuild RAG index for affected files
         try:
             self._rebuild_rag_index()
         except Exception:
-            logger.exception("Failed to rebuild RAG index for person=%s", self.person_name)
+            logger.exception("Failed to rebuild RAG index for anima=%s", self.anima_name)
 
         # Neurogenesis reorganization (forgetting phase 2)
         try:
             from core.memory.forgetting import ForgettingEngine
-            forgetter = ForgettingEngine(self.person_dir, self.person_name)
+            forgetter = ForgettingEngine(self.anima_dir, self.anima_name)
             reorg_result = await forgetter.neurogenesis_reorganize(model=model)
             results["reorganization"] = reorg_result
             logger.info(
@@ -514,11 +514,11 @@ class ConsolidationEngine:
                 reorg_result.get("merged_count", 0),
             )
         except Exception:
-            logger.exception("Neurogenesis reorganization failed for person=%s", self.person_name)
+            logger.exception("Neurogenesis reorganization failed for anima=%s", self.anima_name)
 
         logger.info(
-            "Weekly integration complete for person=%s: merged=%d compressed=%d",
-            self.person_name,
+            "Weekly integration complete for anima=%s: merged=%d compressed=%d",
+            self.anima_name,
             len(results["knowledge_files_merged"]),
             results["episodes_compressed"]
         )
@@ -542,7 +542,7 @@ class ConsolidationEngine:
             from core.memory.rag.singleton import get_vector_store
 
             vector_store = get_vector_store()
-            retriever = MemoryRetriever(vector_store, self.person_name, self.person_dir)
+            retriever = MemoryRetriever(vector_store, self.anima_name, self.anima_dir)
 
             # Get all knowledge files
             knowledge_files = self._list_knowledge_files()
@@ -618,7 +618,7 @@ class ConsolidationEngine:
                 content2 = (self.knowledge_dir / file2).read_text(encoding="utf-8")
 
                 # Build merge prompt
-                prompt = f"""以下は{self.person_name}の類似した2つの知識ファイルです。
+                prompt = f"""以下は{self.anima_name}の類似した2つの知識ファイルです。
 
 【ファイル1: {file1}】
 {content1}
@@ -740,7 +740,7 @@ class ConsolidationEngine:
                     continue
 
                 # Compress with LLM
-                prompt = f"""以下は{self.person_name}の{date_str}のエピソード記録です。
+                prompt = f"""以下は{self.anima_name}の{date_str}のエピソード記録です。
 
 【エピソード】
 {content}
@@ -790,7 +790,7 @@ class ConsolidationEngine:
             from core.memory.rag.singleton import get_vector_store
 
             vector_store = get_vector_store()
-            indexer = MemoryIndexer(vector_store, self.person_name, self.person_dir)
+            indexer = MemoryIndexer(vector_store, self.anima_name, self.anima_dir)
 
             # Re-index all knowledge files
             for knowledge_file in self.knowledge_dir.rglob("*.md"):
@@ -802,7 +802,7 @@ class ConsolidationEngine:
                 indexer.index_file(episode_file, memory_type="episodes")
                 logger.debug("Re-indexed episode: %s", episode_file.name)
 
-            logger.info("RAG index rebuild complete for person=%s", self.person_name)
+            logger.info("RAG index rebuild complete for anima=%s", self.anima_name)
 
         except ImportError:
             logger.debug("RAG not available, skipping index rebuild")
@@ -817,24 +817,24 @@ class ConsolidationEngine:
         This is the final stage of the forgetting pipeline, removing
         memories that have remained at low activation for extended periods.
         """
-        logger.info("Starting monthly forgetting for person=%s", self.person_name)
+        logger.info("Starting monthly forgetting for anima=%s", self.anima_name)
         try:
             from core.memory.forgetting import ForgettingEngine
-            forgetter = ForgettingEngine(self.person_dir, self.person_name)
+            forgetter = ForgettingEngine(self.anima_dir, self.anima_name)
             result = forgetter.complete_forgetting()
 
             # Rebuild RAG index after deletions
             self._rebuild_rag_index()
 
             logger.info(
-                "Monthly forgetting complete for person=%s: "
+                "Monthly forgetting complete for anima=%s: "
                 "forgotten=%d, archived=%d files",
-                self.person_name,
+                self.anima_name,
                 result.get("forgotten_chunks", 0),
                 len(result.get("archived_files", [])),
             )
             return result
 
         except Exception:
-            logger.exception("Monthly forgetting failed for person=%s", self.person_name)
+            logger.exception("Monthly forgetting failed for anima=%s", self.anima_name)
             return {"forgotten_chunks": 0, "archived_files": [], "error": True}

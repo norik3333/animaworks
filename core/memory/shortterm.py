@@ -1,4 +1,4 @@
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
@@ -8,7 +8,7 @@
 """Short-term memory (短期記憶) management.
 
 Handles writing and reading transient session state to the
-``{person_dir}/shortterm/`` folder.  This state bridges across
+``{anima_dir}/shortterm/`` folder.  This state bridges across
 session restarts when the context window threshold is crossed.
 """
 
@@ -59,19 +59,19 @@ class StreamCheckpoint:
 
 
 class ShortTermMemory:
-    """Manages the short-term memory folder for a DigitalPerson.
+    """Manages the short-term memory folder for a DigitalAnima.
 
     Folder layout::
 
-        {person_dir}/shortterm/
+        {anima_dir}/shortterm/
           ├── session_state.md    # Human-readable (fed to agent)
           ├── session_state.json  # Machine-readable (for programmatic restore)
           └── archive/            # Completed / superseded states
     """
 
-    def __init__(self, person_dir: Path) -> None:
-        self.person_dir = person_dir
-        self.shortterm_dir = person_dir / "shortterm"
+    def __init__(self, anima_dir: Path) -> None:
+        self.anima_dir = anima_dir
+        self.shortterm_dir = anima_dir / "shortterm"
         self._archive_dir = self.shortterm_dir / "archive"
 
     # ── Query ───────────────────────────────────────────────

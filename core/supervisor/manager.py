@@ -1,5 +1,5 @@
 """
-Process Supervisor - Manages lifecycle of Person child processes.
+Process Supervisor - Manages lifecycle of Anima child processes.
 """
 
 from __future__ import annotations
@@ -52,7 +52,7 @@ class ReconciliationConfig:
 
 class ProcessSupervisor:
     """
-    Supervisor for managing Person child processes.
+    Supervisor for managing Anima child processes.
 
     Responsibilities:
     - Start/stop child processes
@@ -64,7 +64,7 @@ class ProcessSupervisor:
 
     def __init__(
         self,
-        persons_dir: Path,
+        animas_dir: Path,
         shared_dir: Path,
         run_dir: Path,
         log_dir: Path | None = None,
@@ -73,7 +73,7 @@ class ProcessSupervisor:
         reconciliation_config: ReconciliationConfig | None = None,
         ws_manager: Any | None = None,
     ):
-        self.persons_dir = persons_dir
+        self.animas_dir = animas_dir
         self.shared_dir = shared_dir
         self.run_dir = run_dir
         self.log_dir = log_dir
@@ -93,30 +93,30 @@ class ProcessSupervisor:
         self._restarting: set[str] = set()
         self._bootstrapping: set[str] = set()
 
-        # Callbacks for person lifecycle events (set by server/app.py)
-        self.on_person_added: Callable[[str], None] | None = None
-        self.on_person_removed: Callable[[str], None] | None = None
+        # Callbacks for anima lifecycle events (set by server/app.py)
+        self.on_anima_added: Callable[[str], None] | None = None
+        self.on_anima_removed: Callable[[str], None] | None = None
 
     def is_scheduler_running(self) -> bool:
         """Return whether the system scheduler is running."""
         return self._scheduler_running
 
-    async def start_all(self, person_names: list[str]) -> None:
+    async def start_all(self, anima_names: list[str]) -> None:
         """
-        Start all Person processes.
+        Start all Anima processes.
 
         Args:
-            person_names: List of person names to start
+            anima_names: List of anima names to start
         """
-        logger.info("Starting %d Person processes", len(person_names))
+        logger.info("Starting %d Anima processes", len(anima_names))
 
         # Create socket directory
         socket_dir = self.run_dir / "sockets"
         socket_dir.mkdir(parents=True, exist_ok=True)
 
         # Start each process
-        for person_name in person_names:
-            await self.start_person(person_name)
+        for anima_name in anima_names:
+            await self.start_anima(anima_name)
 
         # Start health check loop
         self._health_check_task = asyncio.create_task(
@@ -133,77 +133,77 @@ class ProcessSupervisor:
 
         logger.info("All processes started")
 
-    async def start_person(self, person_name: str) -> None:
-        """Start a single Person process.
+    async def start_anima(self, anima_name: str) -> None:
+        """Start a single Anima process.
 
         After the process is ready, checks if bootstrap is needed and
         launches it as a background task automatically.
         """
-        if person_name in self.processes:
-            logger.warning("Process already exists: %s", person_name)
+        if anima_name in self.processes:
+            logger.warning("Process already exists: %s", anima_name)
             return
 
         socket_dir = self.run_dir / "sockets"
         socket_dir.mkdir(parents=True, exist_ok=True)
-        socket_path = socket_dir / f"{person_name}.sock"
+        socket_path = socket_dir / f"{anima_name}.sock"
 
         handle = ProcessHandle(
-            person_name=person_name,
+            anima_name=anima_name,
             socket_path=socket_path,
-            persons_dir=self.persons_dir,
+            animas_dir=self.animas_dir,
             shared_dir=self.shared_dir,
             log_dir=self.log_dir
         )
 
         try:
             await handle.start()
-            self.processes[person_name] = handle
-            logger.info("Person process started: %s (PID %s)", person_name, handle.get_pid())
+            self.processes[anima_name] = handle
+            logger.info("Anima process started: %s (PID %s)", anima_name, handle.get_pid())
 
             # Check if bootstrap is needed and launch in background
             try:
                 status = await self.send_request(
-                    person_name, "get_status", {}, timeout=10.0,
+                    anima_name, "get_status", {}, timeout=10.0,
                 )
                 if status.get("needs_bootstrap"):
                     logger.info(
                         "Bootstrap needed for %s, launching background task",
-                        person_name,
+                        anima_name,
                     )
-                    asyncio.create_task(self._run_bootstrap(person_name))
+                    asyncio.create_task(self._run_bootstrap(anima_name))
             except Exception as e:
                 logger.warning(
                     "Could not check bootstrap status for %s: %s",
-                    person_name, e,
+                    anima_name, e,
                 )
 
         except Exception as e:
-            logger.error("Failed to start process %s: %s", person_name, e)
+            logger.error("Failed to start process %s: %s", anima_name, e)
             raise
 
-    def is_bootstrapping(self, person_name: str) -> bool:
-        """Check if a person is currently bootstrapping."""
-        return person_name in self._bootstrapping
+    def is_bootstrapping(self, anima_name: str) -> bool:
+        """Check if an anima is currently bootstrapping."""
+        return anima_name in self._bootstrapping
 
-    async def _run_bootstrap(self, person_name: str) -> None:
-        """Run bootstrap for a person in the background.
+    async def _run_bootstrap(self, anima_name: str) -> None:
+        """Run bootstrap for an anima in the background.
 
         Sends a ``run_bootstrap`` IPC request with a long timeout (600s)
         and broadcasts progress via WebSocket.
         """
-        self._bootstrapping.add(person_name)
-        logger.info("Bootstrap started for %s", person_name)
+        self._bootstrapping.add(anima_name)
+        logger.info("Bootstrap started for %s", anima_name)
 
         # Broadcast bootstrap started
         await self._broadcast_event(
-            "person.bootstrap",
-            {"name": person_name, "status": "started"},
+            "anima.bootstrap",
+            {"name": anima_name, "status": "started"},
         )
 
         try:
-            handle = self.processes.get(person_name)
+            handle = self.processes.get(anima_name)
             if not handle:
-                logger.error("Bootstrap failed: process not found for %s", person_name)
+                logger.error("Bootstrap failed: process not found for %s", anima_name)
                 return
 
             response = await handle.send_request(
@@ -213,38 +213,38 @@ class ProcessSupervisor:
             if response.error:
                 logger.error(
                     "Bootstrap failed for %s: %s",
-                    person_name, response.error.get("message", "Unknown error"),
+                    anima_name, response.error.get("message", "Unknown error"),
                 )
                 await self._broadcast_event(
-                    "person.bootstrap",
-                    {"name": person_name, "status": "failed"},
+                    "anima.bootstrap",
+                    {"name": anima_name, "status": "failed"},
                 )
                 return
 
             result = response.result or {}
             logger.info(
                 "Bootstrap completed for %s (duration_ms=%s)",
-                person_name, result.get("duration_ms", "?"),
+                anima_name, result.get("duration_ms", "?"),
             )
             await self._broadcast_event(
-                "person.bootstrap",
-                {"name": person_name, "status": "completed"},
+                "anima.bootstrap",
+                {"name": anima_name, "status": "completed"},
             )
 
         except asyncio.TimeoutError:
-            logger.error("Bootstrap timed out for %s (600s)", person_name)
+            logger.error("Bootstrap timed out for %s (600s)", anima_name)
             await self._broadcast_event(
-                "person.bootstrap",
-                {"name": person_name, "status": "failed"},
+                "anima.bootstrap",
+                {"name": anima_name, "status": "failed"},
             )
         except Exception:
-            logger.exception("Bootstrap error for %s", person_name)
+            logger.exception("Bootstrap error for %s", anima_name)
             await self._broadcast_event(
-                "person.bootstrap",
-                {"name": person_name, "status": "failed"},
+                "anima.bootstrap",
+                {"name": anima_name, "status": "failed"},
             )
         finally:
-            self._bootstrapping.discard(person_name)
+            self._bootstrapping.discard(anima_name)
 
     async def _broadcast_event(
         self, event_type: str, data: dict[str, Any],
@@ -253,27 +253,27 @@ class ProcessSupervisor:
         if self.ws_manager:
             await self.ws_manager.broadcast({"type": event_type, "data": data})
 
-    async def stop_person(self, person_name: str) -> None:
-        """Stop a single Person process."""
-        handle = self.processes.get(person_name)
+    async def stop_anima(self, anima_name: str) -> None:
+        """Stop a single Anima process."""
+        handle = self.processes.get(anima_name)
         if not handle:
-            logger.warning("Process not found: %s", person_name)
+            logger.warning("Process not found: %s", anima_name)
             return
 
         await handle.stop(timeout=10.0)
-        del self.processes[person_name]
-        logger.info("Person process stopped: %s", person_name)
+        del self.processes[anima_name]
+        logger.info("Anima process stopped: %s", anima_name)
 
-    async def restart_person(self, person_name: str) -> None:
-        """Restart a Person process."""
-        logger.info("Restarting process: %s", person_name)
+    async def restart_anima(self, anima_name: str) -> None:
+        """Restart a Anima process."""
+        logger.info("Restarting process: %s", anima_name)
 
         # Stop existing process
-        if person_name in self.processes:
-            await self.stop_person(person_name)
+        if anima_name in self.processes:
+            await self.stop_anima(anima_name)
 
         # Start new process
-        await self.start_person(person_name)
+        await self.start_anima(anima_name)
 
     async def shutdown_all(self) -> None:
         """Shutdown all processes gracefully."""
@@ -304,7 +304,7 @@ class ProcessSupervisor:
 
         # Stop all processes
         tasks = [
-            self.stop_person(name)
+            self.stop_anima(name)
             for name in list(self.processes.keys())
         ]
         await asyncio.gather(*tasks, return_exceptions=True)
@@ -313,16 +313,16 @@ class ProcessSupervisor:
 
     async def send_request(
         self,
-        person_name: str,
+        anima_name: str,
         method: str,
         params: dict[str, Any],
         timeout: float = 60.0
     ) -> dict:
         """
-        Send IPC request to a Person process.
+        Send IPC request to a Anima process.
 
         Args:
-            person_name: Target person name
+            anima_name: Target anima name
             method: Method name
             params: Request parameters
             timeout: Timeout in seconds
@@ -331,13 +331,13 @@ class ProcessSupervisor:
             Response result dict
 
         Raises:
-            KeyError: If person not found
+            KeyError: If anima not found
             RuntimeError: If process not running
             ValueError: If response contains error
         """
-        handle = self.processes.get(person_name)
+        handle = self.processes.get(anima_name)
         if not handle:
-            raise KeyError(f"Person not found: {person_name}")
+            raise KeyError(f"Anima not found: {anima_name}")
 
         response = await handle.send_request(method, params, timeout)
 
@@ -350,16 +350,16 @@ class ProcessSupervisor:
 
     async def send_request_stream(
         self,
-        person_name: str,
+        anima_name: str,
         method: str,
         params: dict[str, Any],
         timeout: float | None = None,
     ) -> AsyncIterator[IPCResponse]:
         """
-        Send IPC request to a Person process and yield streaming responses.
+        Send IPC request to a Anima process and yield streaming responses.
 
         Args:
-            person_name: Target person name
+            anima_name: Target anima name
             method: Method name
             params: Request parameters (should include stream=True)
             timeout: Per-chunk timeout in seconds. Resets on each received
@@ -369,12 +369,12 @@ class ProcessSupervisor:
             IPCResponse objects (chunks and final result)
 
         Raises:
-            KeyError: If person not found
+            KeyError: If anima not found
             RuntimeError: If process not running
         """
-        handle = self.processes.get(person_name)
+        handle = self.processes.get(anima_name)
         if not handle:
-            raise KeyError(f"Person not found: {person_name}")
+            raise KeyError(f"Anima not found: {anima_name}")
 
         async for response in handle.send_request_stream(
             method, params, timeout
@@ -385,16 +385,16 @@ class ProcessSupervisor:
                 )
             yield response
 
-    async def _poll_person_events(self) -> None:
+    async def _poll_anima_events(self) -> None:
         """Read and broadcast event files from child processes."""
         events_base = self.run_dir / "events"
         if not events_base.exists():
             return
 
-        for person_dir in events_base.iterdir():
-            if not person_dir.is_dir():
+        for anima_dir in events_base.iterdir():
+            if not anima_dir.is_dir():
                 continue
-            for event_file in sorted(person_dir.glob("*.json")):
+            for event_file in sorted(anima_dir.glob("*.json")):
                 try:
                     data = json.loads(event_file.read_text(encoding="utf-8"))
                     event_type = data.get("event", "")
@@ -422,12 +422,12 @@ class ProcessSupervisor:
                 await asyncio.sleep(self.health_config.ping_interval_sec)
 
                 # Poll and broadcast child process events
-                await self._poll_person_events()
+                await self._poll_anima_events()
 
                 # Check all processes in parallel
                 checks = [
-                    self._check_process_health(person_name, handle)
-                    for person_name, handle in list(self.processes.items())
+                    self._check_process_health(anima_name, handle)
+                    for anima_name, handle in list(self.processes.items())
                 ]
                 await asyncio.gather(*checks, return_exceptions=True)
 
@@ -440,37 +440,37 @@ class ProcessSupervisor:
 
     async def _check_process_health(
         self,
-        person_name: str,
+        anima_name: str,
         handle: ProcessHandle
     ) -> None:
         """Check health of a single process."""
         # Skip if currently streaming (IPC lock held, ping would block)
         if handle._streaming:
-            logger.debug("Skipping health check for %s (streaming)", person_name)
+            logger.debug("Skipping health check for %s (streaming)", anima_name)
             return
 
         # Skip if in startup grace period
         uptime = (datetime.now() - handle.stats.started_at).total_seconds()
         if uptime < self.health_config.startup_grace_sec:
-            logger.debug("Skipping health check for %s (startup grace)", person_name)
+            logger.debug("Skipping health check for %s (startup grace)", anima_name)
             return
 
         # Reset restart counter after stable uptime
         if uptime > self.restart_policy.reset_after_sec:
-            if self._restart_counts.get(person_name, 0) > 0:
-                self._restart_counts[person_name] = 0
+            if self._restart_counts.get(anima_name, 0) > 0:
+                self._restart_counts[anima_name] = 0
                 logger.info(
                     "Restart counter reset for %s (stable for %.0fs)",
-                    person_name, uptime
+                    anima_name, uptime
                 )
 
         # Check if process is alive
         if not handle.is_alive():
             logger.error(
                 "Process exited unexpectedly: %s (exit_code=%s)",
-                person_name, handle.stats.exit_code
+                anima_name, handle.stats.exit_code
             )
-            asyncio.create_task(self._handle_process_failure(person_name, handle))
+            asyncio.create_task(self._handle_process_failure(anima_name, handle))
             return
 
         # Ping process
@@ -479,44 +479,44 @@ class ProcessSupervisor:
         if success:
             # Ping successful
             if handle.stats.missed_pings > 0:
-                logger.info("Process recovered: %s", person_name)
+                logger.info("Process recovered: %s", anima_name)
             return
 
         # Ping failed
         logger.warning(
             "Health check failed: %s (missed=%d/%d)",
-            person_name, handle.stats.missed_pings, self.health_config.max_missed_pings
+            anima_name, handle.stats.missed_pings, self.health_config.max_missed_pings
         )
 
         # Check if hang threshold exceeded
         if handle.stats.missed_pings >= self.health_config.max_missed_pings:
             logger.error(
                 "Process hang detected: %s (PID %s)",
-                person_name, handle.get_pid()
+                anima_name, handle.get_pid()
             )
-            asyncio.create_task(self._handle_process_hang(person_name, handle))
+            asyncio.create_task(self._handle_process_hang(anima_name, handle))
 
     async def _handle_process_failure(
         self,
-        person_name: str,
+        anima_name: str,
         handle: ProcessHandle
     ) -> None:
         """Handle process exit/crash.
 
         Runs as an independent task so the health-check loop is not blocked
-        by backoff sleeps.  A per-person guard prevents duplicate restarts.
+        by backoff sleeps.  A per-anima guard prevents duplicate restarts.
         """
-        if person_name in self._restarting:
+        if anima_name in self._restarting:
             return
-        self._restarting.add(person_name)
+        self._restarting.add(anima_name)
 
         try:
             # Check restart count (supervisor-level, survives handle recreation)
-            count = self._restart_counts.get(person_name, 0)
+            count = self._restart_counts.get(anima_name, 0)
             if count >= self.restart_policy.max_retries:
                 logger.error(
                     "Max restart retries exceeded for %s. Manual intervention required.",
-                    person_name
+                    anima_name
                 )
                 handle.state = ProcessState.FAILED
                 return
@@ -529,46 +529,46 @@ class ProcessSupervisor:
 
             logger.info(
                 "Scheduling restart for %s (retry %d/%d, delay=%.1fs)",
-                person_name, count + 1, self.restart_policy.max_retries, backoff
+                anima_name, count + 1, self.restart_policy.max_retries, backoff
             )
 
             # Wait and restart
             await asyncio.sleep(backoff)
 
-            self._restart_counts[person_name] = count + 1
-            await self.restart_person(person_name)
+            self._restart_counts[anima_name] = count + 1
+            await self.restart_anima(anima_name)
 
             logger.info(
                 "Process restarted: %s (PID %s, retry=%d/%d)",
-                person_name, self.processes[person_name].get_pid(),
+                anima_name, self.processes[anima_name].get_pid(),
                 count + 1, self.restart_policy.max_retries
             )
 
         except Exception as e:
-            logger.error("Failed to restart %s: %s", person_name, e)
+            logger.error("Failed to restart %s: %s", anima_name, e)
             handle.state = ProcessState.FAILED
         finally:
-            self._restarting.discard(person_name)
+            self._restarting.discard(anima_name)
 
     async def _handle_process_hang(
         self,
-        person_name: str,
+        anima_name: str,
         handle: ProcessHandle
     ) -> None:
         """Handle hung process (kill and restart)."""
-        logger.warning("Killing hung process: %s", person_name)
+        logger.warning("Killing hung process: %s", anima_name)
 
         # Kill process
         await handle.kill()
 
         # Restart
-        await self._handle_process_failure(person_name, handle)
+        await self._handle_process_failure(anima_name, handle)
 
     # ── Reconciliation ─────────────────────────────────────────────
 
     @staticmethod
-    def read_person_enabled(person_dir: Path) -> bool:
-        """Read the enabled flag from a person's status.json.
+    def read_anima_enabled(anima_dir: Path) -> bool:
+        """Read the enabled flag from an anima's status.json.
 
         Returns True (enabled) when:
         - status.json does not exist (backward compatibility)
@@ -576,7 +576,7 @@ class ProcessSupervisor:
 
         Returns False when status.json exists with ``enabled: false``.
         """
-        status_file = person_dir / "status.json"
+        status_file = anima_dir / "status.json"
         if not status_file.exists():
             return True  # Backward compatibility: no file = enabled
         try:
@@ -602,29 +602,29 @@ class ProcessSupervisor:
         logger.info("Reconciliation loop stopped")
 
     async def _reconcile(self) -> None:
-        """Scan persons_dir and sync desired state with actual process state."""
-        if not self.persons_dir.exists():
+        """Scan animas_dir and sync desired state with actual process state."""
+        if not self.animas_dir.exists():
             return
 
         # Build desired state from disk
         on_disk: dict[str, bool] = {}  # name -> enabled
-        for person_dir in sorted(self.persons_dir.iterdir()):
-            if not person_dir.is_dir():
+        for anima_dir in sorted(self.animas_dir.iterdir()):
+            if not anima_dir.is_dir():
                 continue
-            if not (person_dir / "identity.md").exists():
+            if not (anima_dir / "identity.md").exists():
                 continue
-            on_disk[person_dir.name] = self.read_person_enabled(person_dir)
+            on_disk[anima_dir.name] = self.read_anima_enabled(anima_dir)
 
         running = set(self.processes.keys())
 
         # enabled + not running → start
         for name, enabled in on_disk.items():
             if enabled and name not in running:
-                logger.info("Reconciliation: starting person %s", name)
+                logger.info("Reconciliation: starting anima %s", name)
                 try:
-                    await self.start_person(name)
-                    if self.on_person_added:
-                        self.on_person_added(name)
+                    await self.start_anima(name)
+                    if self.on_anima_added:
+                        self.on_anima_added(name)
                 except Exception:
                     logger.exception(
                         "Reconciliation: failed to start %s", name
@@ -634,12 +634,12 @@ class ProcessSupervisor:
         for name, enabled in on_disk.items():
             if not enabled and name in running:
                 logger.info(
-                    "Reconciliation: stopping person %s (disabled)", name
+                    "Reconciliation: stopping anima %s (disabled)", name
                 )
                 try:
-                    await self.stop_person(name)
-                    if self.on_person_removed:
-                        self.on_person_removed(name)
+                    await self.stop_anima(name)
+                    if self.on_anima_removed:
+                        self.on_anima_removed(name)
                 except Exception:
                     logger.exception(
                         "Reconciliation: failed to stop %s", name
@@ -649,41 +649,41 @@ class ProcessSupervisor:
         for name in list(running):
             if name not in on_disk:
                 logger.info(
-                    "Reconciliation: stopping person %s (removed from disk)",
+                    "Reconciliation: stopping anima %s (removed from disk)",
                     name,
                 )
                 try:
-                    await self.stop_person(name)
-                    if self.on_person_removed:
-                        self.on_person_removed(name)
+                    await self.stop_anima(name)
+                    if self.on_anima_removed:
+                        self.on_anima_removed(name)
                 except Exception:
                     logger.exception(
                         "Reconciliation: failed to stop %s", name
                     )
 
-        # Check for missing person assets (fallback generation)
+        # Check for missing anima assets (fallback generation)
         await self._reconcile_assets()
 
     async def _reconcile_assets(self) -> None:
-        """Check for and generate missing person assets during reconciliation."""
+        """Check for and generate missing anima assets during reconciliation."""
         try:
-            from core.asset_reconciler import find_persons_with_missing_assets, reconcile_person_assets
+            from core.asset_reconciler import find_animas_with_missing_assets, reconcile_anima_assets
 
-            incomplete = find_persons_with_missing_assets(self.persons_dir)
+            incomplete = find_animas_with_missing_assets(self.animas_dir)
             if not incomplete:
                 return
 
             logger.info(
-                "Asset reconciliation: %d person(s) with missing assets",
+                "Asset reconciliation: %d anima(s) with missing assets",
                 len(incomplete),
             )
-            for person_name, _check in incomplete:
-                person_dir = self.persons_dir / person_name
-                result = await reconcile_person_assets(person_dir)
+            for anima_name, _check in incomplete:
+                anima_dir = self.animas_dir / anima_name
+                result = await reconcile_anima_assets(anima_dir)
                 if not result.get("skipped"):
                     await self._broadcast_event(
-                        "person.assets_updated",
-                        {"name": person_name, "source": "reconciliation"},
+                        "anima.assets_updated",
+                        {"name": anima_name, "source": "reconciliation"},
                     )
         except Exception:
             logger.exception("Asset reconciliation failed")
@@ -756,7 +756,7 @@ class ProcessSupervisor:
             logger.info("System cron: Weekly integration on %s at %s:%s JST", day_of_week, time_parts[0], time_parts[1])
 
     async def _run_daily_consolidation(self) -> None:
-        """Run daily consolidation for all persons."""
+        """Run daily consolidation for all animas."""
         logger.info("Starting system-wide daily consolidation")
 
         try:
@@ -772,14 +772,14 @@ class ProcessSupervisor:
             model = getattr(consolidation_cfg, "llm_model", model)
             min_episodes = getattr(consolidation_cfg, "min_episodes_threshold", 1)
 
-        for person_name in list(self.processes.keys()):
+        for anima_name in list(self.processes.keys()):
             try:
                 from core.memory.consolidation import ConsolidationEngine
 
-                person_dir = self.persons_dir / person_name
+                anima_dir = self.animas_dir / anima_name
                 engine = ConsolidationEngine(
-                    person_dir=person_dir,
-                    person_name=person_name,
+                    anima_dir=anima_dir,
+                    anima_name=anima_name,
                 )
 
                 result = await engine.daily_consolidate(
@@ -787,18 +787,18 @@ class ProcessSupervisor:
                     min_episodes=min_episodes,
                 )
 
-                logger.info("Daily consolidation for %s: %s", person_name, result)
+                logger.info("Daily consolidation for %s: %s", anima_name, result)
 
                 if not result.get("skipped"):
                     await self._broadcast_event(
                         "system.consolidation",
-                        {"person": person_name, "type": "daily", "result": result},
+                        {"anima": anima_name, "type": "daily", "result": result},
                     )
             except Exception:
-                logger.exception("Daily consolidation failed for %s", person_name)
+                logger.exception("Daily consolidation failed for %s", anima_name)
 
     async def _run_weekly_integration(self) -> None:
-        """Run weekly integration for all persons."""
+        """Run weekly integration for all animas."""
         logger.info("Starting system-wide weekly integration")
 
         try:
@@ -816,14 +816,14 @@ class ProcessSupervisor:
             duplicate_threshold = getattr(consolidation_cfg, "duplicate_threshold", 0.85)
             episode_retention_days = getattr(consolidation_cfg, "episode_retention_days", 30)
 
-        for person_name in list(self.processes.keys()):
+        for anima_name in list(self.processes.keys()):
             try:
                 from core.memory.consolidation import ConsolidationEngine
 
-                person_dir = self.persons_dir / person_name
+                anima_dir = self.animas_dir / anima_name
                 engine = ConsolidationEngine(
-                    person_dir=person_dir,
-                    person_name=person_name,
+                    anima_dir=anima_dir,
+                    anima_name=anima_name,
                 )
 
                 result = await engine.weekly_integrate(
@@ -834,7 +834,7 @@ class ProcessSupervisor:
 
                 logger.info(
                     "Weekly integration for %s: merged=%d compressed=%d",
-                    person_name,
+                    anima_name,
                     len(result.get("knowledge_files_merged", [])),
                     result.get("episodes_compressed", 0),
                 )
@@ -842,33 +842,33 @@ class ProcessSupervisor:
                 if not result.get("skipped"):
                     await self._broadcast_event(
                         "system.consolidation",
-                        {"person": person_name, "type": "weekly", "result": result},
+                        {"anima": anima_name, "type": "weekly", "result": result},
                     )
             except Exception:
-                logger.exception("Weekly integration failed for %s", person_name)
+                logger.exception("Weekly integration failed for %s", anima_name)
 
     # ── Status ───────────────────────────────────────────────────
 
-    def get_process_status(self, person_name: str) -> dict:
+    def get_process_status(self, anima_name: str) -> dict:
         """
-        Get status of a Person process.
+        Get status of a Anima process.
 
         Returns:
             Status dict with state, PID, uptime, etc.
         """
-        handle = self.processes.get(person_name)
+        handle = self.processes.get(anima_name)
         if not handle:
             return {"status": "not_found"}
 
         uptime = (datetime.now() - handle.stats.started_at).total_seconds()
 
         return {
-            "status": "bootstrapping" if self.is_bootstrapping(person_name) else handle.state.value,
+            "status": "bootstrapping" if self.is_bootstrapping(anima_name) else handle.state.value,
             "pid": handle.get_pid(),
             "uptime_sec": uptime,
-            "restart_count": self._restart_counts.get(person_name, 0),
+            "restart_count": self._restart_counts.get(anima_name, 0),
             "missed_pings": handle.stats.missed_pings,
-            "bootstrapping": self.is_bootstrapping(person_name),
+            "bootstrapping": self.is_bootstrapping(anima_name),
             "last_ping_at": (
                 handle.stats.last_ping_at.isoformat()
                 if handle.stats.last_ping_at else None

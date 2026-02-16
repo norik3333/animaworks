@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from core.supervisor.runner import (
-    PersonRunner,
+    AnimaRunner,
     _CASCADE_THRESHOLD,
     _CASCADE_WINDOW_S,
     _MSG_HEARTBEAT_COOLDOWN_S,
@@ -19,17 +19,17 @@ from core.supervisor.runner import (
 # ── Helpers ──────────────────────────────────────────────────
 
 
-def _make_runner() -> PersonRunner:
-    """Create a PersonRunner with minimal config for unit testing."""
-    runner = PersonRunner(
-        person_name="test",
+def _make_runner() -> AnimaRunner:
+    """Create a AnimaRunner with minimal config for unit testing."""
+    runner = AnimaRunner(
+        anima_name="test",
         socket_path=Path("/tmp/test.sock"),
-        persons_dir=Path("/tmp/persons"),
+        animas_dir=Path("/tmp/animas"),
         shared_dir=Path("/tmp/shared"),
     )
-    runner.person = MagicMock()
-    runner.person.messenger = MagicMock()
-    runner.person._lock = asyncio.Lock()
+    runner.anima = MagicMock()
+    runner.anima.messenger = MagicMock()
+    runner.anima._lock = asyncio.Lock()
     return runner
 
 
@@ -169,14 +169,14 @@ class TestInboxWatcher:
 
         # messenger.has_unread should never be called because
         # _pending_trigger short-circuits first
-        runner.person.messenger.has_unread.assert_not_called()
+        runner.anima.messenger.has_unread.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_skips_when_in_cooldown(self):
         """Loop continues without triggering when in cooldown."""
         runner = _make_runner()
         runner._last_msg_heartbeat_end = time.monotonic()  # Just ended
-        runner.person.messenger.has_unread.return_value = True
+        runner.anima.messenger.has_unread.return_value = True
 
         iteration_count = 0
         original_sleep = asyncio.sleep
@@ -196,12 +196,12 @@ class TestInboxWatcher:
 
     @pytest.mark.asyncio
     async def test_defers_when_lock_held(self):
-        """Sets _deferred_inbox when person._lock is locked."""
+        """Sets _deferred_inbox when anima._lock is locked."""
         runner = _make_runner()
-        runner.person.messenger.has_unread.return_value = True
+        runner.anima.messenger.has_unread.return_value = True
 
         # Acquire the lock before the watcher checks it
-        await runner.person._lock.acquire()
+        await runner.anima._lock.acquire()
 
         iteration_count = 0
         original_sleep = asyncio.sleep
@@ -220,4 +220,4 @@ class TestInboxWatcher:
         assert runner._pending_trigger is False
 
         # Release the lock to clean up
-        runner.person._lock.release()
+        runner.anima._lock.release()

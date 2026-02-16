@@ -1,5 +1,5 @@
 from __future__ import annotations
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
@@ -46,12 +46,12 @@ def _build_emotion_instruction() -> str:
 EMOTION_INSTRUCTION = _build_emotion_instruction()
 
 
-def _discover_other_persons(person_dir: Path) -> list[str]:
-    """List sibling person directories."""
-    persons_root = person_dir.parent
-    self_name = person_dir.name
+def _discover_other_animas(anima_dir: Path) -> list[str]:
+    """List sibling anima directories."""
+    animas_root = anima_dir.parent
+    self_name = anima_dir.name
     others = []
-    for d in sorted(persons_root.iterdir()):
+    for d in sorted(animas_root.iterdir()):
         if d.is_dir() and d.name != self_name and (d / "identity.md").exists():
             others.append(d.name)
     return others
@@ -60,21 +60,21 @@ def _discover_other_persons(person_dir: Path) -> list[str]:
 # ── Organisation Context ─────────────────────────────────
 
 
-def _format_person_entry(name: str, speciality: str | None) -> str:
-    """Format a person name with optional speciality annotation."""
+def _format_anima_entry(name: str, speciality: str | None) -> str:
+    """Format an anima name with optional speciality annotation."""
     if speciality:
         return f"{name} ({speciality})"
     return name
 
 
 def _build_full_org_tree(
-    person_name: str,
-    all_persons: dict[str, Any],
+    anima_name: str,
+    all_animas: dict[str, Any],
 ) -> str:
-    """Build an indented full organization tree for top-level persons."""
+    """Build an indented full organization tree for top-level animas."""
     # Build children map: parent -> list of children
     children: dict[str | None, list[str]] = {}
-    for name, pcfg in all_persons.items():
+    for name, pcfg in all_animas.items():
         parent = pcfg.supervisor
         children.setdefault(parent, []).append(name)
     for k in children:
@@ -83,14 +83,14 @@ def _build_full_org_tree(
     lines: list[str] = []
 
     def _render(name: str, prefix: str, is_last: bool, is_root: bool) -> None:
-        spec = all_persons[name].speciality if name in all_persons else None
-        label = _format_person_entry(name, spec)
+        spec = all_animas[name].speciality if name in all_animas else None
+        label = _format_anima_entry(name, spec)
         if is_root:
             marker = ""
-            suffix = "  ← あなた" if name == person_name else ""
+            suffix = "  ← あなた" if name == anima_name else ""
         else:
             marker = "└── " if is_last else "├── "
-            suffix = "  ← あなた" if name == person_name else ""
+            suffix = "  ← あなた" if name == anima_name else ""
         lines.append(f"{prefix}{marker}{label}{suffix}")
         kids = children.get(name, [])
         for i, child in enumerate(kids):
@@ -108,11 +108,11 @@ def _build_full_org_tree(
     return "\n".join(lines)
 
 
-def _build_org_context(person_name: str, other_persons: list[str]) -> str:
+def _build_org_context(anima_name: str, other_animas: list[str]) -> str:
     """Build organisation context section from supervisor chain.
 
-    Reads config.json to derive each Person's relationship
-    (supervisor / subordinate / peer) relative to *person_name*
+    Reads config.json to derive each Anima's relationship
+    (supervisor / subordinate / peer) relative to *anima_name*
     and returns a formatted prompt section.
     """
     from core.config import load_config
@@ -123,23 +123,23 @@ def _build_org_context(person_name: str, other_persons: list[str]) -> str:
         logger.debug("Could not load config for org context", exc_info=True)
         return ""
 
-    all_persons = config.persons
-    my_config = all_persons.get(person_name)
+    all_animas = config.animas
+    my_config = all_animas.get(anima_name)
     my_supervisor = my_config.supervisor if my_config else None
     my_speciality = my_config.speciality if my_config else None
     is_top_level = my_supervisor is None
 
-    # Top-level person with subordinates: show full org tree
-    if is_top_level and len(all_persons) > 1:
-        person_speciality = my_speciality or "(未設定)"
-        tree_text = _build_full_org_tree(person_name, all_persons)
+    # Top-level anima with subordinates: show full org tree
+    if is_top_level and len(all_animas) > 1:
+        anima_speciality = my_speciality or "(未設定)"
+        tree_text = _build_full_org_tree(anima_name, all_animas)
         parts = [
             f"## あなたの組織上の位置\n\n"
-            f"あなたの専門: {person_speciality}\n\n"
+            f"あなたの専門: {anima_speciality}\n\n"
             f"あなたはトップレベルです（上司なし）。以下が組織全体の構成です：\n\n"
             f"```\n{tree_text}\n```",
         ]
-        if other_persons:
+        if other_animas:
             parts.append(load_prompt("communication_rules"))
         return "\n\n".join(parts)
 
@@ -147,34 +147,34 @@ def _build_org_context(person_name: str, other_persons: list[str]) -> str:
     # Supervisor
     if my_supervisor:
         sup_spec = None
-        if my_supervisor in all_persons:
-            sup_spec = all_persons[my_supervisor].speciality
-        supervisor_line = _format_person_entry(my_supervisor, sup_spec)
+        if my_supervisor in all_animas:
+            sup_spec = all_animas[my_supervisor].speciality
+        supervisor_line = _format_anima_entry(my_supervisor, sup_spec)
     else:
         supervisor_line = "(なし — あなたがトップです)"
 
-    # Subordinates: persons whose supervisor is me
+    # Subordinates: animas whose supervisor is me
     subordinates: list[str] = []
-    for name in sorted(all_persons):
-        if name == person_name:
+    for name in sorted(all_animas):
+        if name == anima_name:
             continue
-        pcfg = all_persons[name]
-        if pcfg.supervisor == person_name:
-            subordinates.append(_format_person_entry(name, pcfg.speciality))
+        pcfg = all_animas[name]
+        if pcfg.supervisor == anima_name:
+            subordinates.append(_format_anima_entry(name, pcfg.speciality))
 
-    # Peers: persons with the same supervisor (excluding self)
+    # Peers: animas with the same supervisor (excluding self)
     peers: list[str] = []
     if my_supervisor is not None:
-        for name in sorted(all_persons):
-            if name == person_name:
+        for name in sorted(all_animas):
+            if name == anima_name:
                 continue
-            pcfg = all_persons[name]
+            pcfg = all_animas[name]
             if pcfg.supervisor == my_supervisor:
-                peers.append(_format_person_entry(name, pcfg.speciality))
+                peers.append(_format_anima_entry(name, pcfg.speciality))
 
     subordinates_line = ", ".join(subordinates) if subordinates else "(なし)"
     peers_line = ", ".join(peers) if peers else "(なし)"
-    person_speciality = my_speciality or "(未設定)"
+    anima_speciality = my_speciality or "(未設定)"
 
     parts = [
         load_prompt(
@@ -182,33 +182,33 @@ def _build_org_context(person_name: str, other_persons: list[str]) -> str:
             supervisor_line=supervisor_line,
             subordinates_line=subordinates_line,
             peers_line=peers_line,
-            person_speciality=person_speciality,
+            anima_speciality=anima_speciality,
         ),
     ]
 
-    # Communication rules: only when there are other persons
-    if other_persons:
+    # Communication rules: only when there are other animas
+    if other_animas:
         parts.append(load_prompt("communication_rules"))
 
     return "\n\n".join(parts)
 
 
 def _build_messaging_section(
-    person_dir: Path,
-    other_persons: list[str],
+    anima_dir: Path,
+    other_animas: list[str],
     execution_mode: str = "a1",
 ) -> str:
     """Build the messaging instructions with resolved paths."""
-    self_name = person_dir.name
+    self_name = anima_dir.name
     main_py = PROJECT_DIR / "main.py"
-    persons_line = (
-        ", ".join(other_persons) if other_persons else "(まだ他の社員はいません)"
+    animas_line = (
+        ", ".join(other_animas) if other_animas else "(まだ他の社員はいません)"
     )
 
     template_name = "messaging_a1" if execution_mode == "a1" else "messaging"
     return load_prompt(
         template_name,
-        persons_line=persons_line,
+        animas_line=animas_line,
         main_py=main_py,
         self_name=self_name,
     )
@@ -224,7 +224,7 @@ def _load_a2_reflection() -> str:
 
 
 def _build_human_notification_guidance() -> str:
-    """Build the human notification instruction for top-level Persons."""
+    """Build the human notification instruction for top-level Animas."""
     return """\
 ## 人間への報告
 
@@ -271,12 +271,12 @@ def build_system_prompt(
     parts: list[str] = []
 
     # Environment guardrails (always first)
-    pd = memory.person_dir
+    pd = memory.anima_dir
     data_dir = get_data_dir()
     parts.append(load_prompt(
         "environment",
         data_dir=data_dir,
-        person_name=pd.name,
+        anima_name=pd.name,
     ))
 
     # Bootstrap instructions (highest priority after environment)
@@ -327,7 +327,7 @@ def build_system_prompt(
 
     parts.append(load_prompt(
         "memory_guide",
-        person_dir=pd,
+        anima_dir=pd,
         knowledge_list=knowledge_list,
         episode_list=episode_list,
         procedure_list=procedure_list,
@@ -352,11 +352,11 @@ def build_system_prompt(
         )
         parts.append(load_prompt(
             "skills_guide",
-            person_dir=pd,
+            anima_dir=pd,
             skill_lines=skill_lines,
         ))
 
-    # Common skills (shared across all persons)
+    # Common skills (shared across all animas)
     if common_skill_summaries:
         common_skill_lines = "\n".join(
             f"| {name} | {desc} |" for name, desc in common_skill_summaries
@@ -369,15 +369,15 @@ def build_system_prompt(
             f"| スキル名 | 概要 |\n|---------|------|\n{common_skill_lines}"
         )
 
-    # Commander hiring guardrail: force create_person tool usage
+    # Commander hiring guardrail: force create_anima tool usage
     if skill_summaries:
         has_newstaff = any(name == "newstaff" for name, _ in skill_summaries)
         if has_newstaff:
             parts.append(
                 "## 雇用ルール\n\n"
-                "新しいPersonを雇用する際は、必ず `create_person` ツールを使用してください。\n"
+                "新しいAnimaを雇用する際は、必ず `create_anima` ツールを使用してください。\n"
                 "手動で identity.md 等のファイルを個別に作成してはいけません。\n"
-                "キャラクターシートを1ファイルで作成し、create_person に渡してください。"
+                "キャラクターシートを1ファイルで作成し、create_anima に渡してください。"
             )
 
     # Inject dynamically generated external tools guide (filtered by registry)
@@ -411,11 +411,11 @@ def build_system_prompt(
     parts.append(EMOTION_INSTRUCTION)
 
     # Organisation context (supervisor / subordinates / peers)
-    other_persons = _discover_other_persons(pd)
+    other_animas = _discover_other_animas(pd)
 
-    # Hiring context: suggest team building when top-level person has no peers
+    # Hiring context: suggest team building when top-level anima has no peers
     # Placed before behavior_rules so the directive is not buried at the end.
-    if not other_persons:
+    if not other_animas:
         try:
             model_config = memory.read_model_config()
             if model_config.supervisor is None:
@@ -425,18 +425,18 @@ def build_system_prompt(
 
     parts.append(load_prompt("behavior_rules"))
 
-    org_context = _build_org_context(pd.name, other_persons)
+    org_context = _build_org_context(pd.name, other_animas)
     if org_context:
         parts.append(org_context)
 
     # Messaging instructions
-    parts.append(_build_messaging_section(pd, other_persons, execution_mode))
+    parts.append(_build_messaging_section(pd, other_animas, execution_mode))
 
-    # Human notification guidance for top-level Persons
+    # Human notification guidance for top-level Animas
     try:
         from core.config import load_config as _load_cfg
         _cfg = _load_cfg()
-        _my_pcfg = _cfg.persons.get(pd.name)
+        _my_pcfg = _cfg.animas.get(pd.name)
         _is_top_level = _my_pcfg is None or _my_pcfg.supervisor is None
         if _is_top_level and _cfg.human_notification.enabled:
             parts.append(_build_human_notification_guidance())

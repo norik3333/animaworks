@@ -152,48 +152,48 @@ class MemoryExperiment:
             participant_id: Participant ID
 
         Returns:
-            Initialized DigitalPerson agent
+            Initialized DigitalAnima agent
 
         Notes:
             This is a placeholder that should be replaced with actual
-            AnimaWorks DigitalPerson initialization in integration testing.
+            AnimaWorks DigitalAnima initialization in integration testing.
         """
-        # TODO: Replace with actual DigitalPerson initialization
-        # from core.person import DigitalPerson
-        # person_dir = self._create_person_environment(participant_id)
-        # agent = DigitalPerson(
-        #     person_dir=person_dir,
+        # TODO: Replace with actual DigitalAnima initialization
+        # from core.anima import DigitalAnima
+        # anima_dir = self._create_anima_environment(participant_id)
+        # agent = DigitalAnima(
+        #     anima_dir=anima_dir,
         #     search_config=self.config.search_config
         # )
         # return agent
 
         logger.warning(
             f"create_agent is a placeholder (participant_id={participant_id}). "
-            "Replace with actual DigitalPerson initialization."
+            "Replace with actual DigitalAnima initialization."
         )
         return None
 
-    def _create_person_environment(self, participant_id: int) -> Path:
-        """Create a person environment for the experiment.
+    def _create_anima_environment(self, participant_id: int) -> Path:
+        """Create an anima environment for the experiment.
 
         Args:
             participant_id: Participant ID
 
         Returns:
-            Path to person directory
+            Path to anima directory
 
         Notes:
             This should:
-            1. Create ~/.animaworks/persons/{experiment_id}_{participant_id}/
+            1. Create ~/.animaworks/animas/{experiment_id}_{participant_id}/
             2. Copy memory base files (knowledge, episodes, skills)
             3. Configure search settings
         """
-        # TODO: Implement person environment creation
-        person_id = f"{self.config.experiment_id}_{self.config.condition}_{participant_id}"
-        person_dir = Path.home() / ".animaworks" / "persons" / person_id
+        # TODO: Implement anima environment creation
+        anima_id = f"{self.config.experiment_id}_{self.config.condition}_{participant_id}"
+        anima_dir = Path.home() / ".animaworks" / "animas" / anima_id
 
-        logger.info(f"Would create person environment at: {person_dir}")
-        return person_dir
+        logger.info(f"Would create anima environment at: {anima_dir}")
+        return anima_dir
 
     # ── Scenario Execution ──────────────────────────────────────────────────
 
@@ -206,7 +206,7 @@ class MemoryExperiment:
         """Execute a single conversation scenario.
 
         Args:
-            agent: DigitalPerson agent
+            agent: DigitalAnima agent
             scenario: Conversation scenario
             exp_logger: Experiment logger
 
@@ -269,7 +269,7 @@ class MemoryExperiment:
         """Execute a single conversation turn.
 
         Args:
-            agent: DigitalPerson agent
+            agent: DigitalAnima agent
             turn: Turn to execute
             conversation_id: Parent conversation ID
             exp_logger: Experiment logger
@@ -337,7 +337,7 @@ class MemoryExperiment:
         """Measure priming layer execution.
 
         Args:
-            agent: DigitalPerson agent
+            agent: DigitalAnima agent
             message: User message
 
         Returns:
@@ -359,7 +359,7 @@ class MemoryExperiment:
         """Measure agent response generation.
 
         Args:
-            agent: DigitalPerson agent
+            agent: DigitalAnima agent
             message: User message
 
         Returns:

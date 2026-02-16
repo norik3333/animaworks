@@ -68,12 +68,12 @@ class TestCopyInfrastructure:
         assert (data_dir / "common_knowledge" / "00_index.md").exists()
         assert (data_dir / "common_knowledge" / "organization" / "structure.md").exists()
 
-    def test_does_not_copy_person_templates(self, tmp_path: Path):
+    def test_does_not_copy_anima_templates(self, tmp_path: Path):
         from core.init import _copy_infrastructure
 
         templates = tmp_path / "templates"
-        (templates / "person_templates").mkdir(parents=True)
-        (templates / "person_templates" / "identity.md").write_text(
+        (templates / "anima_templates").mkdir(parents=True)
+        (templates / "anima_templates" / "identity.md").write_text(
             "# Identity", encoding="utf-8"
         )
         # Also add common_knowledge so there's something valid
@@ -86,7 +86,7 @@ class TestCopyInfrastructure:
         with patch("core.init.TEMPLATES_DIR", templates):
             _copy_infrastructure(data_dir)
 
-        assert not (data_dir / "person_templates").exists()
+        assert not (data_dir / "anima_templates").exists()
 
     def test_copytree_dirs_exist_ok(self, tmp_path: Path):
         """Copying when destination already exists should succeed (dirs_exist_ok)."""
@@ -182,7 +182,7 @@ class TestEnsureRuntimeOnlyDirs:
         _ensure_runtime_only_dirs(data_dir)
 
         expected = [
-            "persons",
+            "animas",
             "shared/inbox",
             "shared/users",
             "tmp/attachments",
@@ -209,13 +209,13 @@ class TestEnsureRuntimeOnlyDirs:
 # ════════════════════════════════════════════════════════════════════
 
 
-def _make_mock_memory(person_dir: Path) -> MagicMock:
+def _make_mock_memory(anima_dir: Path) -> MagicMock:
     """Build a minimal MemoryManager mock for build_system_prompt."""
     mem = MagicMock()
-    mem.person_dir = person_dir
+    mem.anima_dir = anima_dir
     mem.read_bootstrap.return_value = ""
     mem.read_company_vision.return_value = ""
-    mem.read_identity.return_value = "# Test Person"
+    mem.read_identity.return_value = "# Test Anima"
     mem.read_injection.return_value = ""
     mem.read_permissions.return_value = ""
     mem.read_current_state.return_value = ""
@@ -226,7 +226,7 @@ def _make_mock_memory(person_dir: Path) -> MagicMock:
     mem.list_skill_summaries.return_value = []
     mem.list_common_skill_summaries.return_value = []
     mem.list_shared_users.return_value = []
-    mem.common_skills_dir = person_dir.parent.parent / "common_skills"
+    mem.common_skills_dir = anima_dir.parent.parent / "common_skills"
     return mem
 
 
@@ -243,12 +243,12 @@ class TestBuildSystemPromptCommonKnowledge:
         ck_dir.mkdir(parents=True)
         (ck_dir / "00_index.md").write_text("# Index", encoding="utf-8")
 
-        persons_dir = data_dir / "persons"
-        person_dir = persons_dir / "alice"
-        person_dir.mkdir(parents=True)
-        (person_dir / "identity.md").write_text("# Alice", encoding="utf-8")
+        animas_dir = data_dir / "animas"
+        anima_dir = animas_dir / "alice"
+        anima_dir.mkdir(parents=True)
+        (anima_dir / "identity.md").write_text("# Alice", encoding="utf-8")
 
-        memory = _make_mock_memory(person_dir)
+        memory = _make_mock_memory(anima_dir)
 
         monkeypatch.setattr("core.prompt.builder.get_data_dir", lambda: data_dir)
         monkeypatch.setattr(
@@ -273,11 +273,11 @@ class TestBuildSystemPromptCommonKnowledge:
         ck_dir.mkdir(parents=True)
         # Directory exists but no .md files
 
-        persons_dir = data_dir / "persons"
-        person_dir = persons_dir / "alice"
-        person_dir.mkdir(parents=True)
+        animas_dir = data_dir / "animas"
+        anima_dir = animas_dir / "alice"
+        anima_dir.mkdir(parents=True)
 
-        memory = _make_mock_memory(person_dir)
+        memory = _make_mock_memory(anima_dir)
 
         monkeypatch.setattr("core.prompt.builder.get_data_dir", lambda: data_dir)
         monkeypatch.setattr(
@@ -298,11 +298,11 @@ class TestBuildSystemPromptCommonKnowledge:
         data_dir.mkdir(parents=True)
         # No common_knowledge directory at all
 
-        persons_dir = data_dir / "persons"
-        person_dir = persons_dir / "alice"
-        person_dir.mkdir(parents=True)
+        animas_dir = data_dir / "animas"
+        anima_dir = animas_dir / "alice"
+        anima_dir.mkdir(parents=True)
 
-        memory = _make_mock_memory(person_dir)
+        memory = _make_mock_memory(anima_dir)
 
         monkeypatch.setattr("core.prompt.builder.get_data_dir", lambda: data_dir)
         monkeypatch.setattr(
@@ -326,11 +326,11 @@ class TestBuildSystemPromptCommonKnowledge:
         sub.mkdir(parents=True)
         (sub / "guide.md").write_text("# Guide", encoding="utf-8")
 
-        persons_dir = data_dir / "persons"
-        person_dir = persons_dir / "alice"
-        person_dir.mkdir(parents=True)
+        animas_dir = data_dir / "animas"
+        anima_dir = animas_dir / "alice"
+        anima_dir.mkdir(parents=True)
 
-        memory = _make_mock_memory(person_dir)
+        memory = _make_mock_memory(anima_dir)
 
         monkeypatch.setattr("core.prompt.builder.get_data_dir", lambda: data_dir)
         monkeypatch.setattr(
@@ -353,11 +353,11 @@ class TestBuildSystemPromptCommonKnowledge:
         ck_dir.mkdir(parents=True)
         (ck_dir / "notes.txt").write_text("not markdown", encoding="utf-8")
 
-        persons_dir = data_dir / "persons"
-        person_dir = persons_dir / "alice"
-        person_dir.mkdir(parents=True)
+        animas_dir = data_dir / "animas"
+        anima_dir = animas_dir / "alice"
+        anima_dir.mkdir(parents=True)
 
-        memory = _make_mock_memory(person_dir)
+        memory = _make_mock_memory(anima_dir)
 
         monkeypatch.setattr("core.prompt.builder.get_data_dir", lambda: data_dir)
         monkeypatch.setattr(
@@ -418,13 +418,13 @@ class TestGenerateToolParameters:
 class TestGenerateConfigFields:
     """Test _generate_config_fields() produces valid markdown."""
 
-    def test_output_contains_person_model_config_fields(self):
+    def test_output_contains_anima_model_config_fields(self):
         from scripts.generate_reference import _generate_config_fields
-        from core.config.models import PersonModelConfig
+        from core.config.models import AnimaModelConfig
 
         result = _generate_config_fields()
 
-        for fname in PersonModelConfig.model_fields:
+        for fname in AnimaModelConfig.model_fields:
             assert f"`{fname}`" in result, f"Missing field: {fname}"
 
     def test_output_contains_animaworks_config_sections(self):
@@ -433,7 +433,7 @@ class TestGenerateConfigFields:
         result = _generate_config_fields()
 
         assert "AnimaWorksConfig" in result
-        assert "persons" in result
+        assert "animas" in result
         assert "credentials" in result
 
     def test_output_has_heading(self):

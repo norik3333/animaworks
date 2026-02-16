@@ -10,7 +10,7 @@ export function renderChat() {
   const chatMessages = dom.chatMessages || document.getElementById("chatMessages");
   if (!chatMessages) return; // Chat not in DOM (page not active)
 
-  const name = state.selectedPerson;
+  const name = state.selectedAnima;
   const history = state.chatHistories[name] || [];
   if (history.length === 0) {
     chatMessages.innerHTML = '<div class="chat-empty">メッセージはまだありません</div>';
@@ -74,12 +74,12 @@ function renderStreamingBubble(msg) {
 }
 
 export async function sendChat(message) {
-  const name = state.selectedPerson;
+  const name = state.selectedAnima;
   if (!name || !message.trim()) return;
 
-  // Guard: block sending to bootstrapping persons
-  const currentPerson = state.persons.find((p) => p.name === name);
-  if (currentPerson?.status === "bootstrapping" || currentPerson?.bootstrapping) {
+  // Guard: block sending to bootstrapping animas
+  const currentAnima = state.animas.find((p) => p.name === name);
+  if (currentAnima?.status === "bootstrapping" || currentAnima?.bootstrapping) {
     const chatMessages = dom.chatMessages || document.getElementById("chatMessages");
     if (chatMessages) {
       const systemMsg = document.createElement("div");
@@ -108,7 +108,7 @@ export async function sendChat(message) {
 
   try {
     const response = await fetch(
-      `/api/persons/${encodeURIComponent(name)}/chat/stream`,
+      `/api/animas/${encodeURIComponent(name)}/chat/stream`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },

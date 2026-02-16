@@ -1,5 +1,5 @@
 from __future__ import annotations
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
@@ -8,7 +8,7 @@ from __future__ import annotations
 Tests cover:
 1. Complete priming → agent execution → encoding flow
 2. Consolidation lifecycle (daily/weekly)
-3. Multi-person isolation
+3. Multi-anima isolation
 4. System cron integration
 5. Real-world scenario (1-week timeline)
 """
@@ -28,33 +28,33 @@ from core.memory.consolidation import ConsolidationEngine
 from core.memory.conversation import ConversationMemory
 from core.memory import MemoryManager
 from core.memory.priming import PrimingEngine, format_priming_section
-from core.person import DigitalPerson
+from core.anima import DigitalAnima
 
 
 # ── Fixtures ──────────────────────────────────────────────────
 
 
 @pytest.fixture
-async def full_person_environment(tmp_path: Path):
-    """Create a complete person environment with all components.
+async def full_anima_environment(tmp_path: Path):
+    """Create a complete anima environment with all components.
 
     Returns:
         Dictionary containing:
-        - person_dir: Path to person directory
+        - anima_dir: Path to anima directory
         - memory: MemoryManager instance
         - priming: PrimingEngine instance
         - consolidation: ConsolidationEngine instance
-        - person_name: Name of the person
+        - anima_name: Name of the anima
     """
-    person_dir = tmp_path / "alice"
-    person_dir.mkdir()
+    anima_dir = tmp_path / "alice"
+    anima_dir.mkdir()
 
     # Create all subdirectories
     for subdir in ["knowledge", "episodes", "procedures", "skills", "state", "shortterm"]:
-        (person_dir / subdir).mkdir()
+        (anima_dir / subdir).mkdir()
 
     # Create identity.md
-    (person_dir / "identity.md").write_text(
+    (anima_dir / "identity.md").write_text(
         """# Alice - AI Assistant
 
 ## Personality
@@ -69,7 +69,7 @@ Helpful, analytical, and detail-oriented AI assistant.
     )
 
     # Create injection.md
-    (person_dir / "injection.md").write_text(
+    (anima_dir / "injection.md").write_text(
         """# Role
 AI Assistant for software development team.
 
@@ -82,7 +82,7 @@ AI Assistant for software development team.
     )
 
     # Create permissions.md
-    (person_dir / "permissions.md").write_text(
+    (anima_dir / "permissions.md").write_text(
         """# Permissions
 
 ## Allowed Tools
@@ -98,7 +98,7 @@ AI Assistant for software development team.
     )
 
     # Create model_config.json
-    (person_dir / "model_config.json").write_text(
+    (anima_dir / "model_config.json").write_text(
         json.dumps({
             "provider": "anthropic",
             "model_name": "claude-sonnet-4-20250514",
@@ -115,16 +115,16 @@ AI Assistant for software development team.
     # Patch get_shared_dir to return our test shared directory
     with patch("core.paths.get_shared_dir", return_value=tmp_path / "shared"):
         # Initialize components
-        memory_manager = MemoryManager(person_dir)
-        priming_engine = PrimingEngine(person_dir)
-        consolidation_engine = ConsolidationEngine(person_dir, "alice")
+        memory_manager = MemoryManager(anima_dir)
+        priming_engine = PrimingEngine(anima_dir)
+        consolidation_engine = ConsolidationEngine(anima_dir, "alice")
 
         yield {
-            "person_dir": person_dir,
+            "anima_dir": anima_dir,
             "memory": memory_manager,
             "priming": priming_engine,
             "consolidation": consolidation_engine,
-            "person_name": "alice",
+            "anima_name": "alice",
             "shared_dir": tmp_path / "shared",
         }
 
@@ -262,7 +262,7 @@ Combined content from both files with duplicates removed.
 
 
 @pytest.mark.asyncio
-async def test_complete_priming_agent_execution_flow(full_person_environment, mock_llm):
+async def test_complete_priming_agent_execution_flow(full_anima_environment, mock_llm):
     """Test 1: Complete flow from priming → agent execution → encoding.
 
     Verifies:
@@ -273,11 +273,11 @@ async def test_complete_priming_agent_execution_flow(full_person_environment, mo
     - [AUTO-ENCODED] tag is applied
     - RAG index is updated
     """
-    env = full_person_environment
-    person_dir = env["person_dir"]
+    env = full_anima_environment
+    anima_dir = env["anima_dir"]
 
     # Create some test knowledge
-    (person_dir / "knowledge" / "project-notes.md").write_text(
+    (anima_dir / "knowledge" / "project-notes.md").write_text(
         """# Project Notes
 
 ## Architecture
@@ -291,7 +291,7 @@ PostgreSQL for persistence, Redis for caching.
 
     # Create a recent episode
     today = datetime.now().date()
-    (person_dir / "episodes" / f"{today}.md").write_text(
+    (anima_dir / "episodes" / f"{today}.md").write_text(
         f"""# {today} Activity Log
 
 ## 09:00 — Morning standup
@@ -342,9 +342,9 @@ Senior Software Engineer
 
     # Step 3: Simulate conversation memory flow
     model_config = env["memory"].read_model_config()
-    conv_memory = ConversationMemory(person_dir, model_config)
+    conv_memory = ConversationMemory(anima_dir, model_config)
 
-    # Build prompt with priming (this would normally be done by DigitalPerson)
+    # Build prompt with priming (this would normally be done by DigitalAnima)
     message = "How is the microservices architecture progressing?"
     prompt = conv_memory.build_chat_prompt(message, "developer")
 
@@ -365,7 +365,7 @@ Senior Software Engineer
     await conv_memory.finalize_session()
 
     # Step 6: Verify encoding to episodes
-    episode_file = person_dir / "episodes" / f"{today}.md"
+    episode_file = anima_dir / "episodes" / f"{today}.md"
     assert episode_file.exists()
 
     episode_content = episode_file.read_text(encoding="utf-8")
@@ -386,7 +386,7 @@ Senior Software Engineer
 
 
 @pytest.mark.asyncio
-async def test_consolidation_lifecycle(full_person_environment, mock_llm):
+async def test_consolidation_lifecycle(full_anima_environment, mock_llm):
     """Test 2: Memory consolidation lifecycle.
 
     Simulates:
@@ -404,13 +404,13 @@ async def test_consolidation_lifecycle(full_person_environment, mock_llm):
     - [COMPRESSED] tags applied
     - RAG index synchronization
     """
-    env = full_person_environment
-    person_dir = env["person_dir"]
+    env = full_anima_environment
+    anima_dir = env["anima_dir"]
     consolidation = env["consolidation"]
 
     # Day 1: Create 5 episodes
     day1 = datetime.now().date()
-    episode1 = person_dir / "episodes" / f"{day1}.md"
+    episode1 = anima_dir / "episodes" / f"{day1}.md"
     episode1.write_text(
         f"""# {day1} Activity Log
 
@@ -452,7 +452,7 @@ async def test_consolidation_lifecycle(full_person_environment, mock_llm):
     if total_files > 0:
         # Check for AUTO-CONSOLIDATED tag
         for filename in result["knowledge_files_created"]:
-            filepath = person_dir / "knowledge" / filename
+            filepath = anima_dir / "knowledge" / filename
             assert filepath.exists()
             content = filepath.read_text(encoding="utf-8")
             assert "[AUTO-CONSOLIDATED" in content
@@ -460,7 +460,7 @@ async def test_consolidation_lifecycle(full_person_environment, mock_llm):
     # Days 3-6: Create more episodes
     for day_offset in range(1, 5):
         day = day1 + timedelta(days=day_offset)
-        episode = person_dir / "episodes" / f"{day}.md"
+        episode = anima_dir / "episodes" / f"{day}.md"
         episode.write_text(
             f"""# {day} Activity Log
 
@@ -476,7 +476,7 @@ async def test_consolidation_lifecycle(full_person_environment, mock_llm):
         )
 
     # Day 7: Create duplicate knowledge files
-    (person_dir / "knowledge" / "testing-guide-1.md").write_text(
+    (anima_dir / "knowledge" / "testing-guide-1.md").write_text(
         """# Testing Guide 1
 
 ## Best Practices
@@ -489,7 +489,7 @@ Target 80% coverage.
         encoding="utf-8",
     )
 
-    (person_dir / "knowledge" / "testing-guide-2.md").write_text(
+    (anima_dir / "knowledge" / "testing-guide-2.md").write_text(
         """# Testing Guide 2
 
 ## Best Practices
@@ -504,7 +504,7 @@ Aim for 80%+ coverage.
 
     # Create old episode for compression (35 days ago)
     old_date = day1 - timedelta(days=35)
-    old_episode = person_dir / "episodes" / f"{old_date}.md"
+    old_episode = anima_dir / "episodes" / f"{old_date}.md"
     old_episode.write_text(
         f"""# {old_date} Activity Log
 
@@ -521,7 +521,7 @@ Aim for 80%+ coverage.
 
     # Create important episode that should NOT be compressed
     important_date = day1 - timedelta(days=40)
-    important_episode = person_dir / "episodes" / f"{important_date}.md"
+    important_episode = anima_dir / "episodes" / f"{important_date}.md"
     important_episode.write_text(
         f"""# {important_date} Activity Log [IMPORTANT]
 
@@ -549,17 +549,17 @@ This decision has long-term impact.
     assert len(weekly_result["knowledge_files_merged"]) > 0
 
     # Original files should be deleted
-    assert not (person_dir / "knowledge" / "testing-guide-1.md").exists()
-    assert not (person_dir / "knowledge" / "testing-guide-2.md").exists()
+    assert not (anima_dir / "knowledge" / "testing-guide-1.md").exists()
+    assert not (anima_dir / "knowledge" / "testing-guide-2.md").exists()
 
     # Merged file should exist with tags
     merged_files = [
-        f for f in (person_dir / "knowledge").glob("*.md")
+        f for f in (anima_dir / "knowledge").glob("*.md")
         if "testing" not in f.name or "merged" in f.name.lower()
     ]
 
     # Find any new merged file
-    all_knowledge = list((person_dir / "knowledge").glob("*.md"))
+    all_knowledge = list((anima_dir / "knowledge").glob("*.md"))
     for kfile in all_knowledge:
         content = kfile.read_text(encoding="utf-8")
         if "[AUTO-MERGED" in content:
@@ -581,11 +581,11 @@ This decision has long-term impact.
 
 
 @pytest.mark.asyncio
-async def test_multi_person_isolation(tmp_path: Path, mock_llm):
-    """Test 3: Person-to-person data isolation.
+async def test_multi_anima_isolation(tmp_path: Path, mock_llm):
+    """Test 3: Anima-to-anima data isolation.
 
-    Creates 3 persons (Alice, Bob, Carol) and verifies:
-    - Each person has isolated knowledge/episodes
+    Creates 3 animas (Alice, Bob, Carol) and verifies:
+    - Each anima has isolated knowledge/episodes
     - Priming only retrieves own memories
     - ChromaDB collections are separated
     - shared/users/ is accessible to all
@@ -593,47 +593,47 @@ async def test_multi_person_isolation(tmp_path: Path, mock_llm):
     shared_dir = tmp_path / "shared"
     shared_dir.mkdir()
 
-    persons_data = {}
+    animas_data = {}
 
-    # Create 3 persons with unique data
-    for person_name in ["alice", "bob", "carol"]:
-        person_dir = tmp_path / person_name
-        person_dir.mkdir()
+    # Create 3 animas with unique data
+    for anima_name in ["alice", "bob", "carol"]:
+        anima_dir = tmp_path / anima_name
+        anima_dir.mkdir()
 
         for subdir in ["knowledge", "episodes", "skills", "state"]:
-            (person_dir / subdir).mkdir()
+            (anima_dir / subdir).mkdir()
 
         # Create unique identity
-        (person_dir / "identity.md").write_text(
-            f"# {person_name.title()}\n\nI am {person_name.title()}.",
+        (anima_dir / "identity.md").write_text(
+            f"# {anima_name.title()}\n\nI am {anima_name.title()}.",
             encoding="utf-8",
         )
 
         # Create unique knowledge
-        (person_dir / "knowledge" / f"{person_name}-expertise.md").write_text(
-            f"# {person_name.title()}'s Expertise\n\n"
-            f"I specialize in {person_name}-specific tasks.",
+        (anima_dir / "knowledge" / f"{anima_name}-expertise.md").write_text(
+            f"# {anima_name.title()}'s Expertise\n\n"
+            f"I specialize in {anima_name}-specific tasks.",
             encoding="utf-8",
         )
 
         # Create unique episode
         today = datetime.now().date()
-        (person_dir / "episodes" / f"{today}.md").write_text(
+        (anima_dir / "episodes" / f"{today}.md").write_text(
             f"""# {today} Activity Log
 
-## 10:00 — {person_name}'s unique task
-**Topics**: {person_name}-specific work
-**Key Points**: Completed {person_name} tasks
+## 10:00 — {anima_name}'s unique task
+**Topics**: {anima_name}-specific work
+**Key Points**: Completed {anima_name} tasks
 """,
             encoding="utf-8",
         )
 
         # Initialize components
-        memory = MemoryManager(person_dir)
-        priming = PrimingEngine(person_dir)
+        memory = MemoryManager(anima_dir)
+        priming = PrimingEngine(anima_dir)
 
-        persons_data[person_name] = {
-            "dir": person_dir,
+        animas_data[anima_name] = {
+            "dir": anima_dir,
             "memory": memory,
             "priming": priming,
         }
@@ -648,14 +648,14 @@ async def test_multi_person_isolation(tmp_path: Path, mock_llm):
 System Administrator
 
 ## Access
-All persons can see this profile.
+All animas can see this profile.
 """,
         encoding="utf-8",
     )
 
-    # Test priming isolation for each person
+    # Test priming isolation for each anima
     with patch("core.paths.get_shared_dir", return_value=shared_dir):
-        for person_name, data in persons_data.items():
+        for anima_name, data in animas_data.items():
             priming = data["priming"]
 
             result = await priming.prime_memories(
@@ -667,22 +667,22 @@ All persons can see this profile.
             # Should retrieve own knowledge only
             if result.related_knowledge:
                 # Own knowledge may or may not appear due to RAG index state;
-                # isolation is verified by the cross-person check below
+                # isolation is verified by the cross-anima check below
 
-                # Should NOT contain other persons' knowledge
-                other_persons = [p for p in ["alice", "bob", "carol"] if p != person_name]
-                for other in other_persons:
-                    # Allow for some edge cases where person name might appear in generic text
+                # Should NOT contain other animas' knowledge
+                other_animas = [p for p in ["alice", "bob", "carol"] if p != anima_name]
+                for other in other_animas:
+                    # Allow for some edge cases where anima name might appear in generic text
                     # but the actual expertise content should not be there
                     if f"{other}-specific" in result.related_knowledge.lower():
                         pytest.fail(
-                            f"{person_name}'s priming contains {other}'s knowledge: "
+                            f"{anima_name}'s priming contains {other}'s knowledge: "
                             f"{result.related_knowledge}"
                         )
 
             # Should retrieve own episodes only
             if result.recent_episodes:
-                assert person_name in result.recent_episodes.lower()
+                assert anima_name in result.recent_episodes.lower()
 
             # Should retrieve shared user profile (accessible to all)
             if result.sender_profile:
@@ -697,23 +697,23 @@ async def test_system_cron_integration(tmp_path: Path, mock_llm, mock_websocket)
     - LifecycleManager sets up system crons correctly
     - daily_consolidation cron registered at 02:00
     - weekly_integration cron registered on Sunday 03:00
-    - Crons trigger consolidation for all persons
+    - Crons trigger consolidation for all animas
     - WebSocket broadcasts results
     """
-    # Create a person
-    person_dir = tmp_path / "alice"
-    person_dir.mkdir()
+    # Create an anima
+    anima_dir = tmp_path / "alice"
+    anima_dir.mkdir()
 
     for subdir in ["knowledge", "episodes", "skills", "state", "shortterm"]:
-        (person_dir / subdir).mkdir()
+        (anima_dir / subdir).mkdir()
 
-    (person_dir / "identity.md").write_text("# Alice", encoding="utf-8")
-    (person_dir / "injection.md").write_text("# Role\nAssistant", encoding="utf-8")
-    (person_dir / "permissions.md").write_text("# Permissions\n", encoding="utf-8")
-    (person_dir / "heartbeat.md").write_text("# Heartbeat\n30分ごと (9:00-22:00)", encoding="utf-8")
-    (person_dir / "cron.md").write_text("", encoding="utf-8")
+    (anima_dir / "identity.md").write_text("# Alice", encoding="utf-8")
+    (anima_dir / "injection.md").write_text("# Role\nAssistant", encoding="utf-8")
+    (anima_dir / "permissions.md").write_text("# Permissions\n", encoding="utf-8")
+    (anima_dir / "heartbeat.md").write_text("# Heartbeat\n30分ごと (9:00-22:00)", encoding="utf-8")
+    (anima_dir / "cron.md").write_text("", encoding="utf-8")
 
-    (person_dir / "model_config.json").write_text(
+    (anima_dir / "model_config.json").write_text(
         json.dumps({
             "provider": "anthropic",
             "model_name": "claude-sonnet-4-20250514",
@@ -727,7 +727,7 @@ async def test_system_cron_integration(tmp_path: Path, mock_llm, mock_websocket)
 
     # Create episode for consolidation
     today = datetime.now().date()
-    (person_dir / "episodes" / f"{today}.md").write_text(
+    (anima_dir / "episodes" / f"{today}.md").write_text(
         f"""# {today} Activity Log
 
 ## 10:00 — Work
@@ -737,17 +737,17 @@ async def test_system_cron_integration(tmp_path: Path, mock_llm, mock_websocket)
         encoding="utf-8",
     )
 
-    # Create DigitalPerson and LifecycleManager
+    # Create DigitalAnima and LifecycleManager
     with patch("core.paths.get_shared_dir", return_value=shared_dir):
-        person = DigitalPerson(person_dir, shared_dir)
+        anima = DigitalAnima(anima_dir, shared_dir)
         lifecycle = LifecycleManager()
 
         # Set up WebSocket broadcast mock
         if mock_websocket:
             lifecycle.set_broadcast(mock_websocket)
 
-        # Register person
-        lifecycle.register_person(person)
+        # Register anima
+        lifecycle.register_anima(anima)
 
         # Setup system crons
         lifecycle._setup_system_crons()
@@ -772,7 +772,7 @@ async def test_system_cron_integration(tmp_path: Path, mock_llm, mock_websocket)
         await lifecycle._handle_daily_consolidation()
 
         # Verify knowledge files were created (if consolidation ran)
-        knowledge_files = list((person_dir / "knowledge").glob("*.md"))
+        knowledge_files = list((anima_dir / "knowledge").glob("*.md"))
         # Consolidation may or may not create files depending on LLM response parsing
         # Just verify it doesn't error
 
@@ -801,22 +801,22 @@ async def test_end_to_end_real_scenario(tmp_path: Path, mock_llm):
     - Old episodes compressed
     - Final knowledge base is consistent
     """
-    person_dir = tmp_path / "alice"
-    person_dir.mkdir()
+    anima_dir = tmp_path / "alice"
+    anima_dir.mkdir()
 
     for subdir in ["knowledge", "episodes", "skills", "state"]:
-        (person_dir / subdir).mkdir()
+        (anima_dir / subdir).mkdir()
 
-    (person_dir / "identity.md").write_text("# Alice", encoding="utf-8")
+    (anima_dir / "identity.md").write_text("# Alice", encoding="utf-8")
 
-    consolidation = ConsolidationEngine(person_dir, "alice")
+    consolidation = ConsolidationEngine(anima_dir, "alice")
 
     # Week timeline
     base_date = datetime.now().date()
 
     # Day 1 (Monday): Meeting + Coding
     day1 = base_date
-    (person_dir / "episodes" / f"{day1}.md").write_text(
+    (anima_dir / "episodes" / f"{day1}.md").write_text(
         f"""# {day1} Activity Log
 
 ## 09:00 — Team meeting
@@ -837,7 +837,7 @@ async def test_end_to_end_real_scenario(tmp_path: Path, mock_llm):
 
     # Day 2 (Tuesday): Review + Docs + Daily consolidation
     day2 = base_date + timedelta(days=1)
-    (person_dir / "episodes" / f"{day2}.md").write_text(
+    (anima_dir / "episodes" / f"{day2}.md").write_text(
         f"""# {day2} Activity Log
 
 ## 10:00 — Code review
@@ -861,7 +861,7 @@ async def test_end_to_end_real_scenario(tmp_path: Path, mock_llm):
 
     # Day 3 (Wednesday): Bug fix + Testing
     day3 = base_date + timedelta(days=2)
-    (person_dir / "episodes" / f"{day3}.md").write_text(
+    (anima_dir / "episodes" / f"{day3}.md").write_text(
         f"""# {day3} Activity Log
 
 ## 11:00 — Bug investigation
@@ -881,7 +881,7 @@ async def test_end_to_end_real_scenario(tmp_path: Path, mock_llm):
 
     # Day 4 (Thursday): Design + Implementation + Daily consolidation
     day4 = base_date + timedelta(days=3)
-    (person_dir / "episodes" / f"{day4}.md").write_text(
+    (anima_dir / "episodes" / f"{day4}.md").write_text(
         f"""# {day4} Activity Log
 
 ## 09:30 — Design session
@@ -905,7 +905,7 @@ async def test_end_to_end_real_scenario(tmp_path: Path, mock_llm):
 
     # Day 5 (Friday): Release prep
     day5 = base_date + timedelta(days=4)
-    (person_dir / "episodes" / f"{day5}.md").write_text(
+    (anima_dir / "episodes" / f"{day5}.md").write_text(
         f"""# {day5} Activity Log
 
 ## 10:00 — Release preparation
@@ -920,7 +920,7 @@ async def test_end_to_end_real_scenario(tmp_path: Path, mock_llm):
 
     # Day 6 (Saturday): Learning + Daily consolidation
     day6 = base_date + timedelta(days=5)
-    (person_dir / "episodes" / f"{day6}.md").write_text(
+    (anima_dir / "episodes" / f"{day6}.md").write_text(
         f"""# {day6} Activity Log
 
 ## 11:00 — Learning session
@@ -938,7 +938,7 @@ async def test_end_to_end_real_scenario(tmp_path: Path, mock_llm):
     assert result_day6["skipped"] is False
 
     # Create some duplicate knowledge files (simulating consolidation outputs)
-    (person_dir / "knowledge" / "authentication-guide.md").write_text(
+    (anima_dir / "knowledge" / "authentication-guide.md").write_text(
         """# Authentication Guide
 
 ## Implementation
@@ -951,7 +951,7 @@ Using JWT tokens for authentication.
         encoding="utf-8",
     )
 
-    (person_dir / "knowledge" / "auth-guidelines.md").write_text(
+    (anima_dir / "knowledge" / "auth-guidelines.md").write_text(
         """# Auth Guidelines
 
 ## Implementation
@@ -966,7 +966,7 @@ JWT-based authentication system.
 
     # Create old episode for compression
     old_date = base_date - timedelta(days=35)
-    old_episode = person_dir / "episodes" / f"{old_date}.md"
+    old_episode = anima_dir / "episodes" / f"{old_date}.md"
     old_episode.write_text(
         f"""# {old_date} Activity Log
 
@@ -996,8 +996,8 @@ JWT-based authentication system.
     assert len(weekly_result["knowledge_files_merged"]) > 0
 
     # Verify duplicate files were merged
-    assert not (person_dir / "knowledge" / "authentication-guide.md").exists()
-    assert not (person_dir / "knowledge" / "auth-guidelines.md").exists()
+    assert not (anima_dir / "knowledge" / "authentication-guide.md").exists()
+    assert not (anima_dir / "knowledge" / "auth-guidelines.md").exists()
 
     # Verify old episode was compressed
     assert weekly_result["episodes_compressed"] >= 1
@@ -1005,12 +1005,12 @@ JWT-based authentication system.
     assert "[COMPRESSED" in old_content
 
     # Verify knowledge base consistency
-    knowledge_files = list((person_dir / "knowledge").glob("*.md"))
+    knowledge_files = list((anima_dir / "knowledge").glob("*.md"))
     assert len(knowledge_files) > 0
 
     # Verify recent episodes are intact
     for day in [day1, day2, day3, day4, day5, day6]:
-        episode_file = person_dir / "episodes" / f"{day}.md"
+        episode_file = anima_dir / "episodes" / f"{day}.md"
         assert episode_file.exists()
         content = episode_file.read_text(encoding="utf-8")
         assert "[COMPRESSED" not in content  # Recent episodes should not be compressed
@@ -1035,14 +1035,14 @@ JWT-based authentication system.
 
 
 @pytest.mark.asyncio
-async def test_priming_with_empty_memories(full_person_environment):
+async def test_priming_with_empty_memories(full_anima_environment):
     """Test priming gracefully handles empty memory directories."""
-    env = full_person_environment
-    person_dir = env["person_dir"]
+    env = full_anima_environment
+    anima_dir = env["anima_dir"]
 
     # Clear all memories
     for subdir in ["knowledge", "episodes", "skills"]:
-        for file in (person_dir / subdir).glob("*.md"):
+        for file in (anima_dir / subdir).glob("*.md"):
             file.unlink()
 
     # Test priming with no memories
@@ -1062,9 +1062,9 @@ async def test_priming_with_empty_memories(full_person_environment):
 
 
 @pytest.mark.asyncio
-async def test_consolidation_with_insufficient_episodes(full_person_environment, mock_llm):
+async def test_consolidation_with_insufficient_episodes(full_anima_environment, mock_llm):
     """Test consolidation is skipped when episodes are insufficient."""
-    env = full_person_environment
+    env = full_anima_environment
     consolidation = env["consolidation"]
 
     # Run consolidation with min_episodes=10 but only have 0 episodes
@@ -1076,14 +1076,14 @@ async def test_consolidation_with_insufficient_episodes(full_person_environment,
 
 
 @pytest.mark.asyncio
-async def test_conversation_finalization_creates_episode(full_person_environment, mock_llm):
+async def test_conversation_finalization_creates_episode(full_anima_environment, mock_llm):
     """Test that conversation finalization creates episode entry."""
-    env = full_person_environment
-    person_dir = env["person_dir"]
+    env = full_anima_environment
+    anima_dir = env["anima_dir"]
 
     # Create conversation memory
     model_config = env["memory"].read_model_config()
-    conv_memory = ConversationMemory(person_dir, model_config)
+    conv_memory = ConversationMemory(anima_dir, model_config)
 
     # Simulate conversation
     conv_memory.append_turn("human", "Can you help me with task X?")
@@ -1097,7 +1097,7 @@ async def test_conversation_finalization_creates_episode(full_person_environment
 
     # Verify episode was created
     today = datetime.now().date()
-    episode_file = person_dir / "episodes" / f"{today}.md"
+    episode_file = anima_dir / "episodes" / f"{today}.md"
     assert episode_file.exists()
 
     content = episode_file.read_text(encoding="utf-8")
@@ -1108,21 +1108,21 @@ async def test_conversation_finalization_creates_episode(full_person_environment
 
 
 @pytest.mark.asyncio
-async def test_lifecycle_person_registration(tmp_path: Path):
-    """Test LifecycleManager person registration and cleanup."""
-    person_dir = tmp_path / "test_person"
-    person_dir.mkdir()
+async def test_lifecycle_anima_registration(tmp_path: Path):
+    """Test LifecycleManager anima registration and cleanup."""
+    anima_dir = tmp_path / "test_anima"
+    anima_dir.mkdir()
 
     for subdir in ["knowledge", "episodes", "state", "shortterm"]:
-        (person_dir / subdir).mkdir()
+        (anima_dir / subdir).mkdir()
 
-    (person_dir / "identity.md").write_text("# Test", encoding="utf-8")
-    (person_dir / "injection.md").write_text("# Role", encoding="utf-8")
-    (person_dir / "permissions.md").write_text("", encoding="utf-8")
-    (person_dir / "heartbeat.md").write_text("30分ごと (9:00-22:00)", encoding="utf-8")
-    (person_dir / "cron.md").write_text("", encoding="utf-8")
+    (anima_dir / "identity.md").write_text("# Test", encoding="utf-8")
+    (anima_dir / "injection.md").write_text("# Role", encoding="utf-8")
+    (anima_dir / "permissions.md").write_text("", encoding="utf-8")
+    (anima_dir / "heartbeat.md").write_text("30分ごと (9:00-22:00)", encoding="utf-8")
+    (anima_dir / "cron.md").write_text("", encoding="utf-8")
 
-    (person_dir / "model_config.json").write_text(
+    (anima_dir / "model_config.json").write_text(
         json.dumps({"provider": "anthropic", "model_name": "claude-sonnet-4", "mode": "A1"}),
         encoding="utf-8",
     )
@@ -1131,23 +1131,23 @@ async def test_lifecycle_person_registration(tmp_path: Path):
     shared_dir.mkdir()
 
     with patch("core.paths.get_shared_dir", return_value=shared_dir):
-        person = DigitalPerson(person_dir, shared_dir)
+        anima = DigitalAnima(anima_dir, shared_dir)
         lifecycle = LifecycleManager()
 
-        # Register person
-        lifecycle.register_person(person)
-        assert "test_person" in lifecycle.persons
+        # Register anima
+        lifecycle.register_anima(anima)
+        assert "test_anima" in lifecycle.animas
 
         # Verify heartbeat job was created
         jobs = lifecycle.scheduler.get_jobs()
         job_ids = [job.id for job in jobs]
-        assert "test_person_heartbeat" in job_ids
+        assert "test_anima_heartbeat" in job_ids
 
-        # Unregister person
-        lifecycle.unregister_person("test_person")
-        assert "test_person" not in lifecycle.persons
+        # Unregister anima
+        lifecycle.unregister_anima("test_anima")
+        assert "test_anima" not in lifecycle.animas
 
         # Verify heartbeat job was removed
         jobs = lifecycle.scheduler.get_jobs()
         job_ids = [job.id for job in jobs]
-        assert "test_person_heartbeat" not in job_ids
+        assert "test_anima_heartbeat" not in job_ids

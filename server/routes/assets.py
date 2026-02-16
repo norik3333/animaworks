@@ -1,5 +1,5 @@
 from __future__ import annotations
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
@@ -75,15 +75,15 @@ class RemakeConfirmRequest(BaseModel):
 def create_assets_router() -> APIRouter:
     router = APIRouter()
 
-    @router.get("/persons/{name}/assets")
+    @router.get("/animas/{name}/assets")
     async def list_assets(name: str, request: Request):
-        """List available assets for a person."""
-        persons_dir = request.app.state.persons_dir
-        person_dir = persons_dir / name
-        if not person_dir.exists():
-            raise HTTPException(status_code=404, detail=f"Person not found: {name}")
+        """List available assets for an anima."""
+        animas_dir = request.app.state.animas_dir
+        anima_dir = animas_dir / name
+        if not anima_dir.exists():
+            raise HTTPException(status_code=404, detail=f"Anima not found: {name}")
 
-        assets_dir = person_dir / "assets"
+        assets_dir = anima_dir / "assets"
         if not assets_dir.exists():
             return {"assets": []}
         return {
@@ -94,16 +94,16 @@ def create_assets_router() -> APIRouter:
             ]
         }
 
-    @router.get("/persons/{name}/assets/metadata")
+    @router.get("/animas/{name}/assets/metadata")
     async def get_asset_metadata(name: str, request: Request):
-        """Return structured metadata about a person's available assets."""
-        persons_dir = request.app.state.persons_dir
-        person_dir = persons_dir / name
-        if not person_dir.exists():
-            raise HTTPException(status_code=404, detail=f"Person not found: {name}")
+        """Return structured metadata about a anima's available assets."""
+        animas_dir = request.app.state.animas_dir
+        anima_dir = animas_dir / name
+        if not anima_dir.exists():
+            raise HTTPException(status_code=404, detail=f"Anima not found: {name}")
 
-        assets_dir = person_dir / "assets"
-        base_url = f"/api/persons/{name}/assets"
+        assets_dir = anima_dir / "assets"
+        base_url = f"/api/animas/{name}/assets"
 
         asset_files = {
             "avatar_fullbody": "avatar_fullbody.png",
@@ -135,7 +135,7 @@ def create_assets_router() -> APIRouter:
                     }
 
         # Extract image_color from identity.md
-        identity_path = person_dir / "identity.md"
+        identity_path = anima_dir / "identity.md"
         if identity_path.exists():
             try:
                 text = identity_path.read_text(encoding="utf-8")
@@ -150,20 +150,20 @@ def create_assets_router() -> APIRouter:
 
         return result
 
-    @router.api_route("/persons/{name}/assets/{filename}", methods=["GET", "HEAD"])
+    @router.api_route("/animas/{name}/assets/{filename}", methods=["GET", "HEAD"])
     async def get_asset(name: str, filename: str, request: Request):
-        """Serve a static asset file from a person's assets directory."""
-        persons_dir = request.app.state.persons_dir
-        person_dir = persons_dir / name
-        if not person_dir.exists():
-            raise HTTPException(status_code=404, detail=f"Person not found: {name}")
+        """Serve a static asset file from a anima's assets directory."""
+        animas_dir = request.app.state.animas_dir
+        anima_dir = animas_dir / name
+        if not anima_dir.exists():
+            raise HTTPException(status_code=404, detail=f"Anima not found: {name}")
 
         # Validate filename (prevent path traversal)
         safe_name = Path(filename).name
         if safe_name != filename or ".." in filename:
             raise HTTPException(status_code=400, detail="Invalid filename")
 
-        file_path = person_dir / "assets" / safe_name
+        file_path = anima_dir / "assets" / safe_name
         if not file_path.exists() or not file_path.is_file():
             raise HTTPException(status_code=404, detail="Asset not found")
 
@@ -199,24 +199,24 @@ def create_assets_router() -> APIRouter:
             },
         )
 
-    @router.post("/persons/{name}/assets/generate")
+    @router.post("/animas/{name}/assets/generate")
     async def generate_assets(
         name: str, body: AssetGenerateRequest, request: Request,
     ):
         """Trigger character asset generation pipeline."""
         import asyncio
 
-        persons_dir = request.app.state.persons_dir
-        person_dir = persons_dir / name
-        if not person_dir.exists():
-            raise HTTPException(status_code=404, detail=f"Person not found: {name}")
+        animas_dir = request.app.state.animas_dir
+        anima_dir = animas_dir / name
+        if not anima_dir.exists():
+            raise HTTPException(status_code=404, detail=f"Anima not found: {name}")
 
         if not body.prompt:
             raise HTTPException(status_code=400, detail="prompt is required")
 
         from core.tools.image_gen import ImageGenPipeline
 
-        pipeline = ImageGenPipeline(person_dir)
+        pipeline = ImageGenPipeline(anima_dir)
 
         loop = asyncio.get_running_loop()
         result = await loop.run_in_executor(
@@ -245,7 +245,7 @@ def create_assets_router() -> APIRouter:
             generated.append(anim_path.name)
 
         if generated:
-            await emit(request, "person.assets_updated", {
+            await emit(request, "anima.assets_updated", {
                 "name": name,
                 "assets": generated,
                 "errors": result.errors,
@@ -253,19 +253,19 @@ def create_assets_router() -> APIRouter:
 
         return result.to_dict()
 
-    @router.post("/persons/{name}/assets/generate-expression")
+    @router.post("/animas/{name}/assets/generate-expression")
     async def generate_expression_on_demand(
         name: str, body: ExpressionGenerateRequest, request: Request,
     ):
         """Generate a specific bustup expression variant on demand."""
         import asyncio
 
-        persons_dir = request.app.state.persons_dir
-        person_dir = persons_dir / name
-        if not person_dir.exists():
-            raise HTTPException(status_code=404, detail=f"Person not found: {name}")
+        animas_dir = request.app.state.animas_dir
+        anima_dir = animas_dir / name
+        if not anima_dir.exists():
+            raise HTTPException(status_code=404, detail=f"Anima not found: {name}")
 
-        assets_dir = person_dir / "assets"
+        assets_dir = anima_dir / "assets"
         reference_path = assets_dir / "avatar_fullbody.png"
         if not reference_path.exists():
             raise HTTPException(
@@ -277,7 +277,7 @@ def create_assets_router() -> APIRouter:
 
         from core.tools.image_gen import ImageGenPipeline
 
-        pipeline = ImageGenPipeline(person_dir)
+        pipeline = ImageGenPipeline(anima_dir)
 
         loop = asyncio.get_running_loop()
         result_path = await loop.run_in_executor(
@@ -290,7 +290,7 @@ def create_assets_router() -> APIRouter:
         )
 
         if result_path:
-            await emit(request, "person.assets_updated", {
+            await emit(request, "anima.assets_updated", {
                 "name": name,
                 "assets": [result_path.name],
                 "expression": body.expression,
@@ -303,25 +303,25 @@ def create_assets_router() -> APIRouter:
 
     # ── Remake Preview / Confirm / Cancel ──────────────────
 
-    @router.post("/persons/{name}/assets/remake-preview")
+    @router.post("/animas/{name}/assets/remake-preview")
     async def remake_preview(
         name: str, body: RemakePreviewRequest, request: Request,
     ):
-        """Generate a fullbody preview using Vibe Transfer from another person."""
+        """Generate a fullbody preview using Vibe Transfer from another anima."""
         import asyncio
         import shutil
         from datetime import datetime
 
-        persons_dir = request.app.state.persons_dir
-        person_dir = persons_dir / name
-        if not person_dir.exists():
-            raise HTTPException(status_code=404, detail=f"Person not found: {name}")
+        animas_dir = request.app.state.animas_dir
+        anima_dir = animas_dir / name
+        if not anima_dir.exists():
+            raise HTTPException(status_code=404, detail=f"Anima not found: {name}")
 
-        style_dir = persons_dir / body.style_from
+        style_dir = animas_dir / body.style_from
         if not style_dir.exists():
             raise HTTPException(
                 status_code=404,
-                detail=f"Style reference person not found: {body.style_from}",
+                detail=f"Style reference anima not found: {body.style_from}",
             )
 
         style_fullbody = style_dir / "assets" / "avatar_fullbody.png"
@@ -334,7 +334,7 @@ def create_assets_router() -> APIRouter:
         # Resolve prompt
         prompt = body.prompt
         if not prompt:
-            prompt_file = person_dir / "assets" / "prompt.txt"
+            prompt_file = anima_dir / "assets" / "prompt.txt"
             if prompt_file.exists():
                 prompt = prompt_file.read_text(encoding="utf-8").strip()
             if not prompt:
@@ -344,10 +344,10 @@ def create_assets_router() -> APIRouter:
                 )
 
         # Create backup
-        assets_dir = person_dir / "assets"
+        assets_dir = anima_dir / "assets"
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         backup_id = f"assets_backup_{ts}"
-        backup_dir = person_dir / backup_id
+        backup_dir = anima_dir / backup_id
         if assets_dir.exists():
             shutil.copytree(assets_dir, backup_dir)
             logger.info("Backup created: %s", backup_dir)
@@ -356,7 +356,7 @@ def create_assets_router() -> APIRouter:
 
         from core.tools.image_gen import ImageGenPipeline
 
-        pipeline = ImageGenPipeline(person_dir)
+        pipeline = ImageGenPipeline(anima_dir)
 
         loop = asyncio.get_running_loop()
         result = await loop.run_in_executor(
@@ -384,9 +384,9 @@ def create_assets_router() -> APIRouter:
                 detail=f"Preview generation failed: {'; '.join(result.errors)}",
             )
 
-        preview_url = f"/api/persons/{name}/assets/avatar_fullbody.png"
+        preview_url = f"/api/animas/{name}/assets/avatar_fullbody.png"
 
-        await emit(request, "person.remake_preview_ready", {
+        await emit(request, "anima.remake_preview_ready", {
             "name": name,
             "preview_url": preview_url,
             "seed_used": body.seed,
@@ -399,20 +399,20 @@ def create_assets_router() -> APIRouter:
             "backup_id": backup_id,
         }
 
-    @router.post("/persons/{name}/assets/remake-confirm")
+    @router.post("/animas/{name}/assets/remake-confirm")
     async def remake_confirm(
         name: str, body: RemakeConfirmRequest, request: Request,
     ):
         """Accept the preview and cascade-rebuild all remaining assets."""
         import asyncio
 
-        persons_dir = request.app.state.persons_dir
-        person_dir = persons_dir / name
-        if not person_dir.exists():
-            raise HTTPException(status_code=404, detail=f"Person not found: {name}")
+        animas_dir = request.app.state.animas_dir
+        anima_dir = animas_dir / name
+        if not anima_dir.exists():
+            raise HTTPException(status_code=404, detail=f"Anima not found: {name}")
 
         # Verify backup exists
-        backup_dir = person_dir / body.backup_id
+        backup_dir = anima_dir / body.backup_id
         if not backup_dir.exists():
             raise HTTPException(
                 status_code=404,
@@ -420,7 +420,7 @@ def create_assets_router() -> APIRouter:
             )
 
         # Verify fullbody was already generated (from preview step)
-        fullbody_path = person_dir / "assets" / "avatar_fullbody.png"
+        fullbody_path = anima_dir / "assets" / "avatar_fullbody.png"
         if not fullbody_path.exists():
             raise HTTPException(
                 status_code=400,
@@ -428,7 +428,7 @@ def create_assets_router() -> APIRouter:
             )
 
         # Resolve prompt
-        prompt_file = person_dir / "assets" / "prompt.txt"
+        prompt_file = anima_dir / "assets" / "prompt.txt"
         prompt = ""
         if prompt_file.exists():
             prompt = prompt_file.read_text(encoding="utf-8").strip()
@@ -442,7 +442,7 @@ def create_assets_router() -> APIRouter:
 
         from core.tools.image_gen import ImageGenPipeline
 
-        pipeline = ImageGenPipeline(person_dir)
+        pipeline = ImageGenPipeline(anima_dir)
 
         app = request.app  # Capture app ref, not request (request lifecycle ends)
 
@@ -452,7 +452,7 @@ def create_assets_router() -> APIRouter:
 
                 def _progress(step: str, status: str, pct: int) -> None:
                     asyncio.run_coroutine_threadsafe(
-                        _emit_ws("person.remake_progress", {
+                        _emit_ws("anima.remake_progress", {
                             "name": name,
                             "step": step,
                             "status": status,
@@ -483,14 +483,14 @@ def create_assets_router() -> APIRouter:
                 if result.animation_paths:
                     completed.append("animations")
 
-                await _emit_ws("person.remake_complete", {
+                await _emit_ws("anima.remake_complete", {
                     "name": name,
                     "steps_completed": completed,
                     "errors": result.errors,
                 })
             except Exception:
                 logger.exception("Cascade rebuild failed for %s", name)
-                await _emit_ws("person.remake_complete", {
+                await _emit_ws("anima.remake_complete", {
                     "name": name,
                     "steps_completed": [],
                     "errors": ["Internal error during cascade rebuild"],
@@ -509,19 +509,19 @@ def create_assets_router() -> APIRouter:
             "steps": remaining_steps,
         }
 
-    @router.delete("/persons/{name}/assets/remake-preview")
+    @router.delete("/animas/{name}/assets/remake-preview")
     async def cancel_remake_preview(name: str, request: Request):
         """Cancel a remake preview by restoring from the most recent backup."""
         import shutil
 
-        persons_dir = request.app.state.persons_dir
-        person_dir = persons_dir / name
-        if not person_dir.exists():
-            raise HTTPException(status_code=404, detail=f"Person not found: {name}")
+        animas_dir = request.app.state.animas_dir
+        anima_dir = animas_dir / name
+        if not anima_dir.exists():
+            raise HTTPException(status_code=404, detail=f"Anima not found: {name}")
 
         # Find the most recent backup
         backups = sorted(
-            (d for d in person_dir.iterdir()
+            (d for d in anima_dir.iterdir()
              if d.is_dir() and d.name.startswith("assets_backup_")),
             reverse=True,
         )
@@ -529,7 +529,7 @@ def create_assets_router() -> APIRouter:
             raise HTTPException(status_code=404, detail="No backup found to restore")
 
         latest_backup = backups[0]
-        assets_dir = person_dir / "assets"
+        assets_dir = anima_dir / "assets"
 
         # Restore from backup
         if assets_dir.exists():

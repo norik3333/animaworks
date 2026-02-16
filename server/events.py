@@ -1,5 +1,5 @@
 from __future__ import annotations
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
@@ -18,7 +18,7 @@ async def emit(request: Request, event_type: str, data: dict[str, Any]) -> None:
 
 
 async def emit_notification(request: Request, data: dict[str, Any]) -> None:
-    """Broadcast a person notification with queue support.
+    """Broadcast an anima notification with queue support.
 
     Uses ``broadcast_notification`` which queues the event when no
     WebSocket clients are connected, flushing when a client reconnects.

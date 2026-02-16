@@ -124,7 +124,7 @@ class TestAnimaWorksConfigIntegration:
             "version": 1,
             "system": {"mode": "server"},
             "credentials": {"anthropic": {"api_key": ""}},
-            "persons": {},
+            "animas": {},
         }
         config = AnimaWorksConfig.model_validate(data)
         assert config.human_notification.enabled is False

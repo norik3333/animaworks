@@ -16,7 +16,7 @@ def _make_test_app(supervisor=None):
     from server.routes.chat import create_chat_router
 
     app = FastAPI()
-    app.state.persons = {}
+    app.state.animas = {}
     app.state.ws_manager = MagicMock()
     app.state.ws_manager.broadcast = AsyncMock()
     app.state.supervisor = supervisor or MagicMock()
@@ -46,7 +46,7 @@ class TestChatErrorHandling:
         app = _make_test_app(supervisor=sup)
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            resp = await client.post("/api/persons/alice/chat", json={"message": "hi"})
+            resp = await client.post("/api/animas/alice/chat", json={"message": "hi"})
         assert resp.status_code == 500
 
     async def test_chat_timeout_returns_504(self):
@@ -56,7 +56,7 @@ class TestChatErrorHandling:
         app = _make_test_app(supervisor=sup)
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            resp = await client.post("/api/persons/alice/chat", json={"message": "hi"})
+            resp = await client.post("/api/animas/alice/chat", json={"message": "hi"})
         assert resp.status_code == 504
 
     async def test_greet_timeout_returns_504(self):
@@ -66,7 +66,7 @@ class TestChatErrorHandling:
         app = _make_test_app(supervisor=sup)
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            resp = await client.post("/api/persons/alice/greet")
+            resp = await client.post("/api/animas/alice/greet")
         assert resp.status_code == 504
 
     async def test_greet_runtime_error_returns_500(self):
@@ -76,7 +76,7 @@ class TestChatErrorHandling:
         app = _make_test_app(supervisor=sup)
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            resp = await client.post("/api/persons/alice/greet")
+            resp = await client.post("/api/animas/alice/greet")
         assert resp.status_code == 500
 
 
@@ -108,7 +108,7 @@ def _parse_sse_events(body: str) -> list[dict]:
 
 
 class TestStreamErrorCodes:
-    async def test_stream_person_not_found_has_code(self):
+    async def test_stream_anima_not_found_has_code(self):
         async def _raise_key_error(*args, **kwargs):
             raise KeyError("alice")
             yield  # noqa: unreachable
@@ -119,13 +119,13 @@ class TestStreamErrorCodes:
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.post(
-                "/api/persons/alice/chat/stream",
+                "/api/animas/alice/chat/stream",
                 json={"message": "hi"},
             )
         events = _parse_sse_events(resp.text)
         error_events = [e for e in events if e["event"] == "error"]
         assert len(error_events) >= 1
-        assert error_events[0]["data"]["code"] == "PERSON_NOT_FOUND"
+        assert error_events[0]["data"]["code"] == "ANIMA_NOT_FOUND"
 
     async def test_stream_generic_error_has_code(self):
         async def _raise_generic(*args, **kwargs):
@@ -138,7 +138,7 @@ class TestStreamErrorCodes:
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.post(
-                "/api/persons/alice/chat/stream",
+                "/api/animas/alice/chat/stream",
                 json={"message": "hi"},
             )
         events = _parse_sse_events(resp.text)
@@ -157,7 +157,7 @@ class TestStreamErrorCodes:
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.post(
-                "/api/persons/alice/chat/stream",
+                "/api/animas/alice/chat/stream",
                 json={"message": "hi"},
             )
         events = _parse_sse_events(resp.text)
@@ -184,7 +184,7 @@ class TestStreamErrorCodes:
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.post(
-                "/api/persons/alice/chat/stream",
+                "/api/animas/alice/chat/stream",
                 json={"message": "hi"},
             )
         events = _parse_sse_events(resp.text)
@@ -223,7 +223,7 @@ class TestStreamKeepalive:
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.post(
-                "/api/persons/alice/chat/stream",
+                "/api/animas/alice/chat/stream",
                 json={"message": "hi"},
             )
 
@@ -255,7 +255,7 @@ class TestStreamKeepalive:
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.post(
-                "/api/persons/alice/chat/stream",
+                "/api/animas/alice/chat/stream",
                 json={"message": "hi"},
             )
 

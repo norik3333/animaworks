@@ -42,7 +42,7 @@ class MockChannel(NotificationChannel):
         body: str,
         priority: str = "normal",
         *,
-        person_name: str = "",
+        anima_name: str = "",
     ) -> str:
         if self._fail:
             raise ConnectionError("Mock connection error")
@@ -50,7 +50,7 @@ class MockChannel(NotificationChannel):
             "subject": subject,
             "body": body,
             "priority": priority,
-            "person_name": person_name,
+            "anima_name": anima_name,
         })
         return "mock: OK"
 
@@ -101,11 +101,11 @@ class TestHumanNotifier:
             assert ch.sent[0]["priority"] == "urgent"
 
     @pytest.mark.asyncio
-    async def test_notify_with_person_name(self, notifier_with_channels):
+    async def test_notify_with_anima_name(self, notifier_with_channels):
         notifier, channels = notifier_with_channels
-        await notifier.notify("Report", "All good", person_name="alice")
+        await notifier.notify("Report", "All good", anima_name="alice")
         for ch in channels:
-            assert ch.sent[0]["person_name"] == "alice"
+            assert ch.sent[0]["anima_name"] == "alice"
 
     @pytest.mark.asyncio
     async def test_notify_invalid_priority_defaults_to_normal(
@@ -154,7 +154,7 @@ class TestChannelRegistry:
             def channel_type(self) -> str:
                 return "test_registered"
 
-            async def send(self, subject, body, priority="normal", *, person_name=""):
+            async def send(self, subject, body, priority="normal", *, anima_name=""):
                 return "test_registered: OK"
 
         assert "test_registered" in _CHANNEL_REGISTRY

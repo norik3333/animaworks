@@ -75,17 +75,17 @@ export async function loadSessions() {
   const { listArea } = findNodes();
   if (!listArea) return;
 
-  const { selectedPerson } = getState();
+  const { selectedAnima } = getState();
 
-  if (!selectedPerson) {
-    listArea.innerHTML = '<div class="loading-placeholder">Person を選択してください</div>';
+  if (!selectedAnima) {
+    listArea.innerHTML = '<div class="loading-placeholder">Anima を選択してください</div>';
     return;
   }
 
   listArea.innerHTML = '<div class="loading-placeholder">読み込み中...</div>';
 
   try {
-    const data = await api.fetchSessions(selectedPerson);
+    const data = await api.fetchSessions(selectedAnima);
     setState({ sessionList: data });
     renderItems(data);
   } catch (err) {
@@ -220,15 +220,15 @@ function renderTurns(data) {
 }
 
 async function loadActiveConversation() {
-  const { selectedPerson } = getState();
-  if (!selectedPerson) return;
+  const { selectedAnima } = getState();
+  if (!selectedAnima) return;
 
   showDetail("進行中の会話");
   const body = getDetailBody();
   if (body) body.innerHTML = '<div class="loading-placeholder">読み込み中...</div>';
 
   try {
-    const data = await api.fetchConversationFull(selectedPerson);
+    const data = await api.fetchConversationFull(selectedAnima);
     renderTurns(data);
   } catch (err) {
     console.error("Failed to load active conversation:", err);
@@ -237,15 +237,15 @@ async function loadActiveConversation() {
 }
 
 async function loadArchivedSession(sessionId) {
-  const { selectedPerson } = getState();
-  if (!selectedPerson) return;
+  const { selectedAnima } = getState();
+  if (!selectedAnima) return;
 
   showDetail(`セッション: ${sessionId}`);
   const body = getDetailBody();
   if (body) body.innerHTML = '<div class="loading-placeholder">読み込み中...</div>';
 
   try {
-    const data = await api.fetchSession(selectedPerson, sessionId);
+    const data = await api.fetchSession(selectedAnima, sessionId);
     renderArchivedDetail(data);
   } catch (err) {
     console.error("Failed to load archived session:", err);
@@ -295,15 +295,15 @@ function renderArchivedDetail(data) {
 }
 
 async function loadTranscript(date) {
-  const { selectedPerson } = getState();
-  if (!selectedPerson) return;
+  const { selectedAnima } = getState();
+  if (!selectedAnima) return;
 
   showDetail(`会話ログ: ${date}`);
   const body = getDetailBody();
   if (body) body.innerHTML = '<div class="loading-placeholder">読み込み中...</div>';
 
   try {
-    const data = await api.fetchTranscript(selectedPerson, date);
+    const data = await api.fetchTranscript(selectedAnima, date);
     renderTurns(data);
   } catch (err) {
     console.error("Failed to load transcript:", err);
@@ -312,15 +312,15 @@ async function loadTranscript(date) {
 }
 
 async function loadEpisode(date) {
-  const { selectedPerson } = getState();
-  if (!selectedPerson) return;
+  const { selectedAnima } = getState();
+  if (!selectedAnima) return;
 
   showDetail(`エピソード: ${date}`);
   const body = getDetailBody();
   if (body) body.innerHTML = '<div class="loading-placeholder">読み込み中...</div>';
 
   try {
-    const data = await api.fetchEpisode(selectedPerson, date);
+    const data = await api.fetchEpisode(selectedAnima, date);
     body.innerHTML = `<div class="session-markdown">${renderSimpleMarkdown(data.content || "(内容なし)")}</div>`;
   } catch (err) {
     console.error("Failed to load episode:", err);

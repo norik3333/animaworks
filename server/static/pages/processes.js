@@ -37,13 +37,13 @@ async function _loadProcesses() {
     const entries = Object.entries(processes);
 
     if (entries.length === 0) {
-      // Fallback: try person list
-      const persons = await api("/api/persons");
-      if (persons.length === 0) {
+      // Fallback: try anima list
+      const animas = await api("/api/animas");
+      if (animas.length === 0) {
         content.innerHTML = '<div class="loading-placeholder">稼働中のプロセスはありません</div>';
         return;
       }
-      _renderFromPersons(content, persons);
+      _renderFromAnimas(content, animas);
       return;
     }
 
@@ -59,7 +59,7 @@ function _renderFromProcesses(container, entries) {
       <thead>
         <tr>
           <th>ヘルス</th>
-          <th>パーソン名</th>
+          <th>Anima名</th>
           <th>PID</th>
           <th>ステータス</th>
           <th>稼働時間</th>
@@ -112,7 +112,7 @@ function _renderFromProcesses(container, entries) {
       btn.disabled = true;
       btn.textContent = "実行中...";
       try {
-        await fetch(`/api/persons/${encodeURIComponent(name)}/trigger`, { method: "POST" });
+        await fetch(`/api/animas/${encodeURIComponent(name)}/trigger`, { method: "POST" });
         btn.textContent = "完了";
         setTimeout(() => { btn.textContent = "Heartbeat"; btn.disabled = false; }, 2000);
       } catch {
@@ -123,13 +123,13 @@ function _renderFromProcesses(container, entries) {
   });
 }
 
-function _renderFromPersons(container, persons) {
+function _renderFromAnimas(container, animas) {
   let html = `
     <table class="data-table">
       <thead>
         <tr>
           <th>ヘルス</th>
-          <th>パーソン名</th>
+          <th>Anima名</th>
           <th>PID</th>
           <th>ステータス</th>
           <th>稼働時間</th>
@@ -139,7 +139,7 @@ function _renderFromPersons(container, persons) {
       <tbody>
   `;
 
-  for (const p of persons) {
+  for (const p of animas) {
     const status = p.status || "offline";
     const health = _getHealthIndicator(status, 0);
     const uptime = p.uptime_sec ? _formatUptime(p.uptime_sec) : "--";
@@ -172,7 +172,7 @@ function _renderFromPersons(container, persons) {
       btn.disabled = true;
       btn.textContent = "実行中...";
       try {
-        await fetch(`/api/persons/${encodeURIComponent(name)}/trigger`, { method: "POST" });
+        await fetch(`/api/animas/${encodeURIComponent(name)}/trigger`, { method: "POST" });
         btn.textContent = "完了";
         setTimeout(() => { btn.textContent = "Heartbeat"; btn.disabled = false; }, 2000);
       } catch {

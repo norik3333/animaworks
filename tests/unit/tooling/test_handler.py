@@ -14,15 +14,15 @@ from core.tooling.handler import ToolHandler, _SHELL_METACHAR_RE, _error_result,
 
 
 @pytest.fixture
-def person_dir(tmp_path: Path) -> Path:
-    d = tmp_path / "persons" / "test-person"
+def anima_dir(tmp_path: Path) -> Path:
+    d = tmp_path / "animas" / "test-anima"
     d.mkdir(parents=True)
     (d / "permissions.md").write_text("", encoding="utf-8")
     return d
 
 
 @pytest.fixture
-def memory(person_dir: Path) -> MagicMock:
+def memory(anima_dir: Path) -> MagicMock:
     m = MagicMock()
     m.read_permissions.return_value = ""
     m.search_memory_text.return_value = []
@@ -32,7 +32,7 @@ def memory(person_dir: Path) -> MagicMock:
 @pytest.fixture
 def messenger() -> MagicMock:
     m = MagicMock()
-    m.person_name = "test-person"
+    m.anima_name = "test-anima"
     msg = MagicMock()
     msg.id = "msg_001"
     msg.thread_id = "thread_001"
@@ -41,9 +41,9 @@ def messenger() -> MagicMock:
 
 
 @pytest.fixture
-def handler(person_dir: Path, memory: MagicMock) -> ToolHandler:
+def handler(anima_dir: Path, memory: MagicMock) -> ToolHandler:
     return ToolHandler(
-        person_dir=person_dir,
+        anima_dir=anima_dir,
         memory=memory,
         messenger=None,
         tool_registry=[],
@@ -52,10 +52,10 @@ def handler(person_dir: Path, memory: MagicMock) -> ToolHandler:
 
 @pytest.fixture
 def handler_with_messenger(
-    person_dir: Path, memory: MagicMock, messenger: MagicMock,
+    anima_dir: Path, memory: MagicMock, messenger: MagicMock,
 ) -> ToolHandler:
     return ToolHandler(
-        person_dir=person_dir,
+        anima_dir=anima_dir,
         memory=memory,
         messenger=messenger,
         tool_registry=[],
@@ -100,9 +100,9 @@ class TestHandleRouting:
         result = handler.handle("search_memory", {"query": "nothing"})
         assert "No results" in result
 
-    def test_read_memory_file(self, handler: ToolHandler, person_dir: Path):
-        (person_dir / "knowledge").mkdir(exist_ok=True)
-        (person_dir / "knowledge" / "test.md").write_text("content here", encoding="utf-8")
+    def test_read_memory_file(self, handler: ToolHandler, anima_dir: Path):
+        (anima_dir / "knowledge").mkdir(exist_ok=True)
+        (anima_dir / "knowledge" / "test.md").write_text("content here", encoding="utf-8")
         result = handler.handle("read_memory_file", {"path": "knowledge/test.md"})
         assert result == "content here"
 
@@ -141,22 +141,22 @@ class TestHandleRouting:
             )
         assert "File not found" in result
 
-    def test_write_memory_file_overwrite(self, handler: ToolHandler, person_dir: Path):
+    def test_write_memory_file_overwrite(self, handler: ToolHandler, anima_dir: Path):
         result = handler.handle(
             "write_memory_file",
             {"path": "knowledge/new.md", "content": "new content"},
         )
         assert "Written to" in result
-        assert (person_dir / "knowledge" / "new.md").read_text(encoding="utf-8") == "new content"
+        assert (anima_dir / "knowledge" / "new.md").read_text(encoding="utf-8") == "new content"
 
-    def test_write_memory_file_append(self, handler: ToolHandler, person_dir: Path):
-        (person_dir / "knowledge").mkdir(exist_ok=True)
-        (person_dir / "knowledge" / "log.md").write_text("line1\n", encoding="utf-8")
+    def test_write_memory_file_append(self, handler: ToolHandler, anima_dir: Path):
+        (anima_dir / "knowledge").mkdir(exist_ok=True)
+        (anima_dir / "knowledge" / "log.md").write_text("line1\n", encoding="utf-8")
         handler.handle(
             "write_memory_file",
             {"path": "knowledge/log.md", "content": "line2\n", "mode": "append"},
         )
-        content = (person_dir / "knowledge" / "log.md").read_text(encoding="utf-8")
+        content = (anima_dir / "knowledge" / "log.md").read_text(encoding="utf-8")
         assert content == "line1\nline2\n"
 
     def test_send_message_without_messenger(self, handler: ToolHandler):
@@ -178,7 +178,7 @@ class TestHandleRouting:
         handler_with_messenger.handle(
             "send_message", {"to": "alice", "content": "hello"},
         )
-        callback.assert_called_once_with("test-person", "alice", "hello")
+        callback.assert_called_once_with("test-anima", "alice", "hello")
 
     def test_send_message_on_message_sent_error_swallowed(
         self, handler_with_messenger: ToolHandler,
@@ -212,25 +212,25 @@ class TestHandleRouting:
 
 
 class TestFileOperations:
-    def test_read_file_in_person_dir(self, handler: ToolHandler, person_dir: Path):
-        (person_dir / "test.txt").write_text("hello", encoding="utf-8")
-        result = handler.handle("read_file", {"path": str(person_dir / "test.txt")})
+    def test_read_file_in_anima_dir(self, handler: ToolHandler, anima_dir: Path):
+        (anima_dir / "test.txt").write_text("hello", encoding="utf-8")
+        result = handler.handle("read_file", {"path": str(anima_dir / "test.txt")})
         assert result == "hello"
 
-    def test_read_file_not_found(self, handler: ToolHandler, person_dir: Path):
-        result = handler.handle("read_file", {"path": str(person_dir / "missing.txt")})
+    def test_read_file_not_found(self, handler: ToolHandler, anima_dir: Path):
+        result = handler.handle("read_file", {"path": str(anima_dir / "missing.txt")})
         parsed = json.loads(result)
         assert parsed["error_type"] == "FileNotFound"
 
-    def test_read_file_not_a_file(self, handler: ToolHandler, person_dir: Path):
-        result = handler.handle("read_file", {"path": str(person_dir)})
+    def test_read_file_not_a_file(self, handler: ToolHandler, anima_dir: Path):
+        result = handler.handle("read_file", {"path": str(anima_dir)})
         parsed = json.loads(result)
         assert parsed["error_type"] == "InvalidArguments"
 
-    def test_read_file_truncated_at_100k(self, handler: ToolHandler, person_dir: Path):
+    def test_read_file_truncated_at_100k(self, handler: ToolHandler, anima_dir: Path):
         big_content = "x" * 200_000
-        (person_dir / "big.txt").write_text(big_content, encoding="utf-8")
-        result = handler.handle("read_file", {"path": str(person_dir / "big.txt")})
+        (anima_dir / "big.txt").write_text(big_content, encoding="utf-8")
+        result = handler.handle("read_file", {"path": str(anima_dir / "big.txt")})
         assert len(result) == 100_000
 
     def test_read_file_permission_denied(self, handler: ToolHandler):
@@ -238,8 +238,8 @@ class TestFileOperations:
         parsed = json.loads(result)
         assert parsed["error_type"] == "PermissionDenied"
 
-    def test_write_file_in_person_dir(self, handler: ToolHandler, person_dir: Path):
-        path = person_dir / "output.txt"
+    def test_write_file_in_anima_dir(self, handler: ToolHandler, anima_dir: Path):
+        path = anima_dir / "output.txt"
         result = handler.handle("write_file", {"path": str(path), "content": "data"})
         assert "Written to" in result
         assert path.read_text(encoding="utf-8") == "data"
@@ -249,8 +249,8 @@ class TestFileOperations:
         parsed = json.loads(result)
         assert parsed["error_type"] == "PermissionDenied"
 
-    def test_edit_file_success(self, handler: ToolHandler, person_dir: Path):
-        path = person_dir / "code.py"
+    def test_edit_file_success(self, handler: ToolHandler, anima_dir: Path):
+        path = anima_dir / "code.py"
         path.write_text("def foo():\n    pass\n", encoding="utf-8")
         result = handler.handle(
             "edit_file",
@@ -259,8 +259,8 @@ class TestFileOperations:
         assert "Edited" in result
         assert "return 42" in path.read_text(encoding="utf-8")
 
-    def test_edit_file_old_string_not_found(self, handler: ToolHandler, person_dir: Path):
-        path = person_dir / "code.py"
+    def test_edit_file_old_string_not_found(self, handler: ToolHandler, anima_dir: Path):
+        path = anima_dir / "code.py"
         path.write_text("def foo():\n    pass\n", encoding="utf-8")
         result = handler.handle(
             "edit_file",
@@ -269,8 +269,8 @@ class TestFileOperations:
         parsed = json.loads(result)
         assert parsed["error_type"] == "StringNotFound"
 
-    def test_edit_file_ambiguous_match(self, handler: ToolHandler, person_dir: Path):
-        path = person_dir / "code.py"
+    def test_edit_file_ambiguous_match(self, handler: ToolHandler, anima_dir: Path):
+        path = anima_dir / "code.py"
         path.write_text("pass\npass\n", encoding="utf-8")
         result = handler.handle(
             "edit_file",
@@ -280,10 +280,10 @@ class TestFileOperations:
         assert parsed["error_type"] == "AmbiguousMatch"
         assert parsed["context"]["match_count"] == 2
 
-    def test_edit_file_not_found(self, handler: ToolHandler, person_dir: Path):
+    def test_edit_file_not_found(self, handler: ToolHandler, anima_dir: Path):
         result = handler.handle(
             "edit_file",
-            {"path": str(person_dir / "missing.py"), "old_string": "x", "new_string": "y"},
+            {"path": str(anima_dir / "missing.py"), "old_string": "x", "new_string": "y"},
         )
         parsed = json.loads(result)
         assert parsed["error_type"] == "FileNotFound"
@@ -340,8 +340,8 @@ class TestExecuteCommand:
 
 
 class TestFilePermissions:
-    def test_own_person_dir_always_allowed(self, handler: ToolHandler, person_dir: Path):
-        result = handler._check_file_permission(str(person_dir / "any_file.md"))
+    def test_own_anima_dir_always_allowed(self, handler: ToolHandler, anima_dir: Path):
+        result = handler._check_file_permission(str(anima_dir / "any_file.md"))
         assert result is None
 
     def test_denied_without_file_section(self, handler: ToolHandler, memory: MagicMock):
@@ -490,20 +490,20 @@ class TestErrorResult:
 
 
 class TestSearchCode:
-    def test_search_code_basic(self, handler: ToolHandler, person_dir: Path):
-        (person_dir / "test.py").write_text("def hello():\n    return 42\n", encoding="utf-8")
+    def test_search_code_basic(self, handler: ToolHandler, anima_dir: Path):
+        (anima_dir / "test.py").write_text("def hello():\n    return 42\n", encoding="utf-8")
         result = handler.handle("search_code", {"pattern": "hello"})
         assert "test.py:1" in result
         assert "def hello" in result
 
-    def test_search_code_no_matches(self, handler: ToolHandler, person_dir: Path):
-        (person_dir / "test.py").write_text("def foo():\n    pass\n", encoding="utf-8")
+    def test_search_code_no_matches(self, handler: ToolHandler, anima_dir: Path):
+        (anima_dir / "test.py").write_text("def foo():\n    pass\n", encoding="utf-8")
         result = handler.handle("search_code", {"pattern": "nonexistent"})
         assert "No matches" in result
 
-    def test_search_code_with_glob(self, handler: ToolHandler, person_dir: Path):
-        (person_dir / "test.py").write_text("hello\n", encoding="utf-8")
-        (person_dir / "test.md").write_text("hello\n", encoding="utf-8")
+    def test_search_code_with_glob(self, handler: ToolHandler, anima_dir: Path):
+        (anima_dir / "test.py").write_text("hello\n", encoding="utf-8")
+        (anima_dir / "test.md").write_text("hello\n", encoding="utf-8")
         result = handler.handle("search_code", {"pattern": "hello", "glob": "*.py"})
         assert "test.py" in result
         # md file should not be included
@@ -528,35 +528,35 @@ class TestSearchCode:
 
 
 class TestListDirectory:
-    def test_list_directory_basic(self, handler: ToolHandler, person_dir: Path):
-        (person_dir / "file1.txt").write_text("a", encoding="utf-8")
-        (person_dir / "file2.txt").write_text("b", encoding="utf-8")
-        (person_dir / "subdir").mkdir()
+    def test_list_directory_basic(self, handler: ToolHandler, anima_dir: Path):
+        (anima_dir / "file1.txt").write_text("a", encoding="utf-8")
+        (anima_dir / "file2.txt").write_text("b", encoding="utf-8")
+        (anima_dir / "subdir").mkdir()
         result = handler.handle("list_directory", {})
         assert "file1.txt" in result
         assert "file2.txt" in result
         assert "subdir/" in result
 
-    def test_list_directory_with_pattern(self, handler: ToolHandler, person_dir: Path):
-        (person_dir / "test.py").write_text("", encoding="utf-8")
-        (person_dir / "test.md").write_text("", encoding="utf-8")
+    def test_list_directory_with_pattern(self, handler: ToolHandler, anima_dir: Path):
+        (anima_dir / "test.py").write_text("", encoding="utf-8")
+        (anima_dir / "test.md").write_text("", encoding="utf-8")
         result = handler.handle("list_directory", {"pattern": "*.py"})
         assert "test.py" in result
         assert "test.md" not in result
 
-    def test_list_directory_not_found(self, handler: ToolHandler, person_dir: Path):
-        result = handler.handle("list_directory", {"path": str(person_dir / "nonexistent")})
+    def test_list_directory_not_found(self, handler: ToolHandler, anima_dir: Path):
+        result = handler.handle("list_directory", {"path": str(anima_dir / "nonexistent")})
         parsed = json.loads(result)
         assert parsed["error_type"] == "FileNotFound"
 
-    def test_list_directory_not_a_dir(self, handler: ToolHandler, person_dir: Path):
-        (person_dir / "file.txt").write_text("x", encoding="utf-8")
-        result = handler.handle("list_directory", {"path": str(person_dir / "file.txt")})
+    def test_list_directory_not_a_dir(self, handler: ToolHandler, anima_dir: Path):
+        (anima_dir / "file.txt").write_text("x", encoding="utf-8")
+        result = handler.handle("list_directory", {"path": str(anima_dir / "file.txt")})
         parsed = json.loads(result)
         assert parsed["error_type"] == "InvalidArguments"
 
-    def test_list_directory_empty(self, handler: ToolHandler, person_dir: Path):
-        empty_dir = person_dir / "empty"
+    def test_list_directory_empty(self, handler: ToolHandler, anima_dir: Path):
+        empty_dir = anima_dir / "empty"
         empty_dir.mkdir()
         result = handler.handle("list_directory", {"path": str(empty_dir)})
         assert "empty" in result.lower()
@@ -566,14 +566,14 @@ class TestListDirectory:
 
 
 class TestStructuredErrors:
-    def test_read_file_not_found_structured(self, handler: ToolHandler, person_dir: Path):
-        result = handler.handle("read_file", {"path": str(person_dir / "missing.txt")})
+    def test_read_file_not_found_structured(self, handler: ToolHandler, anima_dir: Path):
+        result = handler.handle("read_file", {"path": str(anima_dir / "missing.txt")})
         parsed = json.loads(result)
         assert parsed["status"] == "error"
         assert parsed["error_type"] == "FileNotFound"
 
-    def test_edit_file_string_not_found_structured(self, handler: ToolHandler, person_dir: Path):
-        path = person_dir / "code.py"
+    def test_edit_file_string_not_found_structured(self, handler: ToolHandler, anima_dir: Path):
+        path = anima_dir / "code.py"
         path.write_text("def foo():\n    pass\n", encoding="utf-8")
         result = handler.handle(
             "edit_file",
@@ -583,8 +583,8 @@ class TestStructuredErrors:
         assert parsed["error_type"] == "StringNotFound"
         assert "suggestion" in parsed
 
-    def test_edit_file_ambiguous_structured(self, handler: ToolHandler, person_dir: Path):
-        path = person_dir / "code.py"
+    def test_edit_file_ambiguous_structured(self, handler: ToolHandler, anima_dir: Path):
+        path = anima_dir / "code.py"
         path.write_text("pass\npass\n", encoding="utf-8")
         result = handler.handle(
             "edit_file",
@@ -619,35 +619,35 @@ class TestScheduleChangedCallback:
         assert handler.on_schedule_changed is fn
 
     def test_write_heartbeat_triggers_callback(
-        self, person_dir: Path, memory: MagicMock,
+        self, anima_dir: Path, memory: MagicMock,
     ):
         callback = MagicMock()
         h = ToolHandler(
-            person_dir=person_dir,
+            anima_dir=anima_dir,
             memory=memory,
             on_schedule_changed=callback,
         )
         h.handle("write_memory_file", {"path": "heartbeat.md", "content": "new config"})
-        callback.assert_called_once_with("test-person")
+        callback.assert_called_once_with("test-anima")
 
     def test_write_cron_triggers_callback(
-        self, person_dir: Path, memory: MagicMock,
+        self, anima_dir: Path, memory: MagicMock,
     ):
         callback = MagicMock()
         h = ToolHandler(
-            person_dir=person_dir,
+            anima_dir=anima_dir,
             memory=memory,
             on_schedule_changed=callback,
         )
         h.handle("write_memory_file", {"path": "cron.md", "content": "new cron"})
-        callback.assert_called_once_with("test-person")
+        callback.assert_called_once_with("test-anima")
 
     def test_write_other_file_does_not_trigger_callback(
-        self, person_dir: Path, memory: MagicMock,
+        self, anima_dir: Path, memory: MagicMock,
     ):
         callback = MagicMock()
         h = ToolHandler(
-            person_dir=person_dir,
+            anima_dir=anima_dir,
             memory=memory,
             on_schedule_changed=callback,
         )
@@ -655,20 +655,20 @@ class TestScheduleChangedCallback:
         callback.assert_not_called()
 
     def test_callback_error_does_not_break_write(
-        self, person_dir: Path, memory: MagicMock,
+        self, anima_dir: Path, memory: MagicMock,
     ):
         callback = MagicMock(side_effect=RuntimeError("reload failed"))
         h = ToolHandler(
-            person_dir=person_dir,
+            anima_dir=anima_dir,
             memory=memory,
             on_schedule_changed=callback,
         )
         result = h.handle("write_memory_file", {"path": "heartbeat.md", "content": "cfg"})
         assert "Written to" in result
         # File should still be written despite callback error
-        assert (person_dir / "heartbeat.md").read_text(encoding="utf-8") == "cfg"
+        assert (anima_dir / "heartbeat.md").read_text(encoding="utf-8") == "cfg"
 
-    def test_no_callback_set_does_not_error(self, handler: ToolHandler, person_dir: Path):
+    def test_no_callback_set_does_not_error(self, handler: ToolHandler, anima_dir: Path):
         # handler has no on_schedule_changed set (default None)
         result = handler.handle("write_memory_file", {"path": "heartbeat.md", "content": "cfg"})
         assert "Written to" in result
@@ -697,51 +697,51 @@ class TestMemoryWriteSecurity:
         assert "protected file" in parsed["message"]
 
     def test_write_memory_file_allowed_for_non_protected(
-        self, handler: ToolHandler, person_dir: Path,
+        self, handler: ToolHandler, anima_dir: Path,
     ):
         result = handler.handle(
             "write_memory_file",
             {"path": "knowledge/safe.md", "content": "safe content"},
         )
         assert "Written to" in result
-        assert (person_dir / "knowledge" / "safe.md").read_text(encoding="utf-8") == "safe content"
+        assert (anima_dir / "knowledge" / "safe.md").read_text(encoding="utf-8") == "safe content"
 
     def test_write_memory_file_path_traversal_blocked(
         self, handler: ToolHandler, tmp_path: Path,
     ):
-        # Create another person's directory
-        other = tmp_path / "persons" / "other-person" / "knowledge"
+        # Create another anima's directory
+        other = tmp_path / "animas" / "other-anima" / "knowledge"
         other.mkdir(parents=True)
         result = handler.handle(
             "write_memory_file",
-            {"path": "../other-person/knowledge/stolen.md", "content": "hacked"},
+            {"path": "../other-anima/knowledge/stolen.md", "content": "hacked"},
         )
         parsed = json.loads(result)
         assert parsed["error_type"] == "PermissionDenied"
-        assert "outside person directory" in parsed["message"]
+        assert "outside anima directory" in parsed["message"]
         # Verify file was NOT created
         assert not (other / "stolen.md").exists()
 
     def test_read_memory_file_path_traversal_blocked(
         self, handler: ToolHandler, tmp_path: Path,
     ):
-        # Create another person's directory with a file
-        other = tmp_path / "persons" / "other-person"
+        # Create another anima's directory with a file
+        other = tmp_path / "animas" / "other-anima"
         other.mkdir(parents=True)
         (other / "identity.md").write_text("secret identity", encoding="utf-8")
         result = handler.handle(
             "read_memory_file",
-            {"path": "../other-person/identity.md"},
+            {"path": "../other-anima/identity.md"},
         )
         parsed = json.loads(result)
         assert parsed["error_type"] == "PermissionDenied"
-        assert "outside person directory" in parsed["message"]
+        assert "outside anima directory" in parsed["message"]
 
     def test_read_memory_file_normal_access_allowed(
-        self, handler: ToolHandler, person_dir: Path,
+        self, handler: ToolHandler, anima_dir: Path,
     ):
-        (person_dir / "episodes").mkdir(exist_ok=True)
-        (person_dir / "episodes" / "2026-02-15.md").write_text("daily log", encoding="utf-8")
+        (anima_dir / "episodes").mkdir(exist_ok=True)
+        (anima_dir / "episodes" / "2026-02-15.md").write_text("daily log", encoding="utf-8")
         result = handler.handle(
             "read_memory_file",
             {"path": "episodes/2026-02-15.md"},
@@ -749,7 +749,7 @@ class TestMemoryWriteSecurity:
         assert result == "daily log"
 
     def test_write_memory_file_heartbeat_still_allowed(
-        self, handler: ToolHandler, person_dir: Path,
+        self, handler: ToolHandler, anima_dir: Path,
     ):
         """heartbeat.md is NOT in the protected list."""
         result = handler.handle(
@@ -759,7 +759,7 @@ class TestMemoryWriteSecurity:
         assert "Written to" in result
 
     def test_write_memory_file_cron_still_allowed(
-        self, handler: ToolHandler, person_dir: Path,
+        self, handler: ToolHandler, anima_dir: Path,
     ):
         """cron.md is NOT in the protected list."""
         result = handler.handle(
@@ -776,10 +776,10 @@ class TestFilePermissionWriteProtection:
     """Tests for _check_file_permission with write=True."""
 
     def test_write_to_own_permissions_md_blocked(
-        self, handler: ToolHandler, person_dir: Path,
+        self, handler: ToolHandler, anima_dir: Path,
     ):
         result = handler._check_file_permission(
-            str(person_dir / "permissions.md"), write=True,
+            str(anima_dir / "permissions.md"), write=True,
         )
         assert result is not None
         parsed = json.loads(result)
@@ -787,61 +787,61 @@ class TestFilePermissionWriteProtection:
         assert "protected file" in parsed["message"]
 
     def test_write_to_own_identity_md_blocked(
-        self, handler: ToolHandler, person_dir: Path,
+        self, handler: ToolHandler, anima_dir: Path,
     ):
         result = handler._check_file_permission(
-            str(person_dir / "identity.md"), write=True,
+            str(anima_dir / "identity.md"), write=True,
         )
         assert result is not None
         parsed = json.loads(result)
         assert parsed["error_type"] == "PermissionDenied"
 
     def test_read_permissions_md_allowed(
-        self, handler: ToolHandler, person_dir: Path,
+        self, handler: ToolHandler, anima_dir: Path,
     ):
         """Reading protected files is allowed (write=False)."""
         result = handler._check_file_permission(
-            str(person_dir / "permissions.md"), write=False,
+            str(anima_dir / "permissions.md"), write=False,
         )
         assert result is None
 
     def test_read_permissions_md_allowed_default(
-        self, handler: ToolHandler, person_dir: Path,
+        self, handler: ToolHandler, anima_dir: Path,
     ):
         """Default write=False should allow reading."""
         result = handler._check_file_permission(
-            str(person_dir / "permissions.md"),
+            str(anima_dir / "permissions.md"),
         )
         assert result is None
 
     def test_write_to_knowledge_allowed(
-        self, handler: ToolHandler, person_dir: Path,
+        self, handler: ToolHandler, anima_dir: Path,
     ):
         result = handler._check_file_permission(
-            str(person_dir / "knowledge" / "note.md"), write=True,
+            str(anima_dir / "knowledge" / "note.md"), write=True,
         )
         assert result is None
 
     def test_write_file_handler_blocks_protected(
-        self, handler: ToolHandler, person_dir: Path,
+        self, handler: ToolHandler, anima_dir: Path,
     ):
         """write_file tool should block writes to permissions.md."""
         result = handler.handle(
             "write_file",
-            {"path": str(person_dir / "permissions.md"), "content": "hacked"},
+            {"path": str(anima_dir / "permissions.md"), "content": "hacked"},
         )
         parsed = json.loads(result)
         assert parsed["error_type"] == "PermissionDenied"
 
     def test_edit_file_handler_blocks_protected(
-        self, handler: ToolHandler, person_dir: Path,
+        self, handler: ToolHandler, anima_dir: Path,
     ):
         """edit_file tool should block edits to identity.md."""
-        (person_dir / "identity.md").write_text("original identity", encoding="utf-8")
+        (anima_dir / "identity.md").write_text("original identity", encoding="utf-8")
         result = handler.handle(
             "edit_file",
             {
-                "path": str(person_dir / "identity.md"),
+                "path": str(anima_dir / "identity.md"),
                 "old_string": "original",
                 "new_string": "hacked",
             },
@@ -849,7 +849,7 @@ class TestFilePermissionWriteProtection:
         parsed = json.loads(result)
         assert parsed["error_type"] == "PermissionDenied"
         # Verify file was NOT modified
-        assert "original identity" == (person_dir / "identity.md").read_text(encoding="utf-8")
+        assert "original identity" == (anima_dir / "identity.md").read_text(encoding="utf-8")
 
 
 # ── Command path traversal ───────────────────────────────────
@@ -864,11 +864,11 @@ class TestCommandPathTraversal:
         memory.read_permissions.return_value = "## コマンド実行\n- cp: OK"
         result = handler.handle(
             "execute_command",
-            {"command": "cp ../other-person/secrets.md ./stolen.md"},
+            {"command": "cp ../other-anima/secrets.md ./stolen.md"},
         )
         parsed = json.loads(result)
         assert parsed["error_type"] == "PermissionDenied"
-        assert "outside person directory" in parsed["message"]
+        assert "outside anima directory" in parsed["message"]
 
     def test_command_without_traversal_allowed(
         self, handler: ToolHandler, memory: MagicMock,
@@ -881,17 +881,17 @@ class TestCommandPathTraversal:
         assert "hello" in result
 
     def test_command_with_safe_dotdot_in_own_dir(
-        self, handler: ToolHandler, memory: MagicMock, person_dir: Path,
+        self, handler: ToolHandler, memory: MagicMock, anima_dir: Path,
     ):
-        """Path with .. that still resolves within person_dir should be allowed."""
-        (person_dir / "subdir").mkdir(exist_ok=True)
+        """Path with .. that still resolves within anima_dir should be allowed."""
+        (anima_dir / "subdir").mkdir(exist_ok=True)
         memory.read_permissions.return_value = "## コマンド実行\n- ls: OK"
         result = handler.handle(
             "execute_command",
             {"command": "ls subdir/.."},
         )
-        # Should NOT be blocked — resolves within person_dir
-        assert "PermissionDenied" not in result or "outside person" not in result
+        # Should NOT be blocked — resolves within anima_dir
+        assert "PermissionDenied" not in result or "outside anima" not in result
 
 
 # ── _is_protected_write unit tests ───────────────────────────
@@ -900,25 +900,25 @@ class TestCommandPathTraversal:
 class TestIsProtectedWrite:
     """Direct unit tests for the _is_protected_write function."""
 
-    def test_protected_file_blocked(self, person_dir: Path):
-        result = _is_protected_write(person_dir, person_dir / "permissions.md")
+    def test_protected_file_blocked(self, anima_dir: Path):
+        result = _is_protected_write(anima_dir, anima_dir / "permissions.md")
         assert result is not None
         parsed = json.loads(result)
         assert parsed["error_type"] == "PermissionDenied"
 
-    def test_non_protected_file_allowed(self, person_dir: Path):
-        result = _is_protected_write(person_dir, person_dir / "knowledge" / "note.md")
+    def test_non_protected_file_allowed(self, anima_dir: Path):
+        result = _is_protected_write(anima_dir, anima_dir / "knowledge" / "note.md")
         assert result is None
 
-    def test_path_traversal_blocked(self, person_dir: Path):
-        target = person_dir / ".." / "other-person" / "file.md"
-        result = _is_protected_write(person_dir, target)
+    def test_path_traversal_blocked(self, anima_dir: Path):
+        target = anima_dir / ".." / "other-anima" / "file.md"
+        result = _is_protected_write(anima_dir, target)
         assert result is not None
         parsed = json.loads(result)
         assert parsed["error_type"] == "PermissionDenied"
 
-    def test_within_person_dir_allowed(self, person_dir: Path):
-        result = _is_protected_write(person_dir, person_dir / "episodes" / "log.md")
+    def test_within_anima_dir_allowed(self, anima_dir: Path):
+        result = _is_protected_write(anima_dir, anima_dir / "episodes" / "log.md")
         assert result is None
 
 
@@ -928,8 +928,8 @@ class TestIsProtectedWrite:
 class TestToolCreationPermission:
     """Tests for _check_tool_creation_permission()."""
 
-    def test_no_memory_returns_false(self, person_dir: Path):
-        h = ToolHandler(person_dir=person_dir, memory=None, tool_registry=[])
+    def test_no_memory_returns_false(self, anima_dir: Path):
+        h = ToolHandler(anima_dir=anima_dir, memory=None, tool_registry=[])
         assert h._check_tool_creation_permission("個人ツール") is False
 
     def test_no_tool_creation_section_returns_false(
@@ -1005,7 +1005,7 @@ class TestWriteMemoryFileToolCreation:
         assert "ツール作成" in parsed["message"]
 
     def test_writing_tool_py_with_permission_succeeds(
-        self, handler: ToolHandler, memory: MagicMock, person_dir: Path,
+        self, handler: ToolHandler, memory: MagicMock, anima_dir: Path,
     ):
         memory.read_permissions.return_value = (
             "## ツール作成\n- 個人ツール: yes"
@@ -1015,10 +1015,10 @@ class TestWriteMemoryFileToolCreation:
             {"path": "tools/my_tool.py", "content": "print('hi')"},
         )
         assert "Written to" in result
-        assert (person_dir / "tools" / "my_tool.py").read_text(encoding="utf-8") == "print('hi')"
+        assert (anima_dir / "tools" / "my_tool.py").read_text(encoding="utf-8") == "print('hi')"
 
     def test_writing_non_tool_file_skips_permission_check(
-        self, handler: ToolHandler, memory: MagicMock, person_dir: Path,
+        self, handler: ToolHandler, memory: MagicMock, anima_dir: Path,
     ):
         """Writing knowledge/note.md should not check tool creation permission."""
         memory.read_permissions.return_value = ""  # No permissions at all
@@ -1027,10 +1027,10 @@ class TestWriteMemoryFileToolCreation:
             {"path": "knowledge/note.md", "content": "just a note"},
         )
         assert "Written to" in result
-        assert (person_dir / "knowledge" / "note.md").read_text(encoding="utf-8") == "just a note"
+        assert (anima_dir / "knowledge" / "note.md").read_text(encoding="utf-8") == "just a note"
 
     def test_writing_tools_readme_not_py_skips_permission(
-        self, handler: ToolHandler, memory: MagicMock, person_dir: Path,
+        self, handler: ToolHandler, memory: MagicMock, anima_dir: Path,
     ):
         """Writing tools/readme.md (not .py) should not require tool creation permission."""
         memory.read_permissions.return_value = ""  # No permissions at all
@@ -1039,7 +1039,7 @@ class TestWriteMemoryFileToolCreation:
             {"path": "tools/readme.md", "content": "tool docs"},
         )
         assert "Written to" in result
-        assert (person_dir / "tools" / "readme.md").read_text(encoding="utf-8") == "tool docs"
+        assert (anima_dir / "tools" / "readme.md").read_text(encoding="utf-8") == "tool docs"
 
 
 # ── refresh_tools handler ────────────────────────────────────
@@ -1099,7 +1099,7 @@ class TestShareTool:
     """Tests for _handle_share_tool()."""
 
     def test_personal_tool_not_found(
-        self, handler: ToolHandler, person_dir: Path,
+        self, handler: ToolHandler, anima_dir: Path,
     ):
         result = handler.handle("share_tool", {"tool_name": "nonexistent"})
         parsed = json.loads(result)
@@ -1107,10 +1107,10 @@ class TestShareTool:
         assert "nonexistent" in parsed["message"]
 
     def test_permission_denied_without_shared_tool_permission(
-        self, handler: ToolHandler, memory: MagicMock, person_dir: Path,
+        self, handler: ToolHandler, memory: MagicMock, anima_dir: Path,
     ):
         # Create the personal tool file so it passes the existence check
-        tools_dir = person_dir / "tools"
+        tools_dir = anima_dir / "tools"
         tools_dir.mkdir(parents=True, exist_ok=True)
         (tools_dir / "my_tool.py").write_text("print('hi')", encoding="utf-8")
 
@@ -1121,10 +1121,10 @@ class TestShareTool:
         assert "共有ツール" in parsed["message"]
 
     def test_copies_file_when_permitted(
-        self, handler: ToolHandler, memory: MagicMock, person_dir: Path, tmp_path: Path,
+        self, handler: ToolHandler, memory: MagicMock, anima_dir: Path, tmp_path: Path,
     ):
         # Create the personal tool file
-        tools_dir = person_dir / "tools"
+        tools_dir = anima_dir / "tools"
         tools_dir.mkdir(parents=True, exist_ok=True)
         (tools_dir / "my_tool.py").write_text("print('shared')", encoding="utf-8")
 
@@ -1140,10 +1140,10 @@ class TestShareTool:
         assert (common_dir / "my_tool.py").read_text(encoding="utf-8") == "print('shared')"
 
     def test_error_when_common_tool_already_exists(
-        self, handler: ToolHandler, memory: MagicMock, person_dir: Path, tmp_path: Path,
+        self, handler: ToolHandler, memory: MagicMock, anima_dir: Path, tmp_path: Path,
     ):
         # Create the personal tool file
-        tools_dir = person_dir / "tools"
+        tools_dir = anima_dir / "tools"
         tools_dir.mkdir(parents=True, exist_ok=True)
         (tools_dir / "my_tool.py").write_text("print('new')", encoding="utf-8")
 
@@ -1166,7 +1166,7 @@ class TestShareTool:
         assert (common_dir / "my_tool.py").read_text(encoding="utf-8") == "print('old')"
 
     def test_path_traversal_in_tool_name_blocked(
-        self, handler: ToolHandler, person_dir: Path,
+        self, handler: ToolHandler, anima_dir: Path,
     ):
         result = handler.handle("share_tool", {"tool_name": "../../identity"})
         parsed = json.loads(result)
@@ -1174,7 +1174,7 @@ class TestShareTool:
         assert "valid Python identifier" in parsed["message"]
 
     def test_slash_in_tool_name_blocked(
-        self, handler: ToolHandler, person_dir: Path,
+        self, handler: ToolHandler, anima_dir: Path,
     ):
         result = handler.handle("share_tool", {"tool_name": "foo/bar"})
         parsed = json.loads(result)

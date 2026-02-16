@@ -60,26 +60,26 @@ class TestBaseExecutor:
 
     @pytest.fixture
     def executor(self, model_config: ModelConfig, tmp_path: Path) -> ConcreteExecutor:
-        return ConcreteExecutor(model_config=model_config, person_dir=tmp_path)
+        return ConcreteExecutor(model_config=model_config, anima_dir=tmp_path)
 
     def test_stores_model_config(self, executor: ConcreteExecutor, model_config: ModelConfig):
         assert executor._model_config is model_config
 
-    def test_stores_person_dir(self, executor: ConcreteExecutor, tmp_path: Path):
-        assert executor._person_dir == tmp_path
+    def test_stores_anima_dir(self, executor: ConcreteExecutor, tmp_path: Path):
+        assert executor._anima_dir == tmp_path
 
     def test_resolve_api_key_from_config(self, executor: ConcreteExecutor):
         assert executor._resolve_api_key() == "sk-test-key"
 
     def test_resolve_api_key_from_env(self, tmp_path: Path):
         config = ModelConfig(model="test", api_key=None, api_key_env="MY_TEST_KEY")
-        executor = ConcreteExecutor(model_config=config, person_dir=tmp_path)
+        executor = ConcreteExecutor(model_config=config, anima_dir=tmp_path)
         with patch.dict(os.environ, {"MY_TEST_KEY": "env-key"}):
             assert executor._resolve_api_key() == "env-key"
 
     def test_resolve_api_key_none(self, tmp_path: Path):
         config = ModelConfig(model="test", api_key=None, api_key_env="NONEXISTENT_KEY_XYZ")
-        executor = ConcreteExecutor(model_config=config, person_dir=tmp_path)
+        executor = ConcreteExecutor(model_config=config, anima_dir=tmp_path)
         with patch.dict(os.environ, {}, clear=False):
             os.environ.pop("NONEXISTENT_KEY_XYZ", None)
             assert executor._resolve_api_key() is None
@@ -88,7 +88,7 @@ class TestBaseExecutor:
         config = ModelConfig(
             model="test", api_key="config-key", api_key_env="MY_TEST_KEY",
         )
-        executor = ConcreteExecutor(model_config=config, person_dir=tmp_path)
+        executor = ConcreteExecutor(model_config=config, anima_dir=tmp_path)
         with patch.dict(os.environ, {"MY_TEST_KEY": "env-key"}):
             assert executor._resolve_api_key() == "config-key"
 
@@ -100,5 +100,5 @@ class TestBaseExecutor:
     def test_cannot_instantiate_abstract(self, tmp_path: Path):
         with pytest.raises(TypeError):
             BaseExecutor(  # type: ignore[abstract]
-                model_config=ModelConfig(), person_dir=tmp_path,
+                model_config=ModelConfig(), anima_dir=tmp_path,
             )

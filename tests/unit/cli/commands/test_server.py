@@ -161,14 +161,14 @@ class TestCmdStart:
     @patch("uvicorn.run")
     @patch("server.app.create_app")
     @patch("core.paths.get_shared_dir", return_value=Path("/tmp/shared"))
-    @patch("core.paths.get_persons_dir", return_value=Path("/tmp/persons"))
+    @patch("core.paths.get_animas_dir", return_value=Path("/tmp/animas"))
     @patch("core.init.ensure_runtime_dir")
     @patch("cli.commands.server._write_pid_file")
     @patch("cli.commands.server._is_process_alive", return_value=False)
     @patch("cli.commands.server._read_pid", return_value=999)
     def test_stale_pid_cleanup_and_start(
         self, mock_pid, mock_alive, mock_write_pid,
-        mock_ensure, mock_persons, mock_shared, mock_create, mock_uvicorn,
+        mock_ensure, mock_animas, mock_shared, mock_create, mock_uvicorn,
         mock_remove,
     ):
         from cli.commands.server import cmd_start
@@ -194,13 +194,13 @@ class TestCmdStart:
     @patch("uvicorn.run")
     @patch("server.app.create_app")
     @patch("core.paths.get_shared_dir", return_value=Path("/tmp/shared"))
-    @patch("core.paths.get_persons_dir", return_value=Path("/tmp/persons"))
+    @patch("core.paths.get_animas_dir", return_value=Path("/tmp/animas"))
     @patch("core.init.ensure_runtime_dir")
     @patch("cli.commands.server._write_pid_file")
     @patch("cli.commands.server._read_pid", return_value=None)
     def test_uvicorn_timeout_keep_alive(
         self, mock_pid, mock_write_pid,
-        mock_ensure, mock_persons, mock_shared, mock_create, mock_uvicorn,
+        mock_ensure, mock_animas, mock_shared, mock_create, mock_uvicorn,
         mock_remove,
     ):
         from cli.commands.server import cmd_start
@@ -218,13 +218,13 @@ class TestCmdStart:
     @patch("uvicorn.run")
     @patch("server.app.create_app")
     @patch("core.paths.get_shared_dir", return_value=Path("/tmp/shared"))
-    @patch("core.paths.get_persons_dir", return_value=Path("/tmp/persons"))
+    @patch("core.paths.get_animas_dir", return_value=Path("/tmp/animas"))
     @patch("core.init.ensure_runtime_dir")
     @patch("cli.commands.server._write_pid_file")
     @patch("cli.commands.server._read_pid", return_value=None)
     def test_uvicorn_ws_ping_settings(
         self, mock_pid, mock_write_pid,
-        mock_ensure, mock_persons, mock_shared, mock_create, mock_uvicorn,
+        mock_ensure, mock_animas, mock_shared, mock_create, mock_uvicorn,
         mock_remove,
     ):
         from cli.commands.server import cmd_start

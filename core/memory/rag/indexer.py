@@ -1,5 +1,5 @@
 from __future__ import annotations
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
@@ -56,8 +56,8 @@ class MemoryIndexer:
     def __init__(
         self,
         vector_store,  # VectorStore instance
-        person_name: str,
-        person_dir: Path,
+        anima_name: str,
+        anima_dir: Path,
         embedding_model_name: str = DEFAULT_EMBEDDING_MODEL,
         *,
         collection_prefix: str | None = None,
@@ -67,11 +67,11 @@ class MemoryIndexer:
 
         Args:
             vector_store: VectorStore instance (e.g., ChromaVectorStore)
-            person_name: Person name (for collection naming)
-            person_dir: Path to person's memory directory
+            anima_name: Anima name (for collection naming)
+            anima_dir: Path to anima's memory directory
             embedding_model_name: Sentence-transformers model name
             collection_prefix: Override for collection name prefix.
-                Defaults to person_name.  Use ``"shared"`` for
+                Defaults to anima_name.  Use ``"shared"`` for
                 common_knowledge indexing so collection becomes
                 ``shared_common_knowledge``.
             embedding_model: Pre-initialized SentenceTransformer instance.
@@ -79,9 +79,9 @@ class MemoryIndexer:
                 avoiding redundant model loading.
         """
         self.vector_store = vector_store
-        self.person_name = person_name
-        self.person_dir = person_dir
-        self.collection_prefix = collection_prefix or person_name
+        self.anima_name = anima_name
+        self.anima_dir = anima_dir
+        self.collection_prefix = collection_prefix or anima_name
         self.embedding_model_name = embedding_model_name
 
         # Use injected embedding model or initialize via singleton
@@ -91,7 +91,7 @@ class MemoryIndexer:
             self._init_embedding_model()
 
         # Load index metadata
-        self.meta_path = person_dir / INDEX_META_FILE
+        self.meta_path = anima_dir / INDEX_META_FILE
         self.index_meta = self._load_index_meta()
 
     def _init_embedding_model(self) -> None:
@@ -143,7 +143,7 @@ class MemoryIndexer:
 
         # Check if file has changed
         file_hash = self._compute_file_hash(file_path)
-        file_key = str(file_path.relative_to(self.person_dir))
+        file_key = str(file_path.relative_to(self.anima_dir))
 
         if not force and file_key in self.index_meta:
             if self.index_meta[file_key].get("hash") == file_hash:
@@ -373,7 +373,7 @@ class MemoryIndexer:
         (e.g. ``knowledge/file.md``), so ``memory_type`` is intentionally
         **not** embedded in the ID to avoid path duplication.
         """
-        rel_path = file_path.relative_to(self.person_dir)
+        rel_path = file_path.relative_to(self.anima_dir)
         return f"{self.collection_prefix}/{rel_path}#{index}"
 
     def _extract_metadata(
@@ -386,9 +386,9 @@ class MemoryIndexer:
     ) -> dict[str, str | int | float | list[str]]:
         """Extract metadata from file and content."""
         metadata: dict[str, str | int | float | list[str]] = {
-            "person": self.collection_prefix,
+            "anima": self.collection_prefix,
             "memory_type": memory_type,
-            "source_file": str(file_path.relative_to(self.person_dir)),
+            "source_file": str(file_path.relative_to(self.anima_dir)),
             "chunk_index": chunk_index,
             "total_chunks": total_chunks,
         }

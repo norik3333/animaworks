@@ -1,6 +1,6 @@
 """E2E test for bootstrap notification feature.
 
-Tests the full API response when sending a message to a Person
+Tests the full API response when sending a message to an Anima
 that is currently bootstrapping.
 """
 from __future__ import annotations
@@ -13,7 +13,7 @@ from httpx import ASGITransport, AsyncClient
 
 
 def _make_test_app_with_bootstrap():
-    """Build a test FastAPI app with a mock bootstrapping person."""
+    """Build a test FastAPI app with a mock bootstrapping anima."""
     from fastapi import FastAPI
     from server.routes.chat import create_chat_router
     from core.supervisor.ipc import IPCResponse
@@ -26,10 +26,10 @@ def _make_test_app_with_bootstrap():
     supervisor.processes = {"alice"}
 
     async def _send_request_stream(
-        person_name, method, params, timeout=120.0,
+        anima_name, method, params, timeout=120.0,
     ):
-        """Simulate IPC stream from a bootstrapping person."""
-        if person_name == "alice":
+        """Simulate IPC stream from a bootstrapping anima."""
+        if anima_name == "alice":
             # Emit bootstrap_start
             yield IPCResponse(
                 id="test",
@@ -76,7 +76,7 @@ def _make_test_app_with_bootstrap():
 
 
 def _make_test_app_bootstrap_busy():
-    """Build a test FastAPI app where the person is busy bootstrapping."""
+    """Build a test FastAPI app where the anima is busy bootstrapping."""
     from fastapi import FastAPI
     from server.routes.chat import create_chat_router
     from core.supervisor.ipc import IPCResponse
@@ -89,10 +89,10 @@ def _make_test_app_bootstrap_busy():
     supervisor.processes = {"alice"}
 
     async def _send_request_stream(
-        person_name, method, params, timeout=120.0,
+        anima_name, method, params, timeout=120.0,
     ):
-        """Simulate IPC stream — person rejects with bootstrap_busy."""
-        if person_name == "alice":
+        """Simulate IPC stream — anima rejects with bootstrap_busy."""
+        if anima_name == "alice":
             yield IPCResponse(
                 id="test",
                 stream=True,
@@ -129,7 +129,7 @@ class TestBootstrapStreamE2E:
     """Test bootstrap events in the SSE stream."""
 
     async def test_bootstrap_events_in_stream(self):
-        """When a person is bootstrapping, the SSE stream should include
+        """When an anima is bootstrapping, the SSE stream should include
         bootstrap start and complete events."""
         app = _make_test_app_with_bootstrap()
         transport = ASGITransport(app=app)
@@ -137,7 +137,7 @@ class TestBootstrapStreamE2E:
             transport=transport, base_url="http://test",
         ) as client:
             resp = await client.post(
-                "/api/persons/alice/chat/stream",
+                "/api/animas/alice/chat/stream",
                 json={"message": "Hello"},
             )
 
@@ -152,7 +152,7 @@ class TestBootstrapStreamE2E:
         assert "event: done" in body
 
     async def test_bootstrap_busy_response(self):
-        """When a person is already bootstrapping and the lock is held,
+        """When an anima is already bootstrapping and the lock is held,
         the SSE stream should include a bootstrap busy event."""
         app = _make_test_app_bootstrap_busy()
         transport = ASGITransport(app=app)
@@ -160,7 +160,7 @@ class TestBootstrapStreamE2E:
             transport=transport, base_url="http://test",
         ) as client:
             resp = await client.post(
-                "/api/persons/alice/chat/stream",
+                "/api/animas/alice/chat/stream",
                 json={"message": "Hello"},
             )
 
@@ -171,28 +171,28 @@ class TestBootstrapStreamE2E:
         assert "初期化中" in body
 
     async def test_websocket_bootstrap_broadcast(self):
-        """WebSocket broadcast should be called with person.bootstrap event."""
+        """WebSocket broadcast should be called with anima.bootstrap event."""
         app = _make_test_app_with_bootstrap()
         transport = ASGITransport(app=app)
         async with AsyncClient(
             transport=transport, base_url="http://test",
         ) as client:
             await client.post(
-                "/api/persons/alice/chat/stream",
+                "/api/animas/alice/chat/stream",
                 json={"message": "Hello"},
             )
 
         ws = app.state.ws_manager
-        # Should have broadcast calls — at least person.status + person.bootstrap
+        # Should have broadcast calls — at least anima.status + anima.bootstrap
         assert ws.broadcast.await_count >= 2
 
-        # Inspect broadcast calls for person.bootstrap events
+        # Inspect broadcast calls for anima.bootstrap events
         broadcast_calls = [
             call.args[0] for call in ws.broadcast.call_args_list
         ]
         bootstrap_events = [
             c for c in broadcast_calls
-            if c.get("type") == "person.bootstrap"
+            if c.get("type") == "anima.bootstrap"
         ]
         assert len(bootstrap_events) >= 1
         statuses = {e["data"]["status"] for e in bootstrap_events}

@@ -1,7 +1,7 @@
 """
 Process isolation supervisor package.
 
-Provides process-level isolation for each Person by running them in
+Provides process-level isolation for each Anima by running them in
 separate subprocesses communicating via Unix Domain Sockets.
 """
 

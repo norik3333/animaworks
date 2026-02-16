@@ -1,4 +1,4 @@
-"""CLI commands for viewing person logs."""
+"""CLI commands for viewing anima logs."""
 
 from __future__ import annotations
 
@@ -9,68 +9,68 @@ from pathlib import Path
 
 
 def cmd_logs(args: argparse.Namespace) -> None:
-    """View person logs (tail -f style)."""
+    """View anima logs (tail -f style)."""
     from core.paths import get_data_dir
 
     log_dir = get_data_dir() / "logs"
 
     if args.all:
-        # Show all logs (server + all persons)
+        # Show all logs (server + all animas)
         _tail_all_logs(log_dir)
     else:
-        # Show specific person log
-        if not args.person:
-            print("Error: --person is required (or use --all)")
+        # Show specific anima log
+        if not args.anima:
+            print("Error: --anima is required (or use --all)")
             sys.exit(1)
 
-        _tail_person_log(
+        _tail_anima_log(
             log_dir=log_dir,
-            person_name=args.person,
+            anima_name=args.anima,
             lines=args.lines,
             date=args.date
         )
 
 
-def _tail_person_log(
+def _tail_anima_log(
     log_dir: Path,
-    person_name: str,
+    anima_name: str,
     lines: int = 50,
     date: str | None = None
 ) -> None:
-    """Tail a specific person's log file."""
-    person_log_dir = log_dir / "persons" / person_name
+    """Tail a specific anima's log file."""
+    anima_log_dir = log_dir / "animas" / anima_name
 
-    if not person_log_dir.exists():
-        print(f"Error: No log directory for person '{person_name}'")
-        print(f"Expected: {person_log_dir}")
+    if not anima_log_dir.exists():
+        print(f"Error: No log directory for anima '{anima_name}'")
+        print(f"Expected: {anima_log_dir}")
         sys.exit(1)
 
     # Determine log file
     if date:
-        log_file = person_log_dir / f"{date}.log"
+        log_file = anima_log_dir / f"{date}.log"
         if not log_file.exists():
             print(f"Error: No log file for date {date}")
             sys.exit(1)
         follow = False
     else:
         # Use current.log symlink or find latest
-        current_link = person_log_dir / "current.log"
+        current_link = anima_log_dir / "current.log"
         if current_link.exists():
             if current_link.is_symlink():
-                log_file = person_log_dir / current_link.readlink()
+                log_file = anima_log_dir / current_link.readlink()
             else:
                 # Fallback: read text file reference
                 target_name = current_link.read_text().strip()
-                log_file = person_log_dir / target_name
+                log_file = anima_log_dir / target_name
         else:
             # Find latest log file
             log_files = sorted(
-                person_log_dir.glob("*.log"),
+                anima_log_dir.glob("*.log"),
                 key=lambda p: p.stat().st_mtime,
                 reverse=True
             )
             if not log_files:
-                print(f"Error: No log files found in {person_log_dir}")
+                print(f"Error: No log files found in {anima_log_dir}")
                 sys.exit(1)
             log_file = log_files[0]
         follow = True
@@ -94,17 +94,17 @@ def _tail_person_log(
 
 
 def _tail_all_logs(log_dir: Path) -> None:
-    """Tail all logs (server + all persons)."""
-    # Find all person log directories
-    persons_log_dir = log_dir / "persons"
+    """Tail all logs (server + all animas)."""
+    # Find all anima log directories
+    animas_log_dir = log_dir / "animas"
 
-    if not persons_log_dir.exists():
-        print("No person logs found")
+    if not animas_log_dir.exists():
+        print("No anima logs found")
         return
 
-    person_dirs = [d for d in persons_log_dir.iterdir() if d.is_dir()]
+    anima_dirs = [d for d in animas_log_dir.iterdir() if d.is_dir()]
 
-    print(f"Monitoring {len(person_dirs)} person logs")
+    print(f"Monitoring {len(anima_dirs)} anima logs")
     print("-" * 60)
 
     # Collect all current log files
@@ -115,20 +115,20 @@ def _tail_all_logs(log_dir: Path) -> None:
     if server_log.exists():
         log_files["[SERVER]"] = server_log
 
-    # Person logs
-    for person_dir in person_dirs:
-        person_name = person_dir.name
-        current_link = person_dir / "current.log"
+    # Anima logs
+    for anima_dir in anima_dirs:
+        anima_name = anima_dir.name
+        current_link = anima_dir / "current.log"
 
         if current_link.exists():
             if current_link.is_symlink():
-                log_file = person_dir / current_link.readlink()
+                log_file = anima_dir / current_link.readlink()
             else:
                 target_name = current_link.read_text().strip()
-                log_file = person_dir / target_name
+                log_file = anima_dir / target_name
 
             if log_file.exists():
-                log_files[f"[{person_name}]"] = log_file
+                log_files[f"[{anima_name}]"] = log_file
 
     if not log_files:
         print("No log files found")

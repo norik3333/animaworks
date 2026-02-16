@@ -2,15 +2,15 @@
 import { api } from "../modules/api.js";
 import { escapeHtml, renderMarkdown } from "../modules/state.js";
 
-let _selectedPerson = null;
+let _selectedAnima = null;
 let _activeTab = "episodes";
 let _viewMode = "list"; // "list" | "content"
 let _container = null;
-let _persons = [];
+let _animas = [];
 
 export function render(container) {
   _container = container;
-  _selectedPerson = null;
+  _selectedAnima = null;
   _activeTab = "episodes";
   _viewMode = "list";
 
@@ -20,9 +20,9 @@ export function render(container) {
     </div>
 
     <div style="display:flex; gap:1rem; align-items:center; margin-bottom:1rem;">
-      <label style="font-weight:500;">パーソン:</label>
-      <select id="memoryPersonSelect" class="person-dropdown" style="flex:1; max-width:300px;">
-        <option value="">パーソンを選択...</option>
+      <label style="font-weight:500;">Anima:</label>
+      <select id="memoryAnimaSelect" class="anima-dropdown" style="flex:1; max-width:300px;">
+        <option value="">Animaを選択...</option>
       </select>
     </div>
 
@@ -37,18 +37,18 @@ export function render(container) {
 
     <div class="card">
       <div class="card-body" id="memoryMainContent">
-        <div class="loading-placeholder">パーソンを選択してください</div>
+        <div class="loading-placeholder">Animaを選択してください</div>
       </div>
     </div>
   `;
 
-  _loadPersonList();
+  _loadAnimaList();
   _bindEvents();
 }
 
 export function destroy() {
   _container = null;
-  _persons = [];
+  _animas = [];
 }
 
 // ── Event Binding ──────────────────────────
@@ -56,11 +56,11 @@ export function destroy() {
 function _bindEvents() {
   if (!_container) return;
 
-  // Person selector
-  const select = document.getElementById("memoryPersonSelect");
+  // Anima selector
+  const select = document.getElementById("memoryAnimaSelect");
   if (select) {
     select.addEventListener("change", (e) => {
-      _selectedPerson = e.target.value || null;
+      _selectedAnima = e.target.value || null;
       _viewMode = "list";
       _loadStats();
       _loadFileList();
@@ -80,14 +80,14 @@ function _bindEvents() {
 
 // ── Data Loading ───────────────────────────
 
-async function _loadPersonList() {
-  const select = document.getElementById("memoryPersonSelect");
+async function _loadAnimaList() {
+  const select = document.getElementById("memoryAnimaSelect");
   if (!select) return;
 
   try {
-    _persons = await api("/api/persons");
-    let opts = '<option value="">パーソンを選択...</option>';
-    for (const p of _persons) {
+    _animas = await api("/api/animas");
+    let opts = '<option value="">Animaを選択...</option>';
+    for (const p of _animas) {
       opts += `<option value="${escapeHtml(p.name)}">${escapeHtml(p.name)}</option>`;
     }
     select.innerHTML = opts;
@@ -98,7 +98,7 @@ async function _loadPersonList() {
 
 async function _loadStats() {
   const bar = document.getElementById("memoryStatsBar");
-  if (!bar || !_selectedPerson) {
+  if (!bar || !_selectedAnima) {
     if (bar) bar.innerHTML = "";
     return;
   }
@@ -107,7 +107,7 @@ async function _loadStats() {
 
   // Try memory stats endpoint first
   try {
-    const stats = await api(`/api/persons/${encodeURIComponent(_selectedPerson)}/memory/stats`);
+    const stats = await api(`/api/animas/${encodeURIComponent(_selectedAnima)}/memory/stats`);
     epCount = stats.episodes ?? 0;
     knCount = stats.knowledge ?? 0;
     prCount = stats.procedures ?? 0;
@@ -115,9 +115,9 @@ async function _loadStats() {
     // Fallback: count from file list endpoints
     try {
       const [ep, kn, pr] = await Promise.all([
-        api(`/api/persons/${encodeURIComponent(_selectedPerson)}/episodes`).catch(() => ({ files: [] })),
-        api(`/api/persons/${encodeURIComponent(_selectedPerson)}/knowledge`).catch(() => ({ files: [] })),
-        api(`/api/persons/${encodeURIComponent(_selectedPerson)}/procedures`).catch(() => ({ files: [] })),
+        api(`/api/animas/${encodeURIComponent(_selectedAnima)}/episodes`).catch(() => ({ files: [] })),
+        api(`/api/animas/${encodeURIComponent(_selectedAnima)}/knowledge`).catch(() => ({ files: [] })),
+        api(`/api/animas/${encodeURIComponent(_selectedAnima)}/procedures`).catch(() => ({ files: [] })),
       ]);
       epCount = (ep.files || []).length;
       knCount = (kn.files || []).length;
@@ -145,14 +145,14 @@ async function _loadFileList() {
   const content = document.getElementById("memoryMainContent");
   if (!content) return;
 
-  if (!_selectedPerson) {
-    content.innerHTML = '<div class="loading-placeholder">パーソンを選択してください</div>';
+  if (!_selectedAnima) {
+    content.innerHTML = '<div class="loading-placeholder">Animaを選択してください</div>';
     return;
   }
 
   content.innerHTML = '<div class="loading-placeholder">読み込み中...</div>';
 
-  const endpoint = `/api/persons/${encodeURIComponent(_selectedPerson)}/${_activeTab}`;
+  const endpoint = `/api/animas/${encodeURIComponent(_selectedAnima)}/${_activeTab}`;
 
   try {
     const data = await api(endpoint);
@@ -183,7 +183,7 @@ async function _loadFileList() {
 
 async function _loadFileContent(file) {
   const content = document.getElementById("memoryMainContent");
-  if (!content || !_selectedPerson) return;
+  if (!content || !_selectedAnima) return;
 
   _viewMode = "content";
 
@@ -200,7 +200,7 @@ async function _loadFileContent(file) {
     _loadFileList();
   });
 
-  const endpoint = `/api/persons/${encodeURIComponent(_selectedPerson)}/${_activeTab}/${encodeURIComponent(file)}`;
+  const endpoint = `/api/animas/${encodeURIComponent(_selectedAnima)}/${_activeTab}/${encodeURIComponent(file)}`;
 
   try {
     const data = await api(endpoint);

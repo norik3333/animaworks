@@ -45,8 +45,8 @@ async function _loadGLTFCached(url) {
 const _profileCache = new Map();
 
 /**
- * Register appearance data for a person from the server API.
- * Call before createCharacter() with data from /api/persons.
+ * Register appearance data for an anima from the server API.
+ * Call before createCharacter() with data from /api/animas.
  * @param {string} name
  * @param {{hairColor?: string, eyeColor?: string, bodyColor?: string}} appearance
  */
@@ -355,7 +355,7 @@ function _createTextSprite(text, color) {
   return sprite;
 }
 
-// ── Random Pastel for Dynamic Persons ──────────────────────
+// ── Random Pastel for Dynamic Animas ──────────────────────
 
 /**
  * Generate a deterministic random pastel profile from a name string.
@@ -480,7 +480,7 @@ function _buildCharacterMesh(name, profile) {
 
   // ── userData for raycasting ──────────
   group.traverse((child) => {
-    child.userData.personName = name;
+    child.userData.animaName = name;
   });
 
   // face is null — no expression textures for silhouette models
@@ -899,7 +899,7 @@ export function initCharacters(scene) {
  * Tries to load a rigged GLB model first, then un-rigged, then procedural.
  * Also fetches asset metadata for dynamic color profiles.
  *
- * @param {string} name     - Person name (key in CHARACTER_PROFILES or dynamic).
+ * @param {string} name     - Anima name (key in CHARACTER_PROFILES or dynamic).
  * @param {THREE.Vector3} position - World position to place the character.
  * @returns {Promise<THREE.Group>}   The character's root Group.
  */
@@ -913,7 +913,7 @@ export async function createCharacter(name, position) {
     removeCharacter(name);
   }
 
-  // Fetch metadata to update dynamic color profile for non-hardcoded persons
+  // Fetch metadata to update dynamic color profile for non-hardcoded animas
   if (!_profileCache.has(name)) {
     try {
       const meta = await fetchAssetMetadata(name);
@@ -1031,7 +1031,7 @@ async function _createGLBCharacter(name, position, url, isRigged) {
   group.add(model);
 
   // Tag for raycasting
-  group.traverse((child) => { child.userData.personName = name; });
+  group.traverse((child) => { child.userData.animaName = name; });
 
   group.position.copy(position);
   group.userData._baseX = position.x;
@@ -1094,7 +1094,7 @@ async function _createGLBCharacter(name, position, url, isRigged) {
 }
 
 /**
- * Load animation clips from separate GLB files for a person.
+ * Load animation clips from separate GLB files for an anima.
  * Returns a map of filename -> THREE.AnimationClip.
  * @param {string} name
  * @returns {Promise<Record<string, THREE.AnimationClip>>}
@@ -1211,7 +1211,7 @@ export function removeCharacter(name) {
 /**
  * Change a character's animation state with a smooth transition.
  * For GLB models with loaded animation clips, crossfades between actions.
- * @param {string} name  - Person name.
+ * @param {string} name  - Anima name.
  * @param {string} state - One of the STATES values.
  */
 export function updateCharacterState(name, state) {
@@ -1312,7 +1312,7 @@ function _easeInOutCubic(t) {
 
 /**
  * Return an array of all character meshes suitable for raycasting.
- * Each mesh has `userData.personName` set.
+ * Each mesh has `userData.animaName` set.
  * @returns {THREE.Object3D[]}
  */
 export function getCharacterMeshes() {
@@ -1329,14 +1329,14 @@ export function getCharacterMeshes() {
 }
 
 /**
- * Given an array of raycaster intersections, return the person name
+ * Given an array of raycaster intersections, return the anima name
  * of the first character hit, or null if no character was intersected.
  * @param {THREE.Intersection[]} intersects
  * @returns {string | null}
  */
 export function getCharacterAtIntersection(intersects) {
   for (const hit of intersects) {
-    const name = hit.object.userData.personName;
+    const name = hit.object.userData.animaName;
     if (name && _characters.has(name)) {
       return name;
     }

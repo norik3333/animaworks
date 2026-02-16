@@ -9,61 +9,61 @@ import pytest
 from core.prompt.builder import (
     _build_messaging_section,
     _build_org_context,
-    _discover_other_persons,
-    _format_person_entry,
+    _discover_other_animas,
+    _format_anima_entry,
     build_system_prompt,
     inject_shortterm,
 )
 
 
-# ── _discover_other_persons ───────────────────────────────
+# ── _discover_other_animas ───────────────────────────────
 
 
-class TestDiscoverOtherPersons:
+class TestDiscoverOtherAnimas:
     def test_finds_siblings(self, tmp_path):
-        persons_root = tmp_path / "persons"
-        persons_root.mkdir()
-        alice = persons_root / "alice"
+        animas_root = tmp_path / "animas"
+        animas_root.mkdir()
+        alice = animas_root / "alice"
         alice.mkdir()
         (alice / "identity.md").write_text("I am Alice", encoding="utf-8")
-        bob = persons_root / "bob"
+        bob = animas_root / "bob"
         bob.mkdir()
         (bob / "identity.md").write_text("I am Bob", encoding="utf-8")
 
-        result = _discover_other_persons(alice)
+        result = _discover_other_animas(alice)
         assert result == ["bob"]
 
     def test_excludes_self(self, tmp_path):
-        persons_root = tmp_path / "persons"
-        persons_root.mkdir()
-        alice = persons_root / "alice"
+        animas_root = tmp_path / "animas"
+        animas_root.mkdir()
+        alice = animas_root / "alice"
         alice.mkdir()
         (alice / "identity.md").write_text("I am Alice", encoding="utf-8")
 
-        result = _discover_other_persons(alice)
+        result = _discover_other_animas(alice)
         assert "alice" not in result
 
     def test_excludes_dirs_without_identity(self, tmp_path):
-        persons_root = tmp_path / "persons"
-        persons_root.mkdir()
-        alice = persons_root / "alice"
+        animas_root = tmp_path / "animas"
+        animas_root.mkdir()
+        alice = animas_root / "alice"
         alice.mkdir()
         (alice / "identity.md").write_text("I am Alice", encoding="utf-8")
-        noident = persons_root / "noident"
+        noident = animas_root / "noident"
         noident.mkdir()
         # no identity.md
 
-        result = _discover_other_persons(alice)
+        result = _discover_other_animas(alice)
         assert "noident" not in result
 
     def test_no_siblings(self, tmp_path):
-        persons_root = tmp_path / "persons"
-        persons_root.mkdir()
-        alice = persons_root / "alice"
+        animas_root = tmp_path / "animas"
+        animas_root.mkdir()
+        alice = animas_root / "alice"
         alice.mkdir()
         (alice / "identity.md").write_text("I am Alice", encoding="utf-8")
 
-        result = _discover_other_persons(alice)
+        result = _discover_other_animas(alice)
         assert result == []
 
 
@@ -71,47 +71,47 @@ class TestDiscoverOtherPersons:
 
 
 class TestBuildMessagingSection:
-    def test_with_persons(self, tmp_path):
-        person_dir = tmp_path / "alice"
-        person_dir.mkdir()
+    def test_with_animas(self, tmp_path):
+        anima_dir = tmp_path / "alice"
+        anima_dir.mkdir()
         with patch("core.prompt.builder.load_prompt", return_value="messaging section"):
-            result = _build_messaging_section(person_dir, ["bob", "charlie"])
+            result = _build_messaging_section(anima_dir, ["bob", "charlie"])
             assert result == "messaging section"
 
-    def test_no_persons(self, tmp_path):
-        person_dir = tmp_path / "alice"
-        person_dir.mkdir()
+    def test_no_animas(self, tmp_path):
+        anima_dir = tmp_path / "alice"
+        anima_dir.mkdir()
         with patch("core.prompt.builder.load_prompt", return_value="messaging section") as mock_lp:
-            _build_messaging_section(person_dir, [])
+            _build_messaging_section(anima_dir, [])
             call_kwargs = mock_lp.call_args[1]
-            assert "(まだ他の社員はいません)" in call_kwargs["persons_line"]
+            assert "(まだ他の社員はいません)" in call_kwargs["animas_line"]
 
     def test_a1_mode_uses_messaging_a1_template(self, tmp_path):
         """A1 mode should load the messaging_a1 template."""
-        person_dir = tmp_path / "alice"
-        person_dir.mkdir()
+        anima_dir = tmp_path / "alice"
+        anima_dir.mkdir()
         with patch("core.prompt.builder.load_prompt", return_value="a1 messaging") as mock_lp:
-            result = _build_messaging_section(person_dir, ["bob"], execution_mode="a1")
+            result = _build_messaging_section(anima_dir, ["bob"], execution_mode="a1")
             assert result == "a1 messaging"
             mock_lp.assert_called_once()
             assert mock_lp.call_args[0][0] == "messaging_a1"
 
     def test_a2_mode_uses_messaging_template(self, tmp_path):
         """A2 mode should load the standard messaging template."""
-        person_dir = tmp_path / "alice"
-        person_dir.mkdir()
+        anima_dir = tmp_path / "alice"
+        anima_dir.mkdir()
         with patch("core.prompt.builder.load_prompt", return_value="a2 messaging") as mock_lp:
-            result = _build_messaging_section(person_dir, ["bob"], execution_mode="a2")
+            result = _build_messaging_section(anima_dir, ["bob"], execution_mode="a2")
             assert result == "a2 messaging"
             mock_lp.assert_called_once()
             assert mock_lp.call_args[0][0] == "messaging"
 
     def test_default_mode_uses_a1_template(self, tmp_path):
         """Default execution_mode should be a1, using messaging_a1 template."""
-        person_dir = tmp_path / "alice"
-        person_dir.mkdir()
+        anima_dir = tmp_path / "alice"
+        anima_dir.mkdir()
         with patch("core.prompt.builder.load_prompt", return_value="section") as mock_lp:
-            _build_messaging_section(person_dir, ["bob"])
+            _build_messaging_section(anima_dir, ["bob"])
             assert mock_lp.call_args[0][0] == "messaging_a1"
 
 
@@ -120,12 +120,12 @@ class TestBuildMessagingSection:
 
 class TestBuildSystemPrompt:
     def test_builds_prompt(self, tmp_path, data_dir):
-        person_dir = tmp_path / "persons" / "alice"
-        person_dir.mkdir(parents=True)
-        (person_dir / "identity.md").write_text("I am Alice", encoding="utf-8")
+        anima_dir = tmp_path / "animas" / "alice"
+        anima_dir.mkdir(parents=True)
+        (anima_dir / "identity.md").write_text("I am Alice", encoding="utf-8")
 
         memory = MagicMock()
-        memory.person_dir = person_dir
+        memory.anima_dir = anima_dir
         memory.read_company_vision.return_value = "Company Vision"
         memory.read_identity.return_value = "I am Alice"
         memory.read_injection.return_value = ""
@@ -147,12 +147,12 @@ class TestBuildSystemPrompt:
             assert len(result) > 0
 
     def test_includes_identity(self, tmp_path, data_dir):
-        person_dir = tmp_path / "persons" / "alice"
-        person_dir.mkdir(parents=True)
-        (person_dir / "identity.md").write_text("I am Alice", encoding="utf-8")
+        anima_dir = tmp_path / "animas" / "alice"
+        anima_dir.mkdir(parents=True)
+        (anima_dir / "identity.md").write_text("I am Alice", encoding="utf-8")
 
         memory = MagicMock()
-        memory.person_dir = person_dir
+        memory.anima_dir = anima_dir
         memory.read_company_vision.return_value = ""
         memory.read_identity.return_value = "I am Alice"
         memory.read_injection.return_value = ""
@@ -173,12 +173,12 @@ class TestBuildSystemPrompt:
             assert "I am Alice" in result
 
     def test_includes_skills(self, tmp_path, data_dir):
-        person_dir = tmp_path / "persons" / "alice"
-        person_dir.mkdir(parents=True)
-        (person_dir / "identity.md").write_text("I am Alice", encoding="utf-8")
+        anima_dir = tmp_path / "animas" / "alice"
+        anima_dir.mkdir(parents=True)
+        (anima_dir / "identity.md").write_text("I am Alice", encoding="utf-8")
 
         memory = MagicMock()
-        memory.person_dir = person_dir
+        memory.anima_dir = anima_dir
         memory.read_company_vision.return_value = ""
         memory.read_identity.return_value = ""
         memory.read_injection.return_value = ""
@@ -205,12 +205,12 @@ class TestBuildSystemPrompt:
             assert "coding" in result or "section" in result
 
     def test_includes_bootstrap(self, tmp_path, data_dir):
-        person_dir = tmp_path / "persons" / "alice"
-        person_dir.mkdir(parents=True)
-        (person_dir / "identity.md").write_text("I am Alice", encoding="utf-8")
+        anima_dir = tmp_path / "animas" / "alice"
+        anima_dir.mkdir(parents=True)
+        (anima_dir / "identity.md").write_text("I am Alice", encoding="utf-8")
 
         memory = MagicMock()
-        memory.person_dir = person_dir
+        memory.anima_dir = anima_dir
         memory.read_company_vision.return_value = ""
         memory.read_identity.return_value = ""
         memory.read_injection.return_value = ""
@@ -231,12 +231,12 @@ class TestBuildSystemPrompt:
             assert "Bootstrap instructions" in result
 
     def test_includes_state_and_pending(self, tmp_path, data_dir):
-        person_dir = tmp_path / "persons" / "alice"
-        person_dir.mkdir(parents=True)
-        (person_dir / "identity.md").write_text("I am Alice", encoding="utf-8")
+        anima_dir = tmp_path / "animas" / "alice"
+        anima_dir.mkdir(parents=True)
+        (anima_dir / "identity.md").write_text("I am Alice", encoding="utf-8")
 
         memory = MagicMock()
-        memory.person_dir = person_dir
+        memory.anima_dir = anima_dir
         memory.read_company_vision.return_value = ""
         memory.read_identity.return_value = ""
         memory.read_injection.return_value = ""
@@ -260,12 +260,12 @@ class TestBuildSystemPrompt:
             assert "task 1" in result
 
     def test_a2_mode_injects_discover_tools_guide(self, tmp_path, data_dir):
-        person_dir = tmp_path / "persons" / "alice"
-        person_dir.mkdir(parents=True)
-        (person_dir / "identity.md").write_text("I am Alice", encoding="utf-8")
+        anima_dir = tmp_path / "animas" / "alice"
+        anima_dir.mkdir(parents=True)
+        (anima_dir / "identity.md").write_text("I am Alice", encoding="utf-8")
 
         memory = MagicMock()
-        memory.person_dir = person_dir
+        memory.anima_dir = anima_dir
         memory.read_company_vision.return_value = ""
         memory.read_identity.return_value = ""
         memory.read_injection.return_value = ""
@@ -291,12 +291,12 @@ class TestBuildSystemPrompt:
             assert "chatwork" in result
 
     def test_a1_mode_uses_cli_guide(self, tmp_path, data_dir):
-        person_dir = tmp_path / "persons" / "alice"
-        person_dir.mkdir(parents=True)
-        (person_dir / "identity.md").write_text("I am Alice", encoding="utf-8")
+        anima_dir = tmp_path / "animas" / "alice"
+        anima_dir.mkdir(parents=True)
+        (anima_dir / "identity.md").write_text("I am Alice", encoding="utf-8")
 
         memory = MagicMock()
-        memory.person_dir = person_dir
+        memory.anima_dir = anima_dir
         memory.read_company_vision.return_value = ""
         memory.read_identity.return_value = ""
         memory.read_injection.return_value = ""
@@ -323,18 +323,18 @@ class TestBuildSystemPrompt:
             mock_guide.assert_called_once()
 
 
-# ── _format_person_entry ──────────────────────────────────
+# ── _format_anima_entry ──────────────────────────────────
 
 
-class TestFormatPersonEntry:
+class TestFormatAnimaEntry:
     def test_with_speciality(self):
-        assert _format_person_entry("alice", "frontend") == "alice (frontend)"
+        assert _format_anima_entry("alice", "frontend") == "alice (frontend)"
 
     def test_without_speciality(self):
-        assert _format_person_entry("alice", None) == "alice"
+        assert _format_anima_entry("alice", None) == "alice"
 
     def test_empty_speciality(self):
-        assert _format_person_entry("alice", "") == "alice"
+        assert _format_anima_entry("alice", "") == "alice"
 
 
 # ── _build_org_context ───────────────────────────────────
@@ -343,23 +343,23 @@ class TestFormatPersonEntry:
 class TestBuildOrgContext:
     """Test organisation context derivation from supervisor chain."""
 
-    def test_top_level_person(self, data_dir, make_person):
-        """Top-level person (no supervisor) sees full org tree."""
-        make_person("sakura")
-        make_person("rin", supervisor="sakura", speciality="development")
-        make_person("kotoha", supervisor="sakura", speciality="communication")
+    def test_top_level_anima(self, data_dir, make_anima):
+        """Top-level anima (no supervisor) sees full org tree."""
+        make_anima("sakura")
+        make_anima("rin", supervisor="sakura", speciality="development")
+        make_anima("kotoha", supervisor="sakura", speciality="communication")
 
         result = _build_org_context("sakura", ["rin", "kotoha"])
         assert "あなたはトップレベルです" in result
         assert "rin (development)" in result
         assert "kotoha (communication)" in result
 
-    def test_middle_manager(self, data_dir, make_person):
+    def test_middle_manager(self, data_dir, make_anima):
         """Middle manager sees supervisor, subordinates, and peers."""
-        make_person("sakura")
-        make_person("rin", supervisor="sakura", speciality="development")
-        make_person("kotoha", supervisor="sakura", speciality="communication")
-        make_person("alice", supervisor="rin", speciality="frontend")
+        make_anima("sakura")
+        make_anima("rin", supervisor="sakura", speciality="development")
+        make_anima("kotoha", supervisor="sakura", speciality="communication")
+        make_anima("alice", supervisor="rin", speciality="frontend")
 
         result = _build_org_context("rin", ["sakura", "kotoha", "alice"])
         # Supervisor
@@ -369,12 +369,12 @@ class TestBuildOrgContext:
         # Peer
         assert "kotoha (communication)" in result
 
-    def test_leaf_worker(self, data_dir, make_person):
+    def test_leaf_worker(self, data_dir, make_anima):
         """Leaf worker sees supervisor and peers but no subordinates."""
-        make_person("sakura")
-        make_person("rin", supervisor="sakura", speciality="development")
-        make_person("alice", supervisor="rin", speciality="frontend")
-        make_person("bob", supervisor="rin", speciality="backend")
+        make_anima("sakura")
+        make_anima("rin", supervisor="sakura", speciality="development")
+        make_anima("alice", supervisor="rin", speciality="frontend")
+        make_anima("bob", supervisor="rin", speciality="backend")
 
         result = _build_org_context("alice", ["sakura", "rin", "bob"])
         # Supervisor
@@ -385,9 +385,9 @@ class TestBuildOrgContext:
         # Peer
         assert "bob (backend)" in result
 
-    def test_solo_person(self, data_dir, make_person):
-        """Solo person with no relationships."""
-        make_person("sakura")
+    def test_solo_anima(self, data_dir, make_anima):
+        """Solo anima with no relationships."""
+        make_anima("sakura")
 
         result = _build_org_context("sakura", [])
         assert "あなたがトップです" in result
@@ -395,24 +395,24 @@ class TestBuildOrgContext:
         assert "コミュニケーションルール" not in result
 
     def test_communication_rules_injected_when_others_exist(
-        self, data_dir, make_person
+        self, data_dir, make_anima
     ):
-        """Communication rules are included when other persons exist."""
-        make_person("sakura")
-        make_person("rin", supervisor="sakura", speciality="development")
+        """Communication rules are included when other animas exist."""
+        make_anima("sakura")
+        make_anima("rin", supervisor="sakura", speciality="development")
 
         result = _build_org_context("sakura", ["rin"])
         assert "コミュニケーションルール" in result
 
-    def test_speciality_not_set(self, data_dir, make_person):
-        """Handles persons without speciality gracefully."""
-        make_person("sakura")
-        make_person("rin", supervisor="sakura")
+    def test_speciality_not_set(self, data_dir, make_anima):
+        """Handles animas without speciality gracefully."""
+        make_anima("sakura")
+        make_anima("rin", supervisor="sakura")
 
         result = _build_org_context("sakura", ["rin"])
         # rin should appear without parenthetical speciality
         assert "rin" in result
-        # person_speciality should show (未設定) for sakura
+        # anima_speciality should show (未設定) for sakura
         assert "(未設定)" in result
 
     def test_config_load_failure_returns_empty(self, data_dir):
@@ -421,9 +421,9 @@ class TestBuildOrgContext:
             result = _build_org_context("sakura", ["rin"])
             assert result == ""
 
-    def test_person_not_in_config(self, data_dir, make_person):
-        """Handles gracefully when person_name is not in config.persons."""
-        make_person("rin", supervisor="sakura", speciality="development")
+    def test_anima_not_in_config(self, data_dir, make_anima):
+        """Handles gracefully when anima_name is not in config.animas."""
+        make_anima("rin", supervisor="sakura", speciality="development")
         # sakura has no entry in config but is referenced as supervisor
 
         result = _build_org_context("unknown", ["rin"])
@@ -437,13 +437,13 @@ class TestHiringContextPlacement:
     """Verify hiring_context is injected before behavior_rules."""
 
     def _build_solo_prompt(self, tmp_path, data_dir):
-        """Helper: build system prompt for a solo person with no supervisor."""
-        person_dir = tmp_path / "persons" / "solo"
-        person_dir.mkdir(parents=True)
-        (person_dir / "identity.md").write_text("I am Solo", encoding="utf-8")
+        """Helper: build system prompt for a solo anima with no supervisor."""
+        anima_dir = tmp_path / "animas" / "solo"
+        anima_dir.mkdir(parents=True)
+        (anima_dir / "identity.md").write_text("I am Solo", encoding="utf-8")
 
         memory = MagicMock()
-        memory.person_dir = person_dir
+        memory.anima_dir = anima_dir
         memory.read_company_vision.return_value = ""
         memory.read_identity.return_value = "I am Solo"
         memory.read_injection.return_value = ""
@@ -479,18 +479,18 @@ class TestHiringContextPlacement:
         assert result.index("チーム構成について") < result.index("行動ルール")
 
     def test_hiring_context_not_injected_with_peers(self, tmp_path, data_dir):
-        """hiring_context must NOT be injected when other persons exist."""
-        persons_root = tmp_path / "persons"
-        persons_root.mkdir(parents=True, exist_ok=True)
-        solo = persons_root / "solo"
+        """hiring_context must NOT be injected when other animas exist."""
+        animas_root = tmp_path / "animas"
+        animas_root.mkdir(parents=True, exist_ok=True)
+        solo = animas_root / "solo"
         solo.mkdir()
         (solo / "identity.md").write_text("I am Solo", encoding="utf-8")
-        peer = persons_root / "peer"
+        peer = animas_root / "peer"
         peer.mkdir()
         (peer / "identity.md").write_text("I am Peer", encoding="utf-8")
 
         memory = MagicMock()
-        memory.person_dir = solo
+        memory.anima_dir = solo
         memory.read_company_vision.return_value = ""
         memory.read_identity.return_value = "I am Solo"
         memory.read_injection.return_value = ""
@@ -511,7 +511,7 @@ class TestHiringContextPlacement:
         assert "チーム構成について" not in result
 
     def test_hiring_context_not_injected_with_supervisor(self, tmp_path, data_dir):
-        """hiring_context must NOT be injected when person has a supervisor."""
+        """hiring_context must NOT be injected when anima has a supervisor."""
         memory = self._build_solo_prompt(tmp_path, data_dir)
 
         from core.schemas import ModelConfig

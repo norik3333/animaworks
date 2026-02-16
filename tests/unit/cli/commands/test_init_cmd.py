@@ -12,11 +12,11 @@ class TestCmdInit:
     """Tests for cmd_init function."""
 
     @patch("cli.commands.init_cmd._interactive_user_setup")
-    @patch("cli.commands.init_cmd._interactive_person_setup")
+    @patch("cli.commands.init_cmd._interactive_anima_setup")
     @patch("core.init.ensure_runtime_dir")
     @patch("core.paths.get_data_dir")
     def test_first_time_init(
-        self, mock_get_dir, mock_ensure, mock_person_setup, mock_user_setup, tmp_path
+        self, mock_get_dir, mock_ensure, mock_anima_setup, mock_user_setup, tmp_path
     ):
         from cli.commands.init_cmd import cmd_init
 
@@ -27,12 +27,12 @@ class TestCmdInit:
 
         args = argparse.Namespace(
             force=False, reset=False, template=None,
-            from_md=None, blank=None, skip_person=False, name=None,
+            from_md=None, blank=None, skip_anima=False, name=None,
         )
         cmd_init(args)
 
-        mock_ensure.assert_called_once_with(skip_persons=True)
-        mock_person_setup.assert_called_once_with(data_dir)
+        mock_ensure.assert_called_once_with(skip_animas=True)
+        mock_anima_setup.assert_called_once_with(data_dir)
         mock_user_setup.assert_called_once_with(data_dir)
 
     @patch("core.paths.get_data_dir")
@@ -46,7 +46,7 @@ class TestCmdInit:
 
         args = argparse.Namespace(
             force=False, reset=False, template=None,
-            from_md=None, blank=None, skip_person=False, name=None,
+            from_md=None, blank=None, skip_anima=False, name=None,
         )
         cmd_init(args)
 
@@ -66,7 +66,7 @@ class TestCmdInit:
 
         args = argparse.Namespace(
             force=True, reset=False, template=None,
-            from_md=None, blank=None, skip_person=False, name=None,
+            from_md=None, blank=None, skip_anima=False, name=None,
         )
         cmd_init(args)
 
@@ -86,7 +86,7 @@ class TestCmdInit:
 
         args = argparse.Namespace(
             force=True, reset=False, template=None,
-            from_md=None, blank=None, skip_person=False, name=None,
+            from_md=None, blank=None, skip_anima=False, name=None,
         )
         cmd_init(args)
 
@@ -95,7 +95,7 @@ class TestCmdInit:
 
     @patch("core.init.ensure_runtime_dir")
     @patch("core.paths.get_data_dir")
-    def test_skip_person(self, mock_get_dir, mock_ensure, tmp_path, capsys):
+    def test_skip_anima(self, mock_get_dir, mock_ensure, tmp_path, capsys):
         from cli.commands.init_cmd import cmd_init
 
         data_dir = tmp_path / ".animaworks"
@@ -104,15 +104,15 @@ class TestCmdInit:
 
         args = argparse.Namespace(
             force=False, reset=False, template=None,
-            from_md=None, blank=None, skip_person=True, name=None,
+            from_md=None, blank=None, skip_anima=True, name=None,
         )
         cmd_init(args)
 
         captured = capsys.readouterr()
-        assert "no persons" in captured.out
+        assert "no animas" in captured.out
 
-    @patch("cli.commands.init_cmd._register_person_in_config")
-    @patch("core.person_factory.create_from_template")
+    @patch("cli.commands.init_cmd._register_anima_in_config")
+    @patch("core.anima_factory.create_from_template")
     @patch("core.init.ensure_runtime_dir")
     @patch("core.paths.get_data_dir")
     def test_template_mode(
@@ -122,16 +122,16 @@ class TestCmdInit:
 
         data_dir = tmp_path / ".animaworks"
         data_dir.mkdir()
-        (data_dir / "persons").mkdir()
+        (data_dir / "animas").mkdir()
         mock_get_dir.return_value = data_dir
 
-        person_dir = data_dir / "persons" / "alice"
-        person_dir.mkdir()
-        mock_create.return_value = person_dir
+        anima_dir = data_dir / "animas" / "alice"
+        anima_dir.mkdir()
+        mock_create.return_value = anima_dir
 
         args = argparse.Namespace(
             force=False, reset=False, template="basic",
-            from_md=None, blank=None, skip_person=False, name=None,
+            from_md=None, blank=None, skip_anima=False, name=None,
         )
         cmd_init(args)
 
@@ -139,9 +139,9 @@ class TestCmdInit:
         captured = capsys.readouterr()
         assert "alice" in captured.out
 
-    @patch("cli.commands.init_cmd._register_person_in_config")
-    @patch("core.person_factory.validate_person_name")
-    @patch("core.person_factory.create_blank")
+    @patch("cli.commands.init_cmd._register_anima_in_config")
+    @patch("core.anima_factory.validate_anima_name")
+    @patch("core.anima_factory.create_blank")
     @patch("core.init.ensure_runtime_dir")
     @patch("core.paths.get_data_dir")
     def test_blank_mode(
@@ -152,17 +152,17 @@ class TestCmdInit:
 
         data_dir = tmp_path / ".animaworks"
         data_dir.mkdir()
-        (data_dir / "persons").mkdir()
+        (data_dir / "animas").mkdir()
         mock_get_dir.return_value = data_dir
         mock_validate.return_value = None
 
-        person_dir = data_dir / "persons" / "bob"
-        person_dir.mkdir()
-        mock_create.return_value = person_dir
+        anima_dir = data_dir / "animas" / "bob"
+        anima_dir.mkdir()
+        mock_create.return_value = anima_dir
 
         args = argparse.Namespace(
             force=False, reset=False, template=None,
-            from_md=None, blank="bob", skip_person=False, name=None,
+            from_md=None, blank="bob", skip_anima=False, name=None,
         )
         cmd_init(args)
 
@@ -170,7 +170,7 @@ class TestCmdInit:
         captured = capsys.readouterr()
         assert "bob" in captured.out
 
-    @patch("core.person_factory.validate_person_name")
+    @patch("core.anima_factory.validate_anima_name")
     @patch("core.init.ensure_runtime_dir")
     @patch("core.paths.get_data_dir")
     def test_blank_mode_invalid_name(
@@ -180,28 +180,28 @@ class TestCmdInit:
 
         data_dir = tmp_path / ".animaworks"
         data_dir.mkdir()
-        (data_dir / "persons").mkdir()
+        (data_dir / "animas").mkdir()
         mock_get_dir.return_value = data_dir
         mock_validate.return_value = "Name must be lowercase"
 
         args = argparse.Namespace(
             force=False, reset=False, template=None,
-            from_md=None, blank="INVALID", skip_person=False, name=None,
+            from_md=None, blank="INVALID", skip_anima=False, name=None,
         )
         with pytest.raises(SystemExit):
             cmd_init(args)
 
 
-class TestRegisterPersonInConfig:
-    """Tests for _register_person_in_config."""
+class TestRegisterAnimaInConfig:
+    """Tests for _register_anima_in_config."""
 
-    def test_register_new_person(self, tmp_path):
+    def test_register_new_anima(self, tmp_path):
         import json
-        from cli.commands.init_cmd import _register_person_in_config
+        from cli.commands.init_cmd import _register_anima_in_config
 
         config_path = tmp_path / "config.json"
         config_path.write_text(
-            json.dumps({"version": 1, "persons": {}}),
+            json.dumps({"version": 1, "animas": {}}),
             encoding="utf-8",
         )
 
@@ -210,18 +210,18 @@ class TestRegisterPersonInConfig:
             patch("core.config.models.save_config") as mock_save,
         ):
             mock_config = MagicMock()
-            mock_config.persons = {}
+            mock_config.animas = {}
             mock_load.return_value = mock_config
 
-            _register_person_in_config(tmp_path, "alice")
+            _register_anima_in_config(tmp_path, "alice")
 
             mock_save.assert_called_once()
 
     def test_register_no_config_file(self, tmp_path):
-        from cli.commands.init_cmd import _register_person_in_config
+        from cli.commands.init_cmd import _register_anima_in_config
 
         # No config.json exists — should return silently
-        _register_person_in_config(tmp_path, "alice")
+        _register_anima_in_config(tmp_path, "alice")
 
 
 class TestInteractiveUserSetup:

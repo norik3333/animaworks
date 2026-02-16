@@ -1,5 +1,5 @@
 from __future__ import annotations
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
@@ -16,7 +16,7 @@ from typing import Any, Callable, Coroutine
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
-from core.person import DigitalPerson
+from core.anima import DigitalAnima
 from core.schemas import CronTask
 
 logger = logging.getLogger("animaworks.lifecycle")
@@ -24,7 +24,7 @@ logger = logging.getLogger("animaworks.lifecycle")
 BroadcastFn = Callable[[dict[str, Any]], Coroutine[Any, Any, None]]
 
 # Minimum seconds between consecutive message-triggered heartbeats
-# for the same person. Prevents cascading loops (A sends to B, B replies
+# for the same anima. Prevents cascading loops (A sends to B, B replies
 # to A, A replies to B, …).
 _MSG_HEARTBEAT_COOLDOWN_S = 60
 
@@ -32,11 +32,11 @@ _CASCADE_WINDOW_S = 600   # 10 minutes
 _CASCADE_THRESHOLD = 4     # max round-trips per pair within window
 
 class LifecycleManager:
-    """Manages heartbeat and cron for Digital Persons via APScheduler."""
+    """Manages heartbeat and cron for Digital Animas via APScheduler."""
 
     def __init__(self) -> None:
         self.scheduler = AsyncIOScheduler(timezone="Asia/Tokyo")
-        self.persons: dict[str, DigitalPerson] = {}
+        self.animas: dict[str, DigitalAnima] = {}
         self._ws_broadcast: BroadcastFn | None = None
         self._inbox_watcher_task: asyncio.Task | None = None
         self._pending_triggers: set[str] = set()
@@ -46,56 +46,56 @@ class LifecycleManager:
 
     def set_broadcast(self, fn: BroadcastFn) -> None:
         self._ws_broadcast = fn
-        # Propagate to already-registered persons for bg task notifications
-        for person in self.persons.values():
-            person.set_ws_broadcast(fn)
+        # Propagate to already-registered animas for bg task notifications
+        for anima in self.animas.values():
+            anima.set_ws_broadcast(fn)
 
-    def register_person(self, person: DigitalPerson) -> None:
-        self.persons[person.name] = person
+    def register_anima(self, anima: DigitalAnima) -> None:
+        self.animas[anima.name] = anima
         # Wire up lock-release callback for deferred inbox processing
-        person.set_on_lock_released(
-            lambda n=person.name: asyncio.ensure_future(
-                self._on_person_lock_released(n)
+        anima.set_on_lock_released(
+            lambda n=anima.name: asyncio.ensure_future(
+                self._on_anima_lock_released(n)
             )
         )
         # Wire up schedule-changed callback for hot-reload
-        person.set_on_schedule_changed(self.reload_person_schedule)
+        anima.set_on_schedule_changed(self.reload_anima_schedule)
         # Wire up WebSocket broadcast for background task notifications
         if self._ws_broadcast:
-            person.set_ws_broadcast(self._ws_broadcast)
-        self._setup_heartbeat(person)
-        self._setup_cron_tasks(person)
-        logger.info("Registered '%s' with lifecycle manager", person.name)
+            anima.set_ws_broadcast(self._ws_broadcast)
+        self._setup_heartbeat(anima)
+        self._setup_cron_tasks(anima)
+        logger.info("Registered '%s' with lifecycle manager", anima.name)
 
-    def unregister_person(self, name: str) -> None:
-        """Remove a person and all their scheduled jobs."""
-        self.persons.pop(name, None)
+    def unregister_anima(self, name: str) -> None:
+        """Remove an anima and all their scheduled jobs."""
+        self.animas.pop(name, None)
         self._pending_triggers.discard(name)
         self._deferred_inbox.discard(name)
-        # Remove all scheduler jobs belonging to this person
+        # Remove all scheduler jobs belonging to this anima
         for job in self.scheduler.get_jobs():
             if job.id.startswith(f"{name}_"):
                 job.remove()
         logger.info("Unregistered '%s' from lifecycle manager", name)
 
-    def reload_person_schedule(self, name: str) -> dict[str, Any]:
-        """Reload heartbeat and cron schedules for a person from disk.
+    def reload_anima_schedule(self, name: str) -> dict[str, Any]:
+        """Reload heartbeat and cron schedules for an anima from disk.
 
         Called when heartbeat.md or cron.md is modified at runtime.
 
         Args:
-            name: The person name whose schedule should be reloaded.
+            name: The anima name whose schedule should be reloaded.
 
         Returns:
             A summary dict with keys ``reloaded``, ``removed``, ``new_jobs``
-            (or ``error`` if the person is not registered).
+            (or ``error`` if the anima is not registered).
         """
-        person = self.persons.get(name)
-        if not person:
-            logger.warning("reload_person_schedule: '%s' not registered", name)
-            return {"error": f"Person '{name}' not registered"}
+        anima = self.animas.get(name)
+        if not anima:
+            logger.warning("reload_anima_schedule: '%s' not registered", name)
+            return {"error": f"Anima '{name}' not registered"}
 
-        # Remove existing heartbeat and cron jobs for this person
+        # Remove existing heartbeat and cron jobs for this anima
         removed = 0
         for job in self.scheduler.get_jobs():
             if job.id.startswith(f"{name}_"):
@@ -103,8 +103,8 @@ class LifecycleManager:
                 removed += 1
 
         # Re-setup from current files on disk
-        self._setup_heartbeat(person)
-        self._setup_cron_tasks(person)
+        self._setup_heartbeat(anima)
+        self._setup_cron_tasks(anima)
 
         new_jobs = [
             j.id for j in self.scheduler.get_jobs()
@@ -118,10 +118,10 @@ class LifecycleManager:
 
     # ── Heartbeat ─────────────────────────────────────────
 
-    def _setup_heartbeat(self, person: DigitalPerson) -> None:
-        config = person.memory.read_heartbeat_config()
+    def _setup_heartbeat(self, anima: DigitalAnima) -> None:
+        config = anima.memory.read_heartbeat_config()
 
-        _HEARTBEAT_INTERVAL = 30  # Fixed system-wide; not configurable per person
+        _HEARTBEAT_INTERVAL = 30  # Fixed system-wide; not configurable per anima
 
         active_start, active_end = 9, 22
         m = re.search(r"(\d{1,2}):\d{0,2}\s*-\s*(\d{1,2})", config)
@@ -134,38 +134,38 @@ class LifecycleManager:
                 minute=f"*/{_HEARTBEAT_INTERVAL}",
                 hour=f"{active_start}-{active_end - 1}",
             ),
-            id=f"{person.name}_heartbeat",
-            name=f"{person.name} heartbeat",
-            args=[person.name],
+            id=f"{anima.name}_heartbeat",
+            name=f"{anima.name} heartbeat",
+            args=[anima.name],
             replace_existing=True,
         )
         logger.info(
             "Heartbeat '%s': every %dmin, active %d:00-%d:00",
-            person.name,
+            anima.name,
             _HEARTBEAT_INTERVAL,
             active_start,
             active_end,
         )
 
     async def _heartbeat_wrapper(self, name: str) -> None:
-        person = self.persons.get(name)
-        if not person:
+        anima = self.animas.get(name)
+        if not anima:
             return
 
         logger.info("Heartbeat: %s", name)
-        result = await person.run_heartbeat()
+        result = await anima.run_heartbeat()
         if self._ws_broadcast:
             await self._ws_broadcast(
                 {
-                    "type": "person.heartbeat",
+                    "type": "anima.heartbeat",
                     "data": {"name": name, "result": result.model_dump()},
                 }
             )
 
     # ── Cron ──────────────────────────────────────────────
 
-    def _setup_cron_tasks(self, person: DigitalPerson) -> None:
-        config = person.memory.read_cron_config()
+    def _setup_cron_tasks(self, anima: DigitalAnima) -> None:
+        config = anima.memory.read_cron_config()
         if not config:
             return
 
@@ -176,14 +176,14 @@ class LifecycleManager:
                 self.scheduler.add_job(
                     self._cron_wrapper,
                     trigger,
-                    id=f"{person.name}_cron_{i}",
-                    name=f"{person.name}: {task.name}",
-                    args=[person.name, task],  # Pass entire CronTask object
+                    id=f"{anima.name}_cron_{i}",
+                    name=f"{anima.name}: {task.name}",
+                    args=[anima.name, task],  # Pass entire CronTask object
                     replace_existing=True,
                 )
                 logger.info(
                     "Cron '%s': %s (%s) [%s]",
-                    person.name,
+                    anima.name,
                     task.name,
                     task.schedule,
                     task.type,
@@ -191,21 +191,21 @@ class LifecycleManager:
 
     async def _cron_wrapper(self, name: str, task: CronTask) -> None:
         """Wrapper for cron task execution (both LLM and command types)."""
-        person = self.persons.get(name)
-        if not person:
+        anima = self.animas.get(name)
+        if not anima:
             return
 
         logger.info("Cron: %s -> %s [%s]", name, task.name, task.type)
         # Run cron tasks without awaiting lock — use create_task so
         # multiple simultaneous cron tasks don't block each other.
         asyncio.create_task(
-            self._run_cron_and_broadcast(person, name, task),
+            self._run_cron_and_broadcast(anima, name, task),
             name=f"cron-{name}-{task.name}",
         )
 
     async def _run_cron_and_broadcast(
         self,
-        person: DigitalPerson,
+        anima: DigitalAnima,
         name: str,
         task: CronTask,
     ) -> None:
@@ -213,9 +213,9 @@ class LifecycleManager:
         try:
             if task.type == "llm":
                 # LLM-type: invoke agent.run_cycle
-                result = await person.run_cron_task(task.name, task.description)
+                result = await anima.run_cron_task(task.name, task.description)
                 broadcast_data = {
-                    "type": "person.cron",
+                    "type": "anima.cron",
                     "data": {
                         "name": name,
                         "task": task.name,
@@ -225,14 +225,14 @@ class LifecycleManager:
                 }
             elif task.type == "command":
                 # Command-type: execute bash/tool directly
-                result = await person.run_cron_command(
+                result = await anima.run_cron_command(
                     task.name,
                     command=task.command,
                     tool=task.tool,
                     args=task.args,
                 )
                 broadcast_data = {
-                    "type": "person.cron",
+                    "type": "anima.cron",
                     "data": {
                         "name": name,
                         "task": task.name,
@@ -261,11 +261,11 @@ class LifecycleManager:
         last = self._last_msg_heartbeat_end.get(name, 0.0)
         return (time.monotonic() - last) < _MSG_HEARTBEAT_COOLDOWN_S
 
-    def _check_cascade(self, person_name: str, senders: set[str]) -> bool:
-        """Return True if any (person, sender) pair exceeds cascade threshold."""
+    def _check_cascade(self, anima_name: str, senders: set[str]) -> bool:
+        """Return True if any (anima, sender) pair exceeds cascade threshold."""
         now = time.monotonic()
         for sender in senders:
-            keys = [(person_name, sender), (sender, person_name)]
+            keys = [(anima_name, sender), (sender, anima_name)]
             total = 0
             for k in keys:
                 times = self._pair_heartbeat_times.get(k, [])
@@ -279,16 +279,16 @@ class LifecycleManager:
                 logger.warning(
                     "CASCADE DETECTED: %s <-> %s (%d round-trips in %ds window). "
                     "Suppressing message-triggered heartbeat.",
-                    person_name, sender, total, _CASCADE_WINDOW_S,
+                    anima_name, sender, total, _CASCADE_WINDOW_S,
                 )
                 return True
         return False
 
-    def _record_pair_heartbeat(self, person_name: str, senders: set[str]) -> None:
+    def _record_pair_heartbeat(self, anima_name: str, senders: set[str]) -> None:
         """Record a heartbeat exchange for cascade tracking."""
         now = time.monotonic()
         for sender in senders:
-            key = (person_name, sender)
+            key = (anima_name, sender)
             self._pair_heartbeat_times.setdefault(key, []).append(now)
 
     async def _inbox_watcher_loop(self) -> None:
@@ -296,14 +296,14 @@ class LifecycleManager:
         logger.info("Inbox watcher started (poll interval: 2s)")
         while True:
             await asyncio.sleep(2)
-            for name, person in self.persons.items():
+            for name, anima in self.animas.items():
                 if name in self._pending_triggers:
                     continue
-                if not person.messenger.has_unread():
+                if not anima.messenger.has_unread():
                     continue
                 if self._is_in_cooldown(name):
                     continue
-                if person._lock.locked():
+                if anima._lock.locked():
                     self._deferred_inbox.add(name)
                     continue
                 self._pending_triggers.add(name)
@@ -311,16 +311,16 @@ class LifecycleManager:
                     self._message_triggered_heartbeat(name)
                 )
 
-    async def _on_person_lock_released(self, name: str) -> None:
-        """Check deferred inbox after a person's lock is released."""
+    async def _on_anima_lock_released(self, name: str) -> None:
+        """Check deferred inbox after an anima's lock is released."""
         if name not in self._deferred_inbox:
             return
         self._deferred_inbox.discard(name)
 
-        person = self.persons.get(name)
-        if not person:
+        anima = self.animas.get(name)
+        if not anima:
             return
-        if not person.messenger.has_unread():
+        if not anima.messenger.has_unread():
             return
         if name in self._pending_triggers:
             return
@@ -331,24 +331,24 @@ class LifecycleManager:
         asyncio.create_task(self._message_triggered_heartbeat(name))
 
     async def _message_triggered_heartbeat(self, name: str) -> None:
-        person = self.persons.get(name)
-        if not person:
+        anima = self.animas.get(name)
+        if not anima:
             self._pending_triggers.discard(name)
             return
 
         # Peek at inbox senders for cascade detection
-        senders = {m.from_person for m in person.messenger.receive()}
+        senders = {m.from_person for m in anima.messenger.receive()}
         if senders and self._check_cascade(name, senders):
             self._pending_triggers.discard(name)
             return
 
         try:
             logger.info("Message-triggered heartbeat: %s", name)
-            result = await person.run_heartbeat()
+            result = await anima.run_heartbeat()
             if self._ws_broadcast:
                 await self._ws_broadcast(
                     {
-                        "type": "person.message_heartbeat",
+                        "type": "anima.message_heartbeat",
                         "data": {"name": name, "result": result.model_dump()},
                     }
                 )
@@ -395,7 +395,7 @@ class LifecycleManager:
         logger.info("System cron: Monthly forgetting on 1st at 03:00 JST")
 
     async def _handle_daily_consolidation(self) -> None:
-        """Run daily consolidation for all persons."""
+        """Run daily consolidation for all animas."""
         logger.info("Starting system-wide daily consolidation")
 
         # Load consolidation config
@@ -417,14 +417,14 @@ class LifecycleManager:
             logger.info("Daily consolidation is disabled in config")
             return
 
-        # Run consolidation for each person
-        for person_name, person in self.persons.items():
+        # Run consolidation for each anima
+        for anima_name, anima in self.animas.items():
             try:
                 from core.memory.consolidation import ConsolidationEngine
 
                 engine = ConsolidationEngine(
-                    person_dir=person.memory.person_dir,
-                    person_name=person_name,
+                    anima_dir=anima.memory.anima_dir,
+                    anima_name=anima_name,
                 )
 
                 result = await engine.daily_consolidate(
@@ -434,7 +434,7 @@ class LifecycleManager:
 
                 logger.info(
                     "Daily consolidation for %s: %s",
-                    person_name,
+                    anima_name,
                     result
                 )
 
@@ -444,7 +444,7 @@ class LifecycleManager:
                         {
                             "type": "system.consolidation",
                             "data": {
-                                "person": person_name,
+                                "anima": anima_name,
                                 "type": "daily",
                                 "result": result,
                             },
@@ -453,12 +453,12 @@ class LifecycleManager:
 
             except Exception:
                 logger.exception(
-                    "Daily consolidation failed for person=%s",
-                    person_name
+                    "Daily consolidation failed for anima=%s",
+                    anima_name
                 )
 
     async def _handle_weekly_integration(self) -> None:
-        """Run weekly integration for all persons."""
+        """Run weekly integration for all animas."""
         logger.info("Starting system-wide weekly integration")
 
         # Load config
@@ -482,14 +482,14 @@ class LifecycleManager:
             logger.info("Weekly integration is disabled in config")
             return
 
-        # Run integration for each person
-        for person_name, person in self.persons.items():
+        # Run integration for each anima
+        for anima_name, anima in self.animas.items():
             try:
                 from core.memory.consolidation import ConsolidationEngine
 
                 engine = ConsolidationEngine(
-                    person_dir=person.memory.person_dir,
-                    person_name=person_name,
+                    anima_dir=anima.memory.anima_dir,
+                    anima_name=anima_name,
                 )
 
                 result = await engine.weekly_integrate(
@@ -500,7 +500,7 @@ class LifecycleManager:
 
                 logger.info(
                     "Weekly integration for %s: merged=%d compressed=%d",
-                    person_name,
+                    anima_name,
                     len(result.get("knowledge_files_merged", [])),
                     result.get("episodes_compressed", 0)
                 )
@@ -511,7 +511,7 @@ class LifecycleManager:
                         {
                             "type": "system.consolidation",
                             "data": {
-                                "person": person_name,
+                                "anima": anima_name,
                                 "type": "weekly",
                                 "result": result,
                             },
@@ -520,12 +520,12 @@ class LifecycleManager:
 
             except Exception:
                 logger.exception(
-                    "Weekly integration failed for person=%s",
-                    person_name
+                    "Weekly integration failed for anima=%s",
+                    anima_name
                 )
 
     async def _handle_monthly_forgetting(self) -> None:
-        """Run monthly forgetting for all persons."""
+        """Run monthly forgetting for all animas."""
         logger.info("Starting system-wide monthly forgetting")
 
         # Load config
@@ -543,21 +543,21 @@ class LifecycleManager:
             logger.info("Monthly forgetting is disabled in config")
             return
 
-        # Run forgetting for each person
-        for person_name, person in self.persons.items():
+        # Run forgetting for each anima
+        for anima_name, anima in self.animas.items():
             try:
                 from core.memory.consolidation import ConsolidationEngine
 
                 engine = ConsolidationEngine(
-                    person_dir=person.memory.person_dir,
-                    person_name=person_name,
+                    anima_dir=anima.memory.anima_dir,
+                    anima_name=anima_name,
                 )
 
                 result = await engine.monthly_forget()
 
                 logger.info(
                     "Monthly forgetting for %s: forgotten=%d archived=%d",
-                    person_name,
+                    anima_name,
                     result.get("forgotten_chunks", 0),
                     len(result.get("archived_files", [])),
                 )
@@ -568,7 +568,7 @@ class LifecycleManager:
                         {
                             "type": "system.consolidation",
                             "data": {
-                                "person": person_name,
+                                "anima": anima_name,
                                 "type": "monthly_forgetting",
                                 "result": result,
                             },
@@ -577,8 +577,8 @@ class LifecycleManager:
 
             except Exception:
                 logger.exception(
-                    "Monthly forgetting failed for person=%s",
-                    person_name
+                    "Monthly forgetting failed for anima=%s",
+                    anima_name
                 )
 
     # ── Lifecycle ─────────────────────────────────────────

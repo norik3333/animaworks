@@ -20,18 +20,18 @@ export async function loadMemoryTab(tab) {
   const fileList = dom.memoryFileList || document.getElementById("memoryFileList");
   if (!fileList) return; // Memory browser not in DOM
 
-  const name = state.selectedPerson;
+  const name = state.selectedAnima;
   if (!name) {
-    fileList.innerHTML = '<div class="loading-placeholder">パーソンを選択してください</div>';
+    fileList.innerHTML = '<div class="loading-placeholder">Animaを選択してください</div>';
     return;
   }
 
   fileList.innerHTML = '<div class="loading-placeholder">読み込み中...</div>';
 
   let endpoint;
-  if (tab === "episodes") endpoint = `/api/persons/${encodeURIComponent(name)}/episodes`;
-  else if (tab === "knowledge") endpoint = `/api/persons/${encodeURIComponent(name)}/knowledge`;
-  else endpoint = `/api/persons/${encodeURIComponent(name)}/procedures`;
+  if (tab === "episodes") endpoint = `/api/animas/${encodeURIComponent(name)}/episodes`;
+  else if (tab === "knowledge") endpoint = `/api/animas/${encodeURIComponent(name)}/knowledge`;
+  else endpoint = `/api/animas/${encodeURIComponent(name)}/procedures`;
 
   try {
     const data = await api(endpoint);
@@ -56,7 +56,7 @@ export async function loadMemoryTab(tab) {
 }
 
 async function loadMemoryContent(tab, file) {
-  const name = state.selectedPerson;
+  const name = state.selectedAnima;
   if (!name) return;
 
   const fileList = dom.memoryFileList || document.getElementById("memoryFileList");
@@ -66,9 +66,9 @@ async function loadMemoryContent(tab, file) {
   if (!contentArea) return;
 
   let endpoint;
-  if (tab === "episodes") endpoint = `/api/persons/${encodeURIComponent(name)}/episodes/${encodeURIComponent(file)}`;
-  else if (tab === "knowledge") endpoint = `/api/persons/${encodeURIComponent(name)}/knowledge/${encodeURIComponent(file)}`;
-  else endpoint = `/api/persons/${encodeURIComponent(name)}/procedures/${encodeURIComponent(file)}`;
+  if (tab === "episodes") endpoint = `/api/animas/${encodeURIComponent(name)}/episodes/${encodeURIComponent(file)}`;
+  else if (tab === "knowledge") endpoint = `/api/animas/${encodeURIComponent(name)}/knowledge/${encodeURIComponent(file)}`;
+  else endpoint = `/api/animas/${encodeURIComponent(name)}/procedures/${encodeURIComponent(file)}`;
 
   if (fileList) fileList.style.display = "none";
   contentArea.style.display = "";

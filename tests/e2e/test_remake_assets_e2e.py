@@ -1,9 +1,9 @@
 """E2E tests for the remake-assets workflow.
 
 Tests the complete remake flow:
-  - POST /api/persons/{name}/assets/remake-preview  (preview generation)
-  - POST /api/persons/{name}/assets/remake-confirm   (cascade rebuild)
-  - DELETE /api/persons/{name}/assets/remake-preview  (cancel & restore)
+  - POST /api/animas/{name}/assets/remake-preview  (preview generation)
+  - POST /api/animas/{name}/assets/remake-confirm   (cascade rebuild)
+  - DELETE /api/animas/{name}/assets/remake-preview  (cancel & restore)
   - CLI remake-assets --dry-run
 
 All external API calls (NovelAI, fal.ai, Meshy) are mocked via
@@ -22,14 +22,14 @@ from httpx import ASGITransport, AsyncClient
 # ── Helpers ──────────────────────────────────────────────
 
 
-def _make_test_app(persons_dir: Path):
+def _make_test_app(animas_dir: Path):
     """Create a test FastAPI app with the assets router and mock ws_manager."""
     from fastapi import FastAPI
 
     from server.routes.assets import create_assets_router
 
     app = FastAPI()
-    app.state.persons_dir = persons_dir
+    app.state.animas_dir = animas_dir
     app.state.ws_manager = MagicMock()
     app.state.ws_manager.broadcast = AsyncMock()
     router = create_assets_router()
@@ -68,20 +68,20 @@ def _make_pipeline_result(
 _FAKE_PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
 
 
-def _setup_person_with_assets(
-    persons_dir: Path,
+def _setup_anima_with_assets(
+    animas_dir: Path,
     name: str,
     *,
     with_prompt: bool = True,
     with_fullbody: bool = True,
 ) -> Path:
-    """Create a person directory with optional assets and prompt.txt."""
-    person_dir = persons_dir / name
-    person_dir.mkdir(parents=True, exist_ok=True)
-    (person_dir / "identity.md").write_text(
-        f"# {name}\nA test person.\n", encoding="utf-8",
+    """Create an anima directory with optional assets and prompt.txt."""
+    anima_dir = animas_dir / name
+    anima_dir.mkdir(parents=True, exist_ok=True)
+    (anima_dir / "identity.md").write_text(
+        f"# {name}\nA test anima.\n", encoding="utf-8",
     )
-    assets_dir = person_dir / "assets"
+    assets_dir = anima_dir / "assets"
     assets_dir.mkdir(exist_ok=True)
     if with_prompt:
         (assets_dir / "prompt.txt").write_text(
@@ -90,30 +90,30 @@ def _setup_person_with_assets(
         )
     if with_fullbody:
         (assets_dir / "avatar_fullbody.png").write_bytes(_FAKE_PNG)
-    return person_dir
+    return anima_dir
 
 
 # ── E2E: Remake Preview ─────────────────────────────────
 
 
 class TestRemakePreview:
-    """E2E tests for POST /api/persons/{name}/assets/remake-preview."""
+    """E2E tests for POST /api/animas/{name}/assets/remake-preview."""
 
     @patch("core.tools.image_gen.ImageGenPipeline")
     async def test_remake_preview_returns_preview_url(
         self, mock_pipeline_cls, tmp_path,
     ):
         """Successful preview returns preview_url, seed_used, and backup_id."""
-        persons_dir = tmp_path / "persons"
-        persons_dir.mkdir()
+        animas_dir = tmp_path / "animas"
+        animas_dir.mkdir()
 
-        # Target person (assets to remake)
-        target_dir = _setup_person_with_assets(
-            persons_dir, "target", with_prompt=True, with_fullbody=True,
+        # Target anima (assets to remake)
+        target_dir = _setup_anima_with_assets(
+            animas_dir, "target", with_prompt=True, with_fullbody=True,
         )
-        # Style-from person (reference)
-        _setup_person_with_assets(
-            persons_dir, "style-ref", with_fullbody=True,
+        # Style-from anima (reference)
+        _setup_anima_with_assets(
+            animas_dir, "style-ref", with_fullbody=True,
         )
 
         # Mock pipeline
@@ -123,11 +123,11 @@ class TestRemakePreview:
         mock_pipeline.generate_all.return_value = mock_result
         mock_pipeline_cls.return_value = mock_pipeline
 
-        app = _make_test_app(persons_dir)
+        app = _make_test_app(animas_dir)
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.post(
-                "/api/persons/target/assets/remake-preview",
+                "/api/animas/target/assets/remake-preview",
                 json={
                     "style_from": "style-ref",
                     "vibe_strength": 0.7,
@@ -138,7 +138,7 @@ class TestRemakePreview:
         assert resp.status_code == 200
         data = resp.json()
         assert "preview_url" in data
-        assert data["preview_url"] == "/api/persons/target/assets/avatar_fullbody.png"
+        assert data["preview_url"] == "/api/animas/target/assets/avatar_fullbody.png"
         assert data["seed_used"] == 42
         assert "backup_id" in data
         assert data["backup_id"].startswith("assets_backup_")
@@ -157,11 +157,11 @@ class TestRemakePreview:
         self, mock_pipeline_cls, tmp_path,
     ):
         """Preview endpoint creates a backup directory of existing assets."""
-        persons_dir = tmp_path / "persons"
-        persons_dir.mkdir()
+        animas_dir = tmp_path / "animas"
+        animas_dir.mkdir()
 
-        target_dir = _setup_person_with_assets(persons_dir, "target")
-        _setup_person_with_assets(persons_dir, "style-ref")
+        target_dir = _setup_anima_with_assets(animas_dir, "target")
+        _setup_anima_with_assets(animas_dir, "style-ref")
 
         # Add an extra asset to verify backup completeness
         (target_dir / "assets" / "avatar_bustup.png").write_bytes(_FAKE_PNG)
@@ -173,11 +173,11 @@ class TestRemakePreview:
         mock_pipeline.generate_all.return_value = mock_result
         mock_pipeline_cls.return_value = mock_pipeline
 
-        app = _make_test_app(persons_dir)
+        app = _make_test_app(animas_dir)
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.post(
-                "/api/persons/target/assets/remake-preview",
+                "/api/animas/target/assets/remake-preview",
                 json={"style_from": "style-ref"},
             )
 
@@ -194,17 +194,17 @@ class TestRemakePreview:
         assert (backup_dir / "avatar_bustup.png").exists()
         assert (backup_dir / "prompt.txt").exists()
 
-    async def test_remake_preview_missing_style_person(self, tmp_path):
-        """Returns 404 when style_from person does not exist."""
-        persons_dir = tmp_path / "persons"
-        persons_dir.mkdir()
-        _setup_person_with_assets(persons_dir, "target")
+    async def test_remake_preview_missing_style_anima(self, tmp_path):
+        """Returns 404 when style_from anima does not exist."""
+        animas_dir = tmp_path / "animas"
+        animas_dir.mkdir()
+        _setup_anima_with_assets(animas_dir, "target")
 
-        app = _make_test_app(persons_dir)
+        app = _make_test_app(animas_dir)
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.post(
-                "/api/persons/target/assets/remake-preview",
+                "/api/animas/target/assets/remake-preview",
                 json={"style_from": "nonexistent"},
             )
 
@@ -212,20 +212,20 @@ class TestRemakePreview:
         assert "nonexistent" in resp.json()["detail"]
 
     async def test_remake_preview_missing_fullbody(self, tmp_path):
-        """Returns 404 when style-from person has no avatar_fullbody.png."""
-        persons_dir = tmp_path / "persons"
-        persons_dir.mkdir()
-        _setup_person_with_assets(persons_dir, "target")
+        """Returns 404 when style-from anima has no avatar_fullbody.png."""
+        animas_dir = tmp_path / "animas"
+        animas_dir.mkdir()
+        _setup_anima_with_assets(animas_dir, "target")
         # Style-ref exists but has NO fullbody
-        _setup_person_with_assets(
-            persons_dir, "style-ref", with_fullbody=False,
+        _setup_anima_with_assets(
+            animas_dir, "style-ref", with_fullbody=False,
         )
 
-        app = _make_test_app(persons_dir)
+        app = _make_test_app(animas_dir)
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.post(
-                "/api/persons/target/assets/remake-preview",
+                "/api/animas/target/assets/remake-preview",
                 json={"style_from": "style-ref"},
             )
 
@@ -233,15 +233,15 @@ class TestRemakePreview:
         assert "avatar_fullbody.png" in resp.json()["detail"]
 
     async def test_remake_preview_target_not_found(self, tmp_path):
-        """Returns 404 when target person does not exist."""
-        persons_dir = tmp_path / "persons"
-        persons_dir.mkdir()
+        """Returns 404 when target anima does not exist."""
+        animas_dir = tmp_path / "animas"
+        animas_dir.mkdir()
 
-        app = _make_test_app(persons_dir)
+        app = _make_test_app(animas_dir)
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.post(
-                "/api/persons/ghost/assets/remake-preview",
+                "/api/animas/ghost/assets/remake-preview",
                 json={"style_from": "anyone"},
             )
 
@@ -252,11 +252,11 @@ class TestRemakePreview:
     async def test_remake_preview_emits_websocket_event(
         self, mock_pipeline_cls, tmp_path,
     ):
-        """Preview broadcasts person.remake_preview_ready via WebSocket."""
-        persons_dir = tmp_path / "persons"
-        persons_dir.mkdir()
-        target_dir = _setup_person_with_assets(persons_dir, "target")
-        _setup_person_with_assets(persons_dir, "style-ref")
+        """Preview broadcasts anima.remake_preview_ready via WebSocket."""
+        animas_dir = tmp_path / "animas"
+        animas_dir.mkdir()
+        target_dir = _setup_anima_with_assets(animas_dir, "target")
+        _setup_anima_with_assets(animas_dir, "style-ref")
 
         mock_result = _make_pipeline_result(
             fullbody_path=target_dir / "assets" / "avatar_fullbody.png",
@@ -265,11 +265,11 @@ class TestRemakePreview:
         mock_pipeline.generate_all.return_value = mock_result
         mock_pipeline_cls.return_value = mock_pipeline
 
-        app = _make_test_app(persons_dir)
+        app = _make_test_app(animas_dir)
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.post(
-                "/api/persons/target/assets/remake-preview",
+                "/api/animas/target/assets/remake-preview",
                 json={"style_from": "style-ref"},
             )
 
@@ -281,7 +281,7 @@ class TestRemakePreview:
             payload = call[0][0] if call[0] else {}
             if (
                 isinstance(payload, dict)
-                and payload.get("type") == "person.remake_preview_ready"
+                and payload.get("type") == "anima.remake_preview_ready"
             ):
                 preview_events.append(payload)
 
@@ -370,16 +370,16 @@ class TestRemakePreview:
 
 
 class TestRemakeConfirm:
-    """E2E tests for POST /api/persons/{name}/assets/remake-confirm."""
+    """E2E tests for POST /api/animas/{name}/assets/remake-confirm."""
 
     @patch("core.tools.image_gen.ImageGenPipeline")
     async def test_remake_confirm_starts_cascade(
         self, mock_pipeline_cls, tmp_path,
     ):
         """Confirm returns started status with remaining steps list."""
-        persons_dir = tmp_path / "persons"
-        persons_dir.mkdir()
-        target_dir = _setup_person_with_assets(persons_dir, "target")
+        animas_dir = tmp_path / "animas"
+        animas_dir.mkdir()
+        target_dir = _setup_anima_with_assets(animas_dir, "target")
 
         # Create a backup dir to simulate having done preview first
         backup_dir = target_dir / "assets_backup_20260216_120000"
@@ -394,11 +394,11 @@ class TestRemakeConfirm:
         mock_pipeline.generate_all.return_value = mock_result
         mock_pipeline_cls.return_value = mock_pipeline
 
-        app = _make_test_app(persons_dir)
+        app = _make_test_app(animas_dir)
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.post(
-                "/api/persons/target/assets/remake-confirm",
+                "/api/animas/target/assets/remake-confirm",
                 json={"backup_id": "assets_backup_20260216_120000"},
             )
 
@@ -414,15 +414,15 @@ class TestRemakeConfirm:
 
     async def test_remake_confirm_missing_backup(self, tmp_path):
         """Returns 404 when the specified backup_id does not exist."""
-        persons_dir = tmp_path / "persons"
-        persons_dir.mkdir()
-        _setup_person_with_assets(persons_dir, "target")
+        animas_dir = tmp_path / "animas"
+        animas_dir.mkdir()
+        _setup_anima_with_assets(animas_dir, "target")
 
-        app = _make_test_app(persons_dir)
+        app = _make_test_app(animas_dir)
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.post(
-                "/api/persons/target/assets/remake-confirm",
+                "/api/animas/target/assets/remake-confirm",
                 json={"backup_id": "assets_backup_20260101_000000"},
             )
 
@@ -431,21 +431,21 @@ class TestRemakeConfirm:
 
     async def test_remake_confirm_no_fullbody_preview(self, tmp_path):
         """Returns 400 when fullbody image is missing (preview not done)."""
-        persons_dir = tmp_path / "persons"
-        persons_dir.mkdir()
-        target_dir = _setup_person_with_assets(
-            persons_dir, "target", with_fullbody=False,
+        animas_dir = tmp_path / "animas"
+        animas_dir.mkdir()
+        target_dir = _setup_anima_with_assets(
+            animas_dir, "target", with_fullbody=False,
         )
 
         # Create backup dir but no fullbody in assets
         backup_dir = target_dir / "assets_backup_20260216_120000"
         backup_dir.mkdir()
 
-        app = _make_test_app(persons_dir)
+        app = _make_test_app(animas_dir)
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.post(
-                "/api/persons/target/assets/remake-confirm",
+                "/api/animas/target/assets/remake-confirm",
                 json={"backup_id": "assets_backup_20260216_120000"},
             )
 
@@ -457,13 +457,13 @@ class TestRemakeConfirm:
 
 
 class TestCancelRemakePreview:
-    """E2E tests for DELETE /api/persons/{name}/assets/remake-preview."""
+    """E2E tests for DELETE /api/animas/{name}/assets/remake-preview."""
 
     async def test_cancel_remake_restores_backup(self, tmp_path):
         """Cancel restores assets from the most recent backup and removes it."""
-        persons_dir = tmp_path / "persons"
-        persons_dir.mkdir()
-        target_dir = _setup_person_with_assets(persons_dir, "target")
+        animas_dir = tmp_path / "animas"
+        animas_dir.mkdir()
+        target_dir = _setup_anima_with_assets(animas_dir, "target")
 
         # Create a backup with original content
         backup_dir = target_dir / "assets_backup_20260216_120000"
@@ -479,11 +479,11 @@ class TestCancelRemakePreview:
             b"new-preview-content",
         )
 
-        app = _make_test_app(persons_dir)
+        app = _make_test_app(animas_dir)
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.delete(
-                "/api/persons/target/assets/remake-preview",
+                "/api/animas/target/assets/remake-preview",
             )
 
         assert resp.status_code == 200
@@ -502,15 +502,15 @@ class TestCancelRemakePreview:
 
     async def test_cancel_remake_no_backup_returns_404(self, tmp_path):
         """Returns 404 when there is no backup to restore."""
-        persons_dir = tmp_path / "persons"
-        persons_dir.mkdir()
-        _setup_person_with_assets(persons_dir, "target")
+        animas_dir = tmp_path / "animas"
+        animas_dir.mkdir()
+        _setup_anima_with_assets(animas_dir, "target")
 
-        app = _make_test_app(persons_dir)
+        app = _make_test_app(animas_dir)
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.delete(
-                "/api/persons/target/assets/remake-preview",
+                "/api/animas/target/assets/remake-preview",
             )
 
         assert resp.status_code == 404
@@ -518,9 +518,9 @@ class TestCancelRemakePreview:
 
     async def test_cancel_remake_uses_most_recent_backup(self, tmp_path):
         """When multiple backups exist, the most recent one is used."""
-        persons_dir = tmp_path / "persons"
-        persons_dir.mkdir()
-        target_dir = _setup_person_with_assets(persons_dir, "target")
+        animas_dir = tmp_path / "animas"
+        animas_dir.mkdir()
+        target_dir = _setup_anima_with_assets(animas_dir, "target")
 
         # Create two backups with different timestamps
         old_backup = target_dir / "assets_backup_20260216_100000"
@@ -532,11 +532,11 @@ class TestCancelRemakePreview:
         (new_backup / "prompt.txt").write_text("new backup", encoding="utf-8")
         (new_backup / "avatar_fullbody.png").write_bytes(_FAKE_PNG)
 
-        app = _make_test_app(persons_dir)
+        app = _make_test_app(animas_dir)
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.delete(
-                "/api/persons/target/assets/remake-preview",
+                "/api/animas/target/assets/remake-preview",
             )
 
         assert resp.status_code == 200
@@ -555,10 +555,10 @@ class TestCancelRemakePreview:
 class TestCLIDryRun:
     """E2E tests for the CLI remake-assets --dry-run command."""
 
-    def test_cli_dry_run(self, data_dir: Path, make_person, capsys):
+    def test_cli_dry_run(self, data_dir: Path, make_anima, capsys):
         """Dry-run prints planned actions without making API calls."""
-        # Create target person
-        target_dir = make_person("cli-target")
+        # Create target anima
+        target_dir = make_anima("cli-target")
         assets_dir = target_dir / "assets"
         assets_dir.mkdir(exist_ok=True)
         (assets_dir / "prompt.txt").write_text(
@@ -566,8 +566,8 @@ class TestCLIDryRun:
         )
         (assets_dir / "avatar_fullbody.png").write_bytes(_FAKE_PNG)
 
-        # Create style-from person
-        style_dir = make_person("cli-style")
+        # Create style-from anima
+        style_dir = make_anima("cli-style")
         style_assets = style_dir / "assets"
         style_assets.mkdir(exist_ok=True)
         (style_assets / "avatar_fullbody.png").write_bytes(_FAKE_PNG)
@@ -578,7 +578,7 @@ class TestCLIDryRun:
         import argparse
 
         args = argparse.Namespace(
-            person="cli-target",
+            anima="cli-target",
             style_from="cli-style",
             steps=None,
             prompt=None,
@@ -599,16 +599,16 @@ class TestCLIDryRun:
         assert "Backup:" in captured.out
         assert "fullbody" in captured.out.lower()
 
-    def test_cli_dry_run_missing_style_person(self, data_dir: Path, make_person, capsys):
-        """Dry-run exits early if style-from person does not exist."""
-        make_person("cli-target")
+    def test_cli_dry_run_missing_style_anima(self, data_dir: Path, make_anima, capsys):
+        """Dry-run exits early if style-from anima does not exist."""
+        make_anima("cli-target")
 
         from cli.commands.remake_cmd import _run
 
         import argparse
 
         args = argparse.Namespace(
-            person="cli-target",
+            anima="cli-target",
             style_from="ghost",
             steps=None,
             prompt=None,
@@ -625,15 +625,15 @@ class TestCLIDryRun:
         assert "Error" in captured.out
         assert "ghost" in captured.out
 
-    def test_cli_dry_run_with_custom_steps(self, data_dir: Path, make_person, capsys):
+    def test_cli_dry_run_with_custom_steps(self, data_dir: Path, make_anima, capsys):
         """Dry-run respects --steps filter and shows only selected steps."""
-        target_dir = make_person("cli-target2")
+        target_dir = make_anima("cli-target2")
         assets_dir = target_dir / "assets"
         assets_dir.mkdir(exist_ok=True)
         (assets_dir / "prompt.txt").write_text("test prompt", encoding="utf-8")
         (assets_dir / "avatar_fullbody.png").write_bytes(_FAKE_PNG)
 
-        style_dir = make_person("cli-style2")
+        style_dir = make_anima("cli-style2")
         style_assets = style_dir / "assets"
         style_assets.mkdir(exist_ok=True)
         (style_assets / "avatar_fullbody.png").write_bytes(_FAKE_PNG)
@@ -643,7 +643,7 @@ class TestCLIDryRun:
         import argparse
 
         args = argparse.Namespace(
-            person="cli-target2",
+            anima="cli-target2",
             style_from="cli-style2",
             steps="fullbody,bustup",
             prompt=None,

@@ -14,8 +14,8 @@ def register(subparsers: argparse._SubParsersAction) -> None:
         help="Optimize existing 3D assets (strip meshes from animations, compress models)",
     )
     parser.add_argument(
-        "--person", "-p",
-        help="Optimize assets for a specific person only",
+        "--anima", "-p",
+        help="Optimize assets for a specific anima only",
     )
     parser.add_argument(
         "--dry-run",
@@ -26,31 +26,31 @@ def register(subparsers: argparse._SubParsersAction) -> None:
 
 
 def _run(args: argparse.Namespace) -> None:
-    from core.paths import get_persons_dir
+    from core.paths import get_animas_dir
     from core.tools.image_gen import optimize_glb, strip_mesh_from_glb
 
-    persons_dir = get_persons_dir()
-    if not persons_dir.exists():
-        print(f"Persons directory not found: {persons_dir}")
+    animas_dir = get_animas_dir()
+    if not animas_dir.exists():
+        print(f"Animas directory not found: {animas_dir}")
         return
 
-    if args.person:
-        person_dirs = [persons_dir / args.person]
+    if args.anima:
+        anima_dirs = [animas_dir / args.anima]
     else:
-        person_dirs = sorted(
-            d for d in persons_dir.iterdir()
+        anima_dirs = sorted(
+            d for d in animas_dir.iterdir()
             if d.is_dir() and (d / "assets").is_dir()
         )
 
     total_before = 0
     total_after = 0
 
-    for person_dir in person_dirs:
-        assets_dir = person_dir / "assets"
+    for anima_dir in anima_dirs:
+        assets_dir = anima_dir / "assets"
         if not assets_dir.exists():
             continue
 
-        name = person_dir.name
+        name = anima_dir.name
         print(f"\n=== {name} ===")
 
         # Strip meshes from animation GLBs

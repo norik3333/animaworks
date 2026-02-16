@@ -1,6 +1,6 @@
 // ── 3D Office Scene ──────────────────────
 // Three.js-based isometric office for the AnimaWorks Workspace.
-// Renders a modern open-plan office where AI Persons work at desks.
+// Renders a modern open-plan office where AI Animas work at desks.
 // Desks are dynamically placed based on organizational tree structure.
 // This module owns the scene, camera, renderer, and static furniture.
 // Characters are placed by character.js via getDesks().
@@ -66,7 +66,7 @@ let _raycaster = new THREE.Raycaster();
 let _mouse = new THREE.Vector2();
 
 /**
- * Dynamic desk layout computed from person data.
+ * Dynamic desk layout computed from anima data.
  * @type {Record<string, {x: number, y: number, z: number}>}
  */
 let _deskLayout = {};
@@ -76,13 +76,13 @@ let _floorWidth = 16;
 let _floorDepth = 12;
 
 /**
- * Maps person name to the desk group mesh (for raycasting / highlighting).
+ * Maps anima name to the desk group mesh (for raycasting / highlighting).
  * @type {Map<string, THREE.Group>}
  */
 const _deskGroups = new Map();
 
 /**
- * Maps mesh UUID to person name (for raycaster hit lookup).
+ * Maps mesh UUID to anima name (for raycaster hit lookup).
  * @type {Map<string, string>}
  */
 const _meshToName = new Map();
@@ -113,19 +113,19 @@ const _disposables = new Set();
  */
 
 /**
- * Build an organizational tree from person data.
- * Persons with role "commander" or no supervisor are roots.
+ * Build an organizational tree from anima data.
+ * Animas with role "commander" or no supervisor are roots.
  * Others are placed under their supervisor.
  *
- * @param {Array<{name: string, role?: string, supervisor?: string}>} persons
+ * @param {Array<{name: string, role?: string, supervisor?: string}>} animas
  * @returns {TreeNode[]} Root nodes of the tree.
  */
-function buildOrgTree(persons) {
+function buildOrgTree(animas) {
   /** @type {Map<string, TreeNode>} */
   const nodeMap = new Map();
 
-  // Create nodes for all persons
-  for (const p of persons) {
+  // Create nodes for all animas
+  for (const p of animas) {
     nodeMap.set(p.name, {
       name: p.name,
       role: p.role || null,
@@ -149,7 +149,7 @@ function buildOrgTree(persons) {
     }
   }
 
-  // If no roots found, treat all persons as roots (flat layout)
+  // If no roots found, treat all animas as roots (flat layout)
   if (roots.length === 0) {
     return [...nodeMap.values()];
   }
@@ -412,11 +412,11 @@ function buildWalls(scene) {
 
 /**
  * Create a single desk group with surface, legs, and monitor.
- * @param {string} personName
+ * @param {string} animaName
  * @param {{x: number, y: number, z: number}} pos
  * @returns {THREE.Group}
  */
-function createDesk(personName, pos) {
+function createDesk(animaName, pos) {
   const group = new THREE.Group();
   group.position.set(pos.x, 0, pos.z);
 
@@ -466,7 +466,7 @@ function createDesk(personName, pos) {
   group.add(stand);
 
   // Name label
-  const label = createNameLabel(personName);
+  const label = createNameLabel(animaName);
   if (label) {
     label.position.set(0, 0.02, 0.5);
     label.rotation.x = -Math.PI / 2;
@@ -476,7 +476,7 @@ function createDesk(personName, pos) {
   // Register all child meshes for raycasting
   group.traverse((child) => {
     if (child instanceof THREE.Mesh) {
-      _meshToName.set(child.uuid, personName);
+      _meshToName.set(child.uuid, animaName);
     }
   });
 
@@ -484,7 +484,7 @@ function createDesk(personName, pos) {
 }
 
 /**
- * Render a person name to a CanvasTexture and return a label mesh.
+ * Render an anima name to a CanvasTexture and return a label mesh.
  * @param {string} name
  * @returns {THREE.Mesh | null}
  */
@@ -558,9 +558,9 @@ function buildDesks(scene) {
 /**
  * Draw organizational hierarchy connector lines between supervisor and subordinate desks.
  * @param {THREE.Scene} scene
- * @param {Array<{name: string, role?: string, supervisor?: string}>} persons
+ * @param {Array<{name: string, role?: string, supervisor?: string}>} animas
  */
-function buildConnectors(scene, persons) {
+function buildConnectors(scene, animas) {
   const lineMat = new THREE.LineBasicMaterial({
     color: COLOR.connector,
     transparent: true,
@@ -568,7 +568,7 @@ function buildConnectors(scene, persons) {
   });
   _disposables.add(lineMat);
 
-  for (const p of persons) {
+  for (const p of animas) {
     if (!p.supervisor) continue;
     const fromPos = _deskLayout[p.supervisor];
     const toPos = _deskLayout[p.name];
@@ -875,12 +875,12 @@ function renderLoop() {
 
 /**
  * Initialize the 3D office scene inside the given container element.
- * Desk layout is computed dynamically from the persons array.
+ * Desk layout is computed dynamically from the animas array.
  *
  * @param {HTMLElement} container - The DOM element to host the Three.js canvas
- * @param {Array<{name: string, role?: string, supervisor?: string}>} [persons] - Person data for dynamic layout
+ * @param {Array<{name: string, role?: string, supervisor?: string}>} [animas] - Anima data for dynamic layout
  */
-export function initOffice(container, persons = []) {
+export function initOffice(container, animas = []) {
   if (_renderer) {
     // Already initialized — dispose first
     disposeOffice();
@@ -890,9 +890,9 @@ export function initOffice(container, persons = []) {
   const width = container.clientWidth || 800;
   const height = container.clientHeight || 600;
 
-  // Compute dynamic desk layout from person data
-  if (persons.length > 0) {
-    const roots = buildOrgTree(persons);
+  // Compute dynamic desk layout from anima data
+  if (animas.length > 0) {
+    const roots = buildOrgTree(animas);
     _deskLayout = computeTreeLayout(roots);
   } else {
     _deskLayout = {};
@@ -936,7 +936,7 @@ export function initOffice(container, persons = []) {
   buildFloor(_scene);
   buildWalls(_scene);
   buildDesks(_scene);
-  buildConnectors(_scene, persons);
+  buildConnectors(_scene, animas);
   buildDecorations(_scene);
   buildBookshelf(_scene);
   buildKitchenCorner(_scene);
@@ -1035,7 +1035,7 @@ export function disposeOffice() {
 }
 
 /**
- * Return desk positions as a plain object keyed by person name.
+ * Return desk positions as a plain object keyed by anima name.
  * Character.js uses this to know where to place 3D characters.
  *
  * @returns {Record<string, {x: number, y: number, z: number}>}
@@ -1053,7 +1053,7 @@ export function getDesks() {
  * Highlight a specific desk by showing a glowing ring underneath it.
  * Replaces any existing highlight.
  *
- * @param {string} name - Person name whose desk to highlight
+ * @param {string} name - Anima name whose desk to highlight
  */
 export function highlightDesk(name) {
   if (!_highlightMesh) return;
@@ -1081,7 +1081,7 @@ export function clearHighlight() {
 
 /**
  * Register a callback invoked when a desk or character mesh is clicked.
- * The callback receives the person name as its sole argument.
+ * The callback receives the anima name as its sole argument.
  *
  * @param {(name: string) => void} fn - Click handler
  */
@@ -1102,13 +1102,13 @@ export function getScene() {
 /**
  * Register additional meshes for raycasting (e.g., character meshes added by character.js).
  *
- * @param {string} personName - The person this mesh represents
+ * @param {string} animaName - The anima this mesh represents
  * @param {THREE.Object3D} object - The mesh or group to register
  */
-export function registerClickTarget(personName, object) {
+export function registerClickTarget(animaName, object) {
   object.traverse((child) => {
     if (child instanceof THREE.Mesh) {
-      _meshToName.set(child.uuid, personName);
+      _meshToName.set(child.uuid, animaName);
     }
   });
 }

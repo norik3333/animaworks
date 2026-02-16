@@ -15,8 +15,8 @@ class TestAppLogDir:
         from core.config.models import AnimaWorksConfig
 
         config = AnimaWorksConfig(setup_complete=False)
-        persons_dir = tmp_path / "persons"
-        persons_dir.mkdir()
+        animas_dir = tmp_path / "animas"
+        animas_dir.mkdir()
         shared_dir = tmp_path / "shared"
         shared_dir.mkdir()
         data_dir = tmp_path / "data"
@@ -30,7 +30,7 @@ class TestAppLogDir:
             mock_sup_cls.return_value = MagicMock()
 
             from server.app import create_app
-            app = create_app(persons_dir, shared_dir)
+            app = create_app(animas_dir, shared_dir)
 
             # Verify log_dir was passed
             mock_sup_cls.assert_called_once()

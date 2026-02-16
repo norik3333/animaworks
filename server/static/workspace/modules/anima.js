@@ -1,15 +1,15 @@
-// ── Person Selector & Status Panel ──────────────────────
-// Dropdown for person selection + detail card rendering.
+// ── Anima Selector & Status Panel ──────────────────────
+// Dropdown for anima selection + detail card rendering.
 
 import { getState, setState } from "./state.js";
-import { fetchPersons, fetchPersonDetail } from "./api.js";
+import { fetchAnimas, fetchAnimaDetail } from "./api.js";
 import { escapeHtml, renderSimpleMarkdown } from "./utils.js";
 
 // ── Private State ──────────────────────
 
 let _selectorContainer = null;
 let _statusContainer = null;
-let _onPersonSelect = null;
+let _onAnimaSelect = null;
 
 // ── Helpers ──────────────────────
 
@@ -38,13 +38,13 @@ function statusLabel(status) {
 function renderDropdown() {
   if (!_selectorContainer) return;
 
-  const { persons, selectedPerson } = getState();
+  const { animas, selectedAnima } = getState();
 
-  let html = '<select class="person-dropdown" id="wsPersonDropdown">';
-  html += '<option value="" disabled>Select a person...</option>';
+  let html = '<select class="anima-dropdown" id="wsAnimaDropdown">';
+  html += '<option value="" disabled>Select an anima...</option>';
 
-  for (const p of persons) {
-    const selected = p.name === selectedPerson ? " selected" : "";
+  for (const p of animas) {
+    const selected = p.name === selectedAnima ? " selected" : "";
     if (p.status === "bootstrapping" || p.bootstrapping) {
       html += `<option value="${escapeHtml(p.name)}"${selected} disabled>\u23F3 ${escapeHtml(p.name)} (制作中...)</option>`;
     } else if (p.status === "not_found" || p.status === "stopped") {
@@ -59,11 +59,11 @@ function renderDropdown() {
   _selectorContainer.innerHTML = html;
 
   // Bind change event
-  const dropdown = _selectorContainer.querySelector("#wsPersonDropdown");
+  const dropdown = _selectorContainer.querySelector("#wsAnimaDropdown");
   if (dropdown) {
     dropdown.addEventListener("change", (e) => {
       const name = e.target.value;
-      if (name) selectPerson(name);
+      if (name) selectAnima(name);
     });
   }
 }
@@ -73,27 +73,27 @@ function renderDropdown() {
 function renderStatusPanel() {
   if (!_statusContainer) return;
 
-  const { personDetail, selectedPerson } = getState();
+  const { animaDetail, selectedAnima } = getState();
 
-  if (!selectedPerson) {
+  if (!selectedAnima) {
     _statusContainer.innerHTML = `
-      <div class="person-status-panel">
-        <div class="loading-placeholder">Select a person to view details</div>
+      <div class="anima-status-panel">
+        <div class="loading-placeholder">Select an anima to view details</div>
       </div>
     `;
     return;
   }
 
-  if (!personDetail) {
+  if (!animaDetail) {
     _statusContainer.innerHTML = `
-      <div class="person-status-panel">
+      <div class="anima-status-panel">
         <div class="loading-placeholder">Loading...</div>
       </div>
     `;
     return;
   }
 
-  const d = personDetail;
+  const d = animaDetail;
   const rawStatus = d.status;
   const statusStr = (rawStatus && typeof rawStatus === "object") ? (rawStatus.status || "offline") : (rawStatus || "offline");
   const dotClass = statusClassName(statusStr);
@@ -155,10 +155,10 @@ function renderStatusPanel() {
   }
 
   _statusContainer.innerHTML = `
-    <div class="person-status-panel">
+    <div class="anima-status-panel">
       <div class="status-header">
         <span class="status-dot ${dotClass}"></span>
-        <span class="status-person-name">${escapeHtml(selectedPerson)}</span>
+        <span class="status-anima-name">${escapeHtml(selectedAnima)}</span>
         <span class="status-label">${escapeHtml(statusLabel(statusStr))}</span>
       </div>
       ${sectionsHtml}
@@ -175,15 +175,15 @@ function truncate(str, maxLen) {
 // ── Public API ──────────────────────
 
 /**
- * Render the person selector dropdown into the given container.
+ * Render the anima selector dropdown into the given container.
  */
-export function renderPersonSelector(container) {
+export function renderAnimaSelector(container) {
   _selectorContainer = container || _selectorContainer;
   renderDropdown();
 }
 
 /**
- * Render the person status detail panel into the given container.
+ * Render the anima status detail panel into the given container.
  */
 export function renderStatus(container) {
   _statusContainer = container || _statusContainer;
@@ -191,15 +191,15 @@ export function renderStatus(container) {
 }
 
 /**
- * Initialize the person module.
+ * Initialize the anima module.
  * @param {HTMLElement} selectorContainer - DOM element for the dropdown
  * @param {HTMLElement} statusContainer - DOM element for the status panel
- * @param {function} onPersonSelect - Callback invoked with person name on selection
+ * @param {function} onAnimaSelect - Callback invoked with anima name on selection
  */
-export function initPerson(selectorContainer, statusContainer, onPersonSelect) {
+export function initAnima(selectorContainer, statusContainer, onAnimaSelect) {
   _selectorContainer = selectorContainer;
   _statusContainer = statusContainer;
-  _onPersonSelect = onPersonSelect;
+  _onAnimaSelect = onAnimaSelect;
 
   // Render initial empty state
   renderDropdown();
@@ -207,39 +207,39 @@ export function initPerson(selectorContainer, statusContainer, onPersonSelect) {
 }
 
 /**
- * Load persons list from API and update the dropdown.
+ * Load animas list from API and update the dropdown.
  */
-export async function loadPersons() {
+export async function loadAnimas() {
   try {
-    const persons = await fetchPersons();
-    setState({ persons });
+    const animas = await fetchAnimas();
+    setState({ animas });
     renderDropdown();
   } catch (err) {
-    console.error("Failed to load persons:", err);
+    console.error("Failed to load animas:", err);
     if (_selectorContainer) {
       _selectorContainer.innerHTML =
-        '<div class="loading-placeholder" style="color:#ef4444;">Failed to load persons</div>';
+        '<div class="loading-placeholder" style="color:#ef4444;">Failed to load animas</div>';
     }
   }
 }
 
 /**
- * Select a person by name. Fetches detail and updates state + UI.
+ * Select an anima by name. Fetches detail and updates state + UI.
  */
-export async function selectPerson(name) {
-  setState({ selectedPerson: name, personDetail: null });
+export async function selectAnima(name) {
+  setState({ selectedAnima: name, animaDetail: null });
   renderDropdown();
   renderStatusPanel();
 
   try {
-    const detail = await fetchPersonDetail(name);
-    setState({ personDetail: detail });
+    const detail = await fetchAnimaDetail(name);
+    setState({ animaDetail: detail });
     renderStatusPanel();
   } catch (err) {
-    console.error(`Failed to load person detail for "${name}":`, err);
+    console.error(`Failed to load anima detail for "${name}":`, err);
     if (_statusContainer) {
       _statusContainer.innerHTML = `
-        <div class="person-status-panel">
+        <div class="anima-status-panel">
           <div class="loading-placeholder" style="color:#ef4444;">
             Failed to load details for ${escapeHtml(name)}
           </div>
@@ -249,7 +249,7 @@ export async function selectPerson(name) {
   }
 
   // Notify callback
-  if (_onPersonSelect) {
-    _onPersonSelect(name);
+  if (_onAnimaSelect) {
+    _onAnimaSelect(name);
   }
 }

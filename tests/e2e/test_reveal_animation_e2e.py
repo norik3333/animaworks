@@ -1,8 +1,8 @@
-"""E2E tests for Person birth reveal animation.
+"""E2E tests for Anima birth reveal animation.
 
 Tests the complete flow from asset generation API → WebSocket event emission,
 verifying the contract that the frontend reveal animation relies on:
-1. POST /persons/{name}/assets/generate emits person.assets_updated event
+1. POST /animas/{name}/assets/generate emits anima.assets_updated event
 2. The event payload includes asset filenames (avatar_*) for trigger detection
 3. The workspace HTML serves correctly with reveal overlay elements
 """
@@ -18,13 +18,13 @@ from httpx import ASGITransport, AsyncClient
 # ── Helpers ──────────────────────────────────────────────
 
 
-def _make_test_app(persons_dir: Path | None = None):
+def _make_test_app(animas_dir: Path | None = None):
     """Create a test FastAPI app with mock supervisor and ws_manager."""
     from fastapi import FastAPI
     from server.routes.assets import create_assets_router
 
     app = FastAPI()
-    app.state.persons_dir = persons_dir or Path("/tmp/fake/persons")
+    app.state.animas_dir = animas_dir or Path("/tmp/fake/animas")
     app.state.ws_manager = MagicMock()
     app.state.ws_manager.broadcast = AsyncMock()
     router = create_assets_router()
@@ -55,27 +55,27 @@ def _make_pipeline_result(
 
 
 class TestRevealWebSocketEventE2E:
-    """E2E: Verify person.assets_updated WebSocket event structure
+    """E2E: Verify anima.assets_updated WebSocket event structure
     that the frontend reveal animation handler depends on."""
 
     @patch("core.tools.image_gen.ImageGenPipeline")
     async def test_assets_updated_event_emitted_on_generate(
         self, mock_pipeline_cls, tmp_path
     ):
-        """Asset generation should broadcast person.assets_updated event."""
-        person_dir = tmp_path / "alice"
-        person_dir.mkdir()
+        """Asset generation should broadcast anima.assets_updated event."""
+        anima_dir = tmp_path / "alice"
+        anima_dir.mkdir()
 
         mock_result = _make_pipeline_result(fullbody=True, bustup=True)
         mock_pipeline = MagicMock()
         mock_pipeline.generate_all.return_value = mock_result
         mock_pipeline_cls.return_value = mock_pipeline
 
-        app = _make_test_app(persons_dir=tmp_path)
+        app = _make_test_app(animas_dir=tmp_path)
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.post(
-                "/api/persons/alice/assets/generate",
+                "/api/animas/alice/assets/generate",
                 json={"prompt": "anime character"},
             )
 
@@ -85,11 +85,11 @@ class TestRevealWebSocketEventE2E:
         ws = app.state.ws_manager
         assert ws.broadcast.call_count >= 1
 
-        # Find the person.assets_updated event
+        # Find the anima.assets_updated event
         assets_events = []
         for call in ws.broadcast.call_args_list:
             payload = call[0][0] if call[0] else {}
-            if isinstance(payload, dict) and payload.get("type") == "person.assets_updated":
+            if isinstance(payload, dict) and payload.get("type") == "anima.assets_updated":
                 assets_events.append(payload)
 
         assert len(assets_events) == 1
@@ -103,26 +103,26 @@ class TestRevealWebSocketEventE2E:
     ):
         """Event payload assets list should include avatar_* filenames
         so the frontend can detect when to trigger reveal animation."""
-        person_dir = tmp_path / "alice"
-        person_dir.mkdir()
+        anima_dir = tmp_path / "alice"
+        anima_dir.mkdir()
 
         mock_result = _make_pipeline_result(fullbody=True, bustup=True)
         mock_pipeline = MagicMock()
         mock_pipeline.generate_all.return_value = mock_result
         mock_pipeline_cls.return_value = mock_pipeline
 
-        app = _make_test_app(persons_dir=tmp_path)
+        app = _make_test_app(animas_dir=tmp_path)
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             await client.post(
-                "/api/persons/alice/assets/generate",
+                "/api/animas/alice/assets/generate",
                 json={"prompt": "anime character"},
             )
 
         ws = app.state.ws_manager
         for call in ws.broadcast.call_args_list:
             payload = call[0][0] if call[0] else {}
-            if isinstance(payload, dict) and payload.get("type") == "person.assets_updated":
+            if isinstance(payload, dict) and payload.get("type") == "anima.assets_updated":
                 assets = payload["data"]["assets"]
                 # At least one avatar_* file should be in the list
                 avatar_files = [a for a in assets if a.startswith("avatar_")]
@@ -131,15 +131,15 @@ class TestRevealWebSocketEventE2E:
                 )
                 break
         else:
-            pytest.fail("person.assets_updated event not found")
+            pytest.fail("anima.assets_updated event not found")
 
     @patch("core.tools.image_gen.ImageGenPipeline")
     async def test_event_includes_errors_field(
         self, mock_pipeline_cls, tmp_path
     ):
         """Event should include errors list for frontend error handling."""
-        person_dir = tmp_path / "bob"
-        person_dir.mkdir()
+        anima_dir = tmp_path / "bob"
+        anima_dir.mkdir()
 
         mock_result = _make_pipeline_result(fullbody=True, bustup=False)
         mock_result.errors = ["Bustup generation failed"]
@@ -147,18 +147,18 @@ class TestRevealWebSocketEventE2E:
         mock_pipeline.generate_all.return_value = mock_result
         mock_pipeline_cls.return_value = mock_pipeline
 
-        app = _make_test_app(persons_dir=tmp_path)
+        app = _make_test_app(animas_dir=tmp_path)
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             await client.post(
-                "/api/persons/bob/assets/generate",
+                "/api/animas/bob/assets/generate",
                 json={"prompt": "anime character"},
             )
 
         ws = app.state.ws_manager
         for call in ws.broadcast.call_args_list:
             payload = call[0][0] if call[0] else {}
-            if isinstance(payload, dict) and payload.get("type") == "person.assets_updated":
+            if isinstance(payload, dict) and payload.get("type") == "anima.assets_updated":
                 assert "errors" in payload["data"]
                 break
 

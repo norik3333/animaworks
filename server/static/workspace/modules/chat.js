@@ -9,7 +9,7 @@ import { parseConvSSE as parseSSEEvents, getErrorMessage } from "../../shared/ss
 // ── Constants ──────────────────────────────────
 
 const EMPTY_MSG = "メッセージはまだありません";
-const PLACEHOLDER_DEFAULT = "パーソンを選択してください";
+const PLACEHOLDER_DEFAULT = "Animaを選択してください";
 
 // ── DOM References ──────────────────────────────
 
@@ -101,15 +101,15 @@ function updateStreamingBubble(msg) {
 function updateInputState() {
   if (!inputEl || !sendBtnEl) return;
 
-  const { selectedPerson } = getState();
-  const disabled = !selectedPerson;
+  const { selectedAnima } = getState();
+  const disabled = !selectedAnima;
 
   inputEl.disabled = disabled;
   sendBtnEl.disabled = disabled;
   const mobile = window.matchMedia("(max-width: 768px)").matches;
   const shortcut = mobile ? "Enter" : "Ctrl+Enter";
-  inputEl.placeholder = selectedPerson
-    ? `${selectedPerson} にメッセージ... (${shortcut} で送信)`
+  inputEl.placeholder = selectedAnima
+    ? `${selectedAnima} にメッセージ... (${shortcut} で送信)`
     : PLACEHOLDER_DEFAULT;
 }
 
@@ -201,8 +201,8 @@ export function initChat(container) {
  * Send a message and begin SSE streaming.
  */
 export async function sendMessage(text) {
-  const { selectedPerson, currentUser } = getState();
-  if (!selectedPerson || !text.trim()) return;
+  const { selectedAnima, currentUser } = getState();
+  if (!selectedAnima || !text.trim()) return;
 
   const trimmed = text.trim();
 
@@ -217,7 +217,7 @@ export async function sendMessage(text) {
   setInputEnabled(false);
 
   try {
-    const response = await sendChatStream(selectedPerson, trimmed, currentUser || "human");
+    const response = await sendChatStream(selectedAnima, trimmed, currentUser || "human");
     if (!response.ok) {
       throw new Error(`API ${response.status}: ${response.statusText}`);
     }
@@ -320,11 +320,11 @@ export function addMessage(role, text) {
  * Load full conversation history from server.
  */
 export async function loadConversation() {
-  const { selectedPerson } = getState();
-  if (!selectedPerson) return;
+  const { selectedAnima } = getState();
+  if (!selectedAnima) return;
 
   try {
-    const data = await fetchConversationFull(selectedPerson);
+    const data = await fetchConversationFull(selectedAnima);
     if (data.turns && data.turns.length > 0) {
       const messages = data.turns.map((t) => ({
         role: t.role === "human" ? "user" : "assistant",

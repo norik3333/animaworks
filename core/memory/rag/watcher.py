@@ -1,5 +1,5 @@
 from __future__ import annotations
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
@@ -75,27 +75,27 @@ class FileWatcher:
 
     def __init__(
         self,
-        person_dir: Path,
+        anima_dir: Path,
         indexer,  # MemoryIndexer instance
         knowledge_graph=None,  # KnowledgeGraph instance (optional)
-        person_name: str | None = None,
+        anima_name: str | None = None,
         *,
         extra_watch_dirs: list[tuple[Path, str]] | None = None,
     ) -> None:
         """Initialize file watcher.
 
         Args:
-            person_dir: Path to person's memory directory
+            anima_dir: Path to anima's memory directory
             indexer: MemoryIndexer instance for indexing operations
             knowledge_graph: Optional KnowledgeGraph for incremental updates
-            person_name: Person name (required if knowledge_graph is provided)
+            anima_name: Anima name (required if knowledge_graph is provided)
             extra_watch_dirs: Additional (directory, memory_type) pairs to watch.
                 Used for common_knowledge/ watching with a shared indexer.
         """
-        self.person_dir = person_dir
+        self.anima_dir = anima_dir
         self.indexer = indexer
         self.knowledge_graph = knowledge_graph
-        self.person_name = person_name
+        self.anima_name = anima_name
         self._extra_watch_dirs = extra_watch_dirs or []
         self.observer: Observer | None = None
         self._running = False
@@ -115,7 +115,7 @@ class FileWatcher:
             logger.warning("FileWatcher already running")
             return
 
-        logger.info("Starting FileWatcher for %s", self.person_dir)
+        logger.info("Starting FileWatcher for %s", self.anima_dir)
 
         # Create observer
         self.observer = Observer()
@@ -123,10 +123,10 @@ class FileWatcher:
 
         # Watch memory directories
         watch_dirs = [
-            self.person_dir / "knowledge",
-            self.person_dir / "episodes",
-            self.person_dir / "procedures",
-            self.person_dir / "skills",
+            self.anima_dir / "knowledge",
+            self.anima_dir / "episodes",
+            self.anima_dir / "procedures",
+            self.anima_dir / "skills",
         ]
 
         # Add extra watch dirs (e.g., common_knowledge/)
@@ -253,17 +253,17 @@ class FileWatcher:
                 logger.error("Failed to index file %s: %s", file_path, e)
 
         # Update knowledge graph incrementally if available
-        if knowledge_changed_files and self.knowledge_graph and self.person_name:
+        if knowledge_changed_files and self.knowledge_graph and self.anima_name:
             try:
                 loop = asyncio.get_running_loop()
                 await loop.run_in_executor(
                     None,
                     self.knowledge_graph.update_graph_incremental,
                     knowledge_changed_files,
-                    self.person_name,
+                    self.anima_name,
                 )
                 # Save updated graph
-                cache_dir = self.person_dir / "vectordb"
+                cache_dir = self.anima_dir / "vectordb"
                 await loop.run_in_executor(
                     None,
                     self.knowledge_graph.save_graph,
@@ -294,7 +294,7 @@ class FileWatcher:
                 continue
 
         try:
-            rel_path = file_path.relative_to(self.person_dir)
+            rel_path = file_path.relative_to(self.anima_dir)
             parent_dir = rel_path.parts[0]
 
             # Map directory name to memory type
@@ -308,8 +308,8 @@ class FileWatcher:
             return memory_type_map.get(parent_dir)
 
         except ValueError:
-            # File is outside person_dir
-            logger.warning("File outside person directory: %s", file_path)
+            # File is outside anima_dir
+            logger.warning("File outside anima directory: %s", file_path)
             return None
 
 
@@ -317,29 +317,29 @@ class FileWatcher:
 
 
 def create_file_watcher(
-    person_dir: Path,
+    anima_dir: Path,
     indexer,
     knowledge_graph=None,
-    person_name: str | None = None,
+    anima_name: str | None = None,
     *,
     extra_watch_dirs: list[tuple[Path, str]] | None = None,
 ) -> FileWatcher:
-    """Create a file watcher for a person's memory directory.
+    """Create a file watcher for an anima's memory directory.
 
     Args:
-        person_dir: Path to person directory
+        anima_dir: Path to anima directory
         indexer: MemoryIndexer instance
         knowledge_graph: Optional KnowledgeGraph for incremental updates
-        person_name: Person name (required if knowledge_graph is provided)
+        anima_name: Anima name (required if knowledge_graph is provided)
         extra_watch_dirs: Additional (directory, memory_type) pairs to watch.
 
     Returns:
         FileWatcher instance (not started)
     """
     return FileWatcher(
-        person_dir,
+        anima_dir,
         indexer,
         knowledge_graph,
-        person_name,
+        anima_name,
         extra_watch_dirs=extra_watch_dirs,
     )

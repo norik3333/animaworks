@@ -17,11 +17,11 @@ AnimaWorks サーバーの管理を行う。プログラム更新後のリロー
 | エンドポイント | メソッド | 用途 |
 |--------------|---------|------|
 | `/api/system/status` | GET | システム状態確認 |
-| `/api/system/reload` | POST | **全 person のホットリロード** |
-| `/api/persons` | GET | person 一覧 |
-| `/api/persons/{name}` | GET | person 詳細 |
-| `/api/persons/{name}/chat` | POST | メッセージ送信 |
-| `/api/persons/{name}/trigger` | POST | ハートビート即時実行 |
+| `/api/system/reload` | POST | **全 anima のホットリロード** |
+| `/api/animas` | GET | anima 一覧 |
+| `/api/animas/{name}` | GET | anima 詳細 |
+| `/api/animas/{name}/chat` | POST | メッセージ送信 |
+| `/api/animas/{name}/trigger` | POST | ハートビート即時実行 |
 
 ## システム状態の確認
 
@@ -32,7 +32,7 @@ curl -s http://localhost:18500/api/system/status | python3 -m json.tool
 応答例:
 ```json
 {
-  "persons": 2,
+  "animas": 2,
   "scheduler_running": true,
   "jobs": [
     {"id": "heartbeat_alice", "name": "heartbeat_alice", "next_run": "2026-01-26 10:30:00+09:00"}
@@ -56,12 +56,12 @@ curl -s -X POST http://localhost:18500/api/system/reload | python3 -m json.tool
 }
 ```
 
-- `added`: 新たに検出された person
-- `refreshed`: 再読み込みされた person（ファイル変更が反映される）
-- `removed`: ディスクから削除された person
+- `added`: 新たに検出された anima
+- `refreshed`: 再読み込みされた anima（ファイル変更が反映される）
+- `removed`: ディスクから削除された anima
 - **サーバー再起動は不要。このエンドポイントで設定・プロンプト変更が即座に反映される**
 
 ## 注意事項
 
-- ワーカーを停止しても person のデータ（記憶・設定）は残る
+- ワーカーを停止しても anima のデータ（記憶・設定）は残る
 - **自分自身を停止する操作は行わないこと**

@@ -245,12 +245,12 @@ class PrimingSearchWrapper:
     Measures actual priming overhead and token injection.
     """
 
-    def __init__(self, search_dir: Path, person_dir: Path) -> None:
+    def __init__(self, search_dir: Path, anima_dir: Path) -> None:
         self.vector = DenseVectorSearch()
-        self.person_dir = person_dir
-        self.episodes_dir = person_dir / "episodes"
-        self.knowledge_dir = person_dir / "knowledge"
-        self.skills_dir = person_dir / "skills"
+        self.anima_dir = anima_dir
+        self.episodes_dir = anima_dir / "episodes"
+        self.knowledge_dir = anima_dir / "knowledge"
+        self.skills_dir = anima_dir / "skills"
         self._all_documents: list[dict[str, Any]] = []
 
     def index_documents(self, documents: list[dict[str, Any]]) -> None:
@@ -670,9 +670,9 @@ async def run_scalability_test(
         documents = build_document_list(memory_base)
         search_dir = output_dir / "scalability" / base_domain / size
 
-        # Set up person_dir for priming
-        person_dir = search_dir
-        person_dir.mkdir(parents=True, exist_ok=True)
+        # Set up anima_dir for priming
+        anima_dir = search_dir
+        anima_dir.mkdir(parents=True, exist_ok=True)
 
         # Run each condition
         for cond_name, cond_key in [
@@ -684,7 +684,7 @@ async def run_scalability_test(
                 searcher = DenseVectorSearch()
                 searcher.index_documents(documents)
             else:
-                searcher = PrimingSearchWrapper(search_dir, person_dir)
+                searcher = PrimingSearchWrapper(search_dir, anima_dir)
                 searcher.index_documents(documents)
 
             trial = await run_trial(
@@ -1733,8 +1733,8 @@ async def main() -> None:
             documents = build_document_list(memory_base)
             search_dir = dataset_dir / domain / SIZE
 
-            # Set up person_dir for priming (point to dataset directory)
-            person_dir = search_dir
+            # Set up anima_dir for priming (point to dataset directory)
+            anima_dir = search_dir
 
             # Create appropriate searcher
             if cond_label in ("A", "B"):
@@ -1744,7 +1744,7 @@ async def main() -> None:
                 searcher = DenseVectorSearch()
                 searcher.index_documents(documents)
             else:  # C
-                searcher = PrimingSearchWrapper(search_dir, person_dir)
+                searcher = PrimingSearchWrapper(search_dir, anima_dir)
                 searcher.index_documents(documents)
 
             # Run trial

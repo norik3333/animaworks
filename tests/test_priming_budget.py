@@ -1,5 +1,5 @@
 from __future__ import annotations
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
@@ -14,22 +14,22 @@ from core.memory.priming import PrimingEngine
 
 
 @pytest.fixture
-def temp_person_dir():
-    """Create temporary person directory."""
+def temp_anima_dir():
+    """Create temporary anima directory."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        person_dir = Path(tmpdir)
+        anima_dir = Path(tmpdir)
 
         # Create memory directories
-        (person_dir / "episodes").mkdir()
-        (person_dir / "knowledge").mkdir()
-        (person_dir / "skills").mkdir()
+        (anima_dir / "episodes").mkdir()
+        (anima_dir / "knowledge").mkdir()
+        (anima_dir / "skills").mkdir()
 
-        yield person_dir
+        yield anima_dir
 
 
-def test_message_type_classification(temp_person_dir):
+def test_message_type_classification(temp_anima_dir):
     """Test message type classification."""
-    engine = PrimingEngine(temp_person_dir)
+    engine = PrimingEngine(temp_anima_dir)
 
     # Test greeting
     assert engine._classify_message_type("こんにちは", "chat") == "greeting"
@@ -49,9 +49,9 @@ def test_message_type_classification(temp_person_dir):
     assert engine._classify_message_type("任意の内容", "heartbeat") == "heartbeat"
 
 
-def test_budget_adjustment(temp_person_dir):
+def test_budget_adjustment(temp_anima_dir):
     """Test token budget adjustment based on message type."""
-    engine = PrimingEngine(temp_person_dir)
+    engine = PrimingEngine(temp_anima_dir)
 
     # Test greeting budget (500 tokens)
     greeting_budget = engine._adjust_token_budget("こんにちは", "chat")
@@ -72,12 +72,12 @@ def test_budget_adjustment(temp_person_dir):
 
 
 @pytest.mark.asyncio
-async def test_dynamic_budget_in_priming(temp_person_dir):
+async def test_dynamic_budget_in_priming(temp_anima_dir):
     """Test that dynamic budget affects priming results."""
-    engine = PrimingEngine(temp_person_dir)
+    engine = PrimingEngine(temp_anima_dir)
 
     # Create sample episode file
-    episodes_dir = temp_person_dir / "episodes"
+    episodes_dir = temp_anima_dir / "episodes"
     from datetime import date
     today = date.today()
     episode_file = episodes_dir / f"{today.isoformat()}.md"
@@ -112,9 +112,9 @@ async def test_dynamic_budget_in_priming(temp_person_dir):
 
 
 @pytest.mark.asyncio
-async def test_disabled_dynamic_budget(temp_person_dir):
+async def test_disabled_dynamic_budget(temp_anima_dir):
     """Test priming with dynamic budget disabled."""
-    engine = PrimingEngine(temp_person_dir)
+    engine = PrimingEngine(temp_anima_dir)
 
     # Prime with dynamic budget disabled
     result = await engine.prime_memories(
@@ -129,9 +129,9 @@ async def test_disabled_dynamic_budget(temp_person_dir):
     assert result.estimated_tokens() >= 0  # Just check it doesn't crash
 
 
-def test_budget_distribution(temp_person_dir):
+def test_budget_distribution(temp_anima_dir):
     """Test that budget is distributed proportionally across channels."""
-    engine = PrimingEngine(temp_person_dir)
+    engine = PrimingEngine(temp_anima_dir)
 
     # Default budget distribution:
     # - Sender profile: 500 / 2000 = 25%

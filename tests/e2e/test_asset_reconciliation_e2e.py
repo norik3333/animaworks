@@ -16,26 +16,26 @@ import pytest
 # ── Helpers ──────────────────────────────────────────────────────
 
 
-def _create_person_with_assets(
-    persons_dir: Path,
+def _create_anima_with_assets(
+    animas_dir: Path,
     name: str,
     *,
     complete: bool = True,
 ) -> Path:
-    """Create a person directory, optionally with all required assets."""
+    """Create an anima directory, optionally with all required assets."""
     from core.asset_reconciler import REQUIRED_ASSETS
 
-    person_dir = persons_dir / name
-    person_dir.mkdir(parents=True)
-    (person_dir / "identity.md").write_text(
+    anima_dir = animas_dir / name
+    anima_dir.mkdir(parents=True)
+    (anima_dir / "identity.md").write_text(
         f"# {name}\nimage_prompt: 1girl, {name}\n", encoding="utf-8",
     )
     if complete:
-        assets_dir = person_dir / "assets"
+        assets_dir = anima_dir / "assets"
         assets_dir.mkdir()
         for filename in REQUIRED_ASSETS.values():
             (assets_dir / filename).write_bytes(b"fake-data")
-    return person_dir
+    return anima_dir
 
 
 def _make_mock_pipeline_result() -> MagicMock:
@@ -62,17 +62,17 @@ class TestStartupReconciliation:
     async def test_startup_detects_missing_and_generates(
         self, data_dir: Path,
     ) -> None:
-        """Startup reconciliation detects persons with missing assets and
+        """Startup reconciliation detects animas with missing assets and
         triggers generation for each one sequentially.
         """
         from core.asset_reconciler import reconcile_all_assets
 
-        persons_dir = data_dir / "persons"
+        animas_dir = data_dir / "animas"
 
         # One complete, two incomplete
-        _create_person_with_assets(persons_dir, "sakura", complete=True)
-        _create_person_with_assets(persons_dir, "aoi", complete=False)
-        _create_person_with_assets(persons_dir, "rin", complete=False)
+        _create_anima_with_assets(animas_dir, "sakura", complete=True)
+        _create_anima_with_assets(animas_dir, "aoi", complete=False)
+        _create_anima_with_assets(animas_dir, "rin", complete=False)
 
         mock_result = _make_mock_pipeline_result()
 
@@ -81,16 +81,16 @@ class TestStartupReconciliation:
             mock_pipeline.generate_all.return_value = mock_result
             mock_cls.return_value = mock_pipeline
 
-            results = await reconcile_all_assets(persons_dir)
+            results = await reconcile_all_assets(animas_dir)
 
         # Only aoi and rin should be processed (sakura is complete)
         assert len(results) == 2
-        processed_names = [r["person"] for r in results]
+        processed_names = [r["anima"] for r in results]
         assert "aoi" in processed_names
         assert "rin" in processed_names
         assert "sakura" not in processed_names
 
-        # Pipeline should be called once per incomplete person
+        # Pipeline should be called once per incomplete anima
         assert mock_pipeline.generate_all.call_count == 2
 
         # Verify skip_existing=True was used
@@ -101,14 +101,14 @@ class TestStartupReconciliation:
     async def test_startup_noop_when_all_complete(
         self, data_dir: Path,
     ) -> None:
-        """Startup is a no-op when all persons have complete assets."""
+        """Startup is a no-op when all animas have complete assets."""
         from core.asset_reconciler import reconcile_all_assets
 
-        persons_dir = data_dir / "persons"
-        _create_person_with_assets(persons_dir, "sakura", complete=True)
-        _create_person_with_assets(persons_dir, "kotoha", complete=True)
+        animas_dir = data_dir / "animas"
+        _create_anima_with_assets(animas_dir, "sakura", complete=True)
+        _create_anima_with_assets(animas_dir, "kotoha", complete=True)
 
-        results = await reconcile_all_assets(persons_dir)
+        results = await reconcile_all_assets(animas_dir)
         assert results == []
 
 
@@ -127,26 +127,26 @@ class TestPeriodicReconciliation:
         """
         from core.asset_reconciler import (
             REQUIRED_ASSETS,
-            find_persons_with_missing_assets,
-            reconcile_person_assets,
+            find_animas_with_missing_assets,
+            reconcile_anima_assets,
         )
 
-        persons_dir = data_dir / "persons"
+        animas_dir = data_dir / "animas"
 
         # Start with complete assets
-        person_dir = _create_person_with_assets(
-            persons_dir, "aoi", complete=True,
+        anima_dir = _create_anima_with_assets(
+            animas_dir, "aoi", complete=True,
         )
 
         # Verify initially complete
-        incomplete = find_persons_with_missing_assets(persons_dir)
+        incomplete = find_animas_with_missing_assets(animas_dir)
         assert len(incomplete) == 0
 
         # Simulate asset deletion (e.g., corrupted file removed)
-        (person_dir / "assets" / "avatar_bustup.png").unlink()
+        (anima_dir / "assets" / "avatar_bustup.png").unlink()
 
         # Now should detect as incomplete
-        incomplete = find_persons_with_missing_assets(persons_dir)
+        incomplete = find_animas_with_missing_assets(animas_dir)
         assert len(incomplete) == 1
         assert incomplete[0][0] == "aoi"
         assert "avatar_bustup" in incomplete[0][1]["missing"]
@@ -155,12 +155,12 @@ class TestPeriodicReconciliation:
     async def test_reconcile_skips_on_error_and_continues(
         self, data_dir: Path,
     ) -> None:
-        """If one person's generation fails, the next person still runs."""
+        """If one anima's generation fails, the next anima still runs."""
         from core.asset_reconciler import reconcile_all_assets
 
-        persons_dir = data_dir / "persons"
-        _create_person_with_assets(persons_dir, "aoi", complete=False)
-        _create_person_with_assets(persons_dir, "rin", complete=False)
+        animas_dir = data_dir / "animas"
+        _create_anima_with_assets(animas_dir, "aoi", complete=False)
+        _create_anima_with_assets(animas_dir, "rin", complete=False)
 
         mock_result = _make_mock_pipeline_result()
         call_count = 0
@@ -177,9 +177,9 @@ class TestPeriodicReconciliation:
             mock_pipeline.generate_all.side_effect = _side_effect
             mock_cls.return_value = mock_pipeline
 
-            results = await reconcile_all_assets(persons_dir)
+            results = await reconcile_all_assets(animas_dir)
 
-        # Both persons should have results
+        # Both animas should have results
         assert len(results) == 2
         # First should have error
         assert "error" in results[0]
@@ -192,24 +192,24 @@ class TestPeriodicReconciliation:
 
 
 class TestLockMechanism:
-    """Test the per-person lock prevents concurrent generation."""
+    """Test the per-anima lock prevents concurrent generation."""
 
     @pytest.mark.asyncio
     async def test_concurrent_calls_serialized(
         self, data_dir: Path,
     ) -> None:
-        """Two concurrent reconcile calls for the same person:
+        """Two concurrent reconcile calls for the same anima:
         one runs, the other is skipped.
         """
-        from core.asset_reconciler import _person_locks, reconcile_person_assets
+        from core.asset_reconciler import _anima_locks, reconcile_anima_assets
 
-        persons_dir = data_dir / "persons"
-        person_dir = _create_person_with_assets(
-            persons_dir, "lock-test", complete=False,
+        animas_dir = data_dir / "animas"
+        anima_dir = _create_anima_with_assets(
+            animas_dir, "lock-test", complete=False,
         )
 
         # Clear any stale lock
-        _person_locks.pop("lock-test", None)
+        _anima_locks.pop("lock-test", None)
 
         generation_started = asyncio.Event()
         generation_proceed = asyncio.Event()
@@ -230,13 +230,13 @@ class TestLockMechanism:
             mock_cls.return_value = mock_pipeline
 
             # Start first reconciliation (will hold lock)
-            task1 = asyncio.create_task(reconcile_person_assets(person_dir))
+            task1 = asyncio.create_task(reconcile_anima_assets(anima_dir))
 
             # Wait for generation to start
             await asyncio.wait_for(generation_started.wait(), timeout=5.0)
 
             # Start second reconciliation (should be skipped)
-            result2 = await reconcile_person_assets(person_dir)
+            result2 = await reconcile_anima_assets(anima_dir)
 
             # Release the first task
             generation_proceed.set()
@@ -249,23 +249,23 @@ class TestLockMechanism:
         assert result2["reason"] == "locked"
 
     @pytest.mark.asyncio
-    async def test_different_persons_not_blocked(
+    async def test_different_animas_not_blocked(
         self, data_dir: Path,
     ) -> None:
-        """Different persons use different locks and can run independently."""
-        from core.asset_reconciler import _person_locks, reconcile_person_assets
+        """Different animas use different locks and can run independently."""
+        from core.asset_reconciler import _anima_locks, reconcile_anima_assets
 
-        persons_dir = data_dir / "persons"
-        person_a = _create_person_with_assets(
-            persons_dir, "person-a", complete=False,
+        animas_dir = data_dir / "animas"
+        anima_a = _create_anima_with_assets(
+            animas_dir, "anima-a", complete=False,
         )
-        person_b = _create_person_with_assets(
-            persons_dir, "person-b", complete=False,
+        anima_b = _create_anima_with_assets(
+            animas_dir, "anima-b", complete=False,
         )
 
         # Clear stale locks
-        _person_locks.pop("person-a", None)
-        _person_locks.pop("person-b", None)
+        _anima_locks.pop("anima-a", None)
+        _anima_locks.pop("anima-b", None)
 
         mock_result = _make_mock_pipeline_result()
 
@@ -276,8 +276,8 @@ class TestLockMechanism:
 
             # Run both concurrently — both should succeed
             results = await asyncio.gather(
-                reconcile_person_assets(person_a, prompt="1girl"),
-                reconcile_person_assets(person_b, prompt="1girl"),
+                reconcile_anima_assets(anima_a, prompt="1girl"),
+                reconcile_anima_assets(anima_b, prompt="1girl"),
             )
 
         # Both should have run (not skipped)
@@ -294,14 +294,14 @@ class TestDifferentialGeneration:
     @pytest.mark.asyncio
     async def test_skip_existing_passed(self, data_dir: Path) -> None:
         """Pipeline is called with skip_existing=True for differential gen."""
-        from core.asset_reconciler import reconcile_person_assets
+        from core.asset_reconciler import reconcile_anima_assets
 
-        persons_dir = data_dir / "persons"
-        person_dir = _create_person_with_assets(
-            persons_dir, "partial-test", complete=False,
+        animas_dir = data_dir / "animas"
+        anima_dir = _create_anima_with_assets(
+            animas_dir, "partial-test", complete=False,
         )
         # Add some assets
-        assets_dir = person_dir / "assets"
+        assets_dir = anima_dir / "assets"
         assets_dir.mkdir(exist_ok=True)
         (assets_dir / "avatar_fullbody.png").write_bytes(b"existing")
 
@@ -312,8 +312,8 @@ class TestDifferentialGeneration:
             mock_pipeline.generate_all.return_value = mock_result
             mock_cls.return_value = mock_pipeline
 
-            await reconcile_person_assets(
-                person_dir, prompt="1girl, test",
+            await reconcile_anima_assets(
+                anima_dir, prompt="1girl, test",
             )
 
         mock_pipeline.generate_all.assert_called_once()

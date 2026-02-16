@@ -15,21 +15,21 @@ def register(subparsers: argparse._SubParsersAction) -> None:
     """Register the remake-assets subcommand."""
     parser = subparsers.add_parser(
         "remake-assets",
-        help="Remake character assets with style transfer from another person",
+        help="Remake character assets with style transfer from another anima",
         description=(
             "Regenerate character assets using Vibe Transfer to match "
-            "the art style of a reference person. Supports selective step "
+            "the art style of a reference anima. Supports selective step "
             "execution and automatic backup."
         ),
     )
     parser.add_argument(
-        "person",
-        help="Name of the person whose assets to remake",
+        "anima",
+        help="Name of the anima whose assets to remake",
     )
     parser.add_argument(
         "--style-from",
         required=True,
-        help="Person name to use as style reference (their fullbody image)",
+        help="Anima name to use as style reference (their fullbody image)",
     )
     parser.add_argument(
         "--steps",
@@ -81,25 +81,25 @@ def _run(args: argparse.Namespace) -> None:
     from core.paths import get_data_dir
 
     data_dir = get_data_dir()
-    persons_dir = data_dir / "persons"
+    animas_dir = data_dir / "animas"
 
-    # ── Validate persons exist ──
-    target_dir = persons_dir / args.person
-    style_dir = persons_dir / args.style_from
+    # ── Validate animas exist ──
+    target_dir = animas_dir / args.anima
+    style_dir = animas_dir / args.style_from
 
     if not target_dir.exists():
-        print(f"Error: Person '{args.person}' not found at {target_dir}")
+        print(f"Error: Anima '{args.anima}' not found at {target_dir}")
         return
 
     if not style_dir.exists():
-        print(f"Error: Style reference person '{args.style_from}' not found at {style_dir}")
+        print(f"Error: Style reference anima '{args.style_from}' not found at {style_dir}")
         return
 
     # ── Validate style reference image ──
     style_fullbody = style_dir / "assets" / "avatar_fullbody.png"
     if not style_fullbody.exists():
         print(
-            f"Error: Style reference person '{args.style_from}' has no "
+            f"Error: Style reference anima '{args.style_from}' has no "
             f"avatar_fullbody.png at {style_fullbody}"
         )
         return
@@ -112,7 +112,7 @@ def _run(args: argparse.Namespace) -> None:
             prompt = prompt_file.read_text(encoding="utf-8").strip()
         else:
             print(
-                f"Error: No prompt.txt found for '{args.person}' and --prompt not specified.\n"
+                f"Error: No prompt.txt found for '{args.anima}' and --prompt not specified.\n"
                 f"  Expected at: {prompt_file}\n"
                 f"  Use --prompt to provide a character prompt."
             )
@@ -146,7 +146,7 @@ def _run(args: argparse.Namespace) -> None:
         return
 
     # ── Dry-run summary ──
-    print(f"Remake assets for: {args.person}")
+    print(f"Remake assets for: {args.anima}")
     print(f"Style reference:   {args.style_from} ({style_fullbody})")
     print(f"Vibe strength:     {args.vibe_strength}")
     print(f"Vibe info extract: {args.vibe_info_extracted}")

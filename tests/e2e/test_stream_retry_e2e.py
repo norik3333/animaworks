@@ -192,7 +192,7 @@ class TestStreamRetryFullFlow:
         assert cycle_done["cycle_result"]["action"] == "responded"
 
         # Checkpoint file should be cleared after success
-        shortterm = ShortTermMemory(agent.person_dir)
+        shortterm = ShortTermMemory(agent.anima_dir)
         assert shortterm.load_checkpoint() is None, (
             "Checkpoint should be cleared after successful retry"
         )
@@ -324,7 +324,7 @@ class TestCheckpointClearedOnSuccess:
         assert "cycle_done" in event_types
 
         # The checkpoint file must not exist
-        checkpoint_path = agent.person_dir / "shortterm" / "stream_checkpoint.json"
+        checkpoint_path = agent.anima_dir / "shortterm" / "stream_checkpoint.json"
         assert not checkpoint_path.exists(), (
             f"stream_checkpoint.json should not exist after success, "
             f"but found at {checkpoint_path}"
@@ -404,7 +404,7 @@ class TestCheckpointClearedOnSuccess:
             events.append(chunk)
             # Check if checkpoint exists right after tool_end is yielded
             if chunk["type"] == "tool_end":
-                shortterm = ShortTermMemory(agent.person_dir)
+                shortterm = ShortTermMemory(agent.anima_dir)
                 cp = shortterm.load_checkpoint()
                 if cp is not None:
                     checkpoint_existed_during_stream = True
@@ -415,7 +415,7 @@ class TestCheckpointClearedOnSuccess:
         )
 
         # But after completion, checkpoint should be cleared
-        shortterm = ShortTermMemory(agent.person_dir)
+        shortterm = ShortTermMemory(agent.anima_dir)
         assert shortterm.load_checkpoint() is None, (
             "Checkpoint should be cleared after successful completion"
         )

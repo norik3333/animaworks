@@ -1,5 +1,5 @@
 from __future__ import annotations
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
-from server.dependencies import get_person
+from server.dependencies import get_anima
 from server.events import emit, emit_notification
 
 logger = logging.getLogger("animaworks.routes.chat")
@@ -26,7 +26,7 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     response: str
-    person: str
+    anima: str
 
 
 # ── SSE Helpers ───────────────────────────────────────────────
@@ -78,14 +78,14 @@ def _handle_chunk(
     chunk: dict[str, Any],
     *,
     request: Request | None = None,
-    person_name: str | None = None,
+    anima_name: str | None = None,
 ) -> tuple[str | None, str]:
     """Map a stream chunk to an SSE event name and extract response text.
 
     Args:
         chunk: Stream chunk dictionary.
         request: FastAPI Request (optional, for emitting WebSocket events).
-        person_name: Person name (optional, for WebSocket event data).
+        anima_name: Anima name (optional, for WebSocket event data).
 
     Returns:
         Tuple of (sse_frame_or_None, accumulated_response_text).
@@ -111,20 +111,20 @@ def _handle_chunk(
         return _format_sse("chain_start", {"chain": chunk["chain"]}), ""
 
     if event_type == "bootstrap_start":
-        if request and person_name:
+        if request and anima_name:
             import asyncio
             asyncio.ensure_future(emit(
-                request, "person.bootstrap",
-                {"name": person_name, "status": "started"},
+                request, "anima.bootstrap",
+                {"name": anima_name, "status": "started"},
             ))
         return _format_sse("bootstrap", {"status": "started"}), ""
 
     if event_type == "bootstrap_complete":
-        if request and person_name:
+        if request and anima_name:
             import asyncio
             asyncio.ensure_future(emit(
-                request, "person.bootstrap",
-                {"name": person_name, "status": "completed"},
+                request, "anima.bootstrap",
+                {"name": anima_name, "status": "completed"},
             ))
         return _format_sse("bootstrap", {"status": "completed"}), ""
 
@@ -165,7 +165,7 @@ def _handle_chunk(
 
 
 async def _stream_events(
-    person: Any,
+    anima: Any,
     name: str,
     body: ChatRequest,
     request: Request,
@@ -173,13 +173,13 @@ async def _stream_events(
     """Async generator that yields SSE frames for a streaming chat session."""
     full_response = ""
     try:
-        await emit(request, "person.status", {"name": name, "status": "thinking"})
+        await emit(request, "anima.status", {"name": name, "status": "thinking"})
 
-        async for chunk in person.process_message_stream(
+        async for chunk in anima.process_message_stream(
             body.message, from_person=body.from_person
         ):
             frame, response_text = _handle_chunk(
-                chunk, request=request, person_name=name,
+                chunk, request=request, anima_name=name,
             )
             if response_text:
                 full_response = response_text
@@ -187,11 +187,11 @@ async def _stream_events(
                 yield frame
 
     except Exception:
-        logger.exception("SSE stream error for person=%s", name)
+        logger.exception("SSE stream error for anima=%s", name)
         yield _format_sse("error", {"code": "STREAM_ERROR", "message": "Internal server error"})
 
     finally:
-        await emit(request, "person.status", {"name": name, "status": "idle"})
+        await emit(request, "anima.status", {"name": name, "status": "idle"})
 
 
 # ── Router ────────────────────────────────────────────────────
@@ -199,23 +199,23 @@ async def _stream_events(
 def create_chat_router() -> APIRouter:
     router = APIRouter()
 
-    @router.post("/persons/{name}/chat")
+    @router.post("/animas/{name}/chat")
     async def chat(name: str, body: ChatRequest, request: Request):
         supervisor = request.app.state.supervisor
 
-        # Guard: reject if person is bootstrapping
+        # Guard: reject if anima is bootstrapping
         if supervisor.is_bootstrapping(name):
             return JSONResponse(
                 {"error": "現在キャラクターを作成中です。完了までお待ちください。"},
                 status_code=503,
             )
 
-        await emit(request, "person.status", {"name": name, "status": "thinking"})
+        await emit(request, "anima.status", {"name": name, "status": "thinking"})
 
         try:
-            # Send IPC request to Person process
+            # Send IPC request to Anima process
             result = await supervisor.send_request(
-                person_name=name,
+                anima_name=name,
                 method="process_message",
                 params={
                     "message": body.message,
@@ -231,28 +231,28 @@ def create_chat_router() -> APIRouter:
             for notif in result.get("notifications", []):
                 await emit_notification(request, notif)
 
-            await emit(request, "person.status", {"name": name, "status": "idle"})
+            await emit(request, "anima.status", {"name": name, "status": "idle"})
 
-            return ChatResponse(response=clean_response, person=name)
+            return ChatResponse(response=clean_response, anima=name)
 
         except KeyError:
             from fastapi import HTTPException
-            raise HTTPException(status_code=404, detail=f"Person not found: {name}")
+            raise HTTPException(status_code=404, detail=f"Anima not found: {name}")
         except ValueError as e:
             from fastapi import HTTPException
             raise HTTPException(status_code=500, detail=str(e))
         except asyncio.TimeoutError:
-            logger.error("Timeout waiting for chat response from person=%s", name)
+            logger.error("Timeout waiting for chat response from anima=%s", name)
             return JSONResponse(
                 {"error": "Request timed out"}, status_code=504,
             )
         except RuntimeError as e:
-            logger.exception("Runtime error in chat for person=%s", name)
+            logger.exception("Runtime error in chat for anima=%s", name)
             return JSONResponse(
                 {"error": f"Internal server error: {e}"}, status_code=500,
             )
 
-    @router.post("/persons/{name}/greet")
+    @router.post("/animas/{name}/greet")
     async def greet(name: str, request: Request):
         """Generate a greeting when user clicks the character.
 
@@ -261,7 +261,7 @@ def create_chat_router() -> APIRouter:
         """
         supervisor = request.app.state.supervisor
 
-        # Guard: reject if person is bootstrapping
+        # Guard: reject if anima is bootstrapping
         if supervisor.is_bootstrapping(name):
             return JSONResponse(
                 {"error": "現在キャラクターを作成中です。完了までお待ちください。"},
@@ -270,7 +270,7 @@ def create_chat_router() -> APIRouter:
 
         try:
             result = await supervisor.send_request(
-                person_name=name,
+                anima_name=name,
                 method="greet",
                 params={},
                 timeout=60.0,
@@ -280,37 +280,37 @@ def create_chat_router() -> APIRouter:
                 "response": result.get("response", ""),
                 "emotion": result.get("emotion", "neutral"),
                 "cached": result.get("cached", False),
-                "person": name,
+                "anima": name,
             }
 
         except KeyError:
             from fastapi import HTTPException
-            raise HTTPException(status_code=404, detail=f"Person not found: {name}")
+            raise HTTPException(status_code=404, detail=f"Anima not found: {name}")
         except ValueError as e:
             from fastapi import HTTPException
             raise HTTPException(status_code=500, detail=str(e))
         except asyncio.TimeoutError:
-            logger.error("Timeout waiting for greet response from person=%s", name)
+            logger.error("Timeout waiting for greet response from anima=%s", name)
             return JSONResponse(
                 {"error": "Request timed out"}, status_code=504,
             )
         except RuntimeError as e:
-            logger.exception("Runtime error in greet for person=%s", name)
+            logger.exception("Runtime error in greet for anima=%s", name)
             return JSONResponse(
                 {"error": f"Internal server error: {e}"}, status_code=500,
             )
 
-    @router.post("/persons/{name}/chat/stream")
+    @router.post("/animas/{name}/chat/stream")
     async def chat_stream(name: str, body: ChatRequest, request: Request):
         """Stream chat response via SSE over IPC."""
         supervisor = request.app.state.supervisor
 
-        # Verify person exists before starting the stream
+        # Verify anima exists before starting the stream
         if name not in supervisor.processes:
             from fastapi import HTTPException
-            raise HTTPException(status_code=404, detail=f"Person not found: {name}")
+            raise HTTPException(status_code=404, detail=f"Anima not found: {name}")
 
-        # Guard: return immediately if person is bootstrapping
+        # Guard: return immediately if anima is bootstrapping
         if supervisor.is_bootstrapping(name):
             async def _bootstrap_busy() -> AsyncIterator[str]:
                 yield _format_sse("bootstrap", {
@@ -332,14 +332,14 @@ def create_chat_router() -> APIRouter:
             """Async generator that converts IPC stream to SSE frames."""
             full_response = ""
             try:
-                await emit(request, "person.status", {"name": name, "status": "thinking"})
+                await emit(request, "anima.status", {"name": name, "status": "thinking"})
 
                 from core.config import load_config
                 _config = load_config()
                 _timeout = float(_config.server.ipc_stream_timeout)
 
                 async for ipc_response in supervisor.send_request_stream(
-                    person_name=name,
+                    anima_name=name,
                     method="process_message",
                     params={
                         "message": body.message,
@@ -375,7 +375,7 @@ def create_chat_router() -> APIRouter:
                             frame, response_text = _handle_chunk(
                                 chunk_data,
                                 request=request,
-                                person_name=name,
+                                anima_name=name,
                             )
                             if response_text:
                                 full_response = response_text
@@ -387,16 +387,16 @@ def create_chat_router() -> APIRouter:
                             yield _format_sse("text_delta", {"text": ipc_response.chunk})
 
             except KeyError:
-                logger.error("Person not found during stream: %s", name)
-                yield _format_sse("error", {"code": "PERSON_NOT_FOUND", "message": f"Person not found: {name}"})
+                logger.error("Anima not found during stream: %s", name)
+                yield _format_sse("error", {"code": "ANIMA_NOT_FOUND", "message": f"Anima not found: {name}"})
             except TimeoutError:
-                logger.error("IPC stream timeout for person=%s", name)
+                logger.error("IPC stream timeout for anima=%s", name)
                 yield _format_sse("error", {"code": "IPC_TIMEOUT", "message": "応答がタイムアウトしました"})
             except Exception:
-                logger.exception("IPC stream error for person=%s", name)
+                logger.exception("IPC stream error for anima=%s", name)
                 yield _format_sse("error", {"code": "STREAM_ERROR", "message": "Internal server error"})
             finally:
-                await emit(request, "person.status", {"name": name, "status": "idle"})
+                await emit(request, "anima.status", {"name": name, "status": "idle"})
 
         return StreamingResponse(
             _ipc_stream_events(),

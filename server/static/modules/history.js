@@ -15,14 +15,14 @@ export async function loadSessionList() {
   const sessionList = dom.historySessionList || document.getElementById("historySessionList");
   if (!sessionList) return; // History panel not in DOM
 
-  const name = state.selectedPerson;
+  const name = state.selectedAnima;
   if (!name) {
-    sessionList.innerHTML = '<div class="loading-placeholder">パーソンを選択してください</div>';
+    sessionList.innerHTML = '<div class="loading-placeholder">Animaを選択してください</div>';
     return;
   }
   sessionList.innerHTML = '<div class="loading-placeholder">読み込み中...</div>';
   try {
-    const data = await api(`/api/persons/${encodeURIComponent(name)}/sessions`);
+    const data = await api(`/api/animas/${encodeURIComponent(name)}/sessions`);
     state.sessionList = data;
     renderSessionList(data);
   } catch (err) {
@@ -127,7 +127,7 @@ export function hideHistoryDetail() {
 // ── Conversation Loading ────────────────────
 
 async function loadActiveConversation() {
-  const name = state.selectedPerson;
+  const name = state.selectedAnima;
   if (!name) return;
 
   showHistoryDetail("進行中の会話");
@@ -135,7 +135,7 @@ async function loadActiveConversation() {
   if (conv) conv.innerHTML = '<div class="loading-placeholder">読み込み中...</div>';
 
   try {
-    const data = await api(`/api/persons/${encodeURIComponent(name)}/conversation/full?limit=50`);
+    const data = await api(`/api/animas/${encodeURIComponent(name)}/conversation/full?limit=50`);
     renderConversationDetail(data);
   } catch (err) {
     if (conv) conv.innerHTML = '<div class="loading-placeholder">読み込み失敗</div>';
@@ -178,7 +178,7 @@ function renderConversationDetail(data) {
 }
 
 async function loadArchivedSession(sessionId) {
-  const name = state.selectedPerson;
+  const name = state.selectedAnima;
   if (!name) return;
 
   showHistoryDetail(`セッション: ${sessionId}`);
@@ -186,7 +186,7 @@ async function loadArchivedSession(sessionId) {
   if (conv) conv.innerHTML = '<div class="loading-placeholder">読み込み中...</div>';
 
   try {
-    const data = await api(`/api/persons/${encodeURIComponent(name)}/sessions/${encodeURIComponent(sessionId)}`);
+    const data = await api(`/api/animas/${encodeURIComponent(name)}/sessions/${encodeURIComponent(sessionId)}`);
     renderArchivedSessionDetail(data);
   } catch (err) {
     if (conv) conv.innerHTML = '<div class="loading-placeholder">読み込み失敗</div>';
@@ -219,7 +219,7 @@ function renderArchivedSessionDetail(data) {
 }
 
 async function loadTranscriptInHistory(date) {
-  const name = state.selectedPerson;
+  const name = state.selectedAnima;
   if (!name) return;
 
   showHistoryDetail(`会話ログ: ${date}`);
@@ -227,7 +227,7 @@ async function loadTranscriptInHistory(date) {
   if (conv) conv.innerHTML = '<div class="loading-placeholder">読み込み中...</div>';
 
   try {
-    const data = await api(`/api/persons/${encodeURIComponent(name)}/transcripts/${encodeURIComponent(date)}`);
+    const data = await api(`/api/animas/${encodeURIComponent(name)}/transcripts/${encodeURIComponent(date)}`);
     renderConversationDetail(data);
   } catch (err) {
     if (conv) conv.innerHTML = '<div class="loading-placeholder">読み込み失敗</div>';
@@ -235,7 +235,7 @@ async function loadTranscriptInHistory(date) {
 }
 
 async function loadEpisodeInHistory(date) {
-  const name = state.selectedPerson;
+  const name = state.selectedAnima;
   if (!name) return;
 
   showHistoryDetail(`エピソード: ${date}`);
@@ -243,7 +243,7 @@ async function loadEpisodeInHistory(date) {
   if (conv) conv.innerHTML = '<div class="loading-placeholder">読み込み中...</div>';
 
   try {
-    const data = await api(`/api/persons/${encodeURIComponent(name)}/episodes/${encodeURIComponent(date)}`);
+    const data = await api(`/api/animas/${encodeURIComponent(name)}/episodes/${encodeURIComponent(date)}`);
     if (conv) conv.innerHTML = `<div class="history-markdown">${renderMarkdown(data.content || "(内容なし)")}</div>`;
   } catch (err) {
     if (conv) conv.innerHTML = '<div class="loading-placeholder">読み込み失敗</div>';

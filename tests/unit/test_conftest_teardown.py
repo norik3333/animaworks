@@ -20,7 +20,7 @@ class TestKillOrphanRunners:
         fake_pid = "99999"
         fake_cmdline = (
             f"python\x00-m\x00core.supervisor.runner\x00"
-            f"--persons-dir\x00{data_dir}/persons"
+            f"--animas-dir\x00{data_dir}/animas"
         )
 
         # Create a fake /proc entry

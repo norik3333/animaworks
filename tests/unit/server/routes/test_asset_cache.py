@@ -13,13 +13,13 @@ from server.routes.assets import create_assets_router
 
 @pytest.fixture
 def app_with_assets(tmp_path):
-    """Create a FastAPI app with asset routes and a test person."""
+    """Create a FastAPI app with asset routes and a test anima."""
     app = FastAPI()
-    app.state.persons_dir = tmp_path
+    app.state.animas_dir = tmp_path
 
-    # Create test person with a test asset
-    person_dir = tmp_path / "test-person"
-    assets_dir = person_dir / "assets"
+    # Create test anima with a test asset
+    anima_dir = tmp_path / "test-anima"
+    assets_dir = anima_dir / "assets"
     assets_dir.mkdir(parents=True)
 
     # Create a small test GLB file
@@ -27,7 +27,7 @@ def app_with_assets(tmp_path):
     test_glb.write_bytes(b"fake-glb-data-for-testing")
 
     # Create identity.md
-    (person_dir / "identity.md").write_text("# Test Person\n")
+    (anima_dir / "identity.md").write_text("# Test Anima\n")
 
     router = create_assets_router()
     app.include_router(router, prefix="/api")
@@ -45,7 +45,7 @@ class TestAssetCacheHeaders:
         app, _ = app_with_assets
         client = TestClient(app)
 
-        resp = client.get("/api/persons/test-person/assets/avatar_chibi.glb")
+        resp = client.get("/api/animas/test-anima/assets/avatar_chibi.glb")
         assert resp.status_code == 200
         assert "no-cache" in resp.headers["cache-control"]
 
@@ -54,7 +54,7 @@ class TestAssetCacheHeaders:
         app, _ = app_with_assets
         client = TestClient(app)
 
-        resp = client.get("/api/persons/test-person/assets/avatar_chibi.glb")
+        resp = client.get("/api/animas/test-anima/assets/avatar_chibi.glb")
         assert resp.status_code == 200
         assert "etag" in resp.headers
         etag = resp.headers["etag"]
@@ -66,12 +66,12 @@ class TestAssetCacheHeaders:
         client = TestClient(app)
 
         # First request to get the ETag
-        resp1 = client.get("/api/persons/test-person/assets/avatar_chibi.glb")
+        resp1 = client.get("/api/animas/test-anima/assets/avatar_chibi.glb")
         etag = resp1.headers["etag"]
 
         # Second request with matching If-None-Match
         resp2 = client.get(
-            "/api/persons/test-person/assets/avatar_chibi.glb",
+            "/api/animas/test-anima/assets/avatar_chibi.glb",
             headers={"If-None-Match": etag},
         )
         assert resp2.status_code == 304
@@ -83,7 +83,7 @@ class TestAssetCacheHeaders:
         client = TestClient(app)
 
         resp = client.get(
-            "/api/persons/test-person/assets/avatar_chibi.glb",
+            "/api/animas/test-anima/assets/avatar_chibi.glb",
             headers={"If-None-Match": '"old-etag"'},
         )
         assert resp.status_code == 200
@@ -93,7 +93,7 @@ class TestAssetCacheHeaders:
         app, _ = app_with_assets
         client = TestClient(app)
 
-        resp = client.head("/api/persons/test-person/assets/avatar_chibi.glb")
+        resp = client.head("/api/animas/test-anima/assets/avatar_chibi.glb")
         assert "etag" in resp.headers
         assert "no-cache" in resp.headers["cache-control"]
 
@@ -102,7 +102,7 @@ class TestAssetCacheHeaders:
         app, test_glb = app_with_assets
         client = TestClient(app)
 
-        resp1 = client.get("/api/persons/test-person/assets/avatar_chibi.glb")
+        resp1 = client.get("/api/animas/test-anima/assets/avatar_chibi.glb")
         etag1 = resp1.headers["etag"]
 
         # Modify the file
@@ -110,7 +110,7 @@ class TestAssetCacheHeaders:
         time.sleep(0.01)
         test_glb.write_bytes(b"modified-glb-data")
 
-        resp2 = client.get("/api/persons/test-person/assets/avatar_chibi.glb")
+        resp2 = client.get("/api/animas/test-anima/assets/avatar_chibi.glb")
         etag2 = resp2.headers["etag"]
 
         assert etag1 != etag2

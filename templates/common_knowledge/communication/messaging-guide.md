@@ -1,6 +1,6 @@
 # メッセージ送信の完全ガイド
 
-他の Person（社員）とコミュニケーションを取るための包括的ガイド。
+他の Anima（社員）とコミュニケーションを取るための包括的ガイド。
 メッセージの送信・受信・スレッド管理の全手順を網羅する。
 
 ## send_message ツール — パラメータリファレンス
@@ -12,7 +12,7 @@
 
 #### `search_memory`
 
-Search the person's long-term memory (knowledge, episodes, procedures) by keyword.
+Search the anima's long-term memory (knowledge, episodes, procedures) by keyword.
 
 | パラメータ | 型 | 必須 | 説明 |
 |-----------|-----|------|------|
@@ -21,15 +21,15 @@ Search the person's long-term memory (knowledge, episodes, procedures) by keywor
 
 #### `read_memory_file`
 
-Read a file from the person's memory directory by relative path.
+Read a file from the anima's memory directory by relative path.
 
 | パラメータ | 型 | 必須 | 説明 |
 |-----------|-----|------|------|
-| `path` | string | Yes | Relative path within person dir |
+| `path` | string | Yes | Relative path within anima dir |
 
 #### `write_memory_file`
 
-Write or append to a file in the person's memory directory.
+Write or append to a file in the anima's memory directory.
 
 | パラメータ | 型 | 必須 | 説明 |
 |-----------|-----|------|------|
@@ -39,11 +39,11 @@ Write or append to a file in the person's memory directory.
 
 #### `send_message`
 
-Send a message to another person.
+Send a message to another anima.
 
 | パラメータ | 型 | 必須 | 説明 |
 |-----------|-----|------|------|
-| `to` | string | Yes | Recipient person name |
+| `to` | string | Yes | Recipient anima name |
 | `content` | string | Yes | Message content |
 | `reply_to` | string | No | Message ID to reply to |
 | `thread_id` | string | No | Thread ID |
@@ -54,7 +54,7 @@ Send a message to another person.
 
 | パラメータ | 型 | 必須 | 説明 |
 |-----------|------|------|------|
-| `to` | string | MUST | 宛先の Person 名（例: `alice`） |
+| `to` | string | MUST | 宛先の Anima 名（例: `alice`） |
 | `content` | string | MUST | メッセージ本文 |
 | `reply_to` | string | MAY | 返信先メッセージの ID（例: `20260215_093000_123456`） |
 | `thread_id` | string | MAY | スレッド ID。既存スレッドに参加する場合に指定 |
@@ -211,9 +211,9 @@ python main.py send bob alice "了解しました" --reply-to 20260215_093000_12
 
 **症状**: 送信しても相手に届かない
 
-**原因**: `to` パラメータの Person 名が正確でない
+**原因**: `to` パラメータの Anima 名が正確でない
 
-**対策**: Person 名は大文字・小文字を区別する。不明な場合は `search_memory(query="メンバー", scope="knowledge")` で組織メンバーを確認する
+**対策**: Anima 名は大文字・小文字を区別する。不明な場合は `search_memory(query="メンバー", scope="knowledge")` で組織メンバーを確認する
 
 ### スレッドの断絶
 

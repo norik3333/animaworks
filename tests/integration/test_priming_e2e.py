@@ -1,11 +1,11 @@
 from __future__ import annotations
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 """Integration tests for priming layer (E2E).
 
-Tests the complete priming workflow with real Person directory structure,
+Tests the complete priming workflow with real Anima directory structure,
 consolidation processes, and performance benchmarks.
 """
 
@@ -25,22 +25,22 @@ from core.memory.consolidation import ConsolidationEngine
 
 
 @pytest.fixture
-def person_dir(tmp_path: Path) -> Path:
-    """Create a test person directory structure with sample data."""
-    person_dir = tmp_path / "test_person"
+def anima_dir(tmp_path: Path) -> Path:
+    """Create a test anima directory structure with sample data."""
+    anima_dir = tmp_path / "test_anima"
 
     # Create directory structure
-    (person_dir / "knowledge").mkdir(parents=True)
-    (person_dir / "episodes").mkdir(parents=True)
-    (person_dir / "skills").mkdir(parents=True)
-    (person_dir / "state").mkdir(parents=True)
+    (anima_dir / "knowledge").mkdir(parents=True)
+    (anima_dir / "episodes").mkdir(parents=True)
+    (anima_dir / "skills").mkdir(parents=True)
+    (anima_dir / "state").mkdir(parents=True)
 
     # Create shared users directory
     shared_users_dir = tmp_path / "shared" / "users"
     shared_users_dir.mkdir(parents=True)
 
     # knowledge/ — 3 sample files
-    (person_dir / "knowledge" / "chatwork-policy.md").write_text(
+    (anima_dir / "knowledge" / "chatwork-policy.md").write_text(
         """# Chatworkポリシー
 
 ## 基本ルール
@@ -58,7 +58,7 @@ def person_dir(tmp_path: Path) -> Path:
         encoding="utf-8",
     )
 
-    (person_dir / "knowledge" / "meeting-protocol.md").write_text(
+    (anima_dir / "knowledge" / "meeting-protocol.md").write_text(
         """# ミーティングプロトコル
 
 ## 事前準備
@@ -74,7 +74,7 @@ def person_dir(tmp_path: Path) -> Path:
         encoding="utf-8",
     )
 
-    (person_dir / "knowledge" / "priming-layer-design.md").write_text(
+    (anima_dir / "knowledge" / "priming-layer-design.md").write_text(
         """# プライミングレイヤー設計
 
 ## Phase 1: 自動想起
@@ -99,7 +99,7 @@ def person_dir(tmp_path: Path) -> Path:
     today = datetime.now().date()
     yesterday = today - timedelta(days=1)
 
-    (person_dir / "episodes" / f"{today}.md").write_text(
+    (anima_dir / "episodes" / f"{today}.md").write_text(
         f"""# {today} 行動ログ
 
 ## 09:00 — 朝のタスク確認
@@ -122,7 +122,7 @@ def person_dir(tmp_path: Path) -> Path:
         encoding="utf-8",
     )
 
-    (person_dir / "episodes" / f"{yesterday}.md").write_text(
+    (anima_dir / "episodes" / f"{yesterday}.md").write_text(
         f"""# {yesterday} 行動ログ
 
 ## 14:00 — コードレビュー
@@ -145,7 +145,7 @@ def person_dir(tmp_path: Path) -> Path:
     )
 
     # skills/ — 1 sample skill
-    (person_dir / "skills" / "python_coding.md").write_text(
+    (anima_dir / "skills" / "python_coding.md").write_text(
         """# Python コーディングスキル
 
 ## 概要
@@ -190,7 +190,7 @@ Pythonでの実装・テスト・デバッグが得意
 
     # Patch get_shared_dir to return our test shared directory
     with patch("core.paths.get_shared_dir", return_value=tmp_path / "shared"):
-        yield person_dir
+        yield anima_dir
 
 
 @pytest.fixture
@@ -236,7 +236,7 @@ merged-knowledge.md
   # テストから得られた教訓
 
   ## E2Eテストの重要性
-  - 実際のPerson環境で動作確認が必要
+  - 実際のAnima環境で動作確認が必要
   - モックだけでは不十分
 
   ## パフォーマンス目標
@@ -258,8 +258,8 @@ merged-knowledge.md
 
 
 @pytest.mark.asyncio
-async def test_priming_with_real_person_directory(person_dir: Path):
-    """Test priming works correctly with actual Person directory structure.
+async def test_priming_with_real_anima_directory(anima_dir: Path):
+    """Test priming works correctly with actual Anima directory structure.
 
     Verifies:
     - Channel A: Sender profile is retrieved
@@ -268,8 +268,8 @@ async def test_priming_with_real_person_directory(person_dir: Path):
     - Channel D: Skills are matched
     """
     # Patch get_shared_dir for this test
-    with patch("core.paths.get_shared_dir", return_value=person_dir.parent / "shared"):
-        engine = PrimingEngine(person_dir)
+    with patch("core.paths.get_shared_dir", return_value=anima_dir.parent / "shared"):
+        engine = PrimingEngine(anima_dir)
 
         # Prime with a message about priming and testing
         result = await engine.prime_memories(
@@ -311,7 +311,7 @@ async def test_priming_with_real_person_directory(person_dir: Path):
 
 
 @pytest.mark.asyncio
-async def test_message_to_response_flow(person_dir: Path):
+async def test_message_to_response_flow(anima_dir: Path):
     """Test end-to-end flow: message → priming → system prompt injection.
 
     Simulates the full workflow where:
@@ -322,8 +322,8 @@ async def test_message_to_response_flow(person_dir: Path):
 
     Note: AgentCore.run_cycle() is NOT called (that would require LLM).
     """
-    with patch("core.paths.get_shared_dir", return_value=person_dir.parent / "shared"):
-        engine = PrimingEngine(person_dir)
+    with patch("core.paths.get_shared_dir", return_value=anima_dir.parent / "shared"):
+        engine = PrimingEngine(anima_dir)
 
         # Simulate message reception
         message = "Chatworkで山田さんに進捗報告を送りたい"
@@ -363,7 +363,7 @@ async def test_message_to_response_flow(person_dir: Path):
 
 
 @pytest.mark.asyncio
-async def test_daily_consolidation_e2e(person_dir: Path, mock_llm):
+async def test_daily_consolidation_e2e(anima_dir: Path, mock_llm):
     """Test daily consolidation: episodes → knowledge creation.
 
     Verifies:
@@ -373,11 +373,11 @@ async def test_daily_consolidation_e2e(person_dir: Path, mock_llm):
     - [AUTO-CONSOLIDATED] tag is added
     - RAG index is updated (if available)
     """
-    engine = ConsolidationEngine(person_dir, "test_person")
+    engine = ConsolidationEngine(anima_dir, "test_anima")
 
     # Create some episode entries in the past 24 hours
     today = datetime.now().date()
-    episode_file = person_dir / "episodes" / f"{today}.md"
+    episode_file = anima_dir / "episodes" / f"{today}.md"
 
     # Add more entries to existing today's episode
     current_content = episode_file.read_text(encoding="utf-8")
@@ -417,7 +417,7 @@ async def test_daily_consolidation_e2e(person_dir: Path, mock_llm):
     if total_files > 0:
         if result["knowledge_files_created"]:
             new_file = result["knowledge_files_created"][0]
-            new_file_path = person_dir / "knowledge" / new_file
+            new_file_path = anima_dir / "knowledge" / new_file
             assert new_file_path.exists()
 
             content = new_file_path.read_text(encoding="utf-8")
@@ -425,7 +425,7 @@ async def test_daily_consolidation_e2e(person_dir: Path, mock_llm):
 
         if result["knowledge_files_updated"]:
             updated_file = result["knowledge_files_updated"][0]
-            updated_file_path = person_dir / "knowledge" / updated_file
+            updated_file_path = anima_dir / "knowledge" / updated_file
             assert updated_file_path.exists()
 
             content = updated_file_path.read_text(encoding="utf-8")
@@ -433,7 +433,7 @@ async def test_daily_consolidation_e2e(person_dir: Path, mock_llm):
 
 
 @pytest.mark.asyncio
-async def test_weekly_integration_e2e(person_dir: Path, mock_llm):
+async def test_weekly_integration_e2e(anima_dir: Path, mock_llm):
     """Test weekly integration: knowledge merging and episode compression.
 
     Verifies:
@@ -443,10 +443,10 @@ async def test_weekly_integration_e2e(person_dir: Path, mock_llm):
     - [COMPRESSED] tag is added
     - [IMPORTANT] tagged episodes are preserved
     """
-    engine = ConsolidationEngine(person_dir, "test_person")
+    engine = ConsolidationEngine(anima_dir, "test_anima")
 
     # Create duplicate knowledge files (simulate similar content)
-    (person_dir / "knowledge" / "test-lesson-1.md").write_text(
+    (anima_dir / "knowledge" / "test-lesson-1.md").write_text(
         """# テスト教訓1
 
 ## テストの重要性
@@ -458,7 +458,7 @@ async def test_weekly_integration_e2e(person_dir: Path, mock_llm):
         encoding="utf-8",
     )
 
-    (person_dir / "knowledge" / "test-lesson-2.md").write_text(
+    (anima_dir / "knowledge" / "test-lesson-2.md").write_text(
         """# テスト教訓2
 
 ## テストの重要性
@@ -472,7 +472,7 @@ async def test_weekly_integration_e2e(person_dir: Path, mock_llm):
 
     # Create old episode for compression (35 days ago)
     old_date = datetime.now().date() - timedelta(days=35)
-    old_episode_path = person_dir / "episodes" / f"{old_date}.md"
+    old_episode_path = anima_dir / "episodes" / f"{old_date}.md"
     old_episode_path.write_text(
         f"""# {old_date} 行動ログ
 
@@ -497,7 +497,7 @@ async def test_weekly_integration_e2e(person_dir: Path, mock_llm):
 
     # Create important episode that should NOT be compressed
     important_date = datetime.now().date() - timedelta(days=40)
-    important_episode_path = person_dir / "episodes" / f"{important_date}.md"
+    important_episode_path = anima_dir / "episodes" / f"{important_date}.md"
     important_episode_path.write_text(
         f"""# {important_date} 行動ログ [IMPORTANT]
 
@@ -532,11 +532,11 @@ async def test_weekly_integration_e2e(person_dir: Path, mock_llm):
     assert "test-lesson-2.md" in merge_info
 
     # Original files should be deleted, merged file should exist
-    assert not (person_dir / "knowledge" / "test-lesson-1.md").exists()
-    assert not (person_dir / "knowledge" / "test-lesson-2.md").exists()
+    assert not (anima_dir / "knowledge" / "test-lesson-1.md").exists()
+    assert not (anima_dir / "knowledge" / "test-lesson-2.md").exists()
 
     # Find merged file (could be merged-knowledge.md or similar)
-    merged_files = list((person_dir / "knowledge").glob("*.md"))
+    merged_files = list((anima_dir / "knowledge").glob("*.md"))
     # Filter out original files
     new_merged_files = [
         f for f in merged_files
@@ -563,7 +563,7 @@ async def test_weekly_integration_e2e(person_dir: Path, mock_llm):
 
 
 @pytest.mark.asyncio
-async def test_priming_performance_under_200ms(person_dir: Path):
+async def test_priming_performance_under_200ms(anima_dir: Path):
     """Test priming performance meets 200ms target (95th percentile).
 
     Runs 100 priming operations and measures latency distribution.
@@ -571,8 +571,8 @@ async def test_priming_performance_under_200ms(person_dir: Path):
 
     Note: CI environments may be slower, so we use a relaxed threshold (300ms).
     """
-    with patch("core.paths.get_shared_dir", return_value=person_dir.parent / "shared"):
-        engine = PrimingEngine(person_dir)
+    with patch("core.paths.get_shared_dir", return_value=anima_dir.parent / "shared"):
+        engine = PrimingEngine(anima_dir)
 
         # Prepare various test messages
         test_messages = [
@@ -653,13 +653,13 @@ async def test_priming_performance_under_200ms(person_dir: Path):
 @pytest.mark.asyncio
 async def test_priming_empty_directories(tmp_path: Path):
     """Test priming gracefully handles empty directories."""
-    person_dir = tmp_path / "empty_person"
-    person_dir.mkdir()
-    (person_dir / "knowledge").mkdir()
-    (person_dir / "episodes").mkdir()
-    (person_dir / "skills").mkdir()
+    anima_dir = tmp_path / "empty_anima"
+    anima_dir.mkdir()
+    (anima_dir / "knowledge").mkdir()
+    (anima_dir / "episodes").mkdir()
+    (anima_dir / "skills").mkdir()
 
-    engine = PrimingEngine(person_dir)
+    engine = PrimingEngine(anima_dir)
 
     result = await engine.prime_memories(
         message="Test message",
@@ -676,12 +676,12 @@ async def test_priming_empty_directories(tmp_path: Path):
 
 
 @pytest.mark.asyncio
-async def test_consolidation_skipped_when_no_episodes(person_dir: Path, mock_llm):
+async def test_consolidation_skipped_when_no_episodes(anima_dir: Path, mock_llm):
     """Test daily consolidation is skipped when insufficient episodes."""
-    engine = ConsolidationEngine(person_dir, "test_person")
+    engine = ConsolidationEngine(anima_dir, "test_anima")
 
     # Clear all episode files
-    for episode_file in (person_dir / "episodes").glob("*.md"):
+    for episode_file in (anima_dir / "episodes").glob("*.md"):
         episode_file.unlink()
 
     result = await engine.daily_consolidate(min_episodes=5)
@@ -693,10 +693,10 @@ async def test_consolidation_skipped_when_no_episodes(person_dir: Path, mock_llm
 
 
 @pytest.mark.asyncio
-async def test_priming_dynamic_budget_adjustment(person_dir: Path):
+async def test_priming_dynamic_budget_adjustment(anima_dir: Path):
     """Test dynamic budget adjustment based on message type."""
-    with patch("core.paths.get_shared_dir", return_value=person_dir.parent / "shared"):
-        engine = PrimingEngine(person_dir)
+    with patch("core.paths.get_shared_dir", return_value=anima_dir.parent / "shared"):
+        engine = PrimingEngine(anima_dir)
 
         # Test greeting (small budget: 500 tokens)
         greeting_result = await engine.prime_memories(

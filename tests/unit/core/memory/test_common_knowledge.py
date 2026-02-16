@@ -22,38 +22,38 @@ class TestMemoryIndexerCollectionPrefix:
     """Test that MemoryIndexer uses collection_prefix for naming."""
 
     @pytest.fixture
-    def person_dir(self, tmp_path: Path) -> Path:
-        d = tmp_path / "test_person"
+    def anima_dir(self, tmp_path: Path) -> Path:
+        d = tmp_path / "test_anima"
         d.mkdir()
         (d / "knowledge").mkdir()
         return d
 
-    def _make_indexer(self, vector_store, person_name, person_dir, **kwargs):
+    def _make_indexer(self, vector_store, anima_name, anima_dir, **kwargs):
         """Create a MemoryIndexer with mocked embedding model."""
         from core.memory.rag.indexer import MemoryIndexer
 
         with patch.object(MemoryIndexer, "_init_embedding_model"):
             indexer = MemoryIndexer(
                 vector_store,
-                person_name=person_name,
-                person_dir=person_dir,
+                anima_name=anima_name,
+                anima_dir=anima_dir,
                 **kwargs,
             )
             return indexer
 
     @pytest.fixture
-    def indexer_with_prefix(self, person_dir: Path):
+    def indexer_with_prefix(self, anima_dir: Path):
         """Create a MemoryIndexer with collection_prefix='shared'."""
         return self._make_indexer(
-            MagicMock(), "test_person", person_dir, collection_prefix="shared",
+            MagicMock(), "test_anima", anima_dir, collection_prefix="shared",
         )
 
     @pytest.fixture
-    def indexer_default_prefix(self, person_dir: Path):
+    def indexer_default_prefix(self, anima_dir: Path):
         """Create a MemoryIndexer without explicit collection_prefix."""
-        return self._make_indexer(MagicMock(), "alice", person_dir)
+        return self._make_indexer(MagicMock(), "alice", anima_dir)
 
-    def test_collection_prefix_defaults_to_person_name(
+    def test_collection_prefix_defaults_to_anima_name(
         self, indexer_default_prefix,
     ):
         assert indexer_default_prefix.collection_prefix == "alice"
@@ -62,9 +62,9 @@ class TestMemoryIndexerCollectionPrefix:
         assert indexer_with_prefix.collection_prefix == "shared"
 
     def test_make_chunk_id_uses_collection_prefix(
-        self, indexer_with_prefix, person_dir: Path,
+        self, indexer_with_prefix, anima_dir: Path,
     ):
-        test_file = person_dir / "knowledge" / "test.md"
+        test_file = anima_dir / "knowledge" / "test.md"
         test_file.write_text("content", encoding="utf-8")
         chunk_id = indexer_with_prefix._make_chunk_id(test_file, "knowledge", 0)
         assert chunk_id.startswith("shared/")
@@ -72,10 +72,10 @@ class TestMemoryIndexerCollectionPrefix:
         assert "test.md" in chunk_id
 
     def test_make_chunk_id_no_path_duplication(
-        self, indexer_with_prefix, person_dir: Path,
+        self, indexer_with_prefix, anima_dir: Path,
     ):
         """Chunk ID must NOT contain doubled directory (e.g. knowledge/knowledge/)."""
-        test_file = person_dir / "knowledge" / "test.md"
+        test_file = anima_dir / "knowledge" / "test.md"
         test_file.write_text("content", encoding="utf-8")
         chunk_id = indexer_with_prefix._make_chunk_id(test_file, "knowledge", 0)
         # Expected: shared/knowledge/test.md#0
@@ -84,10 +84,10 @@ class TestMemoryIndexerCollectionPrefix:
         assert "knowledge/knowledge/" not in chunk_id
 
     def test_make_chunk_id_no_path_duplication_episodes(
-        self, indexer_default_prefix, person_dir: Path,
+        self, indexer_default_prefix, anima_dir: Path,
     ):
         """Episode chunk IDs must not double the 'episodes' directory."""
-        episodes_dir = person_dir / "episodes"
+        episodes_dir = anima_dir / "episodes"
         episodes_dir.mkdir(exist_ok=True)
         test_file = episodes_dir / "2026-02-16.md"
         test_file.write_text("content", encoding="utf-8")
@@ -96,10 +96,10 @@ class TestMemoryIndexerCollectionPrefix:
         assert "episodes/episodes/" not in chunk_id
 
     def test_make_chunk_id_common_knowledge(
-        self, indexer_with_prefix, person_dir: Path,
+        self, indexer_with_prefix, anima_dir: Path,
     ):
         """common_knowledge type should produce clean IDs."""
-        ck_dir = person_dir / "common_knowledge"
+        ck_dir = anima_dir / "common_knowledge"
         ck_dir.mkdir(exist_ok=True)
         test_file = ck_dir / "guide.md"
         test_file.write_text("content", encoding="utf-8")
@@ -107,48 +107,48 @@ class TestMemoryIndexerCollectionPrefix:
         assert chunk_id == "shared/common_knowledge/guide.md#0"
         assert "common_knowledge/common_knowledge/" not in chunk_id
 
-    def test_make_chunk_id_default_uses_person_name(
-        self, indexer_default_prefix, person_dir: Path,
+    def test_make_chunk_id_default_uses_anima_name(
+        self, indexer_default_prefix, anima_dir: Path,
     ):
-        test_file = person_dir / "knowledge" / "test.md"
+        test_file = anima_dir / "knowledge" / "test.md"
         test_file.write_text("content", encoding="utf-8")
         chunk_id = indexer_default_prefix._make_chunk_id(test_file, "knowledge", 0)
         assert chunk_id.startswith("alice/")
 
     def test_extract_metadata_uses_collection_prefix(
-        self, indexer_with_prefix, person_dir: Path,
+        self, indexer_with_prefix, anima_dir: Path,
     ):
-        test_file = person_dir / "knowledge" / "test.md"
+        test_file = anima_dir / "knowledge" / "test.md"
         test_file.write_text("Some content here", encoding="utf-8")
         metadata = indexer_with_prefix._extract_metadata(
             test_file, "Some content here", "knowledge", 0, 1,
         )
-        assert metadata["person"] == "shared"
+        assert metadata["anima"] == "shared"
 
-    def test_extract_metadata_default_uses_person_name(
-        self, indexer_default_prefix, person_dir: Path,
+    def test_extract_metadata_default_uses_anima_name(
+        self, indexer_default_prefix, anima_dir: Path,
     ):
-        test_file = person_dir / "knowledge" / "test.md"
+        test_file = anima_dir / "knowledge" / "test.md"
         test_file.write_text("Some content here", encoding="utf-8")
         metadata = indexer_default_prefix._extract_metadata(
             test_file, "Some content here", "knowledge", 0, 1,
         )
-        assert metadata["person"] == "alice"
+        assert metadata["anima"] == "alice"
 
     def test_index_file_uses_collection_prefix_for_collection_name(
-        self, person_dir: Path,
+        self, anima_dir: Path,
     ):
         """index_file() creates collection named '{prefix}_{memory_type}'."""
         vector_store = MagicMock()
         indexer = self._make_indexer(
-            vector_store, "test_person", person_dir, collection_prefix="shared",
+            vector_store, "test_anima", anima_dir, collection_prefix="shared",
         )
         # Mock embedding generation
         indexer._generate_embeddings = MagicMock(
             return_value=[[0.0] * 384],
         )
 
-        test_file = person_dir / "knowledge" / "doc.md"
+        test_file = anima_dir / "knowledge" / "doc.md"
         test_file.write_text(
             "# Title\n\n## Section One\n\nContent here for testing.",
             encoding="utf-8",
@@ -169,8 +169,8 @@ class TestFileWatcherExtraWatchDirs:
     """Test FileWatcher with extra_watch_dirs for common_knowledge."""
 
     @pytest.fixture
-    def person_dir(self, tmp_path: Path) -> Path:
-        d = tmp_path / "person"
+    def anima_dir(self, tmp_path: Path) -> Path:
+        d = tmp_path / "anima"
         d.mkdir()
         for sub in ("knowledge", "episodes", "procedures", "skills"):
             (d / sub).mkdir()
@@ -183,13 +183,13 @@ class TestFileWatcherExtraWatchDirs:
         return d
 
     def test_get_memory_type_recognizes_extra_watch_dir(
-        self, person_dir: Path, common_knowledge_dir: Path,
+        self, anima_dir: Path, common_knowledge_dir: Path,
     ):
         from core.memory.rag.watcher import FileWatcher
 
         indexer = MagicMock()
         watcher = FileWatcher(
-            person_dir,
+            anima_dir,
             indexer,
             extra_watch_dirs=[(common_knowledge_dir, "common_knowledge")],
         )
@@ -199,21 +199,21 @@ class TestFileWatcherExtraWatchDirs:
         assert memory_type == "common_knowledge"
 
     def test_get_memory_type_still_recognizes_personal_dirs(
-        self, person_dir: Path, common_knowledge_dir: Path,
+        self, anima_dir: Path, common_knowledge_dir: Path,
     ):
         from core.memory.rag.watcher import FileWatcher
 
         indexer = MagicMock()
         watcher = FileWatcher(
-            person_dir,
+            anima_dir,
             indexer,
             extra_watch_dirs=[(common_knowledge_dir, "common_knowledge")],
         )
 
-        assert watcher._get_memory_type(person_dir / "knowledge" / "k.md") == "knowledge"
-        assert watcher._get_memory_type(person_dir / "episodes" / "e.md") == "episodes"
-        assert watcher._get_memory_type(person_dir / "procedures" / "p.md") == "procedures"
-        assert watcher._get_memory_type(person_dir / "skills" / "s.md") == "skills"
+        assert watcher._get_memory_type(anima_dir / "knowledge" / "k.md") == "knowledge"
+        assert watcher._get_memory_type(anima_dir / "episodes" / "e.md") == "episodes"
+        assert watcher._get_memory_type(anima_dir / "procedures" / "p.md") == "procedures"
+        assert watcher._get_memory_type(anima_dir / "skills" / "s.md") == "skills"
 
     def test_get_memory_type_extra_dir_takes_priority(
         self, tmp_path: Path,
@@ -221,15 +221,15 @@ class TestFileWatcherExtraWatchDirs:
         """If a file could match both extra and personal, extra wins (checked first)."""
         from core.memory.rag.watcher import FileWatcher
 
-        # Create a scenario where extra_dir is a subdir of person_dir
-        person_dir = tmp_path / "person"
-        person_dir.mkdir()
-        knowledge_dir = person_dir / "knowledge"
+        # Create a scenario where extra_dir is a subdir of anima_dir
+        anima_dir = tmp_path / "anima"
+        anima_dir.mkdir()
+        knowledge_dir = anima_dir / "knowledge"
         knowledge_dir.mkdir()
 
         indexer = MagicMock()
         watcher = FileWatcher(
-            person_dir,
+            anima_dir,
             indexer,
             extra_watch_dirs=[(knowledge_dir, "overridden_type")],
         )
@@ -238,13 +238,13 @@ class TestFileWatcherExtraWatchDirs:
         assert result == "overridden_type"
 
     def test_get_memory_type_unrecognized_returns_none(
-        self, person_dir: Path, common_knowledge_dir: Path,
+        self, anima_dir: Path, common_knowledge_dir: Path,
     ):
         from core.memory.rag.watcher import FileWatcher
 
         indexer = MagicMock()
         watcher = FileWatcher(
-            person_dir,
+            anima_dir,
             indexer,
             extra_watch_dirs=[(common_knowledge_dir, "common_knowledge")],
         )
@@ -252,22 +252,22 @@ class TestFileWatcherExtraWatchDirs:
         result = watcher._get_memory_type(Path("/some/random/path.md"))
         assert result is None
 
-    def test_extra_watch_dirs_default_empty(self, person_dir: Path):
+    def test_extra_watch_dirs_default_empty(self, anima_dir: Path):
         from core.memory.rag.watcher import FileWatcher
 
         indexer = MagicMock()
-        watcher = FileWatcher(person_dir, indexer)
+        watcher = FileWatcher(anima_dir, indexer)
         assert watcher._extra_watch_dirs == []
 
     def test_start_schedules_extra_watch_dirs(
-        self, person_dir: Path, common_knowledge_dir: Path,
+        self, anima_dir: Path, common_knowledge_dir: Path,
     ):
         """start() should schedule the extra_watch_dirs for observation."""
         from core.memory.rag.watcher import FileWatcher
 
         indexer = MagicMock()
         watcher = FileWatcher(
-            person_dir,
+            anima_dir,
             indexer,
             extra_watch_dirs=[(common_knowledge_dir, "common_knowledge")],
         )
@@ -320,7 +320,7 @@ class TestMemoryRetrieverIncludeShared:
 
         retriever.search(
             query="test",
-            person_name="alice",
+            anima_name="alice",
             memory_type="knowledge",
             top_k=3,
             include_shared=False,
@@ -340,7 +340,7 @@ class TestMemoryRetrieverIncludeShared:
 
         retriever.search(
             query="test",
-            person_name="alice",
+            anima_name="alice",
             memory_type="knowledge",
             top_k=3,
             include_shared=True,
@@ -363,7 +363,7 @@ class TestMemoryRetrieverIncludeShared:
 
         retriever.search(
             query="test",
-            person_name="alice",
+            anima_name="alice",
             memory_type="episodes",
             top_k=3,
             include_shared=True,
@@ -382,7 +382,7 @@ class TestMemoryRetrieverIncludeShared:
         personal_result.document.content = "Personal knowledge"
         personal_result.score = 0.9
         personal_result.document.metadata = {
-            "person": "alice",
+            "anima": "alice",
             "updated_at": "2026-02-15T00:00:00",
         }
 
@@ -391,7 +391,7 @@ class TestMemoryRetrieverIncludeShared:
         shared_result.document.content = "Shared knowledge"
         shared_result.score = 0.8
         shared_result.document.metadata = {
-            "person": "shared",
+            "anima": "shared",
             "updated_at": "2026-02-15T00:00:00",
         }
 
@@ -402,7 +402,7 @@ class TestMemoryRetrieverIncludeShared:
 
         results = retriever.search(
             query="test",
-            person_name="alice",
+            anima_name="alice",
             memory_type="knowledge",
             top_k=3,
             include_shared=True,
@@ -450,7 +450,7 @@ class TestEnsureRuntimeOnlyDirs:
 
         _ensure_runtime_only_dirs(data_dir)
 
-        assert (data_dir / "persons").is_dir()
+        assert (data_dir / "animas").is_dir()
         assert (data_dir / "shared" / "inbox").is_dir()
         assert (data_dir / "shared" / "users").is_dir()
         assert (data_dir / "tmp" / "attachments").is_dir()
@@ -465,20 +465,20 @@ class TestToolHandlerCommonKnowledgeRead:
     """Test ToolHandler._handle_read_memory_file with common_knowledge/ prefix."""
 
     @pytest.fixture
-    def person_dir(self, tmp_path: Path) -> Path:
-        d = tmp_path / "persons" / "test-person"
+    def anima_dir(self, tmp_path: Path) -> Path:
+        d = tmp_path / "animas" / "test-anima"
         d.mkdir(parents=True)
         return d
 
     @pytest.fixture
-    def handler(self, person_dir: Path):
+    def handler(self, anima_dir: Path):
         from core.tooling.handler import ToolHandler
 
         memory = MagicMock()
         memory.read_permissions.return_value = ""
         memory.search_memory_text.return_value = []
         return ToolHandler(
-            person_dir=person_dir,
+            anima_dir=anima_dir,
             memory=memory,
             messenger=None,
             tool_registry=[],
@@ -519,11 +519,11 @@ class TestToolHandlerCommonKnowledgeRead:
             )
         assert result == "deep content"
 
-    def test_non_common_knowledge_prefix_uses_person_dir(
-        self, handler, person_dir: Path,
+    def test_non_common_knowledge_prefix_uses_anima_dir(
+        self, handler, anima_dir: Path,
     ):
-        (person_dir / "knowledge").mkdir(exist_ok=True)
-        (person_dir / "knowledge" / "local.md").write_text(
+        (anima_dir / "knowledge").mkdir(exist_ok=True)
+        (anima_dir / "knowledge" / "local.md").write_text(
             "local content", encoding="utf-8",
         )
         result = handler.handle(
@@ -540,18 +540,18 @@ class TestManagerVectorSearchMemory:
     """Test MemoryManager._vector_search_memory with include_shared."""
 
     @pytest.fixture
-    def person_dir(self, tmp_path: Path) -> Path:
-        d = tmp_path / "person"
+    def anima_dir(self, tmp_path: Path) -> Path:
+        d = tmp_path / "anima"
         d.mkdir()
         return d
 
     def test_vector_search_sets_include_shared_for_common_knowledge(
-        self, person_dir: Path, data_dir: Path,
+        self, anima_dir: Path, data_dir: Path,
     ):
         """scope='common_knowledge' passes include_shared=True to retriever."""
         from core.memory.manager import MemoryManager
 
-        mm = MemoryManager(person_dir)
+        mm = MemoryManager(anima_dir)
 
         # Mock the indexer so _vector_search_memory runs
         mm._indexer = MagicMock()
@@ -570,12 +570,12 @@ class TestManagerVectorSearchMemory:
             assert call_kwargs.kwargs.get("include_shared") is True
 
     def test_vector_search_sets_include_shared_for_all(
-        self, person_dir: Path, data_dir: Path,
+        self, anima_dir: Path, data_dir: Path,
     ):
         """scope='all' passes include_shared=True to retriever."""
         from core.memory.manager import MemoryManager
 
-        mm = MemoryManager(person_dir)
+        mm = MemoryManager(anima_dir)
         mm._indexer = MagicMock()
         mm._indexer.vector_store = MagicMock()
 
@@ -590,12 +590,12 @@ class TestManagerVectorSearchMemory:
             assert call_kwargs.kwargs.get("include_shared") is True
 
     def test_vector_search_no_shared_for_knowledge_only(
-        self, person_dir: Path, data_dir: Path,
+        self, anima_dir: Path, data_dir: Path,
     ):
         """scope='knowledge' does NOT pass include_shared=True."""
         from core.memory.manager import MemoryManager
 
-        mm = MemoryManager(person_dir)
+        mm = MemoryManager(anima_dir)
         mm._indexer = MagicMock()
         mm._indexer.vector_store = MagicMock()
 

@@ -1,5 +1,5 @@
 from __future__ import annotations
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
@@ -32,7 +32,7 @@ class TelegramChannel(NotificationChannel):
         body: str,
         priority: str = "normal",
         *,
-        person_name: str = "",
+        anima_name: str = "",
     ) -> str:
         token = self._resolve_env("bot_token_env")
         if not token:
@@ -43,7 +43,7 @@ class TelegramChannel(NotificationChannel):
             return "telegram: ERROR - chat_id not configured"
 
         prefix = f"[{priority.upper()}] " if priority in ("high", "urgent") else ""
-        sender = f" (from {person_name})" if person_name else ""
+        sender = f" (from {anima_name})" if anima_name else ""
         safe_subject = html.escape(subject)
         safe_body = html.escape(body)
         text = f"{prefix}<b>{safe_subject}</b>{sender}\n\n{safe_body}"

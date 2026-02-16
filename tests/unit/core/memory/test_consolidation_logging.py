@@ -22,9 +22,9 @@ class TestConsolidationPromptContent:
 
     @pytest.fixture
     def engine(self, tmp_path: Path) -> ConsolidationEngine:
-        person_dir = tmp_path / "persons" / "sakura"
-        person_dir.mkdir(parents=True)
-        return ConsolidationEngine(person_dir, "sakura")
+        anima_dir = tmp_path / "animas" / "sakura"
+        anima_dir.mkdir(parents=True)
+        return ConsolidationEngine(anima_dir, "sakura")
 
     @pytest.mark.asyncio
     async def test_prompt_requires_specific_info_extraction(self, engine):
@@ -77,9 +77,9 @@ class TestConsolidationLLMResponseLogging:
 
     @pytest.fixture
     def engine(self, tmp_path: Path) -> ConsolidationEngine:
-        person_dir = tmp_path / "persons" / "sakura"
-        person_dir.mkdir(parents=True)
-        return ConsolidationEngine(person_dir, "sakura")
+        anima_dir = tmp_path / "animas" / "sakura"
+        anima_dir.mkdir(parents=True)
+        return ConsolidationEngine(anima_dir, "sakura")
 
     @pytest.mark.asyncio
     async def test_llm_response_logged_at_info(self, engine, caplog):
@@ -106,9 +106,9 @@ class TestMergeToKnowledgeLogging:
 
     @pytest.fixture
     def engine(self, tmp_path: Path) -> ConsolidationEngine:
-        person_dir = tmp_path / "persons" / "sakura"
-        person_dir.mkdir(parents=True)
-        return ConsolidationEngine(person_dir, "sakura")
+        anima_dir = tmp_path / "animas" / "sakura"
+        anima_dir.mkdir(parents=True)
+        return ConsolidationEngine(anima_dir, "sakura")
 
     def test_empty_response_logs_warning(self, engine, caplog):
         with caplog.at_level(logging.WARNING, logger="animaworks.consolidation"):

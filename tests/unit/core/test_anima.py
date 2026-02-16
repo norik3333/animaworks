@@ -1,4 +1,4 @@
-"""Unit tests for core/person.py — DigitalPerson entity."""
+"""Unit tests for core/anima.py — DigitalAnima entity."""
 from __future__ import annotations
 
 import asyncio
@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch, PropertyMock
 
 import pytest
 
-from core.schemas import CycleResult, PersonStatus
+from core.schemas import CycleResult, AnimaStatus
 
 
 # ── Helpers ───────────────────────────────────────────────
@@ -21,77 +21,77 @@ def _make_cycle_result(**kwargs) -> CycleResult:
     return CycleResult(**defaults)
 
 
-# ── DigitalPerson construction ────────────────────────────
+# ── DigitalAnima construction ────────────────────────────
 
 
-class TestDigitalPersonInit:
-    def test_init(self, data_dir, make_person):
-        person_dir = make_person("alice")
+class TestDigitalAnimaInit:
+    def test_init(self, data_dir, make_anima):
+        anima_dir = make_anima("alice")
         shared_dir = data_dir / "shared"
 
-        with patch("core.person.AgentCore") as MockAgent, \
-             patch("core.person.MemoryManager") as MockMM, \
-             patch("core.person.Messenger") as MockMessenger:
+        with patch("core.anima.AgentCore") as MockAgent, \
+             patch("core.anima.MemoryManager") as MockMM, \
+             patch("core.anima.Messenger") as MockMessenger:
             MockMM.return_value.read_model_config.return_value = MagicMock()
-            from core.person import DigitalPerson
-            dp = DigitalPerson(person_dir, shared_dir)
+            from core.anima import DigitalAnima
+            dp = DigitalAnima(anima_dir, shared_dir)
 
             assert dp.name == "alice"
-            assert dp.person_dir == person_dir
+            assert dp.anima_dir == anima_dir
             assert dp._status == "idle"
             assert dp._current_task == ""
             assert dp._last_heartbeat is None
             assert dp._last_activity is None
 
 
-class TestDigitalPersonStatus:
-    def test_status_property(self, data_dir, make_person):
-        person_dir = make_person("alice")
+class TestDigitalAnimaStatus:
+    def test_status_property(self, data_dir, make_anima):
+        anima_dir = make_anima("alice")
         shared_dir = data_dir / "shared"
 
-        with patch("core.person.AgentCore") as MockAgent, \
-             patch("core.person.MemoryManager") as MockMM, \
-             patch("core.person.Messenger") as MockMessenger:
+        with patch("core.anima.AgentCore") as MockAgent, \
+             patch("core.anima.MemoryManager") as MockMM, \
+             patch("core.anima.Messenger") as MockMessenger:
             MockMM.return_value.read_model_config.return_value = MagicMock()
             MockMessenger.return_value.unread_count.return_value = 5
-            from core.person import DigitalPerson
-            dp = DigitalPerson(person_dir, shared_dir)
+            from core.anima import DigitalAnima
+            dp = DigitalAnima(anima_dir, shared_dir)
 
             status = dp.status
-            assert isinstance(status, PersonStatus)
+            assert isinstance(status, AnimaStatus)
             assert status.name == "alice"
             assert status.status == "idle"
             assert status.pending_messages == 5
 
 
 class TestNeedsBootstrap:
-    def test_needs_bootstrap_true(self, data_dir, make_person):
-        person_dir = make_person("alice")
+    def test_needs_bootstrap_true(self, data_dir, make_anima):
+        anima_dir = make_anima("alice")
         shared_dir = data_dir / "shared"
-        (person_dir / "bootstrap.md").write_text("bootstrap", encoding="utf-8")
+        (anima_dir / "bootstrap.md").write_text("bootstrap", encoding="utf-8")
 
-        with patch("core.person.AgentCore"), \
-             patch("core.person.MemoryManager") as MockMM, \
-             patch("core.person.Messenger"):
+        with patch("core.anima.AgentCore"), \
+             patch("core.anima.MemoryManager") as MockMM, \
+             patch("core.anima.Messenger"):
             MockMM.return_value.read_model_config.return_value = MagicMock()
-            from core.person import DigitalPerson
-            dp = DigitalPerson(person_dir, shared_dir)
+            from core.anima import DigitalAnima
+            dp = DigitalAnima(anima_dir, shared_dir)
             assert dp.needs_bootstrap is True
 
-    def test_needs_bootstrap_false(self, data_dir, make_person):
-        person_dir = make_person("alice")
+    def test_needs_bootstrap_false(self, data_dir, make_anima):
+        anima_dir = make_anima("alice")
         shared_dir = data_dir / "shared"
         # Ensure no bootstrap.md
-        bp = person_dir / "bootstrap.md"
+        bp = anima_dir / "bootstrap.md"
         if bp.exists():
             bp.unlink()
 
-        with patch("core.person.AgentCore"), \
-             patch("core.person.MemoryManager") as MockMM, \
-             patch("core.person.Messenger"):
+        with patch("core.anima.AgentCore"), \
+             patch("core.anima.MemoryManager") as MockMM, \
+             patch("core.anima.Messenger"):
             MockMM.return_value.read_model_config.return_value = MagicMock()
-            from core.person import DigitalPerson
-            dp = DigitalPerson(person_dir, shared_dir)
+            from core.anima import DigitalAnima
+            dp = DigitalAnima(anima_dir, shared_dir)
             assert dp.needs_bootstrap is False
 
 
@@ -99,74 +99,74 @@ class TestNeedsBootstrap:
 
 
 class TestCallbacks:
-    def test_set_on_message_sent(self, data_dir, make_person):
-        person_dir = make_person("alice")
+    def test_set_on_message_sent(self, data_dir, make_anima):
+        anima_dir = make_anima("alice")
         shared_dir = data_dir / "shared"
 
-        with patch("core.person.AgentCore") as MockAgent, \
-             patch("core.person.MemoryManager") as MockMM, \
-             patch("core.person.Messenger"):
+        with patch("core.anima.AgentCore") as MockAgent, \
+             patch("core.anima.MemoryManager") as MockMM, \
+             patch("core.anima.Messenger"):
             MockMM.return_value.read_model_config.return_value = MagicMock()
-            from core.person import DigitalPerson
-            dp = DigitalPerson(person_dir, shared_dir)
+            from core.anima import DigitalAnima
+            dp = DigitalAnima(anima_dir, shared_dir)
             fn = MagicMock()
             dp.set_on_message_sent(fn)
             dp.agent.set_on_message_sent.assert_called_once_with(fn)
 
-    def test_set_on_lock_released(self, data_dir, make_person):
-        person_dir = make_person("alice")
+    def test_set_on_lock_released(self, data_dir, make_anima):
+        anima_dir = make_anima("alice")
         shared_dir = data_dir / "shared"
 
-        with patch("core.person.AgentCore"), \
-             patch("core.person.MemoryManager") as MockMM, \
-             patch("core.person.Messenger"):
+        with patch("core.anima.AgentCore"), \
+             patch("core.anima.MemoryManager") as MockMM, \
+             patch("core.anima.Messenger"):
             MockMM.return_value.read_model_config.return_value = MagicMock()
-            from core.person import DigitalPerson
-            dp = DigitalPerson(person_dir, shared_dir)
+            from core.anima import DigitalAnima
+            dp = DigitalAnima(anima_dir, shared_dir)
             fn = MagicMock()
             dp.set_on_lock_released(fn)
             assert dp._on_lock_released is fn
 
 
 class TestNotifyLockReleased:
-    def test_calls_callback(self, data_dir, make_person):
-        person_dir = make_person("alice")
+    def test_calls_callback(self, data_dir, make_anima):
+        anima_dir = make_anima("alice")
         shared_dir = data_dir / "shared"
 
-        with patch("core.person.AgentCore"), \
-             patch("core.person.MemoryManager") as MockMM, \
-             patch("core.person.Messenger"):
+        with patch("core.anima.AgentCore"), \
+             patch("core.anima.MemoryManager") as MockMM, \
+             patch("core.anima.Messenger"):
             MockMM.return_value.read_model_config.return_value = MagicMock()
-            from core.person import DigitalPerson
-            dp = DigitalPerson(person_dir, shared_dir)
+            from core.anima import DigitalAnima
+            dp = DigitalAnima(anima_dir, shared_dir)
             fn = MagicMock()
             dp._on_lock_released = fn
             dp._notify_lock_released()
             fn.assert_called_once()
 
-    def test_no_callback(self, data_dir, make_person):
-        person_dir = make_person("alice")
+    def test_no_callback(self, data_dir, make_anima):
+        anima_dir = make_anima("alice")
         shared_dir = data_dir / "shared"
 
-        with patch("core.person.AgentCore"), \
-             patch("core.person.MemoryManager") as MockMM, \
-             patch("core.person.Messenger"):
+        with patch("core.anima.AgentCore"), \
+             patch("core.anima.MemoryManager") as MockMM, \
+             patch("core.anima.Messenger"):
             MockMM.return_value.read_model_config.return_value = MagicMock()
-            from core.person import DigitalPerson
-            dp = DigitalPerson(person_dir, shared_dir)
+            from core.anima import DigitalAnima
+            dp = DigitalAnima(anima_dir, shared_dir)
             dp._on_lock_released = None
             dp._notify_lock_released()  # should not raise
 
-    def test_exception_in_callback_is_caught(self, data_dir, make_person):
-        person_dir = make_person("alice")
+    def test_exception_in_callback_is_caught(self, data_dir, make_anima):
+        anima_dir = make_anima("alice")
         shared_dir = data_dir / "shared"
 
-        with patch("core.person.AgentCore"), \
-             patch("core.person.MemoryManager") as MockMM, \
-             patch("core.person.Messenger"):
+        with patch("core.anima.AgentCore"), \
+             patch("core.anima.MemoryManager") as MockMM, \
+             patch("core.anima.Messenger"):
             MockMM.return_value.read_model_config.return_value = MagicMock()
-            from core.person import DigitalPerson
-            dp = DigitalPerson(person_dir, shared_dir)
+            from core.anima import DigitalAnima
+            dp = DigitalAnima(anima_dir, shared_dir)
             dp._on_lock_released = MagicMock(side_effect=RuntimeError("boom"))
             dp._notify_lock_released()  # should not raise
 
@@ -175,14 +175,14 @@ class TestNotifyLockReleased:
 
 
 class TestProcessMessage:
-    async def test_process_message_returns_summary(self, data_dir, make_person):
-        person_dir = make_person("alice")
+    async def test_process_message_returns_summary(self, data_dir, make_anima):
+        anima_dir = make_anima("alice")
         shared_dir = data_dir / "shared"
 
-        with patch("core.person.AgentCore") as MockAgent, \
-             patch("core.person.MemoryManager") as MockMM, \
-             patch("core.person.Messenger"), \
-             patch("core.person.ConversationMemory") as MockConv:
+        with patch("core.anima.AgentCore") as MockAgent, \
+             patch("core.anima.MemoryManager") as MockMM, \
+             patch("core.anima.Messenger"), \
+             patch("core.anima.ConversationMemory") as MockConv:
             MockMM.return_value.read_model_config.return_value = MagicMock()
             MockConv.return_value.compress_if_needed = AsyncMock()
             MockConv.return_value.finalize_session = AsyncMock(return_value=False)
@@ -190,22 +190,22 @@ class TestProcessMessage:
             MockConv.return_value.append_turn = MagicMock()
             MockConv.return_value.save = MagicMock()
 
-            from core.person import DigitalPerson
-            dp = DigitalPerson(person_dir, shared_dir)
+            from core.anima import DigitalAnima
+            dp = DigitalAnima(anima_dir, shared_dir)
             dp.agent.run_cycle = AsyncMock(return_value=_make_cycle_result(summary="Hello!"))
 
             result = await dp.process_message("Hi", from_person="human")
             assert result == "Hello!"
             assert dp._status == "idle"
 
-    async def test_status_transitions(self, data_dir, make_person):
-        person_dir = make_person("alice")
+    async def test_status_transitions(self, data_dir, make_anima):
+        anima_dir = make_anima("alice")
         shared_dir = data_dir / "shared"
 
-        with patch("core.person.AgentCore") as MockAgent, \
-             patch("core.person.MemoryManager") as MockMM, \
-             patch("core.person.Messenger"), \
-             patch("core.person.ConversationMemory") as MockConv:
+        with patch("core.anima.AgentCore") as MockAgent, \
+             patch("core.anima.MemoryManager") as MockMM, \
+             patch("core.anima.Messenger"), \
+             patch("core.anima.ConversationMemory") as MockConv:
             MockMM.return_value.read_model_config.return_value = MagicMock()
             MockConv.return_value.compress_if_needed = AsyncMock()
             MockConv.return_value.finalize_session = AsyncMock(return_value=False)
@@ -213,8 +213,8 @@ class TestProcessMessage:
             MockConv.return_value.append_turn = MagicMock()
             MockConv.return_value.save = MagicMock()
 
-            from core.person import DigitalPerson
-            dp = DigitalPerson(person_dir, shared_dir)
+            from core.anima import DigitalAnima
+            dp = DigitalAnima(anima_dir, shared_dir)
 
             observed_statuses = []
 
@@ -227,21 +227,21 @@ class TestProcessMessage:
             assert "thinking" in observed_statuses
             assert dp._status == "idle"
 
-    async def test_exception_resets_status(self, data_dir, make_person):
-        person_dir = make_person("alice")
+    async def test_exception_resets_status(self, data_dir, make_anima):
+        anima_dir = make_anima("alice")
         shared_dir = data_dir / "shared"
 
-        with patch("core.person.AgentCore"), \
-             patch("core.person.MemoryManager") as MockMM, \
-             patch("core.person.Messenger"), \
-             patch("core.person.ConversationMemory") as MockConv:
+        with patch("core.anima.AgentCore"), \
+             patch("core.anima.MemoryManager") as MockMM, \
+             patch("core.anima.Messenger"), \
+             patch("core.anima.ConversationMemory") as MockConv:
             MockMM.return_value.read_model_config.return_value = MagicMock()
             MockConv.return_value.compress_if_needed = AsyncMock()
             MockConv.return_value.finalize_session = AsyncMock(return_value=False)
             MockConv.return_value.build_chat_prompt.return_value = "prompt"
 
-            from core.person import DigitalPerson
-            dp = DigitalPerson(person_dir, shared_dir)
+            from core.anima import DigitalAnima
+            dp = DigitalAnima(anima_dir, shared_dir)
             dp.agent.run_cycle = AsyncMock(side_effect=RuntimeError("fail"))
 
             with pytest.raises(RuntimeError):
@@ -253,20 +253,20 @@ class TestProcessMessage:
 
 
 class TestRunHeartbeat:
-    async def test_run_heartbeat(self, data_dir, make_person):
-        person_dir = make_person("alice")
+    async def test_run_heartbeat(self, data_dir, make_anima):
+        anima_dir = make_anima("alice")
         shared_dir = data_dir / "shared"
 
-        with patch("core.person.AgentCore"), \
-             patch("core.person.MemoryManager") as MockMM, \
-             patch("core.person.Messenger") as MockMsg, \
-             patch("core.person.load_prompt", return_value="prompt"):
+        with patch("core.anima.AgentCore"), \
+             patch("core.anima.MemoryManager") as MockMM, \
+             patch("core.anima.Messenger") as MockMsg, \
+             patch("core.anima.load_prompt", return_value="prompt"):
             MockMM.return_value.read_model_config.return_value = MagicMock()
             MockMM.return_value.read_heartbeat_config.return_value = "checklist"
             MockMsg.return_value.has_unread.return_value = False
 
-            from core.person import DigitalPerson
-            dp = DigitalPerson(person_dir, shared_dir)
+            from core.anima import DigitalAnima
+            dp = DigitalAnima(anima_dir, shared_dir)
             dp.agent.run_cycle = AsyncMock(return_value=_make_cycle_result())
             dp.agent.reset_reply_tracking = MagicMock()
             dp.agent.replied_to = set()
@@ -281,18 +281,18 @@ class TestRunHeartbeat:
 
 
 class TestRunCronTask:
-    async def test_run_cron_task(self, data_dir, make_person):
-        person_dir = make_person("alice")
+    async def test_run_cron_task(self, data_dir, make_anima):
+        anima_dir = make_anima("alice")
         shared_dir = data_dir / "shared"
 
-        with patch("core.person.AgentCore"), \
-             patch("core.person.MemoryManager") as MockMM, \
-             patch("core.person.Messenger"), \
-             patch("core.person.load_prompt", return_value="cron prompt"):
+        with patch("core.anima.AgentCore"), \
+             patch("core.anima.MemoryManager") as MockMM, \
+             patch("core.anima.Messenger"), \
+             patch("core.anima.load_prompt", return_value="cron prompt"):
             MockMM.return_value.read_model_config.return_value = MagicMock()
 
-            from core.person import DigitalPerson
-            dp = DigitalPerson(person_dir, shared_dir)
+            from core.anima import DigitalAnima
+            dp = DigitalAnima(anima_dir, shared_dir)
             dp.agent.run_cycle = AsyncMock(return_value=_make_cycle_result())
 
             result = await dp.run_cron_task("daily_report", "Generate report")
@@ -304,21 +304,21 @@ class TestRunCronTask:
 
 
 class TestProcessGreet:
-    async def test_greet_returns_response(self, data_dir, make_person):
-        person_dir = make_person("alice")
+    async def test_greet_returns_response(self, data_dir, make_anima):
+        anima_dir = make_anima("alice")
         shared_dir = data_dir / "shared"
 
-        with patch("core.person.AgentCore") as MockAgent, \
-             patch("core.person.MemoryManager") as MockMM, \
-             patch("core.person.Messenger"), \
-             patch("core.person.ConversationMemory") as MockConv, \
-             patch("core.person.load_prompt", return_value="greet prompt"):
+        with patch("core.anima.AgentCore") as MockAgent, \
+             patch("core.anima.MemoryManager") as MockMM, \
+             patch("core.anima.Messenger"), \
+             patch("core.anima.ConversationMemory") as MockConv, \
+             patch("core.anima.load_prompt", return_value="greet prompt"):
             MockMM.return_value.read_model_config.return_value = MagicMock()
             MockConv.return_value.append_turn = MagicMock()
             MockConv.return_value.save = MagicMock()
 
-            from core.person import DigitalPerson
-            dp = DigitalPerson(person_dir, shared_dir)
+            from core.anima import DigitalAnima
+            dp = DigitalAnima(anima_dir, shared_dir)
             dp.agent.run_cycle = AsyncMock(
                 return_value=_make_cycle_result(
                     summary='こんにちは！今は待機中です。<!-- emotion: {"emotion": "smile"} -->'
@@ -330,21 +330,21 @@ class TestProcessGreet:
             assert result["emotion"] == "smile"
             assert result["cached"] is False
 
-    async def test_greet_caches_response(self, data_dir, make_person):
-        person_dir = make_person("alice")
+    async def test_greet_caches_response(self, data_dir, make_anima):
+        anima_dir = make_anima("alice")
         shared_dir = data_dir / "shared"
 
-        with patch("core.person.AgentCore"), \
-             patch("core.person.MemoryManager") as MockMM, \
-             patch("core.person.Messenger"), \
-             patch("core.person.ConversationMemory") as MockConv, \
-             patch("core.person.load_prompt", return_value="greet prompt"):
+        with patch("core.anima.AgentCore"), \
+             patch("core.anima.MemoryManager") as MockMM, \
+             patch("core.anima.Messenger"), \
+             patch("core.anima.ConversationMemory") as MockConv, \
+             patch("core.anima.load_prompt", return_value="greet prompt"):
             MockMM.return_value.read_model_config.return_value = MagicMock()
             MockConv.return_value.append_turn = MagicMock()
             MockConv.return_value.save = MagicMock()
 
-            from core.person import DigitalPerson
-            dp = DigitalPerson(person_dir, shared_dir)
+            from core.anima import DigitalAnima
+            dp = DigitalAnima(anima_dir, shared_dir)
             dp.agent.run_cycle = AsyncMock(
                 return_value=_make_cycle_result(summary="Hello!")
             )
@@ -360,21 +360,21 @@ class TestProcessGreet:
             # LLM should only be called once
             assert dp.agent.run_cycle.await_count == 1
 
-    async def test_greet_cache_expires(self, data_dir, make_person):
-        person_dir = make_person("alice")
+    async def test_greet_cache_expires(self, data_dir, make_anima):
+        anima_dir = make_anima("alice")
         shared_dir = data_dir / "shared"
 
-        with patch("core.person.AgentCore"), \
-             patch("core.person.MemoryManager") as MockMM, \
-             patch("core.person.Messenger"), \
-             patch("core.person.ConversationMemory") as MockConv, \
-             patch("core.person.load_prompt", return_value="greet prompt"):
+        with patch("core.anima.AgentCore"), \
+             patch("core.anima.MemoryManager") as MockMM, \
+             patch("core.anima.Messenger"), \
+             patch("core.anima.ConversationMemory") as MockConv, \
+             patch("core.anima.load_prompt", return_value="greet prompt"):
             MockMM.return_value.read_model_config.return_value = MagicMock()
             MockConv.return_value.append_turn = MagicMock()
             MockConv.return_value.save = MagicMock()
 
-            from core.person import DigitalPerson
-            dp = DigitalPerson(person_dir, shared_dir)
+            from core.anima import DigitalAnima
+            dp = DigitalAnima(anima_dir, shared_dir)
             dp.agent.run_cycle = AsyncMock(
                 return_value=_make_cycle_result(summary="Hello!")
             )
@@ -390,21 +390,21 @@ class TestProcessGreet:
             assert result["cached"] is False
             assert dp.agent.run_cycle.await_count == 2
 
-    async def test_greet_records_visit_and_assistant_turns(self, data_dir, make_person):
-        person_dir = make_person("alice")
+    async def test_greet_records_visit_and_assistant_turns(self, data_dir, make_anima):
+        anima_dir = make_anima("alice")
         shared_dir = data_dir / "shared"
 
-        with patch("core.person.AgentCore"), \
-             patch("core.person.MemoryManager") as MockMM, \
-             patch("core.person.Messenger"), \
-             patch("core.person.ConversationMemory") as MockConv, \
-             patch("core.person.load_prompt", return_value="greet prompt"):
+        with patch("core.anima.AgentCore"), \
+             patch("core.anima.MemoryManager") as MockMM, \
+             patch("core.anima.Messenger"), \
+             patch("core.anima.ConversationMemory") as MockConv, \
+             patch("core.anima.load_prompt", return_value="greet prompt"):
             MockMM.return_value.read_model_config.return_value = MagicMock()
             MockConv.return_value.append_turn = MagicMock()
             MockConv.return_value.save = MagicMock()
 
-            from core.person import DigitalPerson
-            dp = DigitalPerson(person_dir, shared_dir)
+            from core.anima import DigitalAnima
+            dp = DigitalAnima(anima_dir, shared_dir)
             dp.agent.run_cycle = AsyncMock(
                 return_value=_make_cycle_result(summary="Hi there!")
             )
@@ -420,21 +420,21 @@ class TestProcessGreet:
             assert MockConv.return_value.append_turn.call_count == 2
             assert MockConv.return_value.save.call_count == 2
 
-    async def test_greet_restores_previous_status(self, data_dir, make_person):
-        person_dir = make_person("alice")
+    async def test_greet_restores_previous_status(self, data_dir, make_anima):
+        anima_dir = make_anima("alice")
         shared_dir = data_dir / "shared"
 
-        with patch("core.person.AgentCore"), \
-             patch("core.person.MemoryManager") as MockMM, \
-             patch("core.person.Messenger"), \
-             patch("core.person.ConversationMemory") as MockConv, \
-             patch("core.person.load_prompt", return_value="greet prompt"):
+        with patch("core.anima.AgentCore"), \
+             patch("core.anima.MemoryManager") as MockMM, \
+             patch("core.anima.Messenger"), \
+             patch("core.anima.ConversationMemory") as MockConv, \
+             patch("core.anima.load_prompt", return_value="greet prompt"):
             MockMM.return_value.read_model_config.return_value = MagicMock()
             MockConv.return_value.append_turn = MagicMock()
             MockConv.return_value.save = MagicMock()
 
-            from core.person import DigitalPerson
-            dp = DigitalPerson(person_dir, shared_dir)
+            from core.anima import DigitalAnima
+            dp = DigitalAnima(anima_dir, shared_dir)
 
             # Set pre-existing status
             dp._status = "working"
@@ -456,21 +456,21 @@ class TestProcessGreet:
             assert dp._status == "working"
             assert dp._current_task == "Report generation"
 
-    async def test_greet_emotion_fallback(self, data_dir, make_person):
-        person_dir = make_person("alice")
+    async def test_greet_emotion_fallback(self, data_dir, make_anima):
+        anima_dir = make_anima("alice")
         shared_dir = data_dir / "shared"
 
-        with patch("core.person.AgentCore"), \
-             patch("core.person.MemoryManager") as MockMM, \
-             patch("core.person.Messenger"), \
-             patch("core.person.ConversationMemory") as MockConv, \
-             patch("core.person.load_prompt", return_value="greet prompt"):
+        with patch("core.anima.AgentCore"), \
+             patch("core.anima.MemoryManager") as MockMM, \
+             patch("core.anima.Messenger"), \
+             patch("core.anima.ConversationMemory") as MockConv, \
+             patch("core.anima.load_prompt", return_value="greet prompt"):
             MockMM.return_value.read_model_config.return_value = MagicMock()
             MockConv.return_value.append_turn = MagicMock()
             MockConv.return_value.save = MagicMock()
 
-            from core.person import DigitalPerson
-            dp = DigitalPerson(person_dir, shared_dir)
+            from core.anima import DigitalAnima
+            dp = DigitalAnima(anima_dir, shared_dir)
             # No emotion tag in response
             dp.agent.run_cycle = AsyncMock(
                 return_value=_make_cycle_result(summary="Plain greeting")
@@ -479,18 +479,18 @@ class TestProcessGreet:
             result = await dp.process_greet()
             assert result["emotion"] == "neutral"
 
-    async def test_greet_exception_restores_status(self, data_dir, make_person):
-        person_dir = make_person("alice")
+    async def test_greet_exception_restores_status(self, data_dir, make_anima):
+        anima_dir = make_anima("alice")
         shared_dir = data_dir / "shared"
 
-        with patch("core.person.AgentCore"), \
-             patch("core.person.MemoryManager") as MockMM, \
-             patch("core.person.Messenger"), \
-             patch("core.person.load_prompt", return_value="greet prompt"):
+        with patch("core.anima.AgentCore"), \
+             patch("core.anima.MemoryManager") as MockMM, \
+             patch("core.anima.Messenger"), \
+             patch("core.anima.load_prompt", return_value="greet prompt"):
             MockMM.return_value.read_model_config.return_value = MagicMock()
 
-            from core.person import DigitalPerson
-            dp = DigitalPerson(person_dir, shared_dir)
+            from core.anima import DigitalAnima
+            dp = DigitalAnima(anima_dir, shared_dir)
             dp._status = "working"
             dp._current_task = "Some task"
             dp.agent.run_cycle = AsyncMock(side_effect=RuntimeError("fail"))
@@ -510,16 +510,16 @@ class TestProcessMessageConversationSave:
     """Tests that process_message pre-saves user input and handles errors."""
 
     async def test_user_input_saved_before_agent_execution(
-        self, data_dir, make_person,
+        self, data_dir, make_anima,
     ):
         """append_turn('human', ...) and save() must be called BEFORE agent.run_cycle()."""
-        person_dir = make_person("alice")
+        anima_dir = make_anima("alice")
         shared_dir = data_dir / "shared"
 
-        with patch("core.person.AgentCore") as MockAgent, \
-             patch("core.person.MemoryManager") as MockMM, \
-             patch("core.person.Messenger"), \
-             patch("core.person.ConversationMemory") as MockConv:
+        with patch("core.anima.AgentCore") as MockAgent, \
+             patch("core.anima.MemoryManager") as MockMM, \
+             patch("core.anima.Messenger"), \
+             patch("core.anima.ConversationMemory") as MockConv:
             MockMM.return_value.read_model_config.return_value = MagicMock()
             MockConv.return_value.compress_if_needed = AsyncMock()
             MockConv.return_value.finalize_session = AsyncMock(return_value=False)
@@ -527,8 +527,8 @@ class TestProcessMessageConversationSave:
             MockConv.return_value.append_turn = MagicMock()
             MockConv.return_value.save = MagicMock()
 
-            from core.person import DigitalPerson
-            dp = DigitalPerson(person_dir, shared_dir)
+            from core.anima import DigitalAnima
+            dp = DigitalAnima(anima_dir, shared_dir)
 
             # Track call order via a shared list
             call_order: list[str] = []
@@ -552,16 +552,16 @@ class TestProcessMessageConversationSave:
             assert call_order.index("save") < call_order.index("run_cycle")
 
     async def test_error_saves_user_input_and_error_marker(
-        self, data_dir, make_person,
+        self, data_dir, make_anima,
     ):
         """When agent.run_cycle() raises, both user input and error marker are saved."""
-        person_dir = make_person("alice")
+        anima_dir = make_anima("alice")
         shared_dir = data_dir / "shared"
 
-        with patch("core.person.AgentCore"), \
-             patch("core.person.MemoryManager") as MockMM, \
-             patch("core.person.Messenger"), \
-             patch("core.person.ConversationMemory") as MockConv:
+        with patch("core.anima.AgentCore"), \
+             patch("core.anima.MemoryManager") as MockMM, \
+             patch("core.anima.Messenger"), \
+             patch("core.anima.ConversationMemory") as MockConv:
             MockMM.return_value.read_model_config.return_value = MagicMock()
             MockConv.return_value.compress_if_needed = AsyncMock()
             MockConv.return_value.finalize_session = AsyncMock(return_value=False)
@@ -569,8 +569,8 @@ class TestProcessMessageConversationSave:
             MockConv.return_value.append_turn = MagicMock()
             MockConv.return_value.save = MagicMock()
 
-            from core.person import DigitalPerson
-            dp = DigitalPerson(person_dir, shared_dir)
+            from core.anima import DigitalAnima
+            dp = DigitalAnima(anima_dir, shared_dir)
             dp.agent.run_cycle = AsyncMock(side_effect=RuntimeError("boom"))
 
             with pytest.raises(RuntimeError):
@@ -593,15 +593,15 @@ class TestProcessMessageConversationSave:
             # save() called at least twice: pre-save + error save
             assert MockConv.return_value.save.call_count >= 2
 
-    async def test_success_saves_both_turns(self, data_dir, make_person):
+    async def test_success_saves_both_turns(self, data_dir, make_anima):
         """On success, both human and assistant turns are saved (regression test)."""
-        person_dir = make_person("alice")
+        anima_dir = make_anima("alice")
         shared_dir = data_dir / "shared"
 
-        with patch("core.person.AgentCore"), \
-             patch("core.person.MemoryManager") as MockMM, \
-             patch("core.person.Messenger"), \
-             patch("core.person.ConversationMemory") as MockConv:
+        with patch("core.anima.AgentCore"), \
+             patch("core.anima.MemoryManager") as MockMM, \
+             patch("core.anima.Messenger"), \
+             patch("core.anima.ConversationMemory") as MockConv:
             MockMM.return_value.read_model_config.return_value = MagicMock()
             MockConv.return_value.compress_if_needed = AsyncMock()
             MockConv.return_value.finalize_session = AsyncMock(return_value=False)
@@ -609,8 +609,8 @@ class TestProcessMessageConversationSave:
             MockConv.return_value.append_turn = MagicMock()
             MockConv.return_value.save = MagicMock()
 
-            from core.person import DigitalPerson
-            dp = DigitalPerson(person_dir, shared_dir)
+            from core.anima import DigitalAnima
+            dp = DigitalAnima(anima_dir, shared_dir)
             dp.agent.run_cycle = AsyncMock(
                 return_value=_make_cycle_result(summary="Great answer")
             )
@@ -633,16 +633,16 @@ class TestProcessMessageStreamConversationSave:
     """Tests that process_message_stream pre-saves user input and handles errors."""
 
     async def test_stream_user_input_saved_before_streaming(
-        self, data_dir, make_person,
+        self, data_dir, make_anima,
     ):
         """append_turn('human', ...) and save() called before streaming starts."""
-        person_dir = make_person("alice")
+        anima_dir = make_anima("alice")
         shared_dir = data_dir / "shared"
 
-        with patch("core.person.AgentCore"), \
-             patch("core.person.MemoryManager") as MockMM, \
-             patch("core.person.Messenger"), \
-             patch("core.person.ConversationMemory") as MockConv:
+        with patch("core.anima.AgentCore"), \
+             patch("core.anima.MemoryManager") as MockMM, \
+             patch("core.anima.Messenger"), \
+             patch("core.anima.ConversationMemory") as MockConv:
             MockMM.return_value.read_model_config.return_value = MagicMock()
             MockConv.return_value.compress_if_needed = AsyncMock()
             MockConv.return_value.finalize_session = AsyncMock(return_value=False)
@@ -650,8 +650,8 @@ class TestProcessMessageStreamConversationSave:
             MockConv.return_value.append_turn = MagicMock()
             MockConv.return_value.save = MagicMock()
 
-            from core.person import DigitalPerson
-            dp = DigitalPerson(person_dir, shared_dir)
+            from core.anima import DigitalAnima
+            dp = DigitalAnima(anima_dir, shared_dir)
 
             call_order: list[str] = []
             MockConv.return_value.append_turn.side_effect = (
@@ -680,16 +680,16 @@ class TestProcessMessageStreamConversationSave:
             assert call_order.index("save") < call_order.index("stream_start")
 
     async def test_stream_error_saves_partial_response(
-        self, data_dir, make_person,
+        self, data_dir, make_anima,
     ):
         """When streaming raises after some text_delta chunks, partial response + error marker is saved."""
-        person_dir = make_person("alice")
+        anima_dir = make_anima("alice")
         shared_dir = data_dir / "shared"
 
-        with patch("core.person.AgentCore"), \
-             patch("core.person.MemoryManager") as MockMM, \
-             patch("core.person.Messenger"), \
-             patch("core.person.ConversationMemory") as MockConv:
+        with patch("core.anima.AgentCore"), \
+             patch("core.anima.MemoryManager") as MockMM, \
+             patch("core.anima.Messenger"), \
+             patch("core.anima.ConversationMemory") as MockConv:
             MockMM.return_value.read_model_config.return_value = MagicMock()
             MockConv.return_value.compress_if_needed = AsyncMock()
             MockConv.return_value.finalize_session = AsyncMock(return_value=False)
@@ -697,8 +697,8 @@ class TestProcessMessageStreamConversationSave:
             MockConv.return_value.append_turn = MagicMock()
             MockConv.return_value.save = MagicMock()
 
-            from core.person import DigitalPerson
-            dp = DigitalPerson(person_dir, shared_dir)
+            from core.anima import DigitalAnima
+            dp = DigitalAnima(anima_dir, shared_dir)
 
             async def mock_stream(prompt, trigger="manual"):
                 yield {"type": "text_delta", "text": "partial "}
@@ -726,16 +726,16 @@ class TestProcessMessageStreamConversationSave:
             assert MockConv.return_value.save.call_count >= 2
 
     async def test_stream_error_without_partial_saves_error_only(
-        self, data_dir, make_person,
+        self, data_dir, make_anima,
     ):
         """When streaming raises immediately (no text_delta), error marker alone is saved."""
-        person_dir = make_person("alice")
+        anima_dir = make_anima("alice")
         shared_dir = data_dir / "shared"
 
-        with patch("core.person.AgentCore"), \
-             patch("core.person.MemoryManager") as MockMM, \
-             patch("core.person.Messenger"), \
-             patch("core.person.ConversationMemory") as MockConv:
+        with patch("core.anima.AgentCore"), \
+             patch("core.anima.MemoryManager") as MockMM, \
+             patch("core.anima.Messenger"), \
+             patch("core.anima.ConversationMemory") as MockConv:
             MockMM.return_value.read_model_config.return_value = MagicMock()
             MockConv.return_value.compress_if_needed = AsyncMock()
             MockConv.return_value.finalize_session = AsyncMock(return_value=False)
@@ -743,8 +743,8 @@ class TestProcessMessageStreamConversationSave:
             MockConv.return_value.append_turn = MagicMock()
             MockConv.return_value.save = MagicMock()
 
-            from core.person import DigitalPerson
-            dp = DigitalPerson(person_dir, shared_dir)
+            from core.anima import DigitalAnima
+            dp = DigitalAnima(anima_dir, shared_dir)
 
             async def mock_stream(prompt, trigger="manual"):
                 raise RuntimeError("immediate failure")
@@ -766,15 +766,15 @@ class TestProcessMessageStreamConversationSave:
             error_content = assistant_calls[0].args[1]
             assert error_content == "[応答が中断されました]"
 
-    async def test_stream_success_saves_normally(self, data_dir, make_person):
+    async def test_stream_success_saves_normally(self, data_dir, make_anima):
         """Normal streaming save still works (cycle_done path)."""
-        person_dir = make_person("alice")
+        anima_dir = make_anima("alice")
         shared_dir = data_dir / "shared"
 
-        with patch("core.person.AgentCore"), \
-             patch("core.person.MemoryManager") as MockMM, \
-             patch("core.person.Messenger"), \
-             patch("core.person.ConversationMemory") as MockConv:
+        with patch("core.anima.AgentCore"), \
+             patch("core.anima.MemoryManager") as MockMM, \
+             patch("core.anima.Messenger"), \
+             patch("core.anima.ConversationMemory") as MockConv:
             MockMM.return_value.read_model_config.return_value = MagicMock()
             MockConv.return_value.compress_if_needed = AsyncMock()
             MockConv.return_value.finalize_session = AsyncMock(return_value=False)
@@ -782,8 +782,8 @@ class TestProcessMessageStreamConversationSave:
             MockConv.return_value.append_turn = MagicMock()
             MockConv.return_value.save = MagicMock()
 
-            from core.person import DigitalPerson
-            dp = DigitalPerson(person_dir, shared_dir)
+            from core.anima import DigitalAnima
+            dp = DigitalAnima(anima_dir, shared_dir)
 
             async def mock_stream(prompt, trigger="manual"):
                 yield {"type": "text_delta", "text": "Full "}
@@ -818,22 +818,22 @@ class TestProcessMessageStreamConversationSave:
 class TestProcessGreetConversationSave:
     """Tests that process_greet saves error markers on failure."""
 
-    async def test_greet_error_saves_error_marker(self, data_dir, make_person):
+    async def test_greet_error_saves_error_marker(self, data_dir, make_anima):
         """When agent.run_cycle() raises during greet, visit marker + error marker are saved."""
-        person_dir = make_person("alice")
+        anima_dir = make_anima("alice")
         shared_dir = data_dir / "shared"
 
-        with patch("core.person.AgentCore"), \
-             patch("core.person.MemoryManager") as MockMM, \
-             patch("core.person.Messenger"), \
-             patch("core.person.ConversationMemory") as MockConv, \
-             patch("core.person.load_prompt", return_value="greet prompt"):
+        with patch("core.anima.AgentCore"), \
+             patch("core.anima.MemoryManager") as MockMM, \
+             patch("core.anima.Messenger"), \
+             patch("core.anima.ConversationMemory") as MockConv, \
+             patch("core.anima.load_prompt", return_value="greet prompt"):
             MockMM.return_value.read_model_config.return_value = MagicMock()
             MockConv.return_value.append_turn = MagicMock()
             MockConv.return_value.save = MagicMock()
 
-            from core.person import DigitalPerson
-            dp = DigitalPerson(person_dir, shared_dir)
+            from core.anima import DigitalAnima
+            dp = DigitalAnima(anima_dir, shared_dir)
             dp.agent.run_cycle = AsyncMock(side_effect=RuntimeError("greet failed"))
 
             with pytest.raises(RuntimeError):

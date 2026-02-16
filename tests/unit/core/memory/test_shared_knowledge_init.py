@@ -20,7 +20,7 @@ class TestSharedKnowledgeInit:
     def data_dir(self, tmp_path: Path, monkeypatch) -> Path:
         d = tmp_path / "data"
         d.mkdir()
-        (d / "persons").mkdir()
+        (d / "animas").mkdir()
         (d / "common_knowledge").mkdir()
         monkeypatch.setenv("ANIMAWORKS_DATA_DIR", str(d))
         # Invalidate path caches
@@ -32,14 +32,14 @@ class TestSharedKnowledgeInit:
         return d
 
     @pytest.fixture
-    def person_dir(self, data_dir: Path) -> Path:
-        d = data_dir / "persons" / "test_person"
+    def anima_dir(self, data_dir: Path) -> Path:
+        d = data_dir / "animas" / "test_anima"
         d.mkdir(parents=True)
         for sub in ("knowledge", "episodes", "procedures", "skills", "state"):
             (d / sub).mkdir()
         return d
 
-    def test_indexes_common_knowledge_on_init(self, person_dir: Path, data_dir: Path):
+    def test_indexes_common_knowledge_on_init(self, anima_dir: Path, data_dir: Path):
         """When common_knowledge/ has .md files, they get indexed."""
         # Create a test common_knowledge file
         ck_dir = data_dir / "common_knowledge"
@@ -70,7 +70,7 @@ class TestSharedKnowledgeInit:
             mock_store = MagicMock()
             mock_vs.return_value = mock_store
 
-            mm = MemoryManager(person_dir)
+            mm = MemoryManager(anima_dir)
             # Trigger lazy init
             mm._get_indexer()
 
@@ -83,7 +83,7 @@ class TestSharedKnowledgeInit:
                 "shared_common_knowledge collection should be created"
             )
 
-    def test_skips_when_no_common_knowledge_files(self, person_dir: Path, data_dir: Path, caplog):
+    def test_skips_when_no_common_knowledge_files(self, anima_dir: Path, data_dir: Path, caplog):
         """When common_knowledge/ is empty, indexing is skipped gracefully."""
         # common_knowledge/ exists but is empty
         from core.memory.manager import MemoryManager
@@ -96,7 +96,7 @@ class TestSharedKnowledgeInit:
             mock_vs.return_value = mock_store
 
             with caplog.at_level(logging.DEBUG, logger="animaworks.memory"):
-                mm = MemoryManager(person_dir)
+                mm = MemoryManager(anima_dir)
                 mm._get_indexer()
 
             # shared_common_knowledge should NOT be created
@@ -106,7 +106,7 @@ class TestSharedKnowledgeInit:
             ]
             assert len(shared_calls) == 0
 
-    def test_does_not_fail_init_on_indexing_error(self, person_dir: Path, data_dir: Path, caplog):
+    def test_does_not_fail_init_on_indexing_error(self, anima_dir: Path, data_dir: Path, caplog):
         """If shared knowledge indexing fails, personal indexer still works."""
         ck_dir = data_dir / "common_knowledge"
         (ck_dir / "guide.md").write_text("content", encoding="utf-8")
@@ -126,7 +126,7 @@ class TestSharedKnowledgeInit:
 
             # _init_indexer catches all exceptions, so personal indexer
             # should still be created even if shared indexing fails
-            mm = MemoryManager(person_dir)
+            mm = MemoryManager(anima_dir)
             # The _ensure_shared_knowledge_indexed error is caught in _init_indexer
             # but since we patched the method directly, the exception propagates
             # to the try/except in _init_indexer
@@ -134,7 +134,7 @@ class TestSharedKnowledgeInit:
             # Personal indexer should still be created
             assert indexer is not None
 
-    def test_hash_based_dedup_prevents_reindexing(self, person_dir: Path, data_dir: Path):
+    def test_hash_based_dedup_prevents_reindexing(self, anima_dir: Path, data_dir: Path):
         """Calling _ensure_shared_knowledge_indexed twice doesn't re-index."""
         ck_dir = data_dir / "common_knowledge"
         (ck_dir / "guide.md").write_text("# Guide\n\ncontent", encoding="utf-8")
@@ -148,14 +148,14 @@ class TestSharedKnowledgeInit:
             mock_store = MagicMock()
             mock_vs.return_value = mock_store
 
-            mm = MemoryManager(person_dir)
+            mm = MemoryManager(anima_dir)
             mm._get_indexer()
 
             # Count upsert calls from first init
             first_upsert_count = mock_store.upsert.call_count
 
-            # Simulate second init (e.g., another person process)
-            mm2 = MemoryManager(person_dir)
+            # Simulate second init (e.g., another anima process)
+            mm2 = MemoryManager(anima_dir)
             mm2._get_indexer()
 
             # Second call should also attempt indexing, but the indexer's

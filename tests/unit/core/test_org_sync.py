@@ -8,7 +8,7 @@ import pytest
 
 from core.config.models import (
     AnimaWorksConfig,
-    PersonModelConfig,
+    AnimaModelConfig,
     invalidate_cache,
     load_config,
     save_config,
@@ -31,9 +31,9 @@ def _reset_config_cache() -> None:
 
 
 @pytest.fixture
-def persons_dir(tmp_path: Path) -> Path:
-    """Create an empty persons directory."""
-    d = tmp_path / "persons"
+def animas_dir(tmp_path: Path) -> Path:
+    """Create an empty animas directory."""
+    d = tmp_path / "animas"
     d.mkdir()
     return d
 
@@ -48,21 +48,21 @@ def config_path(tmp_path: Path) -> Path:
     return p
 
 
-def _make_person(
-    persons_dir: Path,
+def _make_anima(
+    animas_dir: Path,
     name: str,
     identity_content: str = "# Identity\nNo supervisor info.",
     status_json: dict | None = None,
 ) -> Path:
-    """Helper to create a person directory with identity.md and optional status.json."""
-    person_dir = persons_dir / name
-    person_dir.mkdir(parents=True, exist_ok=True)
-    (person_dir / "identity.md").write_text(identity_content, encoding="utf-8")
+    """Helper to create an anima directory with identity.md and optional status.json."""
+    anima_dir = animas_dir / name
+    anima_dir.mkdir(parents=True, exist_ok=True)
+    (anima_dir / "identity.md").write_text(identity_content, encoding="utf-8")
     if status_json is not None:
-        (person_dir / "status.json").write_text(
+        (anima_dir / "status.json").write_text(
             json.dumps(status_json, ensure_ascii=False), encoding="utf-8",
         )
-    return person_dir
+    return anima_dir
 
 
 # ── _detect_circular_references ──────────────────────────────────
@@ -129,240 +129,240 @@ class TestDetectCircularReferences:
 class TestSyncOrgStructure:
     """Tests for the main sync_org_structure function."""
 
-    def test_empty_persons_dir(self, persons_dir: Path, config_path: Path) -> None:
-        """Returns empty dict for empty persons directory."""
-        result = sync_org_structure(persons_dir, config_path)
+    def test_empty_animas_dir(self, animas_dir: Path, config_path: Path) -> None:
+        """Returns empty dict for empty animas directory."""
+        result = sync_org_structure(animas_dir, config_path)
         assert result == {}
 
     def test_nonexistent_dir(self, tmp_path: Path, config_path: Path) -> None:
-        """Returns empty dict when persons dir doesn't exist."""
+        """Returns empty dict when animas dir doesn't exist."""
         result = sync_org_structure(tmp_path / "nonexistent", config_path)
         assert result == {}
 
-    def test_adds_new_person_to_config(
-        self, persons_dir: Path, config_path: Path,
+    def test_adds_new_anima_to_config(
+        self, animas_dir: Path, config_path: Path,
     ) -> None:
-        """Person on disk but not in config gets added."""
-        _make_person(persons_dir, "alice", "| 上司 | bob |\n")
+        """Anima on disk but not in config gets added."""
+        _make_anima(animas_dir, "alice", "| 上司 | bob |\n")
 
-        result = sync_org_structure(persons_dir, config_path)
+        result = sync_org_structure(animas_dir, config_path)
 
         assert result == {"alice": "bob"}
         invalidate_cache()
         cfg = load_config(config_path)
-        assert "alice" in cfg.persons
-        assert cfg.persons["alice"].supervisor == "bob"
+        assert "alice" in cfg.animas
+        assert cfg.animas["alice"].supervisor == "bob"
 
     def test_fills_none_supervisor(
-        self, persons_dir: Path, config_path: Path,
+        self, animas_dir: Path, config_path: Path,
     ) -> None:
         """Config entry with supervisor=None gets filled from identity.md."""
-        _make_person(persons_dir, "alice", "| 上司 | bob |\n")
+        _make_anima(animas_dir, "alice", "| 上司 | bob |\n")
 
         # Pre-populate config with supervisor=None
         cfg = load_config(config_path)
-        cfg.persons["alice"] = PersonModelConfig(supervisor=None)
+        cfg.animas["alice"] = AnimaModelConfig(supervisor=None)
         save_config(cfg, config_path)
         invalidate_cache()
 
-        result = sync_org_structure(persons_dir, config_path)
+        result = sync_org_structure(animas_dir, config_path)
 
         assert result["alice"] == "bob"
         invalidate_cache()
         cfg = load_config(config_path)
-        assert cfg.persons["alice"].supervisor == "bob"
+        assert cfg.animas["alice"].supervisor == "bob"
 
     def test_does_not_overwrite_existing_supervisor(
-        self, persons_dir: Path, config_path: Path,
+        self, animas_dir: Path, config_path: Path,
     ) -> None:
         """Config entry with existing supervisor is NOT overwritten."""
-        _make_person(persons_dir, "alice", "| 上司 | bob |\n")
+        _make_anima(animas_dir, "alice", "| 上司 | bob |\n")
 
         # Pre-populate config with a different supervisor
         cfg = load_config(config_path)
-        cfg.persons["alice"] = PersonModelConfig(supervisor="charlie")
+        cfg.animas["alice"] = AnimaModelConfig(supervisor="charlie")
         save_config(cfg, config_path)
         invalidate_cache()
 
-        sync_org_structure(persons_dir, config_path)
+        sync_org_structure(animas_dir, config_path)
 
         invalidate_cache()
         cfg = load_config(config_path)
-        assert cfg.persons["alice"].supervisor == "charlie"  # Unchanged
+        assert cfg.animas["alice"].supervisor == "charlie"  # Unchanged
 
     def test_no_change_when_already_matched(
-        self, persons_dir: Path, config_path: Path,
+        self, animas_dir: Path, config_path: Path,
     ) -> None:
         """No config write when config already matches disk."""
-        _make_person(persons_dir, "alice", "| 上司 | bob |\n")
+        _make_anima(animas_dir, "alice", "| 上司 | bob |\n")
 
         cfg = load_config(config_path)
-        cfg.persons["alice"] = PersonModelConfig(supervisor="bob")
+        cfg.animas["alice"] = AnimaModelConfig(supervisor="bob")
         save_config(cfg, config_path)
         invalidate_cache()
 
         # Record mtime
         mtime_before = config_path.stat().st_mtime_ns
 
-        sync_org_structure(persons_dir, config_path)
+        sync_org_structure(animas_dir, config_path)
 
         # Config should not have been rewritten
         mtime_after = config_path.stat().st_mtime_ns
         assert mtime_before == mtime_after
 
-    def test_multiple_persons(
-        self, persons_dir: Path, config_path: Path,
+    def test_multiple_animas(
+        self, animas_dir: Path, config_path: Path,
     ) -> None:
-        """Multiple persons are all discovered and synced."""
-        _make_person(persons_dir, "alice", "| 上司 | bob |\n")
-        _make_person(persons_dir, "bob", "| 上司 | (なし) |\n")
-        _make_person(persons_dir, "charlie", "| 上司 | alice |\n")
+        """Multiple animas are all discovered and synced."""
+        _make_anima(animas_dir, "alice", "| 上司 | bob |\n")
+        _make_anima(animas_dir, "bob", "| 上司 | (なし) |\n")
+        _make_anima(animas_dir, "charlie", "| 上司 | alice |\n")
 
-        result = sync_org_structure(persons_dir, config_path)
+        result = sync_org_structure(animas_dir, config_path)
 
         assert result == {"alice": "bob", "bob": None, "charlie": "alice"}
         invalidate_cache()
         cfg = load_config(config_path)
-        assert cfg.persons["alice"].supervisor == "bob"
-        assert cfg.persons["bob"].supervisor is None
-        assert cfg.persons["charlie"].supervisor == "alice"
+        assert cfg.animas["alice"].supervisor == "bob"
+        assert cfg.animas["bob"].supervisor is None
+        assert cfg.animas["charlie"].supervisor == "alice"
 
     def test_fallback_to_status_json(
-        self, persons_dir: Path, config_path: Path,
+        self, animas_dir: Path, config_path: Path,
     ) -> None:
         """Falls back to status.json when identity.md has no supervisor."""
-        _make_person(
-            persons_dir,
+        _make_anima(
+            animas_dir,
             "alice",
             "# Identity: alice\nNo table here.",
             status_json={"supervisor": "bob"},
         )
 
-        result = sync_org_structure(persons_dir, config_path)
+        result = sync_org_structure(animas_dir, config_path)
 
         assert result["alice"] == "bob"
         invalidate_cache()
         cfg = load_config(config_path)
-        assert cfg.persons["alice"].supervisor == "bob"
+        assert cfg.animas["alice"].supervisor == "bob"
 
     def test_identity_takes_priority_over_status(
-        self, persons_dir: Path, config_path: Path,
+        self, animas_dir: Path, config_path: Path,
     ) -> None:
-        """status.json supervisor is checked first by read_person_supervisor."""
-        # Note: read_person_supervisor checks status.json first, then identity.md.
+        """status.json supervisor is checked first by read_anima_supervisor."""
+        # Note: read_anima_supervisor checks status.json first, then identity.md.
         # If status.json has a supervisor, that wins.
-        _make_person(
-            persons_dir,
+        _make_anima(
+            animas_dir,
             "alice",
             "| 上司 | charlie |\n",
             status_json={"supervisor": "bob"},
         )
 
-        result = sync_org_structure(persons_dir, config_path)
+        result = sync_org_structure(animas_dir, config_path)
 
-        # status.json takes priority in read_person_supervisor
+        # status.json takes priority in read_anima_supervisor
         assert result["alice"] == "bob"
 
     def test_circular_reference_skipped(
-        self, persons_dir: Path, config_path: Path,
+        self, animas_dir: Path, config_path: Path,
     ) -> None:
-        """Persons involved in circular references are not synced."""
-        _make_person(persons_dir, "alice", "| 上司 | bob |\n")
-        _make_person(persons_dir, "bob", "| 上司 | alice |\n")
-        _make_person(persons_dir, "charlie", "| 上司 | (なし) |\n")
+        """Animas involved in circular references are not synced."""
+        _make_anima(animas_dir, "alice", "| 上司 | bob |\n")
+        _make_anima(animas_dir, "bob", "| 上司 | alice |\n")
+        _make_anima(animas_dir, "charlie", "| 上司 | (なし) |\n")
 
-        sync_org_structure(persons_dir, config_path)
+        sync_org_structure(animas_dir, config_path)
 
         invalidate_cache()
         cfg = load_config(config_path)
         # alice and bob should not be in config (circular)
-        assert "alice" not in cfg.persons
-        assert "bob" not in cfg.persons
+        assert "alice" not in cfg.animas
+        assert "bob" not in cfg.animas
         # charlie should be added normally
-        assert "charlie" in cfg.persons
+        assert "charlie" in cfg.animas
 
-    def test_skips_non_person_directories(
-        self, persons_dir: Path, config_path: Path,
+    def test_skips_non_anima_directories(
+        self, animas_dir: Path, config_path: Path,
     ) -> None:
         """Directories without identity.md are skipped."""
-        (persons_dir / "not-a-person").mkdir()
-        _make_person(persons_dir, "alice", "| 上司 | bob |\n")
+        (animas_dir / "not-an-anima").mkdir()
+        _make_anima(animas_dir, "alice", "| 上司 | bob |\n")
 
-        result = sync_org_structure(persons_dir, config_path)
+        result = sync_org_structure(animas_dir, config_path)
 
-        assert "not-a-person" not in result
+        assert "not-an-anima" not in result
         assert "alice" in result
 
-    def test_skips_files_in_persons_dir(
-        self, persons_dir: Path, config_path: Path,
+    def test_skips_files_in_animas_dir(
+        self, animas_dir: Path, config_path: Path,
     ) -> None:
-        """Regular files in persons_dir are ignored."""
-        (persons_dir / "README.md").write_text("ignore me", encoding="utf-8")
-        _make_person(persons_dir, "alice", "| 上司 | bob |\n")
+        """Regular files in animas_dir are ignored."""
+        (animas_dir / "README.md").write_text("ignore me", encoding="utf-8")
+        _make_anima(animas_dir, "alice", "| 上司 | bob |\n")
 
-        result = sync_org_structure(persons_dir, config_path)
+        result = sync_org_structure(animas_dir, config_path)
 
         assert len(result) == 1
         assert "alice" in result
 
     def test_fullwidth_paren_name_resolution(
-        self, persons_dir: Path, config_path: Path,
+        self, animas_dir: Path, config_path: Path,
     ) -> None:
         """Japanese name with full-width parens is resolved to English."""
-        _make_person(
-            persons_dir,
+        _make_anima(
+            animas_dir,
             "hinata",
             "| 上司 | 琴葉（kotoha） |\n",
         )
 
-        result = sync_org_structure(persons_dir, config_path)
+        result = sync_org_structure(animas_dir, config_path)
 
         assert result["hinata"] == "kotoha"
         invalidate_cache()
         cfg = load_config(config_path)
-        assert cfg.persons["hinata"].supervisor == "kotoha"
+        assert cfg.animas["hinata"].supervisor == "kotoha"
 
     def test_halfwidth_paren_name_resolution(
-        self, persons_dir: Path, config_path: Path,
+        self, animas_dir: Path, config_path: Path,
     ) -> None:
         """Japanese name with half-width parens is resolved to English."""
-        _make_person(
-            persons_dir,
+        _make_anima(
+            animas_dir,
             "hinata",
             "| 上司 | 琴葉(kotoha) |\n",
         )
 
-        result = sync_org_structure(persons_dir, config_path)
+        result = sync_org_structure(animas_dir, config_path)
 
         assert result["hinata"] == "kotoha"
 
-    def test_person_with_no_supervisor_added_as_none(
-        self, persons_dir: Path, config_path: Path,
+    def test_anima_with_no_supervisor_added_as_none(
+        self, animas_dir: Path, config_path: Path,
     ) -> None:
-        """Person without supervisor info gets added with supervisor=None."""
-        _make_person(
-            persons_dir,
+        """Anima without supervisor info gets added with supervisor=None."""
+        _make_anima(
+            animas_dir,
             "alice",
             "# Identity: alice\nNo supervisor table.\n",
         )
 
-        result = sync_org_structure(persons_dir, config_path)
+        result = sync_org_structure(animas_dir, config_path)
 
         assert result["alice"] is None
         invalidate_cache()
         cfg = load_config(config_path)
-        assert "alice" in cfg.persons
-        assert cfg.persons["alice"].supervisor is None
+        assert "alice" in cfg.animas
+        assert cfg.animas["alice"].supervisor is None
 
-    def test_preserves_existing_person_config_fields(
-        self, persons_dir: Path, config_path: Path,
+    def test_preserves_existing_anima_config_fields(
+        self, animas_dir: Path, config_path: Path,
     ) -> None:
-        """Syncing supervisor preserves other PersonModelConfig fields."""
-        _make_person(persons_dir, "alice", "| 上司 | bob |\n")
+        """Syncing supervisor preserves other AnimaModelConfig fields."""
+        _make_anima(animas_dir, "alice", "| 上司 | bob |\n")
 
         # Pre-populate with extra fields
         cfg = load_config(config_path)
-        cfg.persons["alice"] = PersonModelConfig(
+        cfg.animas["alice"] = AnimaModelConfig(
             model="openai/gpt-4o",
             max_tokens=8192,
             supervisor=None,
@@ -370,59 +370,59 @@ class TestSyncOrgStructure:
         save_config(cfg, config_path)
         invalidate_cache()
 
-        sync_org_structure(persons_dir, config_path)
+        sync_org_structure(animas_dir, config_path)
 
         invalidate_cache()
         cfg = load_config(config_path)
-        assert cfg.persons["alice"].supervisor == "bob"
-        assert cfg.persons["alice"].model == "openai/gpt-4o"
-        assert cfg.persons["alice"].max_tokens == 8192
+        assert cfg.animas["alice"].supervisor == "bob"
+        assert cfg.animas["alice"].model == "openai/gpt-4o"
+        assert cfg.animas["alice"].max_tokens == 8192
 
     def test_mismatch_logs_warning(
-        self, persons_dir: Path, config_path: Path, caplog: pytest.LogCaptureFixture,
+        self, animas_dir: Path, config_path: Path, caplog: pytest.LogCaptureFixture,
     ) -> None:
         """Mismatched supervisors log a warning but keep config value."""
-        _make_person(persons_dir, "alice", "| 上司 | bob |\n")
+        _make_anima(animas_dir, "alice", "| 上司 | bob |\n")
 
         cfg = load_config(config_path)
-        cfg.persons["alice"] = PersonModelConfig(supervisor="charlie")
+        cfg.animas["alice"] = AnimaModelConfig(supervisor="charlie")
         save_config(cfg, config_path)
         invalidate_cache()
 
         with caplog.at_level("WARNING"):
-            sync_org_structure(persons_dir, config_path)
+            sync_org_structure(animas_dir, config_path)
 
         assert "supervisor mismatch" in caplog.text.lower()
         assert "alice" in caplog.text
 
     def test_circular_reference_logs_warning(
-        self, persons_dir: Path, config_path: Path, caplog: pytest.LogCaptureFixture,
+        self, animas_dir: Path, config_path: Path, caplog: pytest.LogCaptureFixture,
     ) -> None:
         """Circular references are logged as warnings."""
-        _make_person(persons_dir, "alice", "| 上司 | bob |\n")
-        _make_person(persons_dir, "bob", "| 上司 | alice |\n")
+        _make_anima(animas_dir, "alice", "| 上司 | bob |\n")
+        _make_anima(animas_dir, "bob", "| 上司 | alice |\n")
 
         with caplog.at_level("WARNING"):
-            sync_org_structure(persons_dir, config_path)
+            sync_org_structure(animas_dir, config_path)
 
         assert "circular" in caplog.text.lower()
 
     def test_nashi_values_produce_none_supervisor(
-        self, persons_dir: Path, config_path: Path,
+        self, animas_dir: Path, config_path: Path,
     ) -> None:
         """Various 'none' values in identity.md produce supervisor=None."""
-        _make_person(persons_dir, "a", "| 上司 | なし |\n")
-        _make_person(persons_dir, "b", "| 上司 | (なし) |\n")
-        _make_person(persons_dir, "c", "| 上司 | - |\n")
+        _make_anima(animas_dir, "a", "| 上司 | なし |\n")
+        _make_anima(animas_dir, "b", "| 上司 | (なし) |\n")
+        _make_anima(animas_dir, "c", "| 上司 | - |\n")
 
-        result = sync_org_structure(persons_dir, config_path)
+        result = sync_org_structure(animas_dir, config_path)
 
         assert result["a"] is None
         assert result["b"] is None
         assert result["c"] is None
 
     def test_realistic_identity_md(
-        self, persons_dir: Path, config_path: Path,
+        self, animas_dir: Path, config_path: Path,
     ) -> None:
         """Supervisor extracted from a realistic multi-section identity.md."""
         identity = (
@@ -437,27 +437,27 @@ class TestSyncOrgStructure:
             "| 身長 | 155cm |\n\n"
             "## 性格特性\n\n元気で前向き。\n"
         )
-        _make_person(persons_dir, "hinata", identity)
+        _make_anima(animas_dir, "hinata", identity)
 
-        result = sync_org_structure(persons_dir, config_path)
+        result = sync_org_structure(animas_dir, config_path)
 
         assert result["hinata"] == "rin"
 
-    def test_return_value_includes_all_persons(
-        self, persons_dir: Path, config_path: Path,
+    def test_return_value_includes_all_animas(
+        self, animas_dir: Path, config_path: Path,
     ) -> None:
-        """Return value includes every discovered person, not just changed ones."""
-        _make_person(persons_dir, "alice", "| 上司 | bob |\n")
-        _make_person(persons_dir, "bob", "# No supervisor.\n")
+        """Return value includes every discovered anima, not just changed ones."""
+        _make_anima(animas_dir, "alice", "| 上司 | bob |\n")
+        _make_anima(animas_dir, "bob", "# No supervisor.\n")
 
         # Pre-populate alice so she won't be changed
         cfg = load_config(config_path)
-        cfg.persons["alice"] = PersonModelConfig(supervisor="bob")
+        cfg.animas["alice"] = AnimaModelConfig(supervisor="bob")
         save_config(cfg, config_path)
         invalidate_cache()
 
-        result = sync_org_structure(persons_dir, config_path)
+        result = sync_org_structure(animas_dir, config_path)
 
-        # Both persons returned even though only bob was newly added
+        # Both animas returned even though only bob was newly added
         assert "alice" in result
         assert "bob" in result

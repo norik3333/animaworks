@@ -21,17 +21,17 @@ from core.execution.agent_sdk import StreamDisconnectedError
 
 
 @pytest.fixture
-def person_dir(tmp_path: Path) -> Path:
-    """Create an isolated person directory with shortterm subdirectory."""
-    d = tmp_path / "persons" / "test-person"
+def anima_dir(tmp_path: Path) -> Path:
+    """Create an isolated anima directory with shortterm subdirectory."""
+    d = tmp_path / "animas" / "test-anima"
     (d / "shortterm").mkdir(parents=True)
     return d
 
 
 @pytest.fixture
-def shortterm(person_dir: Path) -> ShortTermMemory:
-    """Return a ShortTermMemory instance rooted at the test person dir."""
-    return ShortTermMemory(person_dir)
+def shortterm(anima_dir: Path) -> ShortTermMemory:
+    """Return a ShortTermMemory instance rooted at the test anima dir."""
+    return ShortTermMemory(anima_dir)
 
 
 @pytest.fixture
@@ -148,14 +148,14 @@ class TestSaveCheckpoint:
         tmp_path: Path,
     ) -> None:
         """save_checkpoint() creates the shortterm directory when absent."""
-        person_dir = tmp_path / "persons" / "new-person"
-        person_dir.mkdir(parents=True)
+        anima_dir = tmp_path / "animas" / "new-anima"
+        anima_dir.mkdir(parents=True)
         # Do NOT create shortterm/ — let save_checkpoint handle it
-        stm = ShortTermMemory(person_dir)
+        stm = ShortTermMemory(anima_dir)
         cp = StreamCheckpoint(timestamp="2026-02-16T12:00:00")
         path = stm.save_checkpoint(cp)
         assert path.exists()
-        assert (person_dir / "shortterm").is_dir()
+        assert (anima_dir / "shortterm").is_dir()
 
     def test_overwrites_existing_checkpoint(
         self,

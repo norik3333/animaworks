@@ -20,14 +20,14 @@ from server.routes.setup import (
 
 def _make_test_app(
     setup_complete: bool = False,
-    persons_dir: Path | None = None,
+    animas_dir: Path | None = None,
     supervisor: object | None = None,
 ):
     from fastapi import FastAPI
 
     app = FastAPI()
     app.state.setup_complete = setup_complete
-    app.state.persons_dir = persons_dir or Path("/tmp/_test_nonexistent_persons")
+    app.state.animas_dir = animas_dir or Path("/tmp/_test_nonexistent_animas")
     app.state.supervisor = supervisor or AsyncMock()
     router = create_setup_router()
     app.include_router(router)
@@ -325,7 +325,7 @@ class TestCompleteSetup:
         mock_config = MagicMock()
         mock_config.locale = "ja"
         mock_config.credentials = {}
-        mock_config.persons = {}
+        mock_config.animas = {}
 
         app = _make_test_app()
         transport = ASGITransport(app=app)
@@ -353,7 +353,7 @@ class TestCompleteSetup:
         mock_config = MagicMock()
         mock_config.locale = "ja"
         mock_config.credentials = {}
-        mock_config.persons = {}
+        mock_config.animas = {}
 
         app = _make_test_app()
         transport = ASGITransport(app=app)
@@ -377,14 +377,14 @@ class TestCompleteSetup:
         assert resp.status_code == 200
         assert "anthropic" in mock_config.credentials
 
-    async def test_complete_with_blank_person(self, tmp_path: Path):
+    async def test_complete_with_blank_anima(self, tmp_path: Path):
         mock_config = MagicMock()
         mock_config.locale = "ja"
         mock_config.credentials = {}
-        mock_config.persons = {}
+        mock_config.animas = {}
 
-        person_dir = tmp_path / "persons" / "alice"
-        person_dir.mkdir(parents=True)
+        anima_dir = tmp_path / "animas" / "alice"
+        anima_dir.mkdir(parents=True)
 
         app = _make_test_app()
         transport = ASGITransport(app=app)
@@ -393,8 +393,8 @@ class TestCompleteSetup:
             patch("core.config.load_config", return_value=mock_config),
             patch("core.config.save_config"),
             patch("core.config.invalidate_cache"),
-            patch("core.paths.get_persons_dir", return_value=tmp_path / "persons"),
-            patch("core.person_factory.create_blank", return_value=person_dir),
+            patch("core.paths.get_animas_dir", return_value=tmp_path / "animas"),
+            patch("core.anima_factory.create_blank", return_value=anima_dir),
         ):
             async with AsyncClient(transport=transport, base_url="http://test") as client:
                 resp = await client.post(
@@ -402,7 +402,7 @@ class TestCompleteSetup:
                     json={
                         "locale": "ja",
                         "credentials": {},
-                        "person": {"name": "alice"},
+                        "anima": {"name": "alice"},
                     },
                 )
 
@@ -412,7 +412,7 @@ class TestCompleteSetup:
         mock_config = MagicMock()
         mock_config.locale = "ja"
         mock_config.credentials = {}
-        mock_config.persons = {}
+        mock_config.animas = {}
 
         app = _make_test_app(setup_complete=False)
         assert app.state.setup_complete is False
@@ -433,11 +433,11 @@ class TestCompleteSetup:
         assert resp.status_code == 200
         assert app.state.setup_complete is True
 
-    async def test_complete_person_already_exists(self):
+    async def test_complete_anima_already_exists(self):
         mock_config = MagicMock()
         mock_config.locale = "ja"
         mock_config.credentials = {}
-        mock_config.persons = {}
+        mock_config.animas = {}
 
         app = _make_test_app()
         transport = ASGITransport(app=app)
@@ -446,8 +446,8 @@ class TestCompleteSetup:
             patch("core.config.load_config", return_value=mock_config),
             patch("core.config.save_config"),
             patch("core.config.invalidate_cache"),
-            patch("core.paths.get_persons_dir", return_value=Path("/tmp/test/persons")),
-            patch("core.person_factory.create_blank", side_effect=FileExistsError("already exists")),
+            patch("core.paths.get_animas_dir", return_value=Path("/tmp/test/animas")),
+            patch("core.anima_factory.create_blank", side_effect=FileExistsError("already exists")),
         ):
             async with AsyncClient(transport=transport, base_url="http://test") as client:
                 resp = await client.post(
@@ -455,20 +455,20 @@ class TestCompleteSetup:
                     json={
                         "locale": "ja",
                         "credentials": {},
-                        "person": {"name": "alice"},
+                        "anima": {"name": "alice"},
                     },
                 )
 
-        # Should succeed despite FileExistsError (person creation is skipped)
+        # Should succeed despite FileExistsError (anima creation is skipped)
         assert resp.status_code == 200
         data = resp.json()
         assert data["status"] == "ok"
 
-    async def test_complete_person_creation_fails(self):
+    async def test_complete_anima_creation_fails(self):
         mock_config = MagicMock()
         mock_config.locale = "ja"
         mock_config.credentials = {}
-        mock_config.persons = {}
+        mock_config.animas = {}
 
         app = _make_test_app()
         transport = ASGITransport(app=app)
@@ -477,8 +477,8 @@ class TestCompleteSetup:
             patch("core.config.load_config", return_value=mock_config),
             patch("core.config.save_config"),
             patch("core.config.invalidate_cache"),
-            patch("core.paths.get_persons_dir", return_value=Path("/tmp/test/persons")),
-            patch("core.person_factory.create_blank", side_effect=RuntimeError("disk error")),
+            patch("core.paths.get_animas_dir", return_value=Path("/tmp/test/animas")),
+            patch("core.anima_factory.create_blank", side_effect=RuntimeError("disk error")),
         ):
             async with AsyncClient(transport=transport, base_url="http://test") as client:
                 resp = await client.post(
@@ -486,7 +486,7 @@ class TestCompleteSetup:
                     json={
                         "locale": "ja",
                         "credentials": {},
-                        "person": {"name": "alice"},
+                        "anima": {"name": "alice"},
                     },
                 )
 
@@ -499,7 +499,7 @@ class TestCompleteSetup:
         mock_config = MagicMock()
         mock_config.locale = "ja"
         mock_config.credentials = {}
-        mock_config.persons = {}
+        mock_config.animas = {}
 
         app = _make_test_app()
         transport = ASGITransport(app=app)
@@ -508,8 +508,8 @@ class TestCompleteSetup:
             patch("core.config.load_config", return_value=mock_config),
             patch("core.config.save_config"),
             patch("core.config.invalidate_cache"),
-            patch("core.paths.get_persons_dir", return_value=Path("/tmp/test/persons")),
-            patch("core.person_factory.create_blank") as mock_create,
+            patch("core.paths.get_animas_dir", return_value=Path("/tmp/test/animas")),
+            patch("core.anima_factory.create_blank") as mock_create,
         ):
             async with AsyncClient(transport=transport, base_url="http://test") as client:
                 resp = await client.post(
@@ -517,23 +517,23 @@ class TestCompleteSetup:
                     json={
                         "locale": "ja",
                         "credentials": {},
-                        "person": {"name": "sakura"},
+                        "anima": {"name": "sakura"},
                     },
                 )
 
         assert resp.status_code == 200
-        mock_create.assert_called_once_with(Path("/tmp/test/persons"), "sakura")
-        assert "sakura" in mock_config.persons
+        mock_create.assert_called_once_with(Path("/tmp/test/animas"), "sakura")
+        assert "sakura" in mock_config.animas
 
     async def test_complete_with_user_info(self, tmp_path: Path):
         """POST with user info should call save_auth and create user profile dir."""
         mock_config = MagicMock()
         mock_config.locale = "ja"
         mock_config.credentials = {}
-        mock_config.persons = {}
+        mock_config.animas = {}
 
         shared_dir = tmp_path / "shared"
-        app = _make_test_app(persons_dir=tmp_path / "persons")
+        app = _make_test_app(animas_dir=tmp_path / "animas")
         transport = ASGITransport(app=app)
 
         with (
@@ -572,10 +572,10 @@ class TestCompleteSetup:
         mock_config = MagicMock()
         mock_config.locale = "ja"
         mock_config.credentials = {}
-        mock_config.persons = {}
+        mock_config.animas = {}
 
         shared_dir = tmp_path / "shared"
-        app = _make_test_app(persons_dir=tmp_path / "persons")
+        app = _make_test_app(animas_dir=tmp_path / "animas")
         transport = ASGITransport(app=app)
 
         with (
@@ -611,10 +611,10 @@ class TestCompleteSetup:
         mock_config = MagicMock()
         mock_config.locale = "ja"
         mock_config.credentials = {}
-        mock_config.persons = {}
+        mock_config.animas = {}
 
         shared_dir = tmp_path / "shared"
-        app = _make_test_app(persons_dir=tmp_path / "persons")
+        app = _make_test_app(animas_dir=tmp_path / "animas")
         transport = ASGITransport(app=app)
 
         with (
@@ -646,29 +646,29 @@ class TestCompleteSetup:
         # Bio section should not be present
         assert content.strip() == "# Hanako"
 
-    async def test_complete_triggers_person_start(self, tmp_path: Path):
-        """Verify supervisor.start_all() is called after creating a person."""
+    async def test_complete_triggers_anima_start(self, tmp_path: Path):
+        """Verify supervisor.start_all() is called after creating an anima."""
         mock_config = MagicMock()
         mock_config.locale = "ja"
         mock_config.credentials = {}
-        mock_config.persons = {}
+        mock_config.animas = {}
 
-        # Create a person directory with identity.md so rescan picks it up
-        persons_dir = tmp_path / "persons"
-        person_dir = persons_dir / "sakura"
-        person_dir.mkdir(parents=True)
-        (person_dir / "identity.md").write_text("# Sakura", encoding="utf-8")
+        # Create an anima directory with identity.md so rescan picks it up
+        animas_dir = tmp_path / "animas"
+        anima_dir = animas_dir / "sakura"
+        anima_dir.mkdir(parents=True)
+        (anima_dir / "identity.md").write_text("# Sakura", encoding="utf-8")
 
         mock_supervisor = AsyncMock()
-        app = _make_test_app(persons_dir=persons_dir, supervisor=mock_supervisor)
+        app = _make_test_app(animas_dir=animas_dir, supervisor=mock_supervisor)
         transport = ASGITransport(app=app)
 
         with (
             patch("core.config.load_config", return_value=mock_config),
             patch("core.config.save_config"),
             patch("core.config.invalidate_cache"),
-            patch("core.paths.get_persons_dir", return_value=persons_dir),
-            patch("core.person_factory.create_blank"),
+            patch("core.paths.get_animas_dir", return_value=animas_dir),
+            patch("core.anima_factory.create_blank"),
         ):
             async with AsyncClient(transport=transport, base_url="http://test") as client:
                 resp = await client.post(
@@ -676,7 +676,7 @@ class TestCompleteSetup:
                     json={
                         "locale": "ja",
                         "credentials": {},
-                        "person": {"name": "sakura"},
+                        "anima": {"name": "sakura"},
                     },
                 )
 
@@ -688,7 +688,7 @@ class TestCompleteSetup:
         mock_config = MagicMock()
         mock_config.locale = "ja"
         mock_config.credentials = {}
-        mock_config.persons = {}
+        mock_config.animas = {}
 
         app = _make_test_app()
         transport = ASGITransport(app=app)

@@ -1,5 +1,5 @@
 from __future__ import annotations
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
@@ -49,10 +49,10 @@ PROTECTED_MEMORY_TYPES = frozenset({"procedures", "skills", "shared_users"})
 class ForgettingEngine:
     """Active forgetting based on synaptic homeostasis and neurogenesis."""
 
-    def __init__(self, person_dir: Path, person_name: str) -> None:
-        self.person_dir = person_dir
-        self.person_name = person_name
-        self.archive_dir = person_dir / "archive" / "forgotten"
+    def __init__(self, anima_dir: Path, anima_name: str) -> None:
+        self.anima_dir = anima_dir
+        self.anima_name = anima_name
+        self.archive_dir = anima_dir / "archive" / "forgotten"
 
     def _is_protected(self, metadata: dict) -> bool:
         """Check if a chunk is protected from forgetting."""
@@ -95,7 +95,7 @@ class ForgettingEngine:
         Action: Set activation_level="low", record low_activation_since
         Skip: Protected memory types, important chunks, already low
         """
-        logger.info("Starting synaptic downscaling for person=%s", self.person_name)
+        logger.info("Starting synaptic downscaling for anima=%s", self.anima_name)
         now = datetime.now()
         now_iso = now.isoformat()
         total_scanned = 0
@@ -104,7 +104,7 @@ class ForgettingEngine:
 
         # Scan all relevant collections
         for memory_type in ("knowledge", "episodes"):
-            collection_name = f"{self.person_name}_{memory_type}"
+            collection_name = f"{self.anima_name}_{memory_type}"
             chunks = self._get_all_chunks(collection_name)
             total_scanned += len(chunks)
 
@@ -171,8 +171,8 @@ class ForgettingEngine:
             "marked_low": total_marked,
         }
         logger.info(
-            "Synaptic downscaling complete for person=%s: scanned=%d, marked=%d",
-            self.person_name, total_scanned, total_marked,
+            "Synaptic downscaling complete for anima=%s: scanned=%d, marked=%d",
+            self.anima_name, total_scanned, total_marked,
         )
         return result
 
@@ -187,13 +187,13 @@ class ForgettingEngine:
         Criteria: activation_level=="low" AND pairwise vector similarity >= 0.8
         Action: LLM merge -> delete originals -> insert merged chunk
         """
-        logger.info("Starting neurogenesis reorganization for person=%s", self.person_name)
+        logger.info("Starting neurogenesis reorganization for anima=%s", self.anima_name)
         store = self._get_vector_store()
         total_merged = 0
         merged_pairs: list[str] = []
 
         for memory_type in ("knowledge", "episodes"):
-            collection_name = f"{self.person_name}_{memory_type}"
+            collection_name = f"{self.anima_name}_{memory_type}"
             chunks = self._get_all_chunks(collection_name)
 
             # Filter low-activation chunks
@@ -244,8 +244,8 @@ class ForgettingEngine:
             "merged_pairs": merged_pairs,
         }
         logger.info(
-            "Neurogenesis reorganization complete for person=%s: merged=%d",
-            self.person_name, total_merged,
+            "Neurogenesis reorganization complete for anima=%s: merged=%d",
+            self.anima_name, total_merged,
         )
         return result
 
@@ -357,16 +357,16 @@ class ForgettingEngine:
             from core.memory.rag.store import Document
 
             store = get_vector_store()
-            indexer = MemoryIndexer(store, self.person_name, self.person_dir)
+            indexer = MemoryIndexer(store, self.anima_name, self.anima_dir)
 
             # Generate new ID
-            merged_id = f"{self.person_name}/{memory_type}/merged_{datetime.now().strftime('%Y%m%d_%H%M%S')}#0"
+            merged_id = f"{self.anima_name}/{memory_type}/merged_{datetime.now().strftime('%Y%m%d_%H%M%S')}#0"
 
             embedding = indexer._generate_embeddings([content])[0]
 
             now_iso = datetime.now().isoformat()
             metadata = {
-                "person": self.person_name,
+                "anima": self.anima_name,
                 "memory_type": memory_type,
                 "source_file": "merged",
                 "chunk_index": 0,
@@ -381,7 +381,7 @@ class ForgettingEngine:
             }
 
             doc = Document(id=merged_id, content=content, embedding=embedding, metadata=metadata)
-            collection_name = f"{self.person_name}_{memory_type}"
+            collection_name = f"{self.anima_name}_{memory_type}"
             store.upsert(collection_name, [doc])
 
             logger.debug("Indexed merged chunk: %s", merged_id)
@@ -397,14 +397,14 @@ class ForgettingEngine:
         Criteria: low_activation_since > 60 days ago AND access_count == 0
         Action: Move source file to archive/forgotten/, delete from vector index
         """
-        logger.info("Starting complete forgetting for person=%s", self.person_name)
+        logger.info("Starting complete forgetting for anima=%s", self.anima_name)
         now = datetime.now()
         store = self._get_vector_store()
         total_forgotten = 0
         archived_files: list[str] = []
 
         for memory_type in ("knowledge", "episodes"):
-            collection_name = f"{self.person_name}_{memory_type}"
+            collection_name = f"{self.anima_name}_{memory_type}"
             chunks = self._get_all_chunks(collection_name)
 
             ids_to_delete: list[str] = []
@@ -464,14 +464,14 @@ class ForgettingEngine:
             "archived_files": archived_files,
         }
         logger.info(
-            "Complete forgetting done for person=%s: forgotten=%d, archived=%d files",
-            self.person_name, total_forgotten, len(archived_files),
+            "Complete forgetting done for anima=%s: forgotten=%d, archived=%d files",
+            self.anima_name, total_forgotten, len(archived_files),
         )
         return result
 
     def _archive_source_file(self, relative_path: str) -> None:
         """Move source file to archive/forgotten/ directory."""
-        source_path = self.person_dir / relative_path
+        source_path = self.anima_dir / relative_path
         if not source_path.exists():
             return
 

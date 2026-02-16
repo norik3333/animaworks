@@ -34,9 +34,9 @@ def _create_app(data_dir: Path) -> Any:
     """Create a FastAPI app pointing at the test data_dir."""
     from server.app import create_app
 
-    persons_dir = data_dir / "persons"
+    animas_dir = data_dir / "animas"
     shared_dir = data_dir / "shared"
-    return create_app(persons_dir, shared_dir)
+    return create_app(animas_dir, shared_dir)
 
 
 @pytest.fixture
@@ -72,7 +72,7 @@ class TestSetupGuard:
         """Non-setup API routes return 503 during setup."""
         transport = ASGITransport(app=setup_app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            resp = await client.get("/api/persons")
+            resp = await client.get("/api/animas")
             assert resp.status_code == 503
             body = resp.json()
             assert "Setup not yet complete" in body["error"]
@@ -114,7 +114,7 @@ class TestSetupGuard:
         """Various non-setup API routes all return 503."""
         transport = ASGITransport(app=setup_app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            for path in ["/api/persons", "/api/system/health", "/api/sessions"]:
+            for path in ["/api/animas", "/api/system/health", "/api/sessions"]:
                 resp = await client.get(path)
                 assert resp.status_code == 503, f"{path} should return 503 during setup"
 
@@ -373,7 +373,7 @@ class TestSetupComplete:
 
     @pytest.mark.asyncio
     async def test_complete_setup_minimal(self, data_dir: Path):
-        """Complete setup with minimal payload (no person)."""
+        """Complete setup with minimal payload (no anima)."""
         _write_config(data_dir, setup_complete=False)
         app = _create_app(data_dir)
 
@@ -441,8 +441,8 @@ class TestSetupComplete:
         assert config_raw["credentials"]["openai"]["api_key"] == "sk-oai-test"
 
     @pytest.mark.asyncio
-    async def test_complete_setup_creates_blank_person(self, data_dir: Path):
-        """Complete setup with person creates a blank person directory."""
+    async def test_complete_setup_creates_blank_anima(self, data_dir: Path):
+        """Complete setup with anima creates a blank anima directory."""
         _write_config(data_dir, setup_complete=False)
         app = _create_app(data_dir)
 
@@ -455,20 +455,20 @@ class TestSetupComplete:
                 "/api/setup/complete",
                 json={
                     "locale": "ja",
-                    "person": {"name": "hinata"},
+                    "anima": {"name": "hinata"},
                 },
             )
             assert resp.status_code == 200
 
-        # Verify person directory was created
-        person_dir = data_dir / "persons" / "hinata"
-        assert person_dir.exists()
-        assert (person_dir / "state").is_dir()
+        # Verify anima directory was created
+        anima_dir = data_dir / "animas" / "hinata"
+        assert anima_dir.exists()
+        assert (anima_dir / "state").is_dir()
 
-        # Verify person was added to config
+        # Verify anima was added to config
         invalidate_cache()
         config_raw = json.loads((data_dir / "config.json").read_text("utf-8"))
-        assert "hinata" in config_raw["persons"]
+        assert "hinata" in config_raw["animas"]
 
     @pytest.mark.asyncio
     async def test_route_switching_after_completion(self, data_dir: Path):
@@ -485,7 +485,7 @@ class TestSetupComplete:
             resp = await client.get("/api/setup/environment")
             assert resp.status_code == 200
 
-            resp = await client.get("/api/persons")
+            resp = await client.get("/api/animas")
             assert resp.status_code == 503
 
             # Complete setup
@@ -499,8 +499,8 @@ class TestSetupComplete:
             resp = await client.get("/api/setup/environment")
             assert resp.status_code == 403
 
-            # /api/persons should no longer return 503
-            resp = await client.get("/api/persons")
+            # /api/animas should no longer return 503
+            resp = await client.get("/api/animas")
             assert resp.status_code != 503
 
     @pytest.mark.asyncio
@@ -541,7 +541,7 @@ class TestSetupComplete:
             assert resp.status_code == 200
             assert resp.json()["valid"] is True
 
-            # Step 5: Complete setup with person creation
+            # Step 5: Complete setup with anima creation
             resp = await client.post(
                 "/api/setup/complete",
                 json={
@@ -549,7 +549,7 @@ class TestSetupComplete:
                     "credentials": {
                         "anthropic": {"api_key": "sk-ant-test"},
                     },
-                    "person": {"name": "aoi"},
+                    "anima": {"name": "aoi"},
                 },
             )
             assert resp.status_code == 200
@@ -560,23 +560,23 @@ class TestSetupComplete:
             config_raw = json.loads((data_dir / "config.json").read_text("utf-8"))
             assert config_raw["setup_complete"] is True
 
-            # Step 7: Verify person was created
-            assert (data_dir / "persons" / "aoi").is_dir()
-            assert "aoi" in config_raw["persons"]
+            # Step 7: Verify anima was created
+            assert (data_dir / "animas" / "aoi").is_dir()
+            assert "aoi" in config_raw["animas"]
 
             # Step 8: Verify route switching
             resp = await client.get("/api/setup/environment")
             assert resp.status_code == 403
 
-            resp = await client.get("/api/persons")
+            resp = await client.get("/api/animas")
             assert resp.status_code != 503
 
     @pytest.mark.asyncio
-    async def test_duplicate_person_handled_gracefully(self, data_dir: Path, make_person):
-        """Completing setup with an existing person name doesn't crash."""
-        make_person("existing")
+    async def test_duplicate_anima_handled_gracefully(self, data_dir: Path, make_anima):
+        """Completing setup with an existing anima name doesn't crash."""
+        make_anima("existing")
         _write_config(data_dir, setup_complete=False)
-        # Ensure the person dir survives the config rewrite
+        # Ensure the anima dir survives the config rewrite
         app = _create_app(data_dir)
 
         # Mock start_all to prevent spawning real child processes
@@ -588,7 +588,7 @@ class TestSetupComplete:
                 "/api/setup/complete",
                 json={
                     "locale": "ja",
-                    "person": {"name": "existing"},
+                    "anima": {"name": "existing"},
                 },
             )
             # Should succeed (logs warning but does not fail)
@@ -718,11 +718,11 @@ class TestSetupCacheControl:
                 assert key in data, f"Missing i18n key: {key}"
 
 
-# ── 5. Setup with User Info & Person Auto-start ─────────
+# ── 5. Setup with User Info & Anima Auto-start ─────────
 
 
 class TestSetupWithUserInfo:
-    """Test POST /api/setup/complete with user info and person auto-start."""
+    """Test POST /api/setup/complete with user info and anima auto-start."""
 
     @pytest.mark.asyncio
     async def test_complete_setup_with_user_info(self, data_dir: Path):
@@ -817,8 +817,8 @@ class TestSetupWithUserInfo:
         assert len(lines) == 1, "Profile without bio should only have the heading"
 
     @pytest.mark.asyncio
-    async def test_complete_setup_with_user_and_person(self, data_dir: Path):
-        """Complete setup with both user and person creates all artifacts."""
+    async def test_complete_setup_with_user_and_anima(self, data_dir: Path):
+        """Complete setup with both user and anima creates all artifacts."""
         _write_config(data_dir, setup_complete=False)
         app = _create_app(data_dir)
 
@@ -834,7 +834,7 @@ class TestSetupWithUserInfo:
                             "display_name": "Alice",
                             "bio": "Researcher.",
                         },
-                        "person": {"name": "sakura"},
+                        "anima": {"name": "sakura"},
                     },
                 )
                 assert resp.status_code == 200
@@ -845,22 +845,22 @@ class TestSetupWithUserInfo:
                 auth_data = json.loads(auth_path.read_text("utf-8"))
                 assert auth_data["owner"]["username"] == "alice"
 
-                # Verify person directory
-                person_dir = data_dir / "persons" / "sakura"
-                assert person_dir.exists()
-                assert (person_dir / "identity.md").exists()
+                # Verify anima directory
+                anima_dir = data_dir / "animas" / "sakura"
+                assert anima_dir.exists()
+                assert (anima_dir / "identity.md").exists()
 
                 # Verify user profile
                 profile_path = data_dir / "shared" / "users" / "alice" / "index.md"
                 assert profile_path.exists()
 
-                # Verify person_names was updated (accessible via /api/persons)
-                resp = await client.get("/api/persons")
+                # Verify anima_names was updated (accessible via /api/animas)
+                resp = await client.get("/api/animas")
                 assert resp.status_code != 503, "API should be accessible after setup"
 
     @pytest.mark.asyncio
-    async def test_complete_setup_person_autostart(self, data_dir: Path):
-        """After setup with a person, person_names includes the new person."""
+    async def test_complete_setup_anima_autostart(self, data_dir: Path):
+        """After setup with an anima, anima_names includes the new anima."""
         _write_config(data_dir, setup_complete=False)
         app = _create_app(data_dir)
 
@@ -873,22 +873,22 @@ class TestSetupWithUserInfo:
                     "/api/setup/complete",
                     json={
                         "locale": "ja",
-                        "person": {"name": "kaede"},
+                        "anima": {"name": "kaede"},
                     },
                 )
                 assert resp.status_code == 200
 
-            # Verify person_names state was updated
-            assert "kaede" in app.state.person_names
+            # Verify anima_names state was updated
+            assert "kaede" in app.state.anima_names
 
-            # Verify start_all was called with the new person name
+            # Verify start_all was called with the new anima name
             mock_start.assert_awaited_once()
             call_args = mock_start.call_args[0][0]
             assert "kaede" in call_args
 
     @pytest.mark.asyncio
     async def test_full_wizard_flow_with_user_info(self, data_dir: Path):
-        """End-to-end wizard flow including user info, person, and route switching."""
+        """End-to-end wizard flow including user info, anima, and route switching."""
         _write_config(data_dir, setup_complete=False)
         app = _create_app(data_dir)
 
@@ -903,7 +903,7 @@ class TestSetupWithUserInfo:
                 assert resp.status_code == 200
                 assert resp.json()["detected"] == "en"
 
-                # Step 2: Complete setup with locale, credentials, person, and user
+                # Step 2: Complete setup with locale, credentials, anima, and user
                 resp = await client.post(
                     "/api/setup/complete",
                     json={
@@ -911,7 +911,7 @@ class TestSetupWithUserInfo:
                         "credentials": {
                             "anthropic": {"api_key": "sk-ant-test-full"},
                         },
-                        "person": {"name": "miku"},
+                        "anima": {"name": "miku"},
                         "user": {
                             "username": "bob",
                             "display_name": "Bob Smith",
@@ -938,9 +938,9 @@ class TestSetupWithUserInfo:
                 assert auth_data["owner"]["display_name"] == "Bob Smith"
                 assert auth_data["auth_mode"] == "local_trust"
 
-                # Step 5: Verify person directory
-                assert (data_dir / "persons" / "miku").is_dir()
-                assert "miku" in config_raw["persons"]
+                # Step 5: Verify anima directory
+                assert (data_dir / "animas" / "miku").is_dir()
+                assert "miku" in config_raw["animas"]
 
                 # Step 6: Verify user profile
                 profile_path = data_dir / "shared" / "users" / "bob" / "index.md"
@@ -953,5 +953,5 @@ class TestSetupWithUserInfo:
                 resp = await client.get("/api/setup/environment")
                 assert resp.status_code == 403
 
-                resp = await client.get("/api/persons")
+                resp = await client.get("/api/animas")
                 assert resp.status_code != 503

@@ -20,9 +20,9 @@
   --assets-transition: 0.15s ease;
 }
 
-/* ── Person Selector ────────────────────────── */
+/* ── Anima Selector ────────────────────────── */
 
-.assets-person-selector {
+.assets-anima-selector {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -30,7 +30,7 @@
   margin-bottom: 20px;
 }
 
-.assets-person-btn {
+.assets-anima-btn {
   padding: 8px 16px;
   background: var(--assets-card-bg);
   color: var(--assets-text);
@@ -45,18 +45,18 @@
               color var(--assets-transition);
 }
 
-.assets-person-btn:hover {
+.assets-anima-btn:hover {
   background: var(--assets-bg);
   border-color: #9ca3af;
 }
 
-.assets-person-btn--active {
+.assets-anima-btn--active {
   background: var(--assets-primary);
   color: #fff;
   border-color: var(--assets-primary);
 }
 
-.assets-person-btn--active:hover {
+.assets-anima-btn--active:hover {
   background: var(--assets-primary-hover);
   border-color: var(--assets-primary-hover);
 }

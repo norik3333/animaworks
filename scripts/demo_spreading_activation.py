@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
@@ -168,7 +168,7 @@ def demo_graph_construction():
                 return []
 
         class MockIndexer:
-            person_name = "demo"
+            anima_name = "demo"
             def _generate_embeddings(self, texts):
                 return [[0.1] * 384 for _ in texts]
 
@@ -209,7 +209,7 @@ def demo_pagerank(graph: nx.DiGraph):
             return []
 
     class MockIndexer:
-        person_name = "demo"
+        anima_name = "demo"
         def _generate_embeddings(self, texts):
             return [[0.1] * 384 for _ in texts]
 

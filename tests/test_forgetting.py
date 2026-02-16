@@ -1,5 +1,5 @@
 from __future__ import annotations
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
@@ -35,21 +35,21 @@ from core.memory.forgetting import (
 
 
 @pytest.fixture
-def person_dir(tmp_path: Path) -> Path:
-    """Create a temporary person directory structure."""
-    person_dir = tmp_path / "test_person"
-    person_dir.mkdir()
-    (person_dir / "knowledge").mkdir()
-    (person_dir / "episodes").mkdir()
-    (person_dir / "procedures").mkdir()
-    (person_dir / "skills").mkdir()
-    return person_dir
+def anima_dir(tmp_path: Path) -> Path:
+    """Create a temporary anima directory structure."""
+    anima_dir = tmp_path / "test_anima"
+    anima_dir.mkdir()
+    (anima_dir / "knowledge").mkdir()
+    (anima_dir / "episodes").mkdir()
+    (anima_dir / "procedures").mkdir()
+    (anima_dir / "skills").mkdir()
+    return anima_dir
 
 
 @pytest.fixture
-def forgetting_engine(person_dir: Path) -> ForgettingEngine:
+def forgetting_engine(anima_dir: Path) -> ForgettingEngine:
     """Create a ForgettingEngine instance."""
-    return ForgettingEngine(person_dir=person_dir, person_name="test_person")
+    return ForgettingEngine(anima_dir=anima_dir, anima_name="test_anima")
 
 
 def _make_chunk(
@@ -159,7 +159,7 @@ class TestSynapticDownscaling:
         # Verify update_metadata was called with correct args
         mock_store.update_metadata.assert_called_once()
         call_args = mock_store.update_metadata.call_args[0]
-        assert call_args[0] == "test_person_knowledge"
+        assert call_args[0] == "test_anima_knowledge"
         assert call_args[1] == ["old_chunk"]
         assert call_args[2][0]["activation_level"] == "low"
         assert call_args[2][0]["low_activation_since"] != ""
@@ -312,7 +312,7 @@ class TestSynapticDownscaling:
 class TestCompleteForgetting:
     """Test complete_forgetting() (Stage 3: monthly archive and delete)."""
 
-    def test_complete_forgetting_archives_and_deletes(self, forgetting_engine, person_dir):
+    def test_complete_forgetting_archives_and_deletes(self, forgetting_engine, anima_dir):
         """Test that low-activation chunks are archived and deleted.
 
         Chunks with low_activation_since > 60 days ago and access_count=0
@@ -321,8 +321,8 @@ class TestCompleteForgetting:
         """
         old_low_since = (datetime.now() - timedelta(days=90)).isoformat()
 
-        # Create source file in the person dir
-        source_file = person_dir / "knowledge" / "forgotten-topic.md"
+        # Create source file in the anima dir
+        source_file = anima_dir / "knowledge" / "forgotten-topic.md"
         source_file.write_text("# Old topic\n\nThis will be forgotten.", encoding="utf-8")
 
         knowledge_chunks = [
@@ -352,7 +352,7 @@ class TestCompleteForgetting:
         assert "knowledge/forgotten-topic.md" in result["archived_files"]
 
         # Verify source file was moved to archive
-        archive_dir = person_dir / "archive" / "forgotten"
+        archive_dir = anima_dir / "archive" / "forgotten"
         assert archive_dir.exists()
         archived_files = list(archive_dir.iterdir())
         assert len(archived_files) == 1
@@ -364,10 +364,10 @@ class TestCompleteForgetting:
         # Verify delete_documents was called once (for the knowledge collection)
         mock_store.delete_documents.assert_called_once()
         call_args = mock_store.delete_documents.call_args[0]
-        assert call_args[0] == "test_person_knowledge"
+        assert call_args[0] == "test_anima_knowledge"
         assert call_args[1] == ["forget_me"]
 
-    def test_complete_forgetting_skips_accessed_chunks(self, forgetting_engine, person_dir):
+    def test_complete_forgetting_skips_accessed_chunks(self, forgetting_engine, anima_dir):
         """Test that low-activation chunks with access_count > 0 are NOT deleted.
 
         Even if low_activation_since is old, a non-zero access_count means
@@ -395,7 +395,7 @@ class TestCompleteForgetting:
         assert len(result["archived_files"]) == 0
         mock_store.delete_documents.assert_not_called()
 
-    def test_complete_forgetting_skips_protected(self, forgetting_engine, person_dir):
+    def test_complete_forgetting_skips_protected(self, forgetting_engine, anima_dir):
         """Test that protected chunks are not forgotten even if low-activation."""
         old_low_since = (datetime.now() - timedelta(days=90)).isoformat()
         chunks = [
@@ -418,7 +418,7 @@ class TestCompleteForgetting:
         assert result["forgotten_chunks"] == 0
         mock_store.delete_documents.assert_not_called()
 
-    def test_complete_forgetting_skips_normal_activation(self, forgetting_engine, person_dir):
+    def test_complete_forgetting_skips_normal_activation(self, forgetting_engine, anima_dir):
         """Test that chunks with activation_level='normal' are not forgotten."""
         chunks = [
             _make_chunk(
@@ -439,7 +439,7 @@ class TestCompleteForgetting:
         assert result["forgotten_chunks"] == 0
         mock_store.delete_documents.assert_not_called()
 
-    def test_complete_forgetting_skips_recent_low_activation(self, forgetting_engine, person_dir):
+    def test_complete_forgetting_skips_recent_low_activation(self, forgetting_engine, anima_dir):
         """Test that chunks recently marked as low are NOT yet forgotten.
 
         Chunks that have been low for less than FORGETTING_LOW_ACTIVATION_DAYS
@@ -477,12 +477,12 @@ class TestConsolidationForgettingHooks:
         """Create a ConsolidationEngine instance."""
         from core.memory.consolidation import ConsolidationEngine
 
-        person_dir = tmp_path / "test_person"
-        (person_dir / "episodes").mkdir(parents=True)
-        (person_dir / "knowledge").mkdir(parents=True)
+        anima_dir = tmp_path / "test_anima"
+        (anima_dir / "episodes").mkdir(parents=True)
+        (anima_dir / "knowledge").mkdir(parents=True)
         return ConsolidationEngine(
-            person_dir=person_dir,
-            person_name="test_person",
+            anima_dir=anima_dir,
+            anima_name="test_anima",
         )
 
     @pytest.mark.asyncio
@@ -574,12 +574,12 @@ class TestMonthlyForgettingHook:
         """Create a ConsolidationEngine instance."""
         from core.memory.consolidation import ConsolidationEngine
 
-        person_dir = tmp_path / "test_person"
-        (person_dir / "episodes").mkdir(parents=True)
-        (person_dir / "knowledge").mkdir(parents=True)
+        anima_dir = tmp_path / "test_anima"
+        (anima_dir / "episodes").mkdir(parents=True)
+        (anima_dir / "knowledge").mkdir(parents=True)
         return ConsolidationEngine(
-            person_dir=person_dir,
-            person_name="test_person",
+            anima_dir=anima_dir,
+            anima_name="test_anima",
         )
 
     @pytest.mark.asyncio

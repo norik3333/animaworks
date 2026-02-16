@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
@@ -34,9 +34,9 @@ async def main():
 
     # Setup demo environment
     demo_dir = Path(__file__).parent.parent / "demo_data" / "weekly_integration"
-    person_dir = demo_dir / "test_person"
-    knowledge_dir = person_dir / "knowledge"
-    episodes_dir = person_dir / "episodes"
+    anima_dir = demo_dir / "test_anima"
+    knowledge_dir = anima_dir / "knowledge"
+    episodes_dir = anima_dir / "episodes"
 
     # Clean up previous demo data
     import shutil
@@ -46,7 +46,7 @@ async def main():
     knowledge_dir.mkdir(parents=True)
     episodes_dir.mkdir(parents=True)
 
-    print("Demo directory created:", person_dir)
+    print("Demo directory created:", anima_dir)
     print()
 
     # ── Step 1: Create duplicate knowledge files ──────────────────────
@@ -203,8 +203,8 @@ async def main():
     from core.memory.consolidation import ConsolidationEngine
 
     engine = ConsolidationEngine(
-        person_dir=person_dir,
-        person_name="demo_person",
+        anima_dir=anima_dir,
+        anima_name="demo_anima",
     )
 
     print("ConsolidationEngine initialized")
@@ -326,7 +326,7 @@ async def main():
     print("  ✓ Compressed old episodes (keeping [IMPORTANT] ones)")
     print("  ✓ Rebuilt RAG index")
     print()
-    print(f"Demo data location: {person_dir}")
+    print(f"Demo data location: {anima_dir}")
     print()
 
 

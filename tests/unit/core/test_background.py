@@ -21,15 +21,15 @@ from core.background import (
 
 
 @pytest.fixture
-def person_dir(tmp_path: Path) -> Path:
-    d = tmp_path / "persons" / "test-person"
+def anima_dir(tmp_path: Path) -> Path:
+    d = tmp_path / "animas" / "test-anima"
     d.mkdir(parents=True)
     return d
 
 
 @pytest.fixture
-def manager(person_dir: Path) -> BackgroundTaskManager:
-    return BackgroundTaskManager(person_dir, person_name="test-person")
+def manager(anima_dir: Path) -> BackgroundTaskManager:
+    return BackgroundTaskManager(anima_dir, anima_name="test-anima")
 
 
 # ── Eligibility ──────────────────────────────────────────────
@@ -48,11 +48,11 @@ class TestEligibility:
         assert manager.is_eligible("local_llm") is True
         assert manager.is_eligible("run_command") is True
 
-    def test_is_eligible_custom_tools(self, person_dir: Path):
+    def test_is_eligible_custom_tools(self, anima_dir: Path):
         """Custom eligible tools passed to constructor are used."""
         custom = {"my_tool": 10, "another_tool": 20}
         mgr = BackgroundTaskManager(
-            person_dir, person_name="test-person", eligible_tools=custom,
+            anima_dir, anima_name="test-anima", eligible_tools=custom,
         )
         assert mgr.is_eligible("my_tool") is True
         assert mgr.is_eligible("another_tool") is True
@@ -84,16 +84,16 @@ class TestSubmit:
         assert task.status == TaskStatus.RUNNING
         assert task.tool_name == "image_generation"
         assert task.tool_args == {"prompt": "cat"}
-        assert task.person_name == "test-person"
+        assert task.anima_name == "test-anima"
 
     async def test_submit_saves_to_disk(
-        self, manager: BackgroundTaskManager, person_dir: Path,
+        self, manager: BackgroundTaskManager, anima_dir: Path,
     ):
         """Task JSON file is created in state/background_tasks/."""
         execute_fn = MagicMock(return_value="done")
         task_id = manager.submit("local_llm", {"query": "hello"}, execute_fn)
 
-        task_path = person_dir / "state" / "background_tasks" / f"{task_id}.json"
+        task_path = anima_dir / "state" / "background_tasks" / f"{task_id}.json"
         assert task_path.exists()
 
         data = json.loads(task_path.read_text(encoding="utf-8"))
@@ -177,13 +177,13 @@ class TestGetTask:
         assert task.task_id == task_id
 
     def test_get_task_from_disk(
-        self, manager: BackgroundTaskManager, person_dir: Path,
+        self, manager: BackgroundTaskManager, anima_dir: Path,
     ):
         """get_task loads from disk when not in memory."""
         # Manually write a task file to disk
         task_data = {
             "task_id": "diskonly12345",
-            "person_name": "test-person",
+            "anima_name": "test-anima",
             "tool_name": "local_llm",
             "tool_args": {"q": "hi"},
             "status": "completed",
@@ -192,7 +192,7 @@ class TestGetTask:
             "result": "disk result",
             "error": None,
         }
-        storage_dir = person_dir / "state" / "background_tasks"
+        storage_dir = anima_dir / "state" / "background_tasks"
         storage_dir.mkdir(parents=True, exist_ok=True)
         (storage_dir / "diskonly12345.json").write_text(
             json.dumps(task_data, ensure_ascii=False), encoding="utf-8",
@@ -285,17 +285,17 @@ class TestActiveCount:
 
 class TestCleanup:
     def test_cleanup_old_tasks(
-        self, manager: BackgroundTaskManager, person_dir: Path,
+        self, manager: BackgroundTaskManager, anima_dir: Path,
     ):
         """cleanup_old_tasks removes old completed tasks."""
-        storage_dir = person_dir / "state" / "background_tasks"
+        storage_dir = anima_dir / "state" / "background_tasks"
         storage_dir.mkdir(parents=True, exist_ok=True)
 
         # Create an old completed task (48 hours ago)
         old_time = time.time() - 48 * 3600
         old_data = {
             "task_id": "old_task_001",
-            "person_name": "test-person",
+            "anima_name": "test-anima",
             "tool_name": "image_generation",
             "tool_args": {},
             "status": "completed",
@@ -312,7 +312,7 @@ class TestCleanup:
         recent_time = time.time() - 3600
         recent_data = {
             "task_id": "new_task_001",
-            "person_name": "test-person",
+            "anima_name": "test-anima",
             "tool_name": "local_llm",
             "tool_args": {},
             "status": "completed",
@@ -339,7 +339,7 @@ class TestBackgroundTaskModel:
         """BackgroundTask.to_dict() serialization."""
         task = BackgroundTask(
             task_id="abc123",
-            person_name="sakura",
+            anima_name="sakura",
             tool_name="image_generation",
             tool_args={"prompt": "flower"},
             status=TaskStatus.COMPLETED,
@@ -350,7 +350,7 @@ class TestBackgroundTaskModel:
         )
         d = task.to_dict()
         assert d["task_id"] == "abc123"
-        assert d["person_name"] == "sakura"
+        assert d["anima_name"] == "sakura"
         assert d["tool_name"] == "image_generation"
         assert d["tool_args"] == {"prompt": "flower"}
         assert d["status"] == "completed"
@@ -363,7 +363,7 @@ class TestBackgroundTaskModel:
         """summary() for completed task includes tool name and result preview."""
         task = BackgroundTask(
             task_id="abc123",
-            person_name="sakura",
+            anima_name="sakura",
             tool_name="image_generation",
             tool_args={},
             status=TaskStatus.COMPLETED,
@@ -379,7 +379,7 @@ class TestBackgroundTaskModel:
         long_result = "x" * 500
         task = BackgroundTask(
             task_id="abc123",
-            person_name="sakura",
+            anima_name="sakura",
             tool_name="local_llm",
             tool_args={},
             status=TaskStatus.COMPLETED,
@@ -393,7 +393,7 @@ class TestBackgroundTaskModel:
         """summary() for failed task includes error message."""
         task = BackgroundTask(
             task_id="abc123",
-            person_name="sakura",
+            anima_name="sakura",
             tool_name="run_command",
             tool_args={},
             status=TaskStatus.FAILED,
@@ -408,7 +408,7 @@ class TestBackgroundTaskModel:
         """summary() for running task shows status."""
         task = BackgroundTask(
             task_id="abc123",
-            person_name="sakura",
+            anima_name="sakura",
             tool_name="image_generation",
             tool_args={},
             status=TaskStatus.RUNNING,
@@ -421,7 +421,7 @@ class TestBackgroundTaskModel:
         """summary() for pending task shows status."""
         task = BackgroundTask(
             task_id="abc123",
-            person_name="sakura",
+            anima_name="sakura",
             tool_name="image_generation",
             tool_args={},
             status=TaskStatus.PENDING,
@@ -479,7 +479,7 @@ class TestSubmitAsync:
         assert task.status == TaskStatus.RUNNING
         assert task.tool_name == "image_generation"
         assert task.tool_args == {"prompt": "cat"}
-        assert task.person_name == "test-person"
+        assert task.anima_name == "test-anima"
 
         # Cancel the long-running task to avoid warnings
         async_task = manager._async_tasks.get(task_id)
@@ -563,10 +563,10 @@ class TestSubmitAsync:
 
 class TestLoadTaskErrors:
     def test_load_task_handles_corrupt_json(
-        self, manager: BackgroundTaskManager, person_dir: Path,
+        self, manager: BackgroundTaskManager, anima_dir: Path,
     ):
         """get_task returns None when the task file contains invalid JSON."""
-        storage_dir = person_dir / "state" / "background_tasks"
+        storage_dir = anima_dir / "state" / "background_tasks"
         storage_dir.mkdir(parents=True, exist_ok=True)
 
         # Write corrupt (non-parseable) JSON
@@ -577,13 +577,13 @@ class TestLoadTaskErrors:
         assert manager.get_task("corrupt001") is None
 
     def test_load_task_handles_missing_keys(
-        self, manager: BackgroundTaskManager, person_dir: Path,
+        self, manager: BackgroundTaskManager, anima_dir: Path,
     ):
         """get_task returns None when required keys are missing from JSON."""
-        storage_dir = person_dir / "state" / "background_tasks"
+        storage_dir = anima_dir / "state" / "background_tasks"
         storage_dir.mkdir(parents=True, exist_ok=True)
 
-        # Valid JSON but missing required keys (e.g. task_id, person_name)
+        # Valid JSON but missing required keys (e.g. task_id, anima_name)
         (storage_dir / "badkeys001.json").write_text(
             json.dumps({"some_field": "value"}), encoding="utf-8",
         )
@@ -591,15 +591,15 @@ class TestLoadTaskErrors:
         assert manager.get_task("badkeys001") is None
 
     def test_load_task_handles_invalid_status(
-        self, manager: BackgroundTaskManager, person_dir: Path,
+        self, manager: BackgroundTaskManager, anima_dir: Path,
     ):
         """get_task returns None when status value is not a valid TaskStatus."""
-        storage_dir = person_dir / "state" / "background_tasks"
+        storage_dir = anima_dir / "state" / "background_tasks"
         storage_dir.mkdir(parents=True, exist_ok=True)
 
         bad_data = {
             "task_id": "badstat001",
-            "person_name": "test-person",
+            "anima_name": "test-anima",
             "tool_name": "local_llm",
             "tool_args": {},
             "status": "invalid_status_value",
@@ -617,10 +617,10 @@ class TestLoadTaskErrors:
 
 class TestCleanupEdgeCases:
     def test_cleanup_skips_corrupt_json(
-        self, manager: BackgroundTaskManager, person_dir: Path,
+        self, manager: BackgroundTaskManager, anima_dir: Path,
     ):
         """cleanup_old_tasks skips files with corrupt JSON gracefully."""
-        storage_dir = person_dir / "state" / "background_tasks"
+        storage_dir = anima_dir / "state" / "background_tasks"
         storage_dir.mkdir(parents=True, exist_ok=True)
 
         # Write a corrupt JSON file

@@ -3,10 +3,10 @@
 Tests the full pipeline of supervisor synchronization between identity.md /
 status.json on disk and config.json, including:
 
-1. register_person_in_config reads supervisor from identity.md/status.json
+1. register_anima_in_config reads supervisor from identity.md/status.json
 2. sync_org_structure repairs missing/null supervisors in a realistic scenario
 3. Server startup triggers org sync via create_app
-4. Full pipeline: create_from_md + register_person_in_config -> supervisor in config
+4. Full pipeline: create_from_md + register_anima_in_config -> supervisor in config
 
 These are integration tests that exercise real filesystem operations and
 the actual code paths without mocking core functionality.
@@ -21,13 +21,13 @@ import pytest
 
 from core.config.models import (
     AnimaWorksConfig,
-    PersonModelConfig,
+    AnimaModelConfig,
     invalidate_cache,
     load_config,
     save_config,
 )
 from core.org_sync import sync_org_structure
-from core.person_factory import create_from_md
+from core.anima_factory import create_from_md
 
 
 # ── Fixtures ─────────────────────────────────────────────────────
@@ -48,62 +48,62 @@ def _create_config(
     config_path: Path,
     *,
     setup_complete: bool = True,
-    persons: dict[str, PersonModelConfig] | None = None,
+    animas: dict[str, AnimaModelConfig] | None = None,
 ) -> AnimaWorksConfig:
     """Create a config.json file and return the config object."""
     cfg = AnimaWorksConfig(
         setup_complete=setup_complete,
-        persons=persons or {},
+        animas=animas or {},
     )
     save_config(cfg, config_path)
     invalidate_cache()
     return cfg
 
 
-def _make_person(
-    persons_dir: Path,
+def _make_anima(
+    animas_dir: Path,
     name: str,
     identity_content: str = "# Identity\nNo supervisor info.",
     status_json: dict | None = None,
 ) -> Path:
-    """Create a person directory with identity.md and optional status.json."""
-    person_dir = persons_dir / name
-    person_dir.mkdir(parents=True, exist_ok=True)
-    (person_dir / "identity.md").write_text(identity_content, encoding="utf-8")
+    """Create an anima directory with identity.md and optional status.json."""
+    anima_dir = animas_dir / name
+    anima_dir.mkdir(parents=True, exist_ok=True)
+    (anima_dir / "identity.md").write_text(identity_content, encoding="utf-8")
     if status_json is not None:
-        (person_dir / "status.json").write_text(
+        (anima_dir / "status.json").write_text(
             json.dumps(status_json, ensure_ascii=False), encoding="utf-8",
         )
-    return person_dir
+    return anima_dir
 
 
-# ── Test 1: register_person_in_config sets supervisor ────────────
+# ── Test 1: register_anima_in_config sets supervisor ────────────
 
 
-class TestRegisterPersonSupervisor:
-    """Verify register_person_in_config reads supervisor from identity.md."""
+class TestRegisterAnimaSupervisor:
+    """Verify register_anima_in_config reads supervisor from identity.md."""
 
     def test_register_picks_up_supervisor_from_identity_md(
         self, tmp_path: Path,
     ) -> None:
         """When identity.md contains '| 上司 | sakura |',
-        register_person_in_config should set supervisor='sakura' in config.json.
+        register_anima_in_config should set supervisor='sakura' in config.json.
         """
-        from core.config.models import register_person_in_config
+        from core.config.models import register_anima_in_config
 
         # Set up data directory
         data_dir = tmp_path / "data"
         data_dir.mkdir()
-        persons_dir = data_dir / "persons"
-        persons_dir.mkdir()
+        animas_dir = data_dir / "animas"
+        animas_dir.mkdir()
         config_path = data_dir / "config.json"
 
         _create_config(config_path)
 
-        # Create person directory with supervisor in identity.md
-        person_dir = persons_dir / "hinata"
-        person_dir.mkdir()
-        (person_dir / "identity.md").write_text(
+        # Create anima directory with supervisor in identity.md
+        anima_dir = animas_dir / "hinata"
+        anima_dir.mkdir()
+        (anima_dir / "identity.md").write_text(
             "# hinata\n\n"
             "| 項目 | 設定 |\n"
             "|------|------|\n"
@@ -113,103 +113,103 @@ class TestRegisterPersonSupervisor:
         )
 
         # Act
-        register_person_in_config(data_dir, "hinata")
+        register_anima_in_config(data_dir, "hinata")
 
         # Assert
         invalidate_cache()
         cfg = load_config(config_path)
-        assert "hinata" in cfg.persons
-        assert cfg.persons["hinata"].supervisor == "sakura"
+        assert "hinata" in cfg.animas
+        assert cfg.animas["hinata"].supervisor == "sakura"
 
     def test_register_picks_up_supervisor_from_status_json(
         self, tmp_path: Path,
     ) -> None:
         """When status.json has supervisor field,
-        register_person_in_config should read it.
+        register_anima_in_config should read it.
         """
-        from core.config.models import register_person_in_config
+        from core.config.models import register_anima_in_config
 
         data_dir = tmp_path / "data"
         data_dir.mkdir()
-        persons_dir = data_dir / "persons"
-        persons_dir.mkdir()
+        animas_dir = data_dir / "animas"
+        animas_dir.mkdir()
         config_path = data_dir / "config.json"
 
         _create_config(config_path)
 
-        person_dir = persons_dir / "kotoha"
-        person_dir.mkdir()
-        (person_dir / "identity.md").write_text(
+        anima_dir = animas_dir / "kotoha"
+        anima_dir.mkdir()
+        (anima_dir / "identity.md").write_text(
             "# kotoha\nNo supervisor table here.",
             encoding="utf-8",
         )
-        (person_dir / "status.json").write_text(
+        (anima_dir / "status.json").write_text(
             json.dumps({"supervisor": "sakura"}),
             encoding="utf-8",
         )
 
-        register_person_in_config(data_dir, "kotoha")
+        register_anima_in_config(data_dir, "kotoha")
 
         invalidate_cache()
         cfg = load_config(config_path)
-        assert "kotoha" in cfg.persons
-        assert cfg.persons["kotoha"].supervisor == "sakura"
+        assert "kotoha" in cfg.animas
+        assert cfg.animas["kotoha"].supervisor == "sakura"
 
-    def test_register_is_noop_for_existing_person(
+    def test_register_is_noop_for_existing_anima(
         self, tmp_path: Path,
     ) -> None:
-        """If the person already exists in config, register should not modify it."""
-        from core.config.models import register_person_in_config
+        """If the anima already exists in config, register should not modify it."""
+        from core.config.models import register_anima_in_config
 
         data_dir = tmp_path / "data"
         data_dir.mkdir()
-        persons_dir = data_dir / "persons"
-        persons_dir.mkdir()
+        animas_dir = data_dir / "animas"
+        animas_dir.mkdir()
         config_path = data_dir / "config.json"
 
         _create_config(
             config_path,
-            persons={"hinata": PersonModelConfig(supervisor="rin")},
+            animas={"hinata": AnimaModelConfig(supervisor="rin")},
         )
 
-        person_dir = persons_dir / "hinata"
-        person_dir.mkdir()
-        (person_dir / "identity.md").write_text(
+        anima_dir = animas_dir / "hinata"
+        anima_dir.mkdir()
+        (anima_dir / "identity.md").write_text(
             "| 上司 | sakura |\n", encoding="utf-8",
         )
 
-        register_person_in_config(data_dir, "hinata")
+        register_anima_in_config(data_dir, "hinata")
 
         invalidate_cache()
         cfg = load_config(config_path)
         # Should still be "rin", not updated to "sakura"
-        assert cfg.persons["hinata"].supervisor == "rin"
+        assert cfg.animas["hinata"].supervisor == "rin"
 
     def test_register_with_japanese_supervisor_fullwidth_parens(
         self, tmp_path: Path,
     ) -> None:
         """Japanese name with full-width parens resolves to English name."""
-        from core.config.models import register_person_in_config
+        from core.config.models import register_anima_in_config
 
         data_dir = tmp_path / "data"
         data_dir.mkdir()
-        persons_dir = data_dir / "persons"
-        persons_dir.mkdir()
+        animas_dir = data_dir / "animas"
+        animas_dir.mkdir()
         config_path = data_dir / "config.json"
 
         _create_config(config_path)
 
-        person_dir = persons_dir / "chatbot"
-        person_dir.mkdir()
-        (person_dir / "identity.md").write_text(
+        anima_dir = animas_dir / "chatbot"
+        anima_dir.mkdir()
+        (anima_dir / "identity.md").write_text(
             "| 上司 | 琴葉（kotoha） |\n", encoding="utf-8",
         )
 
-        register_person_in_config(data_dir, "chatbot")
+        register_anima_in_config(data_dir, "chatbot")
 
         invalidate_cache()
         cfg = load_config(config_path)
-        assert cfg.persons["chatbot"].supervisor == "kotoha"
+        assert cfg.animas["chatbot"].supervisor == "kotoha"
 
 
 # ── Test 2: sync_org_structure repairs missing/null supervisors ──
@@ -226,11 +226,11 @@ class TestSyncOrgStructureRealisticScenario:
         Setup:
         - config.json: sakura(supervisor=null), kotoha(supervisor="sakura"),
           chatwork_checker(supervisor=null)
-        - persons/sakura/identity.md (no 上司 row)
-        - persons/kotoha/identity.md (上司: サクラ(sakura))
-        - persons/chatwork_checker/identity.md (上司: 琴葉（kotoha）)
-        - persons/rin/identity.md (no 上司 row) -- NOT in config.json
-        - persons/aoi/identity.md (no 上司 row) -- NOT in config.json
+        - animas/sakura/identity.md (no 上司 row)
+        - animas/kotoha/identity.md (上司: サクラ(sakura))
+        - animas/chatwork_checker/identity.md (上司: 琴葉（kotoha）)
+        - animas/rin/identity.md (no 上司 row) -- NOT in config.json
+        - animas/aoi/identity.md (no 上司 row) -- NOT in config.json
 
         Expected after sync:
         - chatwork_checker: supervisor="kotoha" (was null, repaired)
@@ -242,25 +242,25 @@ class TestSyncOrgStructureRealisticScenario:
         # Arrange: create directory structure
         data_dir = tmp_path / "animaworks"
         data_dir.mkdir()
-        persons_dir = data_dir / "persons"
-        persons_dir.mkdir()
+        animas_dir = data_dir / "animas"
+        animas_dir.mkdir()
         config_path = data_dir / "config.json"
 
         # Create config.json with initial (buggy) state
         _create_config(
             config_path,
-            persons={
-                "sakura": PersonModelConfig(supervisor=None),
-                "kotoha": PersonModelConfig(supervisor="sakura"),
-                "chatwork_checker": PersonModelConfig(supervisor=None),
+            animas={
+                "sakura": AnimaModelConfig(supervisor=None),
+                "kotoha": AnimaModelConfig(supervisor="sakura"),
+                "chatwork_checker": AnimaModelConfig(supervisor=None),
             },
         )
 
-        # Create person directories with identity.md files
+        # Create anima directories with identity.md files
 
         # sakura: top-level manager, no supervisor
-        _make_person(
-            persons_dir, "sakura",
+        _make_anima(
+            animas_dir, "sakura",
             "# Identity: sakura\n\n"
             "## 基本プロフィール\n\n"
             "| 項目 | 設定 |\n"
@@ -271,8 +271,8 @@ class TestSyncOrgStructureRealisticScenario:
         )
 
         # kotoha: reports to sakura
-        _make_person(
-            persons_dir, "kotoha",
+        _make_anima(
+            animas_dir, "kotoha",
             "# Identity: kotoha\n\n"
             "## 基本プロフィール\n\n"
             "| 項目 | 設定 |\n"
@@ -282,8 +282,8 @@ class TestSyncOrgStructureRealisticScenario:
         )
 
         # chatwork_checker: reports to kotoha (THIS IS THE BUG - config had null)
-        _make_person(
-            persons_dir, "chatwork_checker",
+        _make_anima(
+            animas_dir, "chatwork_checker",
             "# Identity: chatwork_checker\n\n"
             "| 項目 | 設定 |\n"
             "|------|------|\n"
@@ -292,8 +292,8 @@ class TestSyncOrgStructureRealisticScenario:
         )
 
         # rin: exists on disk but NOT in config.json (no supervisor)
-        _make_person(
-            persons_dir, "rin",
+        _make_anima(
+            animas_dir, "rin",
             "# Identity: rin\n\n"
             "| 項目 | 設定 |\n"
             "|------|------|\n"
@@ -302,17 +302,17 @@ class TestSyncOrgStructureRealisticScenario:
         )
 
         # aoi: exists on disk but NOT in config.json (no supervisor)
-        _make_person(
-            persons_dir, "aoi",
+        _make_anima(
+            animas_dir, "aoi",
             "# Identity: aoi\n\n"
             "## プロフィール\n"
             "クリエイティブ担当。\n",
         )
 
         # Act
-        result = sync_org_structure(persons_dir, config_path)
+        result = sync_org_structure(animas_dir, config_path)
 
-        # Assert: all persons discovered
+        # Assert: all animas discovered
         assert set(result.keys()) == {
             "sakura", "kotoha", "chatwork_checker", "rin", "aoi",
         }
@@ -329,21 +329,21 @@ class TestSyncOrgStructureRealisticScenario:
         cfg = load_config(config_path)
 
         # chatwork_checker: supervisor repaired from null to "kotoha"
-        assert cfg.persons["chatwork_checker"].supervisor == "kotoha"
+        assert cfg.animas["chatwork_checker"].supervisor == "kotoha"
 
         # rin: newly added to config with supervisor=None
-        assert "rin" in cfg.persons
-        assert cfg.persons["rin"].supervisor is None
+        assert "rin" in cfg.animas
+        assert cfg.animas["rin"].supervisor is None
 
         # aoi: newly added to config with supervisor=None
-        assert "aoi" in cfg.persons
-        assert cfg.persons["aoi"].supervisor is None
+        assert "aoi" in cfg.animas
+        assert cfg.animas["aoi"].supervisor is None
 
         # sakura: still supervisor=None (unchanged)
-        assert cfg.persons["sakura"].supervisor is None
+        assert cfg.animas["sakura"].supervisor is None
 
         # kotoha: still supervisor="sakura" (unchanged, already correct)
-        assert cfg.persons["kotoha"].supervisor == "sakura"
+        assert cfg.animas["kotoha"].supervisor == "sakura"
 
     def test_sync_does_not_overwrite_manual_config_override(
         self, tmp_path: Path,
@@ -353,61 +353,61 @@ class TestSyncOrgStructureRealisticScenario:
         """
         data_dir = tmp_path / "animaworks"
         data_dir.mkdir()
-        persons_dir = data_dir / "persons"
-        persons_dir.mkdir()
+        animas_dir = data_dir / "animas"
+        animas_dir.mkdir()
         config_path = data_dir / "config.json"
 
         _create_config(
             config_path,
-            persons={
-                "alice": PersonModelConfig(supervisor="manual_boss"),
+            animas={
+                "alice": AnimaModelConfig(supervisor="manual_boss"),
             },
         )
 
-        _make_person(
-            persons_dir, "alice",
+        _make_anima(
+            animas_dir, "alice",
             "| 上司 | disk_boss |\n",
         )
 
-        sync_org_structure(persons_dir, config_path)
+        sync_org_structure(animas_dir, config_path)
 
         invalidate_cache()
         cfg = load_config(config_path)
         # Manual config override should be preserved
-        assert cfg.persons["alice"].supervisor == "manual_boss"
+        assert cfg.animas["alice"].supervisor == "manual_boss"
 
 
 # ── Test 3: Server startup triggers org sync ─────────────────────
 
 
 class TestServerStartupOrgSync:
-    """Test that create_app properly handles person discovery with supervisors.
+    """Test that create_app properly handles anima discovery with supervisors.
 
     Rather than testing the full lifespan (which would require asyncio and
     process management), we test that:
-    - create_app discovers persons from the persons directory
-    - The reconciliation callback uses register_person_in_config
-    - A newly discovered person gets added with the correct supervisor
+    - create_app discovers animas from the animas directory
+    - The reconciliation callback uses register_anima_in_config
+    - A newly discovered anima gets added with the correct supervisor
 
     We mock ProcessSupervisor and the lifespan to avoid starting real processes.
     """
 
-    def test_create_app_discovers_persons_and_reconciliation_registers_supervisor(
+    def test_create_app_discovers_animas_and_reconciliation_registers_supervisor(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Test that the reconciliation callback in lifespan properly registers
-        a new person with supervisor extracted from identity.md.
+        a new anima with supervisor extracted from identity.md.
 
-        This simulates what happens when a person is discovered after app creation
+        This simulates what happens when an anima is discovered after app creation
         (e.g., filesystem reconciliation detects a new directory).
         """
-        from core.config.models import register_person_in_config
+        from core.config.models import register_anima_in_config
 
         # Set up isolated data directory
         data_dir = tmp_path / "animaworks"
         data_dir.mkdir()
-        persons_dir = data_dir / "persons"
-        persons_dir.mkdir()
+        animas_dir = data_dir / "animas"
+        animas_dir.mkdir()
         shared_dir = data_dir / "shared"
         shared_dir.mkdir()
         (shared_dir / "inbox").mkdir()
@@ -416,38 +416,38 @@ class TestServerStartupOrgSync:
 
         monkeypatch.setenv("ANIMAWORKS_DATA_DIR", str(data_dir))
 
-        # Create config with setup_complete=True but no persons
+        # Create config with setup_complete=True but no animas
         _create_config(config_path, setup_complete=True)
 
-        # Create a person on disk with supervisor in identity.md
-        person_dir = persons_dir / "newperson"
-        person_dir.mkdir()
-        (person_dir / "identity.md").write_text(
-            "# Identity: newperson\n\n"
+        # Create an anima on disk with supervisor in identity.md
+        anima_dir = animas_dir / "newanima"
+        anima_dir.mkdir()
+        (anima_dir / "identity.md").write_text(
+            "# Identity: newanima\n\n"
             "| 項目 | 設定 |\n"
             "|------|------|\n"
             "| 上司 | sakura |\n",
             encoding="utf-8",
         )
 
-        # Directly call register_person_in_config (the function used by
+        # Directly call register_anima_in_config (the function used by
         # the reconciliation callback in lifespan)
-        register_person_in_config(data_dir, "newperson")
+        register_anima_in_config(data_dir, "newanima")
 
         # Verify
         invalidate_cache()
         cfg = load_config(config_path)
-        assert "newperson" in cfg.persons
-        assert cfg.persons["newperson"].supervisor == "sakura"
+        assert "newanima" in cfg.animas
+        assert cfg.animas["newanima"].supervisor == "sakura"
 
-    def test_create_app_discovers_existing_persons(
+    def test_create_app_discovers_existing_animas(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        """Test that create_app properly discovers persons from the persons directory."""
+        """Test that create_app properly discovers animas from the animas directory."""
         data_dir = tmp_path / "animaworks"
         data_dir.mkdir()
-        persons_dir = data_dir / "persons"
-        persons_dir.mkdir()
+        animas_dir = data_dir / "animas"
+        animas_dir.mkdir()
         shared_dir = data_dir / "shared"
         shared_dir.mkdir()
         (shared_dir / "inbox").mkdir()
@@ -463,11 +463,11 @@ class TestServerStartupOrgSync:
         _create_config(
             config_path,
             setup_complete=True,
-            persons={"sakura": PersonModelConfig(supervisor=None)},
+            animas={"sakura": AnimaModelConfig(supervisor=None)},
         )
 
-        # Create a person with identity.md
-        _make_person(persons_dir, "sakura", "# Identity: sakura\nTop manager.")
+        # Create an anima with identity.md
+        _make_anima(animas_dir, "sakura", "# Identity: sakura\nTop manager.")
 
         # Mock ProcessSupervisor to avoid spawning real processes
         with patch("server.app.ProcessSupervisor") as mock_supervisor_cls:
@@ -475,21 +475,21 @@ class TestServerStartupOrgSync:
 
             from server.app import create_app
 
-            app = create_app(persons_dir, shared_dir)
+            app = create_app(animas_dir, shared_dir)
 
-        # Verify that person was discovered
-        assert "sakura" in app.state.person_names
+        # Verify that anima was discovered
+        assert "sakura" in app.state.anima_names
 
-    def test_reconciliation_callback_wires_register_person_in_config(
+    def test_reconciliation_callback_wires_register_anima_in_config(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Verify the lifespan reconciliation callback calls
-        register_person_in_config for newly added persons.
+        register_anima_in_config for newly added animas.
         """
         data_dir = tmp_path / "animaworks"
         data_dir.mkdir()
-        persons_dir = data_dir / "persons"
-        persons_dir.mkdir()
+        animas_dir = data_dir / "animas"
+        animas_dir.mkdir()
         shared_dir = data_dir / "shared"
         shared_dir.mkdir()
         (shared_dir / "inbox").mkdir()
@@ -504,9 +504,9 @@ class TestServerStartupOrgSync:
 
         _create_config(config_path, setup_complete=True)
 
-        # Create a person with supervisor
-        _make_person(
-            persons_dir, "hinata",
+        # Create an anima with supervisor
+        _make_anima(
+            animas_dir, "hinata",
             "| 上司 | kotoha |\n",
         )
 
@@ -519,42 +519,42 @@ class TestServerStartupOrgSync:
 
             from server.app import create_app
 
-            app = create_app(persons_dir, shared_dir)
+            app = create_app(animas_dir, shared_dir)
 
         # The lifespan hasn't run yet, but we can simulate the
-        # _on_person_added callback that it registers.
+        # _on_anima_added callback that it registers.
         # The callback is registered in lifespan, so let's test the
-        # registration mechanism directly by calling register_person_in_config
+        # registration mechanism directly by calling register_anima_in_config
         # as the callback would.
-        from core.config.models import register_person_in_config
-        register_person_in_config(data_dir, "new_hire")
+        from core.config.models import register_anima_in_config
+        register_anima_in_config(data_dir, "new_hire")
 
         # Since new_hire doesn't exist on disk, supervisor should be None
         invalidate_cache()
         cfg = load_config(config_path)
-        assert "new_hire" in cfg.persons
-        assert cfg.persons["new_hire"].supervisor is None
+        assert "new_hire" in cfg.animas
+        assert cfg.animas["new_hire"].supervisor is None
 
-        # But for a person with identity.md on disk, supervisor IS extracted
+        # But for an anima with identity.md on disk, supervisor IS extracted
         invalidate_cache()
-        _make_person(
-            persons_dir, "another_hire",
+        _make_anima(
+            animas_dir, "another_hire",
             "| 上司 | sakura |\n",
         )
-        register_person_in_config(data_dir, "another_hire")
+        register_anima_in_config(data_dir, "another_hire")
 
         invalidate_cache()
         cfg = load_config(config_path)
-        assert "another_hire" in cfg.persons
-        assert cfg.persons["another_hire"].supervisor == "sakura"
+        assert "another_hire" in cfg.animas
+        assert cfg.animas["another_hire"].supervisor == "sakura"
 
 
 # ── Test 4: Full pipeline — create_from_md + register ────────────
 
 
 class TestFullPipelineCreateAndRegister:
-    """End-to-end test of the full person creation pipeline:
-    create_from_md creates person directory -> register_person_in_config
+    """End-to-end test of the full anima creation pipeline:
+    create_from_md creates anima directory -> register_anima_in_config
     reads supervisor from the created files -> config.json is updated.
     """
 
@@ -562,11 +562,11 @@ class TestFullPipelineCreateAndRegister:
         self, data_dir: Path, tmp_path: Path,
     ) -> None:
         """Full pipeline: character sheet with supervisor -> create_from_md ->
-        register_person_in_config -> config.json has supervisor set.
+        register_anima_in_config -> config.json has supervisor set.
         """
-        from core.config.models import register_person_in_config
+        from core.config.models import register_anima_in_config
 
-        persons_dir = data_dir / "persons"
+        animas_dir = data_dir / "animas"
 
         # Write a full character sheet
         character_sheet = """\
@@ -596,33 +596,33 @@ class TestFullPipelineCreateAndRegister:
         sheet_path = tmp_path / "sheet.md"
         sheet_path.write_text(character_sheet, encoding="utf-8")
 
-        # Step 1: Create person from character sheet
-        person_dir = create_from_md(persons_dir, sheet_path)
+        # Step 1: Create anima from character sheet
+        anima_dir = create_from_md(animas_dir, sheet_path)
 
         # Verify status.json was created with supervisor
         status = json.loads(
-            (person_dir / "status.json").read_text(encoding="utf-8")
+            (anima_dir / "status.json").read_text(encoding="utf-8")
         )
         assert status["supervisor"] == "sakura"
 
-        # Step 2: Register person in config
-        register_person_in_config(data_dir, "testworker")
+        # Step 2: Register anima in config
+        register_anima_in_config(data_dir, "testworker")
 
         # Step 3: Verify config.json
         invalidate_cache()
         cfg = load_config(data_dir / "config.json")
-        assert "testworker" in cfg.persons
-        assert cfg.persons["testworker"].supervisor == "sakura"
+        assert "testworker" in cfg.animas
+        assert cfg.animas["testworker"].supervisor == "sakura"
 
     def test_create_from_md_no_supervisor_then_register(
         self, data_dir: Path, tmp_path: Path,
     ) -> None:
         """When character sheet has no supervisor (なし),
-        register_person_in_config should set supervisor=None.
+        register_anima_in_config should set supervisor=None.
         """
-        from core.config.models import register_person_in_config
+        from core.config.models import register_anima_in_config
 
-        persons_dir = data_dir / "persons"
+        animas_dir = data_dir / "animas"
 
         character_sheet = """\
 # Character: toplevel
@@ -651,30 +651,30 @@ class TestFullPipelineCreateAndRegister:
         sheet_path = tmp_path / "sheet.md"
         sheet_path.write_text(character_sheet, encoding="utf-8")
 
-        person_dir = create_from_md(persons_dir, sheet_path)
+        anima_dir = create_from_md(animas_dir, sheet_path)
 
         # status.json should have empty string for supervisor (なし -> "")
         status = json.loads(
-            (person_dir / "status.json").read_text(encoding="utf-8")
+            (anima_dir / "status.json").read_text(encoding="utf-8")
         )
         assert status["supervisor"] == ""
 
         # Register
-        register_person_in_config(data_dir, "toplevel")
+        register_anima_in_config(data_dir, "toplevel")
 
         invalidate_cache()
         cfg = load_config(data_dir / "config.json")
-        assert "toplevel" in cfg.persons
+        assert "toplevel" in cfg.animas
         # Empty string in status.json resolves to None in config
-        assert cfg.persons["toplevel"].supervisor is None
+        assert cfg.animas["toplevel"].supervisor is None
 
     def test_create_from_md_with_japanese_supervisor_fullwidth_parens(
         self, data_dir: Path, tmp_path: Path,
     ) -> None:
         """Full pipeline with Japanese supervisor name in full-width parens."""
-        from core.config.models import register_person_in_config
+        from core.config.models import register_anima_in_config
 
-        persons_dir = data_dir / "persons"
+        animas_dir = data_dir / "animas"
 
         character_sheet = """\
 # Character: assistant
@@ -703,31 +703,31 @@ class TestFullPipelineCreateAndRegister:
         sheet_path = tmp_path / "sheet.md"
         sheet_path.write_text(character_sheet, encoding="utf-8")
 
-        person_dir = create_from_md(persons_dir, sheet_path)
+        anima_dir = create_from_md(animas_dir, sheet_path)
 
         # status.json stores the raw value
         status = json.loads(
-            (person_dir / "status.json").read_text(encoding="utf-8")
+            (anima_dir / "status.json").read_text(encoding="utf-8")
         )
         assert status["supervisor"] == "琴葉（kotoha）"
 
-        # register_person_in_config resolves to English name
-        register_person_in_config(data_dir, "assistant")
+        # register_anima_in_config resolves to English name
+        register_anima_in_config(data_dir, "assistant")
 
         invalidate_cache()
         cfg = load_config(data_dir / "config.json")
-        assert "assistant" in cfg.persons
-        assert cfg.persons["assistant"].supervisor == "kotoha"
+        assert "assistant" in cfg.animas
+        assert cfg.animas["assistant"].supervisor == "kotoha"
 
-    def test_create_multiple_persons_and_sync_builds_full_org(
+    def test_create_multiple_animas_and_sync_builds_full_org(
         self, data_dir: Path, tmp_path: Path,
     ) -> None:
-        """Create multiple persons from character sheets, register them,
+        """Create multiple animas from character sheets, register them,
         and verify the full organizational hierarchy in config.json.
         """
-        from core.config.models import register_person_in_config
+        from core.config.models import register_anima_in_config
 
-        persons_dir = data_dir / "persons"
+        animas_dir = data_dir / "animas"
 
         # Create manager (no supervisor)
         manager_sheet = """\
@@ -754,8 +754,8 @@ class TestFullPipelineCreateAndRegister:
 """
         sheet1 = tmp_path / "manager.md"
         sheet1.write_text(manager_sheet, encoding="utf-8")
-        create_from_md(persons_dir, sheet1)
-        register_person_in_config(data_dir, "manager")
+        create_from_md(animas_dir, sheet1)
+        register_anima_in_config(data_dir, "manager")
         invalidate_cache()
 
         # Create worker reporting to manager
@@ -783,11 +783,11 @@ class TestFullPipelineCreateAndRegister:
 """
         sheet2 = tmp_path / "worker.md"
         sheet2.write_text(worker_sheet, encoding="utf-8")
-        create_from_md(persons_dir, sheet2)
-        register_person_in_config(data_dir, "worker")
+        create_from_md(animas_dir, sheet2)
+        register_anima_in_config(data_dir, "worker")
         invalidate_cache()
 
         # Verify full org structure in config
         cfg = load_config(data_dir / "config.json")
-        assert cfg.persons["manager"].supervisor is None
-        assert cfg.persons["worker"].supervisor == "manager"
+        assert cfg.animas["manager"].supervisor is None
+        assert cfg.animas["worker"].supervisor == "manager"

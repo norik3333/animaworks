@@ -240,9 +240,9 @@ async def test_event_with_datetime():
     """E2E: IPCEvent.to_json() with datetime in data should serialize correctly."""
     now = datetime.now()
     event = IPCEvent(
-        event="person_activity",
+        event="anima_activity",
         data={
-            "person": "sakura",
+            "anima": "sakura",
             "last_activity": now,
             "status": "active",
         },
@@ -252,8 +252,8 @@ async def test_event_with_datetime():
     json_str = event.to_json()
     data = json.loads(json_str)
 
-    assert data["event"] == "person_activity"
-    assert data["data"]["person"] == "sakura"
+    assert data["event"] == "anima_activity"
+    assert data["data"]["anima"] == "sakura"
     assert data["data"]["status"] == "active"
     assert isinstance(data["data"]["last_activity"], str)
     assert str(now) == data["data"]["last_activity"]

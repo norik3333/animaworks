@@ -1,5 +1,5 @@
 from __future__ import annotations
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
@@ -128,7 +128,7 @@ class WebSocketManager:
 
     async def broadcast_notification(self, data: dict) -> None:
         """Broadcast a notification event. Queue if no clients connected."""
-        event = {"type": "person.notification", "data": data}
+        event = {"type": "anima.notification", "data": data}
         if self.active_connections:
             await self.broadcast(event)
         else:

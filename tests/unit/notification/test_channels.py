@@ -90,7 +90,7 @@ class TestSlackChannel:
             assert len(payload["text"]) <= 40000
 
     @pytest.mark.asyncio
-    async def test_send_with_priority_and_person(self, channel: SlackChannel):
+    async def test_send_with_priority_and_anima(self, channel: SlackChannel):
         mock_response = MagicMock()
         mock_response.raise_for_status = MagicMock()
 
@@ -102,7 +102,7 @@ class TestSlackChannel:
             mock_cls.return_value = mock_client
 
             result = await channel.send(
-                "Alert", "Error occurred", "urgent", person_name="alice"
+                "Alert", "Error occurred", "urgent", anima_name="alice"
             )
             assert result == "slack: OK"
             payload = mock_client.post.call_args[1]["json"]
@@ -452,7 +452,7 @@ class TestNtfyChannel:
             assert mock_client.post.call_args[0][0] == "https://ntfy.sh/test-topic"
 
     @pytest.mark.asyncio
-    async def test_send_with_person_name(self, channel: NtfyChannel):
+    async def test_send_with_anima_name(self, channel: NtfyChannel):
         mock_response = MagicMock()
         mock_response.raise_for_status = MagicMock()
 
@@ -463,7 +463,7 @@ class TestNtfyChannel:
             mock_client.__aexit__ = AsyncMock(return_value=False)
             mock_cls.return_value = mock_client
 
-            await channel.send("Test", "Body", person_name="bob")
+            await channel.send("Test", "Body", anima_name="bob")
             headers = mock_client.post.call_args[1]["headers"]
             assert "(from bob)" in headers["Title"]
 

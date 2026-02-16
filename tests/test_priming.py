@@ -1,5 +1,5 @@
 from __future__ import annotations
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
@@ -16,19 +16,19 @@ from core.memory.priming import PrimingEngine, format_priming_section
 
 
 @pytest.fixture
-def temp_person_dir():
-    """Create a temporary person directory with sample memory files."""
+def temp_anima_dir():
+    """Create a temporary anima directory with sample memory files."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        person_dir = Path(tmpdir) / "persons" / "test_person"
-        person_dir.mkdir(parents=True)
+        anima_dir = Path(tmpdir) / "animas" / "test_anima"
+        anima_dir.mkdir(parents=True)
 
         # Create memory directories
-        (person_dir / "episodes").mkdir()
-        (person_dir / "knowledge").mkdir()
-        (person_dir / "skills").mkdir()
+        (anima_dir / "episodes").mkdir()
+        (anima_dir / "knowledge").mkdir()
+        (anima_dir / "skills").mkdir()
 
         # Create sample episode file (today)
-        today_episode = person_dir / "episodes" / f"{date.today().isoformat()}.md"
+        today_episode = anima_dir / "episodes" / f"{date.today().isoformat()}.md"
         today_episode.write_text(
             f"# {date.today().isoformat()} 行動ログ\n\n"
             "## 09:00 — 朝のタスク確認\n\n"
@@ -47,7 +47,7 @@ def temp_person_dir():
         )
 
         # Create sample knowledge file
-        knowledge_file = person_dir / "knowledge" / "priming-layer.md"
+        knowledge_file = anima_dir / "knowledge" / "priming-layer.md"
         knowledge_file.write_text(
             "# プライミングレイヤー\n\n"
             "自動想起メカニズムを実装する。\n"
@@ -57,7 +57,7 @@ def temp_person_dir():
         )
 
         # Create sample skill file
-        skill_file = person_dir / "skills" / "web_search.md"
+        skill_file = anima_dir / "skills" / "web_search.md"
         skill_file.write_text(
             "# Web検索スキル\n\n"
             "## 概要\n"
@@ -65,7 +65,7 @@ def temp_person_dir():
             encoding="utf-8",
         )
 
-        yield person_dir
+        yield anima_dir
 
 
 @pytest.fixture
@@ -94,9 +94,9 @@ def temp_shared_dir():
 
 
 @pytest.mark.asyncio
-async def test_priming_all_channels(temp_person_dir, temp_shared_dir):
+async def test_priming_all_channels(temp_anima_dir, temp_shared_dir):
     """Test all 4 priming channels."""
-    engine = PrimingEngine(temp_person_dir)
+    engine = PrimingEngine(temp_anima_dir)
 
     # Mock shared_dir by patching get_shared_dir at the point it's imported
     from unittest.mock import patch
@@ -134,9 +134,9 @@ async def test_priming_all_channels(temp_person_dir, temp_shared_dir):
 
 
 @pytest.mark.asyncio
-async def test_priming_skill_match(temp_person_dir, temp_shared_dir):
+async def test_priming_skill_match(temp_anima_dir, temp_shared_dir):
     """Test skill matching in Channel D."""
-    engine = PrimingEngine(temp_person_dir)
+    engine = PrimingEngine(temp_anima_dir)
 
     # Use English keyword "web" to match "web_search" filename
     result = await engine.prime_memories(
@@ -151,9 +151,9 @@ async def test_priming_skill_match(temp_person_dir, temp_shared_dir):
 
 
 @pytest.mark.asyncio
-async def test_priming_empty_result(temp_person_dir, temp_shared_dir):
+async def test_priming_empty_result(temp_anima_dir, temp_shared_dir):
     """Test priming with no relevant memories."""
-    engine = PrimingEngine(temp_person_dir)
+    engine = PrimingEngine(temp_anima_dir)
 
     result = await engine.prime_memories(
         message="Hello",
@@ -193,9 +193,9 @@ def test_format_priming_section():
     print(f"\nFormatted priming section:\n{formatted}")
 
 
-def test_keyword_extraction(temp_person_dir, temp_shared_dir):
+def test_keyword_extraction(temp_anima_dir, temp_shared_dir):
     """Test keyword extraction from message."""
-    engine = PrimingEngine(temp_person_dir)
+    engine = PrimingEngine(temp_anima_dir)
 
     # Japanese text - without morphological analyzer, it extracts whole phrases
     keywords1 = engine._extract_keywords("山田さん プライミング レイヤー 話したい")
@@ -227,28 +227,28 @@ if __name__ == "__main__":
 
     async def run_tests():
         with tempfile.TemporaryDirectory() as tmpdir:
-            person_dir = Path(tmpdir) / "persons" / "test_person"
-            person_dir.mkdir(parents=True)
-            (person_dir / "episodes").mkdir()
-            (person_dir / "knowledge").mkdir()
-            (person_dir / "skills").mkdir()
+            anima_dir = Path(tmpdir) / "animas" / "test_anima"
+            anima_dir.mkdir(parents=True)
+            (anima_dir / "episodes").mkdir()
+            (anima_dir / "knowledge").mkdir()
+            (anima_dir / "skills").mkdir()
 
             shared_dir = Path(tmpdir) / "shared"
             users_dir = shared_dir / "users"
             users_dir.mkdir(parents=True)
 
             # Create sample data
-            today_episode = person_dir / "episodes" / f"{date.today().isoformat()}.md"
+            today_episode = anima_dir / "episodes" / f"{date.today().isoformat()}.md"
             today_episode.write_text(
                 f"# {date.today().isoformat()} 行動ログ\n\n"
                 "## 09:00 — テスト\n\nテストエピソード\n",
                 encoding="utf-8",
             )
 
-            (person_dir / "knowledge" / "test.md").write_text("テスト知識", encoding="utf-8")
-            (person_dir / "skills" / "test_skill.md").write_text("## 概要\nテストスキル", encoding="utf-8")
+            (anima_dir / "knowledge" / "test.md").write_text("テスト知識", encoding="utf-8")
+            (anima_dir / "skills" / "test_skill.md").write_text("## 概要\nテストスキル", encoding="utf-8")
 
-            engine = PrimingEngine(person_dir)
+            engine = PrimingEngine(anima_dir)
             result = await engine.prime_memories("テストメッセージ", "human")
 
             print(f"Priming test result:")

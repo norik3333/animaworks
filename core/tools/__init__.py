@@ -1,4 +1,4 @@
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
@@ -61,14 +61,14 @@ def discover_common_tools(data_dir: Path | None = None) -> dict[str, str]:
     return common
 
 
-def discover_personal_tools(person_dir: Path) -> dict[str, str]:
-    """Scan ``{person_dir}/tools/`` for personal tool modules.
+def discover_personal_tools(anima_dir: Path) -> dict[str, str]:
+    """Scan ``{anima_dir}/tools/`` for personal tool modules.
 
     Returns:
         Mapping of tool_name → absolute file path.
         Skips files starting with ``_`` (including ``__init__.py``).
     """
-    tools_dir = person_dir / "tools"
+    tools_dir = anima_dir / "tools"
     if not tools_dir.is_dir():
         return {}
     personal: dict[str, str] = {}
@@ -92,18 +92,18 @@ def cli_dispatch():
 
     Supports core tools (from ``TOOL_MODULES``), common tools
     (from ``common_tools/``), and personal tools discovered via
-    the ``ANIMAWORKS_PERSON_DIR`` environment variable.
+    the ``ANIMAWORKS_ANIMA_DIR`` environment variable.
     """
     import os
 
     # Discover common tools
     common = discover_common_tools()
 
-    # Discover personal tools if person_dir is set
-    person_dir_str = os.environ.get("ANIMAWORKS_PERSON_DIR", "")
+    # Discover personal tools if anima_dir is set
+    anima_dir_str = os.environ.get("ANIMAWORKS_ANIMA_DIR", "")
     personal: dict[str, str] = {}
-    if person_dir_str:
-        personal = discover_personal_tools(Path(person_dir_str))
+    if anima_dir_str:
+        personal = discover_personal_tools(Path(anima_dir_str))
 
     all_tools = set(TOOL_MODULES.keys()) | set(common.keys()) | set(personal.keys())
 

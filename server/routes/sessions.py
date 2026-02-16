@@ -1,5 +1,5 @@
 from __future__ import annotations
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
@@ -18,20 +18,20 @@ logger = logging.getLogger("animaworks.routes.sessions")
 def create_sessions_router() -> APIRouter:
     router = APIRouter()
 
-    @router.get("/persons/{name}/sessions")
+    @router.get("/animas/{name}/sessions")
     async def list_sessions(name: str, request: Request):
         """List all available sessions: active conversation, archives, episodes."""
-        persons_dir = request.app.state.persons_dir
-        person_dir = persons_dir / name
-        if not person_dir.exists():
-            raise HTTPException(status_code=404, detail=f"Person not found: {name}")
+        animas_dir = request.app.state.animas_dir
+        anima_dir = animas_dir / name
+        if not anima_dir.exists():
+            raise HTTPException(status_code=404, detail=f"Anima not found: {name}")
 
         from core.config.models import load_model_config
 
-        model_config = load_model_config(person_dir)
+        model_config = load_model_config(anima_dir)
 
         # Active conversation
-        conv = ConversationMemory(person_dir, model_config)
+        conv = ConversationMemory(anima_dir, model_config)
         conv_state = conv.load()
         active_conv = None
         if conv_state.turns or conv_state.compressed_summary:
@@ -49,7 +49,7 @@ def create_sessions_router() -> APIRouter:
             }
 
         # Archived sessions — metadata only (no full content read)
-        stm = ShortTermMemory(person_dir)
+        stm = ShortTermMemory(anima_dir)
         archived = []
         archive_dir = stm._archive_dir
         if archive_dir.exists():
@@ -78,7 +78,7 @@ def create_sessions_router() -> APIRouter:
                     pass
 
         # Episodes — partial read (first 200 chars only, no full file load)
-        memory = MemoryManager(person_dir)
+        memory = MemoryManager(anima_dir)
         episodes = []
         for stem in memory.list_episode_files():
             ep_path = memory.episodes_dir / f"{stem}.md"
@@ -90,7 +90,7 @@ def create_sessions_router() -> APIRouter:
 
         # Transcripts — count lines without loading full content
         transcripts = []
-        transcript_dir = person_dir / "transcripts"
+        transcript_dir = anima_dir / "transcripts"
         if transcript_dir.exists():
             for tf in sorted(transcript_dir.glob("*.jsonl"), reverse=True):
                 line_count = sum(
@@ -102,24 +102,24 @@ def create_sessions_router() -> APIRouter:
                 )
 
         return {
-            "person": name,
+            "anima": name,
             "active_conversation": active_conv,
             "archived_sessions": archived,
             "episodes": episodes,
             "transcripts": transcripts,
         }
 
-    @router.get("/persons/{name}/sessions/{session_id}")
+    @router.get("/animas/{name}/sessions/{session_id}")
     async def get_session_detail(
         name: str, session_id: str, request: Request,
     ):
         """Get archived session detail."""
-        persons_dir = request.app.state.persons_dir
-        person_dir = persons_dir / name
-        if not person_dir.exists():
-            raise HTTPException(status_code=404, detail=f"Person not found: {name}")
+        animas_dir = request.app.state.animas_dir
+        anima_dir = animas_dir / name
+        if not anima_dir.exists():
+            raise HTTPException(status_code=404, detail=f"Anima not found: {name}")
 
-        stm = ShortTermMemory(person_dir)
+        stm = ShortTermMemory(anima_dir)
         archive_dir = stm._archive_dir
         json_path = archive_dir / f"{session_id}.json"
         md_path = archive_dir / f"{session_id}.md"
@@ -137,27 +137,27 @@ def create_sessions_router() -> APIRouter:
             markdown = md_path.read_text(encoding="utf-8")
 
         return {
-            "person": name,
+            "anima": name,
             "session_id": session_id,
             "data": data,
             "markdown": markdown,
         }
 
-    @router.get("/persons/{name}/transcripts/{date}")
+    @router.get("/animas/{name}/transcripts/{date}")
     async def get_transcript(name: str, date: str, request: Request):
         """Get full conversation transcript for a specific date."""
-        persons_dir = request.app.state.persons_dir
-        person_dir = persons_dir / name
-        if not person_dir.exists():
-            raise HTTPException(status_code=404, detail=f"Person not found: {name}")
+        animas_dir = request.app.state.animas_dir
+        anima_dir = animas_dir / name
+        if not anima_dir.exists():
+            raise HTTPException(status_code=404, detail=f"Anima not found: {name}")
 
         from core.config.models import load_model_config
-        model_config = load_model_config(person_dir)
+        model_config = load_model_config(anima_dir)
 
-        conv = ConversationMemory(person_dir, model_config)
+        conv = ConversationMemory(anima_dir, model_config)
         messages = conv.load_transcript(date)
         return {
-            "person": name,
+            "anima": name,
             "date": date,
             "has_summary": False,
             "compressed_summary": "",

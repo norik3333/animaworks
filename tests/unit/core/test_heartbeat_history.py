@@ -1,4 +1,4 @@
-"""Unit tests for heartbeat history date-split and purge in core/person.py."""
+"""Unit tests for heartbeat history date-split and purge in core/anima.py."""
 from __future__ import annotations
 
 import json
@@ -14,14 +14,14 @@ from core.schemas import CycleResult
 # ── Helpers ───────────────────────────────────────────────
 
 
-def _make_digital_person(person_dir: Path, shared_dir: Path):
-    """Create a DigitalPerson with all heavy deps mocked."""
-    with patch("core.person.AgentCore"), \
-         patch("core.person.MemoryManager") as MockMM, \
-         patch("core.person.Messenger"):
+def _make_digital_anima(anima_dir: Path, shared_dir: Path):
+    """Create a DigitalAnima with all heavy deps mocked."""
+    with patch("core.anima.AgentCore"), \
+         patch("core.anima.MemoryManager") as MockMM, \
+         patch("core.anima.Messenger"):
         MockMM.return_value.read_model_config.return_value = MagicMock()
-        from core.person import DigitalPerson
-        return DigitalPerson(person_dir, shared_dir)
+        from core.anima import DigitalAnima
+        return DigitalAnima(anima_dir, shared_dir)
 
 
 def _make_cycle_result(**kwargs) -> CycleResult:
@@ -36,8 +36,8 @@ def _make_cycle_result(**kwargs) -> CycleResult:
 
 
 @pytest.fixture
-def person_dir(tmp_path: Path) -> Path:
-    d = tmp_path / "persons" / "alice"
+def anima_dir(tmp_path: Path) -> Path:
+    d = tmp_path / "animas" / "alice"
     d.mkdir(parents=True)
     (d / "identity.md").write_text("# Alice", encoding="utf-8")
     return d
@@ -51,9 +51,9 @@ def shared_dir(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def dp(person_dir: Path, shared_dir: Path):
-    """A DigitalPerson instance with mocked dependencies."""
-    return _make_digital_person(person_dir, shared_dir)
+def dp(anima_dir: Path, shared_dir: Path):
+    """A DigitalAnima instance with mocked dependencies."""
+    return _make_digital_anima(anima_dir, shared_dir)
 
 
 # ── TestHeartbeatHistory ──────────────────────────────────
@@ -62,12 +62,12 @@ def dp(person_dir: Path, shared_dir: Path):
 class TestHeartbeatHistory:
     """Tests for _save_heartbeat_history, _load_heartbeat_history, and _purge_old_heartbeat_logs."""
 
-    def test_save_creates_date_split_file(self, dp, person_dir):
+    def test_save_creates_date_split_file(self, dp, anima_dir):
         """Saving creates {date}.jsonl in heartbeat_history/ directory."""
         result = _make_cycle_result(summary="First heartbeat")
         dp._save_heartbeat_history(result)
 
-        history_dir = person_dir / "shortterm" / "heartbeat_history"
+        history_dir = anima_dir / "shortterm" / "heartbeat_history"
         assert history_dir.exists()
 
         today_file = history_dir / f"{date.today().isoformat()}.jsonl"
@@ -81,7 +81,7 @@ class TestHeartbeatHistory:
         assert entry["duration_ms"] == 150
         assert "timestamp" in entry
 
-    def test_save_appends_to_existing(self, dp, person_dir):
+    def test_save_appends_to_existing(self, dp, anima_dir):
         """Multiple saves to same date append lines."""
         result1 = _make_cycle_result(summary="First")
         result2 = _make_cycle_result(summary="Second")
@@ -92,7 +92,7 @@ class TestHeartbeatHistory:
         dp._save_heartbeat_history(result3)
 
         today_file = (
-            person_dir / "shortterm" / "heartbeat_history"
+            anima_dir / "shortterm" / "heartbeat_history"
             / f"{date.today().isoformat()}.jsonl"
         )
         lines = today_file.read_text(encoding="utf-8").strip().splitlines()
@@ -101,9 +101,9 @@ class TestHeartbeatHistory:
         summaries = [json.loads(line)["summary"] for line in lines]
         assert summaries == ["First", "Second", "Third"]
 
-    def test_load_from_date_split(self, dp, person_dir):
+    def test_load_from_date_split(self, dp, anima_dir):
         """Loading reads from date-split directory."""
-        history_dir = person_dir / "shortterm" / "heartbeat_history"
+        history_dir = anima_dir / "shortterm" / "heartbeat_history"
         history_dir.mkdir(parents=True)
 
         # Write entries for today
@@ -131,9 +131,9 @@ class TestHeartbeatHistory:
         assert "Entry 3" in lines[-2]
         assert "Entry 2" in lines[-3]
 
-    def test_load_fallback_legacy(self, dp, person_dir):
+    def test_load_fallback_legacy(self, dp, anima_dir):
         """Loading falls back to legacy single file if no directory."""
-        shortterm_dir = person_dir / "shortterm"
+        shortterm_dir = anima_dir / "shortterm"
         shortterm_dir.mkdir(parents=True, exist_ok=True)
         # No heartbeat_history/ directory
 
@@ -153,12 +153,12 @@ class TestHeartbeatHistory:
         assert "Legacy heartbeat" in text
         assert "[scanned]" in text
 
-    def test_load_returns_empty_when_no_files(self, dp, person_dir):
+    def test_load_returns_empty_when_no_files(self, dp, anima_dir):
         """Loading returns empty string when neither directory nor legacy file exists."""
         text = dp._load_heartbeat_history()
         assert text == ""
 
-    def test_max_lines_truncation(self, dp, person_dir):
+    def test_max_lines_truncation(self, dp, anima_dir):
         """Files are truncated to _HEARTBEAT_HISTORY_MAX_LINES."""
         # Override max lines to a small number for testing
         original_max = dp._HEARTBEAT_HISTORY_MAX_LINES
@@ -172,7 +172,7 @@ class TestHeartbeatHistory:
                 dp._save_heartbeat_history(result)
 
             today_file = (
-                person_dir / "shortterm" / "heartbeat_history"
+                anima_dir / "shortterm" / "heartbeat_history"
                 / f"{date.today().isoformat()}.jsonl"
             )
             lines = today_file.read_text(encoding="utf-8").strip().splitlines()
@@ -185,9 +185,9 @@ class TestHeartbeatHistory:
         finally:
             type(dp)._HEARTBEAT_HISTORY_MAX_LINES = original_max
 
-    def test_purge_removes_old_files(self, dp, person_dir):
+    def test_purge_removes_old_files(self, dp, anima_dir):
         """Files older than retention period are deleted."""
-        history_dir = person_dir / "shortterm" / "heartbeat_history"
+        history_dir = anima_dir / "shortterm" / "heartbeat_history"
         history_dir.mkdir(parents=True)
 
         # Create a file that is within retention (today)
@@ -213,9 +213,9 @@ class TestHeartbeatHistory:
         # Old file should be deleted
         assert not (history_dir / f"{old_date.isoformat()}.jsonl").exists()
 
-    def test_purge_keeps_recent_files(self, dp, person_dir):
+    def test_purge_keeps_recent_files(self, dp, anima_dir):
         """Files within retention period are not deleted."""
-        history_dir = person_dir / "shortterm" / "heartbeat_history"
+        history_dir = anima_dir / "shortterm" / "heartbeat_history"
         history_dir.mkdir(parents=True)
 
         # Create several files within retention
@@ -230,9 +230,9 @@ class TestHeartbeatHistory:
         remaining = list(history_dir.glob("*.jsonl"))
         assert len(remaining) == 5
 
-    def test_purge_ignores_non_date_filenames(self, dp, person_dir):
+    def test_purge_ignores_non_date_filenames(self, dp, anima_dir):
         """Files that do not have ISO date stems are skipped, not deleted."""
-        history_dir = person_dir / "shortterm" / "heartbeat_history"
+        history_dir = anima_dir / "shortterm" / "heartbeat_history"
         history_dir.mkdir(parents=True)
 
         (history_dir / "not-a-date.jsonl").write_text(
@@ -248,9 +248,9 @@ class TestHeartbeatHistory:
         assert (history_dir / "not-a-date.jsonl").exists()
         assert (history_dir / f"{date.today().isoformat()}.jsonl").exists()
 
-    def test_save_triggers_purge(self, dp, person_dir):
+    def test_save_triggers_purge(self, dp, anima_dir):
         """_save_heartbeat_history calls _purge_old_heartbeat_logs."""
-        history_dir = person_dir / "shortterm" / "heartbeat_history"
+        history_dir = anima_dir / "shortterm" / "heartbeat_history"
         history_dir.mkdir(parents=True)
 
         # Create an old file beyond retention
@@ -267,9 +267,9 @@ class TestHeartbeatHistory:
         # Today's file should exist
         assert (history_dir / f"{date.today().isoformat()}.jsonl").exists()
 
-    def test_load_across_multiple_days(self, dp, person_dir):
+    def test_load_across_multiple_days(self, dp, anima_dir):
         """Loading reads entries from multiple recent day files."""
-        history_dir = person_dir / "shortterm" / "heartbeat_history"
+        history_dir = anima_dir / "shortterm" / "heartbeat_history"
         history_dir.mkdir(parents=True)
 
         # Write one entry per day for 3 days
@@ -292,14 +292,14 @@ class TestHeartbeatHistory:
         # _HEARTBEAT_HISTORY_N is 3, and we have 3 entries total
         assert len(lines) == 3
 
-    def test_save_summary_truncated_at_500_chars(self, dp, person_dir):
+    def test_save_summary_truncated_at_500_chars(self, dp, anima_dir):
         """Summary in saved entry is truncated to 500 characters."""
         long_summary = "x" * 1000
         result = _make_cycle_result(summary=long_summary)
         dp._save_heartbeat_history(result)
 
         today_file = (
-            person_dir / "shortterm" / "heartbeat_history"
+            anima_dir / "shortterm" / "heartbeat_history"
             / f"{date.today().isoformat()}.jsonl"
         )
         content = today_file.read_text(encoding="utf-8").strip()

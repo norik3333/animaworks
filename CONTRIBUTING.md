@@ -43,7 +43,7 @@ pip install -e ".[all-tools,test]"
 All source files must include the AGPL header:
 
 ```python
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 ```

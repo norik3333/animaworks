@@ -13,7 +13,7 @@ from core.schemas import CycleResult, ModelConfig
 
 
 def _make_agent(
-    person_dir: Path,
+    anima_dir: Path,
     model: str = "claude-sonnet-4-20250514",
     execution_mode: str | None = None,
     resolved_mode: str | None = None,
@@ -27,7 +27,7 @@ def _make_agent(
     )
     memory = MagicMock()
     memory.read_permissions.return_value = ""
-    memory.person_dir = person_dir
+    memory.anima_dir = anima_dir
     messenger = MagicMock()
 
     with patch("core.agent.ToolHandler"), \
@@ -38,7 +38,7 @@ def _make_agent(
         mock_executor = MagicMock()
         mock_create.return_value = mock_executor
         from core.agent import AgentCore
-        agent = AgentCore(person_dir, memory, mc, messenger)
+        agent = AgentCore(anima_dir, memory, mc, messenger)
         agent._executor = mock_executor
     return agent
 

@@ -1,4 +1,4 @@
-"""E2E tests for Supervisor person reconciliation.
+"""E2E tests for Supervisor anima reconciliation.
 
 Tests the complete flow: status.json on disk -> API endpoints -> process lifecycle.
 """
@@ -12,19 +12,19 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 
-def _make_app(persons_dir: Path, shared_dir: Path, person_names: list[str]):
-    """Create a minimal FastAPI app with both persons and system routers."""
+def _make_app(animas_dir: Path, shared_dir: Path, anima_names: list[str]):
+    """Create a minimal FastAPI app with both animas and system routers."""
     from fastapi import FastAPI
-    from server.routes.persons import create_persons_router
+    from server.routes.animas import create_animas_router
     from server.routes.system import create_system_router
 
     app = FastAPI()
-    app.state.persons_dir = persons_dir
+    app.state.animas_dir = animas_dir
     app.state.shared_dir = shared_dir
-    app.state.person_names = list(person_names)
+    app.state.anima_names = list(anima_names)
 
     supervisor = MagicMock()
-    supervisor.processes = {name: MagicMock() for name in person_names}
+    supervisor.processes = {name: MagicMock() for name in anima_names}
     supervisor.get_process_status.return_value = {"status": "running", "pid": 1234}
     supervisor.get_all_status.return_value = {}
 
@@ -35,16 +35,16 @@ def _make_app(persons_dir: Path, shared_dir: Path, person_names: list[str]):
     async def _stop(name: str) -> None:
         supervisor.processes.pop(name, None)
 
-    supervisor.start_person = AsyncMock(side_effect=_start)
-    supervisor.stop_person = AsyncMock(side_effect=_stop)
-    supervisor.restart_person = AsyncMock()
+    supervisor.start_anima = AsyncMock(side_effect=_start)
+    supervisor.stop_anima = AsyncMock(side_effect=_stop)
+    supervisor.restart_anima = AsyncMock()
     app.state.supervisor = supervisor
 
     ws_manager = MagicMock()
     ws_manager.active_connections = []
     app.state.ws_manager = ws_manager
 
-    app.include_router(create_persons_router(), prefix="/api")
+    app.include_router(create_animas_router(), prefix="/api")
     app.include_router(create_system_router(), prefix="/api")
     return app
 
@@ -53,22 +53,22 @@ class TestReconciliationE2E:
     """End-to-end tests for the reconciliation workflow."""
 
     async def test_full_enable_disable_cycle(self, tmp_path):
-        """Test: create person -> disable -> enable -> verify status.json states."""
-        persons_dir = tmp_path / "persons"
+        """Test: create anima -> disable -> enable -> verify status.json states."""
+        animas_dir = tmp_path / "animas"
         shared_dir = tmp_path / "shared"
-        persons_dir.mkdir()
+        animas_dir.mkdir()
 
-        # Create person on disk
-        alice_dir = persons_dir / "alice"
+        # Create anima on disk
+        alice_dir = animas_dir / "alice"
         alice_dir.mkdir()
         (alice_dir / "identity.md").write_text("# Alice")
 
-        app = _make_app(persons_dir, shared_dir, person_names=["alice"])
+        app = _make_app(animas_dir, shared_dir, anima_names=["alice"])
 
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             # Disable
-            resp = await client.post("/api/persons/alice/disable")
+            resp = await client.post("/api/animas/alice/disable")
             assert resp.status_code == 200
             data = resp.json()
             assert data["enabled"] is False
@@ -77,11 +77,11 @@ class TestReconciliationE2E:
             status_data = json.loads((alice_dir / "status.json").read_text())
             assert status_data["enabled"] is False
 
-            # Verify person removed from person_names
-            assert "alice" not in app.state.person_names
+            # Verify anima removed from anima_names
+            assert "alice" not in app.state.anima_names
 
             # Enable
-            resp = await client.post("/api/persons/alice/enable")
+            resp = await client.post("/api/animas/alice/enable")
             assert resp.status_code == 200
             data = resp.json()
             assert data["enabled"] is True
@@ -90,28 +90,28 @@ class TestReconciliationE2E:
             status_data = json.loads((alice_dir / "status.json").read_text())
             assert status_data["enabled"] is True
 
-            # Verify person back in person_names
-            assert "alice" in app.state.person_names
+            # Verify anima back in anima_names
+            assert "alice" in app.state.anima_names
 
     async def test_reload_respects_disabled_status(self, tmp_path):
-        """Test: disabled person is not started during reload."""
-        persons_dir = tmp_path / "persons"
+        """Test: disabled anima is not started during reload."""
+        animas_dir = tmp_path / "animas"
         shared_dir = tmp_path / "shared"
-        persons_dir.mkdir()
+        animas_dir.mkdir()
 
-        # Create enabled person
-        alice_dir = persons_dir / "alice"
+        # Create enabled anima
+        alice_dir = animas_dir / "alice"
         alice_dir.mkdir()
         (alice_dir / "identity.md").write_text("# Alice")
         (alice_dir / "status.json").write_text('{"enabled": true}')
 
-        # Create disabled person
-        bob_dir = persons_dir / "bob"
+        # Create disabled anima
+        bob_dir = animas_dir / "bob"
         bob_dir.mkdir()
         (bob_dir / "identity.md").write_text("# Bob")
         (bob_dir / "status.json").write_text('{"enabled": false}')
 
-        app = _make_app(persons_dir, shared_dir, person_names=[])
+        app = _make_app(animas_dir, shared_dir, anima_names=[])
 
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -125,20 +125,20 @@ class TestReconciliationE2E:
 
     async def test_disable_then_reload_keeps_disabled(self, tmp_path):
         """Test: disabling via API persists through reload."""
-        persons_dir = tmp_path / "persons"
+        animas_dir = tmp_path / "animas"
         shared_dir = tmp_path / "shared"
-        persons_dir.mkdir()
+        animas_dir.mkdir()
 
-        alice_dir = persons_dir / "alice"
+        alice_dir = animas_dir / "alice"
         alice_dir.mkdir()
         (alice_dir / "identity.md").write_text("# Alice")
 
-        app = _make_app(persons_dir, shared_dir, person_names=["alice"])
+        app = _make_app(animas_dir, shared_dir, anima_names=["alice"])
 
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             # Disable alice via API
-            resp = await client.post("/api/persons/alice/disable")
+            resp = await client.post("/api/animas/alice/disable")
             assert resp.status_code == 200
 
             # Reload -- alice should NOT be re-added because she's disabled
@@ -147,18 +147,18 @@ class TestReconciliationE2E:
             assert "alice" not in data.get("added", [])
             assert "alice" not in data.get("refreshed", [])
 
-    async def test_person_without_status_json_is_loaded_on_reload(self, tmp_path):
-        """Test: backward compatibility -- no status.json means person is enabled."""
-        persons_dir = tmp_path / "persons"
+    async def test_anima_without_status_json_is_loaded_on_reload(self, tmp_path):
+        """Test: backward compatibility -- no status.json means anima is enabled."""
+        animas_dir = tmp_path / "animas"
         shared_dir = tmp_path / "shared"
-        persons_dir.mkdir()
+        animas_dir.mkdir()
 
-        alice_dir = persons_dir / "alice"
+        alice_dir = animas_dir / "alice"
         alice_dir.mkdir()
         (alice_dir / "identity.md").write_text("# Alice")
         # No status.json -- should be treated as enabled
 
-        app = _make_app(persons_dir, shared_dir, person_names=[])
+        app = _make_app(animas_dir, shared_dir, anima_names=[])
 
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:

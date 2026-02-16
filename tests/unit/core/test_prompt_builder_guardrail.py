@@ -1,7 +1,7 @@
 """Unit tests for the commander hiring guardrail in core/prompt/builder.py.
 
 Verifies that the "雇用ルール" section is appended to the system prompt
-only when a "newstaff" skill is present in the person's skill summaries.
+only when a "newstaff" skill is present in the anima's skill summaries.
 """
 from __future__ import annotations
 
@@ -22,12 +22,12 @@ def _make_mock_memory(
     Sets up all required method return values with reasonable defaults,
     injecting the given *skill_summaries* for ``list_skill_summaries()``.
     """
-    person_dir = tmp_path / "persons" / "testperson"
-    person_dir.mkdir(parents=True, exist_ok=True)
-    (person_dir / "identity.md").write_text("# Test Person", encoding="utf-8")
+    anima_dir = tmp_path / "animas" / "testanima"
+    anima_dir.mkdir(parents=True, exist_ok=True)
+    (anima_dir / "identity.md").write_text("# Test Anima", encoding="utf-8")
 
     memory = MagicMock()
-    memory.person_dir = person_dir
+    memory.anima_dir = anima_dir
     memory.read_bootstrap.return_value = ""
     memory.read_company_vision.return_value = ""
     memory.read_identity.return_value = ""
@@ -54,7 +54,7 @@ class TestCommanderHiringGuardrail:
         self, tmp_path: Path, data_dir: Path,
     ) -> None:
         """When skill_summaries contains 'newstaff', the prompt must include
-        the 雇用ルール section with create_person tool instruction."""
+        the 雇用ルール section with create_anima tool instruction."""
         memory = _make_mock_memory(
             tmp_path,
             skill_summaries=[("newstaff", "新しい社員雇用")],
@@ -64,7 +64,7 @@ class TestCommanderHiringGuardrail:
             result = build_system_prompt(memory)
 
         assert "雇用ルール" in result
-        assert "create_person" in result
+        assert "create_anima" in result
 
     def test_guardrail_absent_when_no_newstaff_skill(
         self, tmp_path: Path, data_dir: Path,
@@ -109,7 +109,7 @@ class TestCommanderHiringGuardrail:
             result = build_system_prompt(memory)
 
         # All key phrases from the guardrail block
-        assert "create_person" in result
+        assert "create_anima" in result
         assert "identity.md" in result
         assert "キャラクターシート" in result
 
@@ -131,4 +131,4 @@ class TestCommanderHiringGuardrail:
             result = build_system_prompt(memory)
 
         assert "雇用ルール" in result
-        assert "create_person" in result
+        assert "create_anima" in result

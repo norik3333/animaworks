@@ -18,41 +18,41 @@ class TestChunkIdFormat:
     """Verify chunk IDs do not contain doubled directory paths."""
 
     @pytest.fixture
-    def person_dir(self, tmp_path: Path) -> Path:
-        d = tmp_path / "test_person"
+    def anima_dir(self, tmp_path: Path) -> Path:
+        d = tmp_path / "test_anima"
         d.mkdir()
         for sub in ("knowledge", "episodes", "procedures", "skills"):
             (d / sub).mkdir()
         return d
 
-    def _make_indexer(self, person_dir: Path, prefix: str | None = None):
+    def _make_indexer(self, anima_dir: Path, prefix: str | None = None):
         from core.memory.rag.indexer import MemoryIndexer
 
         with patch.object(MemoryIndexer, "_init_embedding_model"):
             return MemoryIndexer(
                 MagicMock(),
-                person_name=person_dir.name,
-                person_dir=person_dir,
+                anima_name=anima_dir.name,
+                anima_dir=anima_dir,
                 collection_prefix=prefix,
             )
 
-    def test_knowledge_chunk_id(self, person_dir: Path):
-        indexer = self._make_indexer(person_dir)
-        f = person_dir / "knowledge" / "topic.md"
+    def test_knowledge_chunk_id(self, anima_dir: Path):
+        indexer = self._make_indexer(anima_dir)
+        f = anima_dir / "knowledge" / "topic.md"
         f.write_text("x", encoding="utf-8")
         cid = indexer._make_chunk_id(f, "knowledge", 0)
-        assert cid == f"{person_dir.name}/knowledge/topic.md#0"
+        assert cid == f"{anima_dir.name}/knowledge/topic.md#0"
 
-    def test_episodes_chunk_id(self, person_dir: Path):
-        indexer = self._make_indexer(person_dir)
-        f = person_dir / "episodes" / "2026-02-16.md"
+    def test_episodes_chunk_id(self, anima_dir: Path):
+        indexer = self._make_indexer(anima_dir)
+        f = anima_dir / "episodes" / "2026-02-16.md"
         f.write_text("x", encoding="utf-8")
         cid = indexer._make_chunk_id(f, "episodes", 2)
-        assert cid == f"{person_dir.name}/episodes/2026-02-16.md#2"
+        assert cid == f"{anima_dir.name}/episodes/2026-02-16.md#2"
 
-    def test_shared_common_knowledge_chunk_id(self, person_dir: Path):
-        indexer = self._make_indexer(person_dir, prefix="shared")
-        ck = person_dir / "common_knowledge"
+    def test_shared_common_knowledge_chunk_id(self, anima_dir: Path):
+        indexer = self._make_indexer(anima_dir, prefix="shared")
+        ck = anima_dir / "common_knowledge"
         ck.mkdir(exist_ok=True)
         f = ck / "guide.md"
         f.write_text("x", encoding="utf-8")
@@ -65,28 +65,28 @@ class TestChunkByMarkdownHeadingsMemoryType:
     """Verify _chunk_by_markdown_headings uses the memory_type parameter."""
 
     @pytest.fixture
-    def person_dir(self, tmp_path: Path) -> Path:
-        d = tmp_path / "person"
+    def anima_dir(self, tmp_path: Path) -> Path:
+        d = tmp_path / "anima"
         d.mkdir()
         (d / "knowledge").mkdir()
         (d / "common_knowledge").mkdir()
         return d
 
-    def _make_indexer(self, person_dir: Path, prefix: str | None = None):
+    def _make_indexer(self, anima_dir: Path, prefix: str | None = None):
         from core.memory.rag.indexer import MemoryIndexer
 
         with patch.object(MemoryIndexer, "_init_embedding_model"):
             return MemoryIndexer(
                 MagicMock(),
-                person_name=person_dir.name,
-                person_dir=person_dir,
+                anima_name=anima_dir.name,
+                anima_dir=anima_dir,
                 collection_prefix=prefix,
             )
 
-    def test_memory_type_propagated_to_chunk_ids(self, person_dir: Path):
+    def test_memory_type_propagated_to_chunk_ids(self, anima_dir: Path):
         """When called with memory_type='common_knowledge', chunk IDs reflect that."""
-        indexer = self._make_indexer(person_dir, prefix="shared")
-        f = person_dir / "common_knowledge" / "guide.md"
+        indexer = self._make_indexer(anima_dir, prefix="shared")
+        f = anima_dir / "common_knowledge" / "guide.md"
         f.write_text("preamble\n\n## Section A\n\nBody A", encoding="utf-8")
 
         chunks = indexer._chunk_by_markdown_headings(f, f.read_text(), "common_knowledge")
@@ -97,10 +97,10 @@ class TestChunkByMarkdownHeadingsMemoryType:
             # Must NOT contain 'knowledge/' (that would mean the old hardcoded value leaked)
             assert "/knowledge/" not in chunk.id or "/common_knowledge/" in chunk.id
 
-    def test_memory_type_knowledge(self, person_dir: Path):
+    def test_memory_type_knowledge(self, anima_dir: Path):
         """Standard knowledge type still works correctly."""
-        indexer = self._make_indexer(person_dir)
-        f = person_dir / "knowledge" / "topic.md"
+        indexer = self._make_indexer(anima_dir)
+        f = anima_dir / "knowledge" / "topic.md"
         f.write_text("intro\n\n## Heading\n\nContent here", encoding="utf-8")
 
         chunks = indexer._chunk_by_markdown_headings(f, f.read_text(), "knowledge")
@@ -113,26 +113,26 @@ class TestChunkByMarkdownHeadingsPreambleCollision:
     """Verify preamble and heading sections get unique sequential IDs."""
 
     @pytest.fixture
-    def person_dir(self, tmp_path: Path) -> Path:
-        d = tmp_path / "person"
+    def anima_dir(self, tmp_path: Path) -> Path:
+        d = tmp_path / "anima"
         d.mkdir()
         (d / "knowledge").mkdir()
         return d
 
-    def _make_indexer(self, person_dir: Path):
+    def _make_indexer(self, anima_dir: Path):
         from core.memory.rag.indexer import MemoryIndexer
 
         with patch.object(MemoryIndexer, "_init_embedding_model"):
             return MemoryIndexer(
                 MagicMock(),
-                person_name=person_dir.name,
-                person_dir=person_dir,
+                anima_name=anima_dir.name,
+                anima_dir=anima_dir,
             )
 
-    def test_preamble_and_first_heading_have_different_ids(self, person_dir: Path):
+    def test_preamble_and_first_heading_have_different_ids(self, anima_dir: Path):
         """Preamble (#0) and first heading section (#1) must not collide."""
-        indexer = self._make_indexer(person_dir)
-        f = person_dir / "knowledge" / "topic.md"
+        indexer = self._make_indexer(anima_dir)
+        f = anima_dir / "knowledge" / "topic.md"
         # Preamble is >50 chars to trigger inclusion
         f.write_text(
             "# Topic Title\n\n[AUTO-CONSOLIDATED: 2026-02-16 02:00]\n\n"
@@ -151,10 +151,10 @@ class TestChunkByMarkdownHeadingsPreambleCollision:
         assert ids[1].endswith("#1")
         assert ids[2].endswith("#2")
 
-    def test_no_preamble_starts_at_zero(self, person_dir: Path):
+    def test_no_preamble_starts_at_zero(self, anima_dir: Path):
         """Without preamble, first heading section gets #0."""
-        indexer = self._make_indexer(person_dir)
-        f = person_dir / "knowledge" / "topic.md"
+        indexer = self._make_indexer(anima_dir)
+        f = anima_dir / "knowledge" / "topic.md"
         f.write_text(
             "short\n\n## Section A\n\nBody A\n\n## Section B\n\nBody B",
             encoding="utf-8",
@@ -166,10 +166,10 @@ class TestChunkByMarkdownHeadingsPreambleCollision:
         assert chunks[0].id.endswith("#0")
         assert chunks[1].id.endswith("#1")
 
-    def test_auto_consolidated_header_triggers_preamble(self, person_dir: Path):
+    def test_auto_consolidated_header_triggers_preamble(self, anima_dir: Path):
         """Real-world pattern: [AUTO-CONSOLIDATED: ...] creates >50 char preamble."""
-        indexer = self._make_indexer(person_dir)
-        f = person_dir / "knowledge" / "system-integration.md"
+        indexer = self._make_indexer(anima_dir)
+        f = anima_dir / "knowledge" / "system-integration.md"
         content = (
             "# system-integration\n\n"
             "[AUTO-CONSOLIDATED: 2026-02-16 02:00]\n\n"
@@ -191,10 +191,10 @@ class TestChunkByMarkdownHeadingsPreambleCollision:
         for i, chunk in enumerate(chunks):
             assert chunk.id.endswith(f"#{i}")
 
-    def test_single_heading_with_preamble(self, person_dir: Path):
+    def test_single_heading_with_preamble(self, anima_dir: Path):
         """File with preamble and exactly one heading section."""
-        indexer = self._make_indexer(person_dir)
-        f = person_dir / "knowledge" / "topic.md"
+        indexer = self._make_indexer(anima_dir)
+        f = anima_dir / "knowledge" / "topic.md"
         f.write_text(
             "# Title\n\nSome long preamble that is definitely over fifty characters.\n\n"
             "## The Only Section\n\nContent here",
@@ -208,10 +208,10 @@ class TestChunkByMarkdownHeadingsPreambleCollision:
         assert chunks[1].id.endswith("#1")  # heading
         assert chunks[0].id != chunks[1].id
 
-    def test_chunk_indices_in_metadata(self, person_dir: Path):
+    def test_chunk_indices_in_metadata(self, anima_dir: Path):
         """chunk_index in metadata matches the sequential ID."""
-        indexer = self._make_indexer(person_dir)
-        f = person_dir / "knowledge" / "topic.md"
+        indexer = self._make_indexer(anima_dir)
+        f = anima_dir / "knowledge" / "topic.md"
         f.write_text(
             "# Title\n\n[AUTO-CONSOLIDATED: 2026-02-16]\nExtra context line here.\n\n"
             "## A\n\nBody A\n\n## B\n\nBody B",
@@ -228,25 +228,25 @@ class TestChunkByTimeHeadingsMemoryType:
     """Verify _chunk_by_time_headings uses the memory_type parameter."""
 
     @pytest.fixture
-    def person_dir(self, tmp_path: Path) -> Path:
-        d = tmp_path / "person"
+    def anima_dir(self, tmp_path: Path) -> Path:
+        d = tmp_path / "anima"
         d.mkdir()
         (d / "episodes").mkdir()
         return d
 
-    def _make_indexer(self, person_dir: Path):
+    def _make_indexer(self, anima_dir: Path):
         from core.memory.rag.indexer import MemoryIndexer
 
         with patch.object(MemoryIndexer, "_init_embedding_model"):
             return MemoryIndexer(
                 MagicMock(),
-                person_name=person_dir.name,
-                person_dir=person_dir,
+                anima_name=anima_dir.name,
+                anima_dir=anima_dir,
             )
 
-    def test_memory_type_propagated_to_chunk_ids(self, person_dir: Path):
-        indexer = self._make_indexer(person_dir)
-        f = person_dir / "episodes" / "2026-02-16.md"
+    def test_memory_type_propagated_to_chunk_ids(self, anima_dir: Path):
+        indexer = self._make_indexer(anima_dir)
+        f = anima_dir / "episodes" / "2026-02-16.md"
         f.write_text(
             "# 2026-02-16\n\n## 09:30 — Morning\n\nDid stuff\n\n## 14:00 — Afternoon\n\nMore stuff",
             encoding="utf-8",
@@ -263,26 +263,26 @@ class TestChunkFileDispatches:
     """Verify _chunk_file dispatches memory_type to all strategies."""
 
     @pytest.fixture
-    def person_dir(self, tmp_path: Path) -> Path:
-        d = tmp_path / "person"
+    def anima_dir(self, tmp_path: Path) -> Path:
+        d = tmp_path / "anima"
         d.mkdir()
         for sub in ("knowledge", "episodes", "procedures"):
             (d / sub).mkdir()
         return d
 
-    def _make_indexer(self, person_dir: Path):
+    def _make_indexer(self, anima_dir: Path):
         from core.memory.rag.indexer import MemoryIndexer
 
         with patch.object(MemoryIndexer, "_init_embedding_model"):
             return MemoryIndexer(
                 MagicMock(),
-                person_name=person_dir.name,
-                person_dir=person_dir,
+                anima_name=anima_dir.name,
+                anima_dir=anima_dir,
             )
 
-    def test_common_knowledge_dispatches_with_correct_type(self, person_dir: Path):
-        indexer = self._make_indexer(person_dir)
-        ck_dir = person_dir / "common_knowledge"
+    def test_common_knowledge_dispatches_with_correct_type(self, anima_dir: Path):
+        indexer = self._make_indexer(anima_dir)
+        ck_dir = anima_dir / "common_knowledge"
         ck_dir.mkdir(exist_ok=True)
         f = ck_dir / "doc.md"
         content = "preamble\n\n## Section\n\nBody"
@@ -292,9 +292,9 @@ class TestChunkFileDispatches:
         for chunk in chunks:
             assert chunk.metadata["memory_type"] == "common_knowledge"
 
-    def test_episodes_dispatches_with_correct_type(self, person_dir: Path):
-        indexer = self._make_indexer(person_dir)
-        f = person_dir / "episodes" / "2026-02-16.md"
+    def test_episodes_dispatches_with_correct_type(self, anima_dir: Path):
+        indexer = self._make_indexer(anima_dir)
+        f = anima_dir / "episodes" / "2026-02-16.md"
         content = "# Day\n\n## 10:00 — Test\n\nContent"
         f.write_text(content, encoding="utf-8")
 
@@ -302,9 +302,9 @@ class TestChunkFileDispatches:
         for chunk in chunks:
             assert chunk.metadata["memory_type"] == "episodes"
 
-    def test_procedures_dispatches_with_correct_type(self, person_dir: Path):
-        indexer = self._make_indexer(person_dir)
-        f = person_dir / "procedures" / "deploy.md"
+    def test_procedures_dispatches_with_correct_type(self, anima_dir: Path):
+        indexer = self._make_indexer(anima_dir)
+        f = anima_dir / "procedures" / "deploy.md"
         content = "# Deploy procedure\n\nStep 1: do the thing"
         f.write_text(content, encoding="utf-8")
 

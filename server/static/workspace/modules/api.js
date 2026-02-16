@@ -20,24 +20,24 @@ function post(path, body) {
   });
 }
 
-// ── Person ──────────────────────
+// ── Anima ──────────────────────
 
-export function fetchPersons() {
-  return request("/api/persons");
+export function fetchAnimas() {
+  return request("/api/animas");
 }
 
-export function fetchPersonDetail(name) {
-  return request(`/api/persons/${encodeURIComponent(name)}`);
+export function fetchAnimaDetail(name) {
+  return request(`/api/animas/${encodeURIComponent(name)}`);
 }
 
 // ── Chat ──────────────────────
 
-export function greetPerson(name) {
-  return post(`/api/persons/${encodeURIComponent(name)}/greet`, {});
+export function greetAnima(name) {
+  return post(`/api/animas/${encodeURIComponent(name)}/greet`, {});
 }
 
 export function sendChat(name, message, userName) {
-  return post(`/api/persons/${encodeURIComponent(name)}/chat`, {
+  return post(`/api/animas/${encodeURIComponent(name)}/chat`, {
     message,
     from_person: userName || "human",
   });
@@ -47,7 +47,7 @@ export function sendChat(name, message, userName) {
  * Start SSE chat stream. Returns the raw Response for manual reading.
  */
 export function sendChatStream(name, message, userName) {
-  return fetch(`/api/persons/${encodeURIComponent(name)}/chat/stream`, {
+  return fetch(`/api/animas/${encodeURIComponent(name)}/chat/stream`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ message, from_person: userName || "human" }),
@@ -57,45 +57,45 @@ export function sendChatStream(name, message, userName) {
 // ── Memory ──────────────────────
 
 export function fetchEpisodes(name) {
-  return request(`/api/persons/${encodeURIComponent(name)}/episodes`);
+  return request(`/api/animas/${encodeURIComponent(name)}/episodes`);
 }
 
 export function fetchEpisode(name, date) {
-  return request(`/api/persons/${encodeURIComponent(name)}/episodes/${encodeURIComponent(date)}`);
+  return request(`/api/animas/${encodeURIComponent(name)}/episodes/${encodeURIComponent(date)}`);
 }
 
 export function fetchKnowledge(name) {
-  return request(`/api/persons/${encodeURIComponent(name)}/knowledge`);
+  return request(`/api/animas/${encodeURIComponent(name)}/knowledge`);
 }
 
 export function fetchKnowledgeTopic(name, topic) {
-  return request(`/api/persons/${encodeURIComponent(name)}/knowledge/${encodeURIComponent(topic)}`);
+  return request(`/api/animas/${encodeURIComponent(name)}/knowledge/${encodeURIComponent(topic)}`);
 }
 
 export function fetchProcedures(name) {
-  return request(`/api/persons/${encodeURIComponent(name)}/procedures`);
+  return request(`/api/animas/${encodeURIComponent(name)}/procedures`);
 }
 
 export function fetchProcedure(name, proc) {
-  return request(`/api/persons/${encodeURIComponent(name)}/procedures/${encodeURIComponent(proc)}`);
+  return request(`/api/animas/${encodeURIComponent(name)}/procedures/${encodeURIComponent(proc)}`);
 }
 
 // ── Session ──────────────────────
 
 export function fetchSessions(name) {
-  return request(`/api/persons/${encodeURIComponent(name)}/sessions`);
+  return request(`/api/animas/${encodeURIComponent(name)}/sessions`);
 }
 
 export function fetchSession(name, sessionId) {
-  return request(`/api/persons/${encodeURIComponent(name)}/sessions/${encodeURIComponent(sessionId)}`);
+  return request(`/api/animas/${encodeURIComponent(name)}/sessions/${encodeURIComponent(sessionId)}`);
 }
 
 export function fetchConversationFull(name, limit = 50) {
-  return request(`/api/persons/${encodeURIComponent(name)}/conversation/full?limit=${limit}`);
+  return request(`/api/animas/${encodeURIComponent(name)}/conversation/full?limit=${limit}`);
 }
 
 export function fetchTranscript(name, date) {
-  return request(`/api/persons/${encodeURIComponent(name)}/transcripts/${encodeURIComponent(date)}`);
+  return request(`/api/animas/${encodeURIComponent(name)}/transcripts/${encodeURIComponent(date)}`);
 }
 
 // ── System ──────────────────────
@@ -113,21 +113,21 @@ export function reloadSystem() {
 }
 
 export function triggerHeartbeat(name) {
-  return post(`/api/persons/${encodeURIComponent(name)}/trigger`, {});
+  return post(`/api/animas/${encodeURIComponent(name)}/trigger`, {});
 }
 
 // ── Assets ──────────────────────
 
 export function assetUrl(name, filename) {
-  return `/api/persons/${encodeURIComponent(name)}/assets/${encodeURIComponent(filename)}`;
+  return `/api/animas/${encodeURIComponent(name)}/assets/${encodeURIComponent(filename)}`;
 }
 
 export function fetchAssets(name) {
-  return request(`/api/persons/${encodeURIComponent(name)}/assets`);
+  return request(`/api/animas/${encodeURIComponent(name)}/assets`);
 }
 
 export function fetchAssetMetadata(name) {
-  return request(`/api/persons/${encodeURIComponent(name)}/assets/metadata`);
+  return request(`/api/animas/${encodeURIComponent(name)}/assets/metadata`);
 }
 
 /**

@@ -1,5 +1,5 @@
 from __future__ import annotations
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
@@ -52,22 +52,22 @@ class TestLifecycleConsolidationIntegration:
     async def test_handle_daily_consolidation_with_config(self, tmp_path: Path):
         """Test daily consolidation handler respects config settings."""
         from core.lifecycle import LifecycleManager
-        from core.person import DigitalPerson
+        from core.anima import DigitalAnima
 
         manager = LifecycleManager()
 
-        # Create mock person
-        person_dir = tmp_path / "test_person"
-        person_dir.mkdir(parents=True)
-        (person_dir / "identity.md").write_text("# Test Person", encoding="utf-8")
+        # Create mock anima
+        anima_dir = tmp_path / "test_anima"
+        anima_dir.mkdir(parents=True)
+        (anima_dir / "identity.md").write_text("# Test Anima", encoding="utf-8")
 
-        # Mock DigitalPerson
-        mock_person = MagicMock(spec=DigitalPerson)
-        mock_person.name = "test_person"
-        mock_person.memory = MagicMock()
-        mock_person.memory.person_dir = person_dir
+        # Mock DigitalAnima
+        mock_anima = MagicMock(spec=DigitalAnima)
+        mock_anima.name = "test_anima"
+        mock_anima.memory = MagicMock()
+        mock_anima.memory.anima_dir = anima_dir
 
-        manager.persons["test_person"] = mock_person
+        manager.animas["test_anima"] = mock_anima
 
         # Mock config to disable consolidation
         mock_config = MagicMock()
@@ -82,18 +82,18 @@ class TestLifecycleConsolidationIntegration:
         # (No exception should be raised)
 
     @pytest.mark.asyncio
-    async def test_handle_daily_consolidation_with_person(self, tmp_path: Path):
-        """Test daily consolidation runs for registered person."""
+    async def test_handle_daily_consolidation_with_anima(self, tmp_path: Path):
+        """Test daily consolidation runs for registered anima."""
         from core.lifecycle import LifecycleManager
-        from core.person import DigitalPerson
+        from core.anima import DigitalAnima
         from datetime import datetime
 
         manager = LifecycleManager()
 
-        # Create person with episodes
-        person_dir = tmp_path / "test_person"
-        episodes_dir = person_dir / "episodes"
-        knowledge_dir = person_dir / "knowledge"
+        # Create anima with episodes
+        anima_dir = tmp_path / "test_anima"
+        episodes_dir = anima_dir / "episodes"
+        knowledge_dir = anima_dir / "knowledge"
         episodes_dir.mkdir(parents=True)
         knowledge_dir.mkdir(parents=True)
 
@@ -105,13 +105,13 @@ class TestLifecycleConsolidationIntegration:
 **要点**: Test content
 """, encoding="utf-8")
 
-        # Mock person
-        mock_person = MagicMock(spec=DigitalPerson)
-        mock_person.name = "test_person"
-        mock_person.memory = MagicMock()
-        mock_person.memory.person_dir = person_dir
+        # Mock anima
+        mock_anima = MagicMock(spec=DigitalAnima)
+        mock_anima.name = "test_anima"
+        mock_anima.memory = MagicMock()
+        mock_anima.memory.anima_dir = anima_dir
 
-        manager.persons["test_person"] = mock_person
+        manager.animas["test_anima"] = mock_anima
 
         # Mock config to enable consolidation
         mock_config = MagicMock()

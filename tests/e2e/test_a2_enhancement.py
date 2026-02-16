@@ -26,15 +26,15 @@ from tests.helpers.mocks import (
 
 
 @pytest.fixture
-def person_dir(tmp_path: Path) -> Path:
-    d = tmp_path / "persons" / "test"
+def anima_dir(tmp_path: Path) -> Path:
+    d = tmp_path / "animas" / "test"
     d.mkdir(parents=True)
     (d / "permissions.md").write_text(
         "## 外部ツール\n- chatwork: OK\n- slack: OK\n"
         "## ファイル操作\n## コマンド実行\n",
         encoding="utf-8",
     )
-    (d / "identity.md").write_text("# Test Person", encoding="utf-8")
+    (d / "identity.md").write_text("# Test Anima", encoding="utf-8")
     for sub in ["episodes", "knowledge", "procedures", "skills", "state", "shortterm"]:
         (d / sub).mkdir(exist_ok=True)
     return d
@@ -53,7 +53,7 @@ def model_config() -> ModelConfig:
 
 
 @pytest.fixture
-def memory(person_dir: Path) -> MagicMock:
+def memory(anima_dir: Path) -> MagicMock:
     from core.memory import MemoryManager
     m = MagicMock(spec=MemoryManager)
     m.read_permissions.return_value = (
@@ -61,22 +61,22 @@ def memory(person_dir: Path) -> MagicMock:
         "## ファイル操作\n## コマンド実行\n"
     )
     m.search_memory_text.return_value = []
-    m.person_dir = person_dir
+    m.anima_dir = anima_dir
     return m
 
 
 @pytest.fixture
-def executor(model_config, person_dir, memory):
+def executor(model_config, anima_dir, memory):
     from core.tooling.handler import ToolHandler
     from core.execution.litellm_loop import LiteLLMExecutor
     th = ToolHandler(
-        person_dir=person_dir,
+        anima_dir=anima_dir,
         memory=memory,
         tool_registry=["chatwork", "slack"],
     )
     return LiteLLMExecutor(
         model_config=model_config,
-        person_dir=person_dir,
+        anima_dir=anima_dir,
         tool_handler=th,
         tool_registry=["chatwork", "slack"],
         memory=memory,
@@ -151,9 +151,9 @@ class TestDiscoverToolsE2E:
 class TestSearchCodeE2E:
     """Test search_code tool in the A2 loop."""
 
-    async def test_search_code_in_loop(self, executor, person_dir):
+    async def test_search_code_in_loop(self, executor, anima_dir):
         """LLM calls search_code → gets results → responds."""
-        (person_dir / "test_file.py").write_text(
+        (anima_dir / "test_file.py").write_text(
             "def calculate():\n    return 42\n", encoding="utf-8",
         )
 
@@ -174,10 +174,10 @@ class TestSearchCodeE2E:
 class TestListDirectoryE2E:
     """Test list_directory tool in the A2 loop."""
 
-    async def test_list_directory_in_loop(self, executor, person_dir):
+    async def test_list_directory_in_loop(self, executor, anima_dir):
         """LLM calls list_directory → gets listing → responds."""
-        (person_dir / "readme.md").write_text("# Test", encoding="utf-8")
-        (person_dir / "config.json").write_text("{}", encoding="utf-8")
+        (anima_dir / "readme.md").write_text("# Test", encoding="utf-8")
+        (anima_dir / "config.json").write_text("{}", encoding="utf-8")
 
         tc = make_tool_call("list_directory", {}, "call_001")
         resp1 = make_litellm_response(content="", tool_calls=[tc])
@@ -196,11 +196,11 @@ class TestListDirectoryE2E:
 class TestStructuredErrorsE2E:
     """Test structured errors in the A2 loop."""
 
-    async def test_file_not_found_structured(self, executor, person_dir):
+    async def test_file_not_found_structured(self, executor, anima_dir):
         """read_file on missing file returns structured error."""
         tc = make_tool_call(
             "read_file",
-            {"path": str(person_dir / "nonexistent.txt")},
+            {"path": str(anima_dir / "nonexistent.txt")},
             "call_001",
         )
         resp1 = make_litellm_response(content="", tool_calls=[tc])
@@ -237,13 +237,13 @@ class TestJsonParseErrorE2E:
 class TestParallelToolCallsE2E:
     """Test parallel tool_call execution."""
 
-    async def test_multiple_reads_execute(self, executor, person_dir):
+    async def test_multiple_reads_execute(self, executor, anima_dir):
         """Multiple read tool calls in one response are handled."""
-        (person_dir / "a.txt").write_text("content_a", encoding="utf-8")
-        (person_dir / "b.txt").write_text("content_b", encoding="utf-8")
+        (anima_dir / "a.txt").write_text("content_a", encoding="utf-8")
+        (anima_dir / "b.txt").write_text("content_b", encoding="utf-8")
 
-        tc1 = make_tool_call("read_file", {"path": str(person_dir / "a.txt")}, "call_001")
-        tc2 = make_tool_call("read_file", {"path": str(person_dir / "b.txt")}, "call_002")
+        tc1 = make_tool_call("read_file", {"path": str(anima_dir / "a.txt")}, "call_001")
+        tc2 = make_tool_call("read_file", {"path": str(anima_dir / "b.txt")}, "call_002")
         resp1 = make_litellm_response(content="", tool_calls=[tc1, tc2])
         resp2 = make_litellm_response(
             content="Read both files",

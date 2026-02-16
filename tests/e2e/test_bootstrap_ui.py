@@ -1,11 +1,11 @@
-"""E2E tests for bootstrap UI feature — person list and start endpoints.
+"""E2E tests for bootstrap UI feature — anima list and start endpoints.
 
 Tests the API integration points that drive the frontend bootstrap UI:
-1. GET /api/persons returns bootstrapping flag per person
-2. POST /api/persons/{name}/start triggers person startup
-3. Start endpoint rejects already-running persons
-4. Bootstrapping person transitions to idle after completion
-5. Multiple persons can have independent states simultaneously
+1. GET /api/animas returns bootstrapping flag per anima
+2. POST /api/animas/{name}/start triggers anima startup
+3. Start endpoint rejects already-running animas
+4. Bootstrapping anima transitions to idle after completion
+5. Multiple animas can have independent states simultaneously
 """
 from __future__ import annotations
 
@@ -21,19 +21,19 @@ from httpx import ASGITransport, AsyncClient
 
 def _create_app(
     tmp_path: Path,
-    person_names: list[str] | None = None,
+    anima_names: list[str] | None = None,
     supervisor: MagicMock | None = None,
 ) -> "FastAPI":  # noqa: F821
     """Build a real FastAPI app via create_app with mocked externals.
 
     Args:
-        tmp_path: Temporary directory for person/shared data.
-        person_names: Override discovered person names.
+        tmp_path: Temporary directory for anima/shared data.
+        anima_names: Override discovered anima names.
         supervisor: Optional pre-configured mock supervisor. When not
             supplied a default mock is created.
     """
-    persons_dir = tmp_path / "persons"
-    persons_dir.mkdir(parents=True, exist_ok=True)
+    animas_dir = tmp_path / "animas"
+    animas_dir.mkdir(parents=True, exist_ok=True)
     shared_dir = tmp_path / "shared"
     shared_dir.mkdir(parents=True, exist_ok=True)
 
@@ -62,35 +62,35 @@ def _create_app(
 
         from server.app import create_app
 
-        app = create_app(persons_dir, shared_dir)
+        app = create_app(animas_dir, shared_dir)
 
-    if person_names is not None:
-        app.state.person_names = person_names
+    if anima_names is not None:
+        app.state.anima_names = anima_names
 
     return app
 
 
-def _create_person_on_disk(persons_dir: Path, name: str) -> Path:
-    """Create a minimal person directory on disk."""
-    person_dir = persons_dir / name
-    person_dir.mkdir(parents=True, exist_ok=True)
+def _create_anima_on_disk(animas_dir: Path, name: str) -> Path:
+    """Create a minimal anima directory on disk."""
+    anima_dir = animas_dir / name
+    anima_dir.mkdir(parents=True, exist_ok=True)
     for subdir in ("episodes", "knowledge", "procedures", "state", "shortterm"):
-        (person_dir / subdir).mkdir(exist_ok=True)
-    (person_dir / "identity.md").write_text(
-        f"# {name}\nTest person.", encoding="utf-8",
+        (anima_dir / subdir).mkdir(exist_ok=True)
+    (anima_dir / "identity.md").write_text(
+        f"# {name}\nTest anima.", encoding="utf-8",
     )
-    (person_dir / "injection.md").write_text("", encoding="utf-8")
-    (person_dir / "permissions.md").write_text("", encoding="utf-8")
-    return person_dir
+    (anima_dir / "injection.md").write_text("", encoding="utf-8")
+    (anima_dir / "permissions.md").write_text("", encoding="utf-8")
+    return anima_dir
 
 
 def _make_supervisor_mock(
     statuses: dict[str, dict] | None = None,
 ) -> MagicMock:
-    """Create a mock supervisor with configurable per-person status.
+    """Create a mock supervisor with configurable per-anima status.
 
     Args:
-        statuses: Mapping from person name to the dict returned by
+        statuses: Mapping from anima name to the dict returned by
             ``get_process_status(name)``.  Names not in this mapping
             return a default ``not_found`` status.
     """
@@ -102,23 +102,23 @@ def _make_supervisor_mock(
         return statuses.get(name, {"status": "not_found", "bootstrapping": False})
 
     sup.get_process_status = MagicMock(side_effect=_get_process_status)
-    sup.start_person = AsyncMock()
+    sup.start_anima = AsyncMock()
     return sup
 
 
 # ── Tests ────────────────────────────────────────────────────
 
 
-class TestPersonListBootstrapIntegration:
-    """Test GET /api/persons returns correct bootstrap status."""
+class TestAnimaListBootstrapIntegration:
+    """Test GET /api/animas returns correct bootstrap status."""
 
-    async def test_person_list_shows_bootstrapping_status(
+    async def test_anima_list_shows_bootstrapping_status(
         self, tmp_path: Path,
     ) -> None:
-        """When supervisor reports a person as bootstrapping, the
-        GET /api/persons response includes ``bootstrapping: True``."""
-        persons_dir = tmp_path / "persons"
-        _create_person_on_disk(persons_dir, "alice")
+        """When supervisor reports an anima as bootstrapping, the
+        GET /api/animas response includes ``bootstrapping: True``."""
+        animas_dir = tmp_path / "animas"
+        _create_anima_on_disk(animas_dir, "alice")
 
         supervisor = _make_supervisor_mock(
             statuses={
@@ -131,10 +131,10 @@ class TestPersonListBootstrapIntegration:
             },
         )
 
-        app = _create_app(tmp_path, person_names=["alice"], supervisor=supervisor)
+        app = _create_app(tmp_path, anima_names=["alice"], supervisor=supervisor)
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            resp = await client.get("/api/persons")
+            resp = await client.get("/api/animas")
 
         assert resp.status_code == 200
         data = resp.json()
@@ -144,13 +144,13 @@ class TestPersonListBootstrapIntegration:
         assert alice["bootstrapping"] is True
         assert alice["status"] == "bootstrapping"
 
-    async def test_person_start_triggers_bootstrap(
+    async def test_anima_start_triggers_bootstrap(
         self, tmp_path: Path,
     ) -> None:
-        """POST /api/persons/{name}/start calls supervisor.start_person
+        """POST /api/animas/{name}/start calls supervisor.start_anima
         and returns ``{status: started}``."""
-        persons_dir = tmp_path / "persons"
-        _create_person_on_disk(persons_dir, "alice")
+        animas_dir = tmp_path / "animas"
+        _create_anima_on_disk(animas_dir, "alice")
 
         supervisor = _make_supervisor_mock(
             statuses={
@@ -163,26 +163,26 @@ class TestPersonListBootstrapIntegration:
             },
         )
 
-        app = _create_app(tmp_path, person_names=["alice"], supervisor=supervisor)
+        app = _create_app(tmp_path, anima_names=["alice"], supervisor=supervisor)
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            resp = await client.post("/api/persons/alice/start")
+            resp = await client.post("/api/animas/alice/start")
 
         assert resp.status_code == 200
         body = resp.json()
         assert body["status"] == "started"
         assert body["name"] == "alice"
 
-        # Verify supervisor.start_person was called exactly once
-        supervisor.start_person.assert_awaited_once_with("alice")
+        # Verify supervisor.start_anima was called exactly once
+        supervisor.start_anima.assert_awaited_once_with("alice")
 
-    async def test_start_endpoint_rejects_running_person(
+    async def test_start_endpoint_rejects_running_anima(
         self, tmp_path: Path,
     ) -> None:
-        """When a person is already running, POST /start returns
-        ``{status: already_running}`` without calling start_person."""
-        persons_dir = tmp_path / "persons"
-        _create_person_on_disk(persons_dir, "alice")
+        """When an anima is already running, POST /start returns
+        ``{status: already_running}`` without calling start_anima."""
+        animas_dir = tmp_path / "animas"
+        _create_anima_on_disk(animas_dir, "alice")
 
         supervisor = _make_supervisor_mock(
             statuses={
@@ -195,30 +195,30 @@ class TestPersonListBootstrapIntegration:
             },
         )
 
-        app = _create_app(tmp_path, person_names=["alice"], supervisor=supervisor)
+        app = _create_app(tmp_path, anima_names=["alice"], supervisor=supervisor)
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            resp = await client.post("/api/persons/alice/start")
+            resp = await client.post("/api/animas/alice/start")
 
         assert resp.status_code == 200
         body = resp.json()
         assert body["status"] == "already_running"
         assert body["current_status"] == "running"
 
-        # start_person should NOT have been called
-        supervisor.start_person.assert_not_awaited()
+        # start_anima should NOT have been called
+        supervisor.start_anima.assert_not_awaited()
 
-    async def test_bootstrapping_person_transitions_to_idle(
+    async def test_bootstrapping_anima_transitions_to_idle(
         self, tmp_path: Path,
     ) -> None:
-        """After bootstrap completes, the person status should reflect
+        """After bootstrap completes, the anima status should reflect
         'running' (idle) rather than 'bootstrapping'.
 
-        This simulates two successive GET /api/persons calls: the first
+        This simulates two successive GET /api/animas calls: the first
         during bootstrap, the second after bootstrap completes.
         """
-        persons_dir = tmp_path / "persons"
-        _create_person_on_disk(persons_dir, "alice")
+        animas_dir = tmp_path / "animas"
+        _create_anima_on_disk(animas_dir, "alice")
 
         # Phase 1: bootstrapping
         supervisor = _make_supervisor_mock(
@@ -232,10 +232,10 @@ class TestPersonListBootstrapIntegration:
             },
         )
 
-        app = _create_app(tmp_path, person_names=["alice"], supervisor=supervisor)
+        app = _create_app(tmp_path, anima_names=["alice"], supervisor=supervisor)
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            resp1 = await client.get("/api/persons")
+            resp1 = await client.get("/api/animas")
 
         data1 = resp1.json()
         assert data1[0]["bootstrapping"] is True
@@ -255,20 +255,20 @@ class TestPersonListBootstrapIntegration:
         )
 
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            resp2 = await client.get("/api/persons")
+            resp2 = await client.get("/api/animas")
 
         data2 = resp2.json()
         assert data2[0]["bootstrapping"] is False
         assert data2[0]["status"] == "running"
 
-    async def test_multiple_persons_independent_states(
+    async def test_multiple_animas_independent_states(
         self, tmp_path: Path,
     ) -> None:
-        """Two persons can have different states simultaneously — one
+        """Two animas can have different states simultaneously — one
         sleeping (stopped), one bootstrapping."""
-        persons_dir = tmp_path / "persons"
-        _create_person_on_disk(persons_dir, "alice")
-        _create_person_on_disk(persons_dir, "bob")
+        animas_dir = tmp_path / "animas"
+        _create_anima_on_disk(animas_dir, "alice")
+        _create_anima_on_disk(animas_dir, "bob")
 
         supervisor = _make_supervisor_mock(
             statuses={
@@ -288,46 +288,46 @@ class TestPersonListBootstrapIntegration:
         )
 
         app = _create_app(
-            tmp_path, person_names=["alice", "bob"], supervisor=supervisor,
+            tmp_path, anima_names=["alice", "bob"], supervisor=supervisor,
         )
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            resp = await client.get("/api/persons")
+            resp = await client.get("/api/animas")
 
         assert resp.status_code == 200
         data = resp.json()
         assert len(data) == 2
 
-        persons = {p["name"]: p for p in data}
+        animas = {p["name"]: p for p in data}
 
         # Alice is sleeping (stopped)
-        assert persons["alice"]["status"] == "stopped"
-        assert persons["alice"]["bootstrapping"] is False
+        assert animas["alice"]["status"] == "stopped"
+        assert animas["alice"]["bootstrapping"] is False
 
         # Bob is bootstrapping
-        assert persons["bob"]["status"] == "bootstrapping"
-        assert persons["bob"]["bootstrapping"] is True
+        assert animas["bob"]["status"] == "bootstrapping"
+        assert animas["bob"]["bootstrapping"] is True
 
-    async def test_start_unknown_person_returns_404(
+    async def test_start_unknown_anima_returns_404(
         self, tmp_path: Path,
     ) -> None:
-        """POST /api/persons/{name}/start for a name not in person_names
+        """POST /api/animas/{name}/start for a name not in anima_names
         returns 404."""
         supervisor = _make_supervisor_mock()
-        app = _create_app(tmp_path, person_names=[], supervisor=supervisor)
+        app = _create_app(tmp_path, anima_names=[], supervisor=supervisor)
 
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            resp = await client.post("/api/persons/nobody/start")
+            resp = await client.post("/api/animas/nobody/start")
 
         assert resp.status_code == 404
 
-    async def test_start_stopped_person_is_accepted(
+    async def test_start_stopped_anima_is_accepted(
         self, tmp_path: Path,
     ) -> None:
         """POST /start with status 'not_found' (never started) is accepted."""
-        persons_dir = tmp_path / "persons"
-        _create_person_on_disk(persons_dir, "alice")
+        animas_dir = tmp_path / "animas"
+        _create_anima_on_disk(animas_dir, "alice")
 
         supervisor = _make_supervisor_mock(
             statuses={
@@ -338,23 +338,23 @@ class TestPersonListBootstrapIntegration:
             },
         )
 
-        app = _create_app(tmp_path, person_names=["alice"], supervisor=supervisor)
+        app = _create_app(tmp_path, anima_names=["alice"], supervisor=supervisor)
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            resp = await client.post("/api/persons/alice/start")
+            resp = await client.post("/api/animas/alice/start")
 
         assert resp.status_code == 200
         body = resp.json()
         assert body["status"] == "started"
-        supervisor.start_person.assert_awaited_once_with("alice")
+        supervisor.start_anima.assert_awaited_once_with("alice")
 
-    async def test_person_list_non_bootstrapping_person(
+    async def test_anima_list_non_bootstrapping_anima(
         self, tmp_path: Path,
     ) -> None:
-        """A running person that is NOT bootstrapping has
+        """A running anima that is NOT bootstrapping has
         ``bootstrapping: False``."""
-        persons_dir = tmp_path / "persons"
-        _create_person_on_disk(persons_dir, "alice")
+        animas_dir = tmp_path / "animas"
+        _create_anima_on_disk(animas_dir, "alice")
 
         supervisor = _make_supervisor_mock(
             statuses={
@@ -367,10 +367,10 @@ class TestPersonListBootstrapIntegration:
             },
         )
 
-        app = _create_app(tmp_path, person_names=["alice"], supervisor=supervisor)
+        app = _create_app(tmp_path, anima_names=["alice"], supervisor=supervisor)
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            resp = await client.get("/api/persons")
+            resp = await client.get("/api/animas")
 
         assert resp.status_code == 200
         data = resp.json()

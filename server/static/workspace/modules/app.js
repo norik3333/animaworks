@@ -2,10 +2,10 @@
 // Initialization, screen switching, and event delegation.
 
 import { getState, setState, subscribe } from "./state.js";
-import { fetchSystemStatus, fetchConversationFull, greetPerson } from "./api.js";
+import { fetchSystemStatus, fetchConversationFull, greetAnima } from "./api.js";
 import { connect, onEvent } from "./websocket.js";
 import { initLogin, getCurrentUser, logout } from "./login.js";
-import { initPerson, loadPersons, selectPerson, renderPersonSelector, renderStatus } from "./person.js";
+import { initAnima, loadAnimas, selectAnima, renderAnimaSelector, renderStatus } from "./anima.js";
 import { initMemory, loadMemoryTab } from "./memory.js";
 import { initSession, loadSessions } from "./session.js";
 import { escapeHtml, renderSimpleMarkdown } from "./utils.js";
@@ -43,7 +43,7 @@ const dom = {};
 function cacheDom() {
   dom.loginContainer = document.getElementById("wsLogin");
   dom.dashboard = document.getElementById("wsDashboard");
-  dom.personSelector = document.getElementById("wsPersonSelector");
+  dom.animaSelector = document.getElementById("wsAnimaSelector");
   dom.systemStatus = document.getElementById("wsSystemStatus");
   dom.userInfo = document.getElementById("wsUserInfo");
   dom.rightTabs = document.getElementById("wsRightTabs");
@@ -64,7 +64,7 @@ function cacheDom() {
   dom.convOverlay = document.getElementById("wsConvOverlay");
   dom.convLayout = document.getElementById("wsConvLayout");
   dom.convBack = document.getElementById("wsConvBack");
-  dom.convPersonName = document.getElementById("wsConvPersonName");
+  dom.convAnimaName = document.getElementById("wsConvAnimaName");
   dom.convCanvas = document.getElementById("wsConvCanvas");
   dom.convMessages = document.getElementById("wsConvMessages");
   dom.convInput = document.getElementById("wsConvInput");
@@ -88,7 +88,7 @@ const TYPE_ICONS = {
   system: "\u2699\uFE0F",
 };
 
-function addActivity(type, personName, summary) {
+function addActivity(type, animaName, summary) {
   if (!dom.paneActivity) return;
 
   const now = new Date();
@@ -100,7 +100,7 @@ function addActivity(type, personName, summary) {
   entry.innerHTML = `
     <span class="activity-time">${ts}</span>
     <span class="activity-icon">${icon}</span>
-    <span class="activity-person">${escapeHtml(personName)}</span>
+    <span class="activity-anima">${escapeHtml(animaName)}</span>
     <span class="activity-summary">${escapeHtml(summary)}</span>`;
 
   dom.paneActivity.prepend(entry);
@@ -136,9 +136,9 @@ async function initOfficeIfNeeded() {
   setState({ officeInitialized: true });
 
   try {
-    // Initialize 3D scene with person data for dynamic desk layout
-    const { persons } = getState();
-    initOffice(dom.officeCanvas, persons);
+    // Initialize 3D scene with anima data for dynamic desk layout
+    const { animas } = getState();
+    initOffice(dom.officeCanvas, animas);
 
     // Initialize characters in the scene
     const scene = getScene();
@@ -154,7 +154,7 @@ async function initOfficeIfNeeded() {
 
     // Create characters at their dynamically assigned desk positions
     const desks = getDesks();
-    for (const p of persons) {
+    for (const p of animas) {
       // Register appearance from API before creating character
       if (p.appearance) {
         setAppearance(p.name, p.appearance);
@@ -170,7 +170,7 @@ async function initOfficeIfNeeded() {
             }
           });
         }
-        const animState = mapPersonStatusToAnim(p.status);
+        const animState = mapAnimaStatusToAnim(p.status);
         updateCharacterState(p.name, animState);
       }
     }
@@ -182,7 +182,7 @@ async function initOfficeIfNeeded() {
     initMovement(navGrid, floorW, floorD);
 
     // Register all characters with the movement system
-    for (const p of persons) {
+    for (const p of animas) {
       const group = getCharacterGroup(p.name);
       const home = getCharacterHome(p.name);
       if (group && home) {
@@ -192,7 +192,7 @@ async function initOfficeIfNeeded() {
 
     // ── Interactions + Idle Behaviors + Timeline init ──────────
     const movementSystem = { moveTo, moveToHome, stopMovement, isMoving };
-    const characterMap = Object.fromEntries(persons.map((p) => [p.name, true]));
+    const characterMap = Object.fromEntries(animas.map((p) => [p.name, true]));
     initInteractions(scene, characterMap, movementSystem);
 
     const pois = computePOIs(floorW, floorD);
@@ -202,15 +202,15 @@ async function initOfficeIfNeeded() {
     loadHistory(24);
 
     // Handle character clicks → open conversation in right panel
-    // selectPerson → onPersonSelected → openConversation の一本化フロー
-    setCharacterClickHandler((personName) => {
-      selectPerson(personName);
+    // selectAnima → onAnimaSelected → openConversation の一本化フロー
+    setCharacterClickHandler((animaName) => {
+      selectAnima(animaName);
     });
 
-    // Highlight selected person's desk
-    const { selectedPerson } = getState();
-    if (selectedPerson) {
-      highlightDesk(selectedPerson);
+    // Highlight selected anima's desk
+    const { selectedAnima } = getState();
+    if (selectedAnima) {
+      highlightDesk(selectedAnima);
     }
   } catch (err) {
     console.error("[office] Failed to initialize 3D office:", err);
@@ -218,7 +218,7 @@ async function initOfficeIfNeeded() {
   }
 }
 
-function mapPersonStatusToAnim(status) {
+function mapAnimaStatusToAnim(status) {
   if (!status) return "idle";
   const s = typeof status === "object" ? status.state || status.status || "idle" : String(status);
   const lower = s.toLowerCase();
@@ -238,16 +238,16 @@ function mapPersonStatusToAnim(status) {
 let bustupInitialized = false;
 let convStreamController = null;
 
-async function openConversation(personName) {
+async function openConversation(animaName) {
   if (!dom.convOverlay) return;
 
-  setState({ conversationOpen: true, conversationPerson: personName });
+  setState({ conversationOpen: true, conversationAnima: animaName });
 
   // Show conversation overlay on top of office
   dom.convOverlay.classList.remove("hidden");
 
-  // Update person name + mobile placeholder
-  if (dom.convPersonName) dom.convPersonName.textContent = personName;
+  // Update anima name + mobile placeholder
+  if (dom.convAnimaName) dom.convAnimaName.textContent = animaName;
   updateConvInputPlaceholder();
 
   // Reset mobile panels on conversation open
@@ -267,12 +267,12 @@ async function openConversation(personName) {
   }
 
   // Set character (may load AI-generated bust-up image) and expression
-  await setCharacter(personName);
+  await setCharacter(animaName);
   setExpression("neutral");
 
   // Load and render chat history, then trigger greeting
-  await loadAndRenderConvMessages(personName);
-  triggerGreeting(personName);
+  await loadAndRenderConvMessages(animaName);
+  triggerGreeting(animaName);
 
   // Focus input
   dom.convInput?.focus();
@@ -292,7 +292,7 @@ function closeConversation() {
   // Cleanup mobile resources
   _cleanupMobileResources();
 
-  setState({ conversationOpen: false, conversationPerson: null });
+  setState({ conversationOpen: false, conversationAnima: null });
   setTalking(false);
 
   // Abort any active stream
@@ -306,11 +306,11 @@ function closeConversation() {
 
 let _greetingInFlight = false;
 
-async function triggerGreeting(personName) {
+async function triggerGreeting(animaName) {
   if (_greetingInFlight) return;
   _greetingInFlight = true;
   try {
-    const data = await greetPerson(personName);
+    const data = await greetAnima(animaName);
     if (!data.response) return;
 
     // Add visit marker + greeting message to chat
@@ -371,10 +371,10 @@ function renderConvMessages() {
   });
 }
 
-async function loadAndRenderConvMessages(personName) {
-  if (!personName) return;
+async function loadAndRenderConvMessages(animaName) {
+  if (!animaName) return;
   try {
-    const data = await fetchConversationFull(personName);
+    const data = await fetchConversationFull(animaName);
     if (data.turns && data.turns.length > 0) {
       const messages = data.turns.map((t) => ({
         role: t.role === "human" ? "user" : t.role === "system" ? "system" : "assistant",
@@ -397,8 +397,8 @@ async function sendConversationMessage() {
   const text = dom.convInput?.value?.trim();
   if (!text) return;
 
-  const personName = getState().conversationPerson;
-  if (!personName) return;
+  const animaName = getState().conversationAnima;
+  if (!animaName) return;
 
   // Clear input
   dom.convInput.value = "";
@@ -417,7 +417,7 @@ async function sendConversationMessage() {
 
   try {
     const userName = getCurrentUser() || "guest";
-    const resp = await fetch(`/api/persons/${encodeURIComponent(personName)}/chat/stream`, {
+    const resp = await fetch(`/api/animas/${encodeURIComponent(animaName)}/chat/stream`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ message: text, from_person: userName }),
@@ -541,7 +541,7 @@ async function loadSystemStatus() {
     const data = await fetchSystemStatus();
     updateStatusDisplay(
       data.scheduler_running,
-      `${data.scheduler_running ? "稼働中" : "停止"} (${data.persons}名)`
+      `${data.scheduler_running ? "稼働中" : "停止"} (${data.animas}名)`
     );
   } catch {
     updateStatusDisplay(false, "接続失敗");
@@ -559,7 +559,7 @@ function updateStatusDisplay(ok, text) {
 // ── WebSocket Handlers ──────────────────────
 
 const wsUnsubscribers = [];
-const lastPersonStatus = {};
+const lastAnimaStatus = {};
 
 function setupWebSocket() {
   wsUnsubscribers.forEach((fn) => fn());
@@ -567,32 +567,32 @@ function setupWebSocket() {
 
   connect();
 
-  wsUnsubscribers.push(onEvent("person.status", (data) => {
-    const { persons, selectedPerson } = getState();
-    const idx = persons.findIndex((p) => p.name === data.name);
+  wsUnsubscribers.push(onEvent("anima.status", (data) => {
+    const { animas, selectedAnima } = getState();
+    const idx = animas.findIndex((p) => p.name === data.name);
     if (idx >= 0) {
-      persons[idx] = { ...persons[idx], ...data };
-      setState({ persons: [...persons] });
-      renderPersonSelector(dom.personSelector);
+      animas[idx] = { ...animas[idx], ...data };
+      setState({ animas: [...animas] });
+      renderAnimaSelector(dom.animaSelector);
     }
-    if (data.name === selectedPerson) {
+    if (data.name === selectedAnima) {
       renderStatus(dom.paneState);
     }
     // Update 3D character animation
     if (getState().officeInitialized) {
-      const animState = mapPersonStatusToAnim(data.status);
+      const animState = mapAnimaStatusToAnim(data.status);
       updateCharacterState(data.name, animState);
       setState({ characterStates: { ...getState().characterStates, [data.name]: animState } });
     }
     // Only log to activity feed when status actually changes
-    if (lastPersonStatus[data.name] !== data.status) {
-      lastPersonStatus[data.name] = data.status;
+    if (lastAnimaStatus[data.name] !== data.status) {
+      lastAnimaStatus[data.name] = data.status;
       addActivity("system", data.name, `Status: ${data.status}`);
     }
   }));
 
-  // ── person.interaction — inter-person messaging visualization ──
-  wsUnsubscribers.push(onEvent("person.interaction", (data) => {
+  // ── anima.interaction — inter-anima messaging visualization ──
+  wsUnsubscribers.push(onEvent("anima.interaction", (data) => {
     cancelBehavior(data.from_person);
     cancelBehavior(data.to_person);
 
@@ -603,72 +603,72 @@ function setupWebSocket() {
     addTimelineEvent({
       id: Date.now().toString(),
       type: "message",
-      persons: [data.from_person, data.to_person],
+      animas: [data.from_person, data.to_person],
       timestamp: new Date().toISOString(),
       summary: `${data.from_person} → ${data.to_person}: ${data.summary || ""}`,
       metadata: { text: data.summary || "" },
     });
   }));
 
-  wsUnsubscribers.push(onEvent("person.heartbeat", (data) => {
+  wsUnsubscribers.push(onEvent("anima.heartbeat", (data) => {
     addActivity("heartbeat", data.name, data.summary || "heartbeat completed");
-    const { selectedPerson } = getState();
-    if (data.name === selectedPerson) {
+    const { selectedAnima } = getState();
+    if (data.name === selectedAnima) {
       renderStatus(dom.paneState);
     }
     addTimelineEvent({
       id: Date.now().toString(),
       type: "heartbeat",
-      persons: [data.name],
+      animas: [data.name],
       timestamp: new Date().toISOString(),
       summary: data.summary || "heartbeat completed",
     });
   }));
 
-  wsUnsubscribers.push(onEvent("person.cron", (data) => {
+  wsUnsubscribers.push(onEvent("anima.cron", (data) => {
     addActivity("cron", data.name, data.summary || `cron: ${data.job || ""}`);
     addTimelineEvent({
       id: Date.now().toString(),
       type: "cron",
-      persons: [data.name],
+      animas: [data.name],
       timestamp: new Date().toISOString(),
       summary: data.summary || `cron: ${data.job || ""}`,
     });
   }));
 
-  wsUnsubscribers.push(onEvent("person.bootstrap", (data) => {
+  wsUnsubscribers.push(onEvent("anima.bootstrap", (data) => {
     const { name, status: bsStatus } = data;
     if (bsStatus === "started") {
-      const { persons } = getState();
-      const idx = persons.findIndex((p) => p.name === name);
+      const { animas } = getState();
+      const idx = animas.findIndex((p) => p.name === name);
       if (idx >= 0) {
-        persons[idx] = { ...persons[idx], status: "bootstrapping", bootstrapping: true };
-        setState({ persons: [...persons] });
-        renderPersonSelector(dom.personSelector);
+        animas[idx] = { ...animas[idx], status: "bootstrapping", bootstrapping: true };
+        setState({ animas: [...animas] });
+        renderAnimaSelector(dom.animaSelector);
       }
       if (getState().officeInitialized) {
         updateCharacterState(name, "thinking");
       }
       addActivity("system", name, "ブートストラップ開始");
     } else if (bsStatus === "completed") {
-      const { persons } = getState();
-      const idx = persons.findIndex((p) => p.name === name);
+      const { animas } = getState();
+      const idx = animas.findIndex((p) => p.name === name);
       if (idx >= 0) {
-        persons[idx] = { ...persons[idx], status: "idle", bootstrapping: false };
-        setState({ persons: [...persons] });
-        renderPersonSelector(dom.personSelector);
+        animas[idx] = { ...animas[idx], status: "idle", bootstrapping: false };
+        setState({ animas: [...animas] });
+        renderAnimaSelector(dom.animaSelector);
       }
       if (getState().officeInitialized) {
         updateCharacterState(name, "idle");
       }
       addActivity("system", name, "ブートストラップ完了");
     } else if (bsStatus === "failed") {
-      const { persons } = getState();
-      const idx = persons.findIndex((p) => p.name === name);
+      const { animas } = getState();
+      const idx = animas.findIndex((p) => p.name === name);
       if (idx >= 0) {
-        persons[idx] = { ...persons[idx], status: "error", bootstrapping: false };
-        setState({ persons: [...persons] });
-        renderPersonSelector(dom.personSelector);
+        animas[idx] = { ...animas[idx], status: "error", bootstrapping: false };
+        setState({ animas: [...animas] });
+        renderAnimaSelector(dom.animaSelector);
       }
       if (getState().officeInitialized) {
         updateCharacterState(name, "error");
@@ -677,46 +677,46 @@ function setupWebSocket() {
     }
   }));
 
-  wsUnsubscribers.push(onEvent("person.assets_updated", async (data) => {
-    const personName = data.name;
-    addActivity("system", personName, `アセット更新: ${(data.assets || []).join(", ")}`);
+  wsUnsubscribers.push(onEvent("anima.assets_updated", async (data) => {
+    const animaName = data.name;
+    addActivity("system", animaName, `アセット更新: ${(data.assets || []).join(", ")}`);
 
-    // ── Reveal animation (Person birth) ──
+    // ── Reveal animation (Anima birth) ──
     const assets = data.assets || [];
     const hasAvatar = assets.some((a) => a.startsWith("avatar_"));
     if (hasAvatar) {
-      const avatarUrl = `/api/persons/${encodeURIComponent(personName)}/assets/avatar_bustup.png`;
-      await playReveal({ name: personName, avatarUrl });
+      const avatarUrl = `/api/animas/${encodeURIComponent(animaName)}/assets/avatar_bustup.png`;
+      await playReveal({ name: animaName, avatarUrl });
     }
 
     // Refresh 3D character if office is initialised
     if (getState().officeInitialized) {
       const desks = getDesks();
-      const deskPos = desks[personName];
+      const deskPos = desks[animaName];
       if (deskPos) {
-        removeCharacter(personName);
+        removeCharacter(animaName);
         const group = await createCharacter(
-          personName,
+          animaName,
           { x: deskPos.x, y: deskPos.y + 0.4, z: deskPos.z - 0.3 },
         );
         if (group) {
           group.traverse((child) => {
-            if (child.isMesh) registerClickTarget(personName, child);
+            if (child.isMesh) registerClickTarget(animaName, child);
           });
         }
       }
     }
 
-    // Refresh bust-up if conversation is open for this person
-    if (getState().conversationPerson === personName) {
-      await setCharacter(personName);
+    // Refresh bust-up if conversation is open for this anima
+    if (getState().conversationAnima === animaName) {
+      await setCharacter(animaName);
     }
   }));
 
   // Track connection state for status indicator
   wsUnsubscribers.push(subscribe((state) => {
     if (state.wsConnected) {
-      updateStatusDisplay(true, `接続済 (${state.persons.length}名)`);
+      updateStatusDisplay(true, `接続済 (${state.animas.length}名)`);
     } else {
       updateStatusDisplay(false, "再接続中...");
     }
@@ -791,10 +791,10 @@ function initMobileControls() {
 
 function updateConvInputPlaceholder() {
   if (!dom.convInput) return;
-  const personName = getState().conversationPerson;
-  if (!personName) return;
+  const animaName = getState().conversationAnima;
+  if (!animaName) return;
   dom.convInput.placeholder = isMobileView()
-    ? `${personName} にメッセージ... (Enter)`
+    ? `${animaName} にメッセージ... (Enter)`
     : `メッセージを入力... (Ctrl+Enter)`;
 }
 
@@ -860,7 +860,7 @@ async function startDashboard() {
   }
 
   if (dashboardInitialized) {
-    await loadPersons();
+    await loadAnimas();
     await loadSystemStatus();
     // Re-init office if needed
     initOfficeIfNeeded();
@@ -869,7 +869,7 @@ async function startDashboard() {
   dashboardInitialized = true;
 
   // Initialize sub-modules
-  initPerson(dom.personSelector, dom.paneState, onPersonSelected);
+  initAnima(dom.animaSelector, dom.paneState, onAnimaSelected);
   initMemory(dom.memoryPanel);
   initSession(dom.paneHistory);
 
@@ -924,7 +924,7 @@ async function startDashboard() {
   });
 
   // Load data
-  await loadPersons();
+  await loadAnimas();
   await loadSystemStatus();
 
   // Connect WebSocket
@@ -942,9 +942,9 @@ async function startDashboard() {
   initMobileKeyboard();
 }
 
-// ── Person Selection Callback ──────────────────────
+// ── Anima Selection Callback ──────────────────────
 
-async function onPersonSelected(name) {
+async function onAnimaSelected(name) {
   // Highlight desk in 3D
   if (getState().officeInitialized) {
     highlightDesk(name);

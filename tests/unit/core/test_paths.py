@@ -15,7 +15,7 @@ from core.paths import (
     get_common_skills_dir,
     get_company_dir,
     get_data_dir,
-    get_persons_dir,
+    get_animas_dir,
     get_shared_dir,
     get_tmp_dir,
     load_prompt,
@@ -68,9 +68,9 @@ class TestGetDataDir:
 
 
 class TestSubdirHelpers:
-    def test_get_persons_dir(self, tmp_path):
+    def test_get_animas_dir(self, tmp_path):
         with patch.dict("os.environ", {"ANIMAWORKS_DATA_DIR": str(tmp_path)}):
-            assert get_persons_dir() == tmp_path.resolve() / "persons"
+            assert get_animas_dir() == tmp_path.resolve() / "animas"
 
     def test_get_shared_dir(self, tmp_path):
         with patch.dict("os.environ", {"ANIMAWORKS_DATA_DIR": str(tmp_path)}):
@@ -107,10 +107,10 @@ class TestLoadPrompt:
         prompts_dir = tmp_path / "prompts"
         prompts_dir.mkdir()
         (prompts_dir / "test_tpl.md").write_text(
-            "Hello {person_name}!", encoding="utf-8"
+            "Hello {anima_name}!", encoding="utf-8"
         )
         with patch("core.paths.PROMPTS_DIR", prompts_dir):
-            result = load_prompt("test_tpl", person_name="World")
+            result = load_prompt("test_tpl", anima_name="World")
             assert result == "Hello World!"
 
     def test_load_without_kwargs(self, tmp_path):

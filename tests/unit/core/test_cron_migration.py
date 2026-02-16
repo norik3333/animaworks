@@ -129,9 +129,9 @@ class TestMigrateCronFormat:
 
     def test_basic_migration(self, tmp_path):
         """Basic migration converts Japanese schedule to cron expression."""
-        person_dir = tmp_path / "alice"
-        person_dir.mkdir()
-        cron_md = person_dir / "cron.md"
+        anima_dir = tmp_path / "alice"
+        anima_dir.mkdir()
+        cron_md = anima_dir / "cron.md"
         cron_md.write_text(
             "## 毎朝の業務計画（毎日 9:00 JST）\n"
             "type: llm\n"
@@ -139,7 +139,7 @@ class TestMigrateCronFormat:
             encoding="utf-8",
         )
 
-        result = migrate_cron_format(person_dir)
+        result = migrate_cron_format(anima_dir)
         assert result is True
 
         migrated = cron_md.read_text(encoding="utf-8")
@@ -150,9 +150,9 @@ class TestMigrateCronFormat:
 
     def test_multiple_tasks_migration(self, tmp_path):
         """Multiple tasks are all migrated."""
-        person_dir = tmp_path / "bob"
-        person_dir.mkdir()
-        cron_md = person_dir / "cron.md"
+        anima_dir = tmp_path / "bob"
+        anima_dir.mkdir()
+        cron_md = anima_dir / "cron.md"
         cron_md.write_text(
             "## 朝会（毎日 9:00）\n"
             "type: llm\n"
@@ -164,7 +164,7 @@ class TestMigrateCronFormat:
             encoding="utf-8",
         )
 
-        result = migrate_cron_format(person_dir)
+        result = migrate_cron_format(anima_dir)
         assert result is True
 
         migrated = cron_md.read_text(encoding="utf-8")
@@ -173,9 +173,9 @@ class TestMigrateCronFormat:
 
     def test_weekday_migration(self, tmp_path):
         """平日 schedule is migrated correctly."""
-        person_dir = tmp_path / "carol"
-        person_dir.mkdir()
-        cron_md = person_dir / "cron.md"
+        anima_dir = tmp_path / "carol"
+        anima_dir.mkdir()
+        cron_md = anima_dir / "cron.md"
         cron_md.write_text(
             "## 日次チェック（平日 8:30）\n"
             "type: llm\n"
@@ -183,7 +183,7 @@ class TestMigrateCronFormat:
             encoding="utf-8",
         )
 
-        result = migrate_cron_format(person_dir)
+        result = migrate_cron_format(anima_dir)
         assert result is True
 
         migrated = cron_md.read_text(encoding="utf-8")
@@ -191,9 +191,9 @@ class TestMigrateCronFormat:
 
     def test_monthly_migration(self, tmp_path):
         """毎月DD日 schedule is migrated correctly."""
-        person_dir = tmp_path / "dave"
-        person_dir.mkdir()
-        cron_md = person_dir / "cron.md"
+        anima_dir = tmp_path / "dave"
+        anima_dir.mkdir()
+        cron_md = anima_dir / "cron.md"
         cron_md.write_text(
             "## 月次レポート（毎月1日 10:00）\n"
             "type: llm\n"
@@ -201,7 +201,7 @@ class TestMigrateCronFormat:
             encoding="utf-8",
         )
 
-        result = migrate_cron_format(person_dir)
+        result = migrate_cron_format(anima_dir)
         assert result is True
 
         migrated = cron_md.read_text(encoding="utf-8")
@@ -209,9 +209,9 @@ class TestMigrateCronFormat:
 
     def test_already_migrated_skipped(self, tmp_path):
         """Already-migrated file returns False."""
-        person_dir = tmp_path / "eve"
-        person_dir.mkdir()
-        cron_md = person_dir / "cron.md"
+        anima_dir = tmp_path / "eve"
+        anima_dir.mkdir()
+        cron_md = anima_dir / "cron.md"
         content = (
             "## Morning Task\n"
             "schedule: 0 9 * * *\n"
@@ -220,29 +220,29 @@ class TestMigrateCronFormat:
         )
         cron_md.write_text(content, encoding="utf-8")
 
-        result = migrate_cron_format(person_dir)
+        result = migrate_cron_format(anima_dir)
         assert result is False
         # Content should be unchanged
         assert cron_md.read_text(encoding="utf-8") == content
 
     def test_missing_cron_md(self, tmp_path):
         """Missing cron.md returns False."""
-        person_dir = tmp_path / "frank"
-        person_dir.mkdir()
-        assert migrate_cron_format(person_dir) is False
+        anima_dir = tmp_path / "frank"
+        anima_dir.mkdir()
+        assert migrate_cron_format(anima_dir) is False
 
     def test_empty_cron_md(self, tmp_path):
         """Empty cron.md returns False."""
-        person_dir = tmp_path / "grace"
-        person_dir.mkdir()
-        (person_dir / "cron.md").write_text("", encoding="utf-8")
-        assert migrate_cron_format(person_dir) is False
+        anima_dir = tmp_path / "grace"
+        anima_dir.mkdir()
+        (anima_dir / "cron.md").write_text("", encoding="utf-8")
+        assert migrate_cron_format(anima_dir) is False
 
     def test_unconvertible_schedule_noted(self, tmp_path):
         """Unconvertible schedules get a migration note comment."""
-        person_dir = tmp_path / "henry"
-        person_dir.mkdir()
-        cron_md = person_dir / "cron.md"
+        anima_dir = tmp_path / "henry"
+        anima_dir.mkdir()
+        cron_md = anima_dir / "cron.md"
         cron_md.write_text(
             "## 隔週ミーティング（隔週金曜 17:00）\n"
             "type: llm\n"
@@ -254,7 +254,7 @@ class TestMigrateCronFormat:
             encoding="utf-8",
         )
 
-        result = migrate_cron_format(person_dir)
+        result = migrate_cron_format(anima_dir)
         assert result is True
 
         migrated = cron_md.read_text(encoding="utf-8")
@@ -265,9 +265,9 @@ class TestMigrateCronFormat:
 
     def test_html_comments_preserved(self, tmp_path):
         """HTML comment blocks are preserved during migration."""
-        person_dir = tmp_path / "iris"
-        person_dir.mkdir()
-        cron_md = person_dir / "cron.md"
+        anima_dir = tmp_path / "iris"
+        anima_dir.mkdir()
+        cron_md = anima_dir / "cron.md"
         cron_md.write_text(
             "<!-- This is a top-level comment -->\n"
             "\n"
@@ -277,7 +277,7 @@ class TestMigrateCronFormat:
             encoding="utf-8",
         )
 
-        result = migrate_cron_format(person_dir)
+        result = migrate_cron_format(anima_dir)
         assert result is True
 
         migrated = cron_md.read_text(encoding="utf-8")
@@ -286,9 +286,9 @@ class TestMigrateCronFormat:
 
     def test_minutes_interval_migration(self, tmp_path):
         """X分毎 pattern is migrated correctly."""
-        person_dir = tmp_path / "jack"
-        person_dir.mkdir()
-        cron_md = person_dir / "cron.md"
+        anima_dir = tmp_path / "jack"
+        anima_dir.mkdir()
+        cron_md = anima_dir / "cron.md"
         cron_md.write_text(
             "## ヘルスチェック（5分毎）\n"
             "type: command\n"
@@ -296,7 +296,7 @@ class TestMigrateCronFormat:
             encoding="utf-8",
         )
 
-        result = migrate_cron_format(person_dir)
+        result = migrate_cron_format(anima_dir)
         assert result is True
 
         migrated = cron_md.read_text(encoding="utf-8")
@@ -304,9 +304,9 @@ class TestMigrateCronFormat:
 
     def test_task_with_ascii_parens(self, tmp_path):
         """Task with ASCII parentheses (not fullwidth) is also handled."""
-        person_dir = tmp_path / "kate"
-        person_dir.mkdir()
-        cron_md = person_dir / "cron.md"
+        anima_dir = tmp_path / "kate"
+        anima_dir.mkdir()
+        cron_md = anima_dir / "cron.md"
         cron_md.write_text(
             "## Morning Task (毎日 9:00 JST)\n"
             "type: llm\n"
@@ -314,7 +314,7 @@ class TestMigrateCronFormat:
             encoding="utf-8",
         )
 
-        result = migrate_cron_format(person_dir)
+        result = migrate_cron_format(anima_dir)
         assert result is True
 
         migrated = cron_md.read_text(encoding="utf-8")
@@ -326,15 +326,15 @@ class TestMigrateCronFormat:
 
 
 class TestMigrateAllCron:
-    """Tests for bulk cron migration across all persons."""
+    """Tests for bulk cron migration across all animas."""
 
-    def test_migrate_multiple_persons(self, tmp_path):
-        """Migrates cron.md for multiple persons."""
-        persons_dir = tmp_path / "persons"
-        persons_dir.mkdir()
+    def test_migrate_multiple_animas(self, tmp_path):
+        """Migrates cron.md for multiple animas."""
+        animas_dir = tmp_path / "animas"
+        animas_dir.mkdir()
 
         for name in ("alice", "bob"):
-            d = persons_dir / name
+            d = animas_dir / name
             d.mkdir()
             (d / "cron.md").write_text(
                 f"## {name}のタスク（毎日 9:00）\n"
@@ -343,16 +343,16 @@ class TestMigrateAllCron:
                 encoding="utf-8",
             )
 
-        count = migrate_all_cron(persons_dir)
+        count = migrate_all_cron(animas_dir)
         assert count == 2
 
     def test_skips_non_directories(self, tmp_path):
         """Non-directory entries are skipped."""
-        persons_dir = tmp_path / "persons"
-        persons_dir.mkdir()
-        (persons_dir / "not_a_dir.txt").write_text("hello", encoding="utf-8")
+        animas_dir = tmp_path / "animas"
+        animas_dir.mkdir()
+        (animas_dir / "not_a_dir.txt").write_text("hello", encoding="utf-8")
 
-        count = migrate_all_cron(persons_dir)
+        count = migrate_all_cron(animas_dir)
         assert count == 0
 
     def test_nonexistent_directory(self, tmp_path):
@@ -361,12 +361,12 @@ class TestMigrateAllCron:
         assert count == 0
 
     def test_mix_of_migrated_and_unmigrated(self, tmp_path):
-        """Only unmigrated persons are counted."""
-        persons_dir = tmp_path / "persons"
-        persons_dir.mkdir()
+        """Only unmigrated animas are counted."""
+        animas_dir = tmp_path / "animas"
+        animas_dir.mkdir()
 
         # Already migrated
-        alice = persons_dir / "alice"
+        alice = animas_dir / "alice"
         alice.mkdir()
         (alice / "cron.md").write_text(
             "## Task\nschedule: 0 9 * * *\ntype: llm\nDo it.\n",
@@ -374,12 +374,12 @@ class TestMigrateAllCron:
         )
 
         # Needs migration
-        bob = persons_dir / "bob"
+        bob = animas_dir / "bob"
         bob.mkdir()
         (bob / "cron.md").write_text(
             "## タスク（毎日 10:00）\ntype: llm\nやる。\n",
             encoding="utf-8",
         )
 
-        count = migrate_all_cron(persons_dir)
+        count = migrate_all_cron(animas_dir)
         assert count == 1

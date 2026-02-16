@@ -91,13 +91,15 @@ class TestChatworkClient:
         assert client.api_token == "my-token"
 
     def test_init_from_env(self):
-        client = ChatworkClient()
+        with patch("core.tools.chatwork.get_credential", return_value="test-cw-token"):
+            client = ChatworkClient()
         assert client.api_token == "test-cw-token"
 
     def test_init_missing_token(self, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.delenv("CHATWORK_API_TOKEN", raising=False)
-        with pytest.raises(ToolConfigError):
-            ChatworkClient()
+        with patch("core.tools.chatwork.get_credential", side_effect=ToolConfigError("no token")):
+            with pytest.raises(ToolConfigError):
+                ChatworkClient()
 
     def test_me(self):
         self._mock_session.request.return_value = self._make_response(

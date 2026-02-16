@@ -1,5 +1,5 @@
 from __future__ import annotations
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
@@ -30,7 +30,7 @@ MEMORY_TOOLS: list[dict[str, Any]] = [
     {
         "name": "search_memory",
         "description": (
-            "Search the person's long-term memory "
+            "Search the anima's long-term memory "
             "(knowledge, episodes, procedures) by keyword."
         ),
         "parameters": {
@@ -48,13 +48,13 @@ MEMORY_TOOLS: list[dict[str, Any]] = [
     },
     {
         "name": "read_memory_file",
-        "description": "Read a file from the person's memory directory by relative path.",
+        "description": "Read a file from the anima's memory directory by relative path.",
         "parameters": {
             "type": "object",
             "properties": {
                 "path": {
                     "type": "string",
-                    "description": "Relative path within person dir",
+                    "description": "Relative path within anima dir",
                 },
             },
             "required": ["path"],
@@ -62,7 +62,7 @@ MEMORY_TOOLS: list[dict[str, Any]] = [
     },
     {
         "name": "write_memory_file",
-        "description": "Write or append to a file in the person's memory directory.",
+        "description": "Write or append to a file in the anima's memory directory.",
         "parameters": {
             "type": "object",
             "properties": {
@@ -75,11 +75,11 @@ MEMORY_TOOLS: list[dict[str, Any]] = [
     },
     {
         "name": "send_message",
-        "description": "Send a message to another person.",
+        "description": "Send a message to another anima.",
         "parameters": {
             "type": "object",
             "properties": {
-                "to": {"type": "string", "description": "Recipient person name"},
+                "to": {"type": "string", "description": "Recipient anima name"},
                 "content": {"type": "string", "description": "Message content"},
                 "reply_to": {"type": "string", "description": "Message ID to reply to"},
                 "thread_id": {"type": "string", "description": "Thread ID"},
@@ -160,7 +160,7 @@ SEARCH_TOOLS: list[dict[str, Any]] = [
                 },
                 "path": {
                     "type": "string",
-                    "description": "Directory or file path to search in (default: person_dir)",
+                    "description": "Directory or file path to search in (default: anima_dir)",
                 },
                 "glob": {
                     "type": "string",
@@ -182,7 +182,7 @@ SEARCH_TOOLS: list[dict[str, Any]] = [
             "properties": {
                 "path": {
                     "type": "string",
-                    "description": "Directory path (default: person_dir)",
+                    "description": "Directory path (default: anima_dir)",
                 },
                 "pattern": {
                     "type": "string",
@@ -266,7 +266,7 @@ TOOL_MANAGEMENT_TOOLS: list[dict[str, Any]] = [
     {
         "name": "share_tool",
         "description": (
-            "Copy a personal tool to common_tools/ so all persons can use it. "
+            "Copy a personal tool to common_tools/ so all animas can use it. "
             "The tool file is copied from your tools/ directory to the shared "
             "common_tools/ directory."
         ),
@@ -285,13 +285,13 @@ TOOL_MANAGEMENT_TOOLS: list[dict[str, Any]] = [
 
 ADMIN_TOOLS: list[dict[str, Any]] = [
     {
-        "name": "create_person",
+        "name": "create_anima",
         "description": (
-            "Create a new Digital Person from a character sheet. "
+            "Create a new Digital Anima from a character sheet. "
             "Pass the character sheet content directly via character_sheet_content, "
             "or specify a path via character_sheet_path. "
             "The factory creates the directory structure atomically, "
-            "and the new person self-configures via bootstrap on first startup."
+            "and the new anima self-configures via bootstrap on first startup."
         ),
         "parameters": {
             "type": "object",
@@ -308,13 +308,13 @@ ADMIN_TOOLS: list[dict[str, Any]] = [
                     "type": "string",
                     "description": (
                         "Path to the character_sheet.md file "
-                        "(absolute or relative to person_dir). "
+                        "(absolute or relative to anima_dir). "
                         "Ignored if character_sheet_content is provided."
                     ),
                 },
                 "name": {
                     "type": "string",
-                    "description": "Person name (lowercase alphanumeric). If omitted, extracted from sheet.",
+                    "description": "Anima name (lowercase alphanumeric). If omitted, extracted from sheet.",
                 },
                 "supervisor": {
                     "type": "string",
@@ -380,8 +380,8 @@ def build_tool_list(
         include_file_tools: Include file/command operation tools (for A2 mode).
         include_search_tools: Include search_code/list_directory tools.
         include_discovery_tools: Include discover_tools tool.
-        include_notification_tools: Include notify_human tool (for top-level Persons).
-        include_admin_tools: Include admin tools (create_person etc.).
+        include_notification_tools: Include notify_human tool (for top-level Animas).
+        include_admin_tools: Include admin tools (create_anima etc.).
         include_tool_management: Include refresh_tools/share_tool tools.
         external_schemas: Additional tool schemas in canonical format.
 

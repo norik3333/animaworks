@@ -1,15 +1,15 @@
 /* ============================================
-   Digital Person — Person Avatar Styles
+   Digital Anima — Anima Avatar Styles
    ============================================ */
 
-.person-avatar-container {
+.anima-avatar-container {
   display: flex;
   align-items: center;
   flex-shrink: 0;
   margin-right: 8px;
 }
 
-.person-avatar-img {
+.anima-avatar-img {
   width: 36px;
   height: 36px;
   border-radius: 50%;
@@ -17,7 +17,7 @@
   border: 2px solid #e0e0e0;
 }
 
-.person-avatar-placeholder {
+.anima-avatar-placeholder {
   width: 36px;
   height: 36px;
   border-radius: 50%;

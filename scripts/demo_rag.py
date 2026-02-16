@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
@@ -25,12 +25,12 @@ logging.basicConfig(
 logger = logging.getLogger("demo_rag")
 
 
-def create_sample_memories(person_dir: Path) -> None:
+def create_sample_memories(anima_dir: Path) -> None:
     """Create sample memory files for demonstration."""
     logger.info("Creating sample memory files...")
 
-    knowledge_dir = person_dir / "knowledge"
-    episodes_dir = person_dir / "episodes"
+    knowledge_dir = anima_dir / "knowledge"
+    episodes_dir = anima_dir / "episodes"
     knowledge_dir.mkdir(parents=True, exist_ok=True)
     episodes_dir.mkdir(parents=True, exist_ok=True)
 
@@ -117,7 +117,7 @@ Chatworkで見積書を送付。山田さんから「検討します」との返
     logger.info("Sample memory files created")
 
 
-def demo_indexing(person_dir: Path) -> None:
+def demo_indexing(anima_dir: Path) -> None:
     """Demonstrate memory indexing."""
     logger.info("=" * 70)
     logger.info("STEP 1: Indexing Memory Files")
@@ -132,22 +132,22 @@ def demo_indexing(person_dir: Path) -> None:
         return
 
     # Initialize vector store
-    vectordb_dir = person_dir / "vectordb"
+    vectordb_dir = anima_dir / "vectordb"
     vectordb_dir.mkdir(parents=True, exist_ok=True)
     vector_store = ChromaVectorStore(persist_dir=vectordb_dir)
 
     # Initialize indexer
-    indexer = MemoryIndexer(vector_store, "demo_person", person_dir)
+    indexer = MemoryIndexer(vector_store, "demo_anima", anima_dir)
 
     # Index knowledge files
     logger.info("Indexing knowledge files...")
-    knowledge_dir = person_dir / "knowledge"
+    knowledge_dir = anima_dir / "knowledge"
     chunks = indexer.index_directory(knowledge_dir, "knowledge")
     logger.info("  Indexed %d chunks from knowledge/", chunks)
 
     # Index episodes
     logger.info("Indexing episode files...")
-    episodes_dir = person_dir / "episodes"
+    episodes_dir = anima_dir / "episodes"
     chunks = indexer.index_directory(episodes_dir, "episodes")
     logger.info("  Indexed %d chunks from episodes/", chunks)
 
@@ -167,7 +167,7 @@ def demo_vector_search(vector_store, indexer, knowledge_dir: Path, query: str) -
 
     results = retriever.search(
         query=query,
-        person_name="demo_person",
+        anima_name="demo_anima",
         memory_type="knowledge",
         top_k=3,
     )
@@ -180,7 +180,7 @@ def demo_vector_search(vector_store, indexer, knowledge_dir: Path, query: str) -
                     result.source_scores.get("recency", 0))
 
 
-async def demo_priming_integration(person_dir: Path) -> None:
+async def demo_priming_integration(anima_dir: Path) -> None:
     """Demonstrate priming layer with vector search."""
     logger.info("")
     logger.info("=" * 70)
@@ -189,7 +189,7 @@ async def demo_priming_integration(person_dir: Path) -> None:
 
     from core.memory.priming import PrimingEngine
 
-    engine = PrimingEngine(person_dir)
+    engine = PrimingEngine(anima_dir)
 
     test_messages = [
         "山田さんからChatworkで至急の依頼が来ました",
@@ -223,19 +223,19 @@ def main() -> None:
 
     # Create temporary directory
     with tempfile.TemporaryDirectory() as tmpdir:
-        person_dir = Path(tmpdir) / "demo_person"
-        person_dir.mkdir()
+        anima_dir = Path(tmpdir) / "demo_anima"
+        anima_dir.mkdir()
 
         # Step 1: Create sample memories
-        create_sample_memories(person_dir)
+        create_sample_memories(anima_dir)
 
         # Step 2: Index memories
-        components = demo_indexing(person_dir)
+        components = demo_indexing(anima_dir)
         if not components:
             return
 
         vector_store, indexer = components
-        knowledge_dir = person_dir / "knowledge"
+        knowledge_dir = anima_dir / "knowledge"
 
         # Step 3: Demonstrate vector search
         logger.info("")
@@ -258,7 +258,7 @@ def main() -> None:
             demo_vector_search(vector_store, indexer, knowledge_dir, query)
 
         # Step 4: Priming integration
-        asyncio.run(demo_priming_integration(person_dir))
+        asyncio.run(demo_priming_integration(anima_dir))
 
         logger.info("")
         logger.info("=" * 70)

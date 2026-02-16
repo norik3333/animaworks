@@ -21,16 +21,16 @@ class TestNotificationSentEventInStream:
     """Verify that process_message_stream yields notification_sent events
     when the agent uses notify_human during a cycle."""
 
-    async def test_notification_sent_appears_in_stream(self, data_dir, make_person):
+    async def test_notification_sent_appears_in_stream(self, data_dir, make_anima):
         """When notify_human is called during streaming, notification_sent events
         should appear in the process_message_stream output."""
-        person_dir = make_person("stream-notif-test")
+        anima_dir = make_anima("stream-notif-test")
         shared_dir = data_dir / "shared"
 
-        with patch("core.person.AgentCore") as MockAgent, \
-             patch("core.person.MemoryManager") as MockMM, \
-             patch("core.person.Messenger"), \
-             patch("core.person.ConversationMemory") as MockConv:
+        with patch("core.anima.AgentCore") as MockAgent, \
+             patch("core.anima.MemoryManager") as MockMM, \
+             patch("core.anima.Messenger"), \
+             patch("core.anima.ConversationMemory") as MockConv:
             MockMM.return_value.read_model_config.return_value = MagicMock()
             MockConv.return_value.compress_if_needed = AsyncMock()
             MockConv.return_value.finalize_session = AsyncMock(return_value=False)
@@ -38,20 +38,20 @@ class TestNotificationSentEventInStream:
             MockConv.return_value.append_turn = MagicMock()
             MockConv.return_value.save = MagicMock()
 
-            from core.person import DigitalPerson
-            dp = DigitalPerson(person_dir, shared_dir)
+            from core.anima import DigitalAnima
+            dp = DigitalAnima(anima_dir, shared_dir)
 
             # Simulate notification data that would be queued by ToolHandler
             pending_notifications = [
                 {
-                    "person": "stream-notif-test",
+                    "anima": "stream-notif-test",
                     "subject": "Task Complete",
                     "body": "The daily report has been generated",
                     "priority": "normal",
                     "timestamp": "2026-02-16T10:00:00",
                 },
                 {
-                    "person": "stream-notif-test",
+                    "anima": "stream-notif-test",
                     "subject": "Error Alert",
                     "body": "Database connection timeout detected",
                     "priority": "high",
@@ -104,15 +104,15 @@ class TestNotificationSentEventInStream:
             assert notif_events[1]["data"]["subject"] == "Error Alert"
             assert notif_events[1]["data"]["priority"] == "high"
 
-    async def test_no_notification_events_when_none_queued(self, data_dir, make_person):
+    async def test_no_notification_events_when_none_queued(self, data_dir, make_anima):
         """When no notifications are queued, no notification_sent events appear."""
-        person_dir = make_person("no-notif-test")
+        anima_dir = make_anima("no-notif-test")
         shared_dir = data_dir / "shared"
 
-        with patch("core.person.AgentCore"), \
-             patch("core.person.MemoryManager") as MockMM, \
-             patch("core.person.Messenger"), \
-             patch("core.person.ConversationMemory") as MockConv:
+        with patch("core.anima.AgentCore"), \
+             patch("core.anima.MemoryManager") as MockMM, \
+             patch("core.anima.Messenger"), \
+             patch("core.anima.ConversationMemory") as MockConv:
             MockMM.return_value.read_model_config.return_value = MagicMock()
             MockConv.return_value.compress_if_needed = AsyncMock()
             MockConv.return_value.finalize_session = AsyncMock(return_value=False)
@@ -120,8 +120,8 @@ class TestNotificationSentEventInStream:
             MockConv.return_value.append_turn = MagicMock()
             MockConv.return_value.save = MagicMock()
 
-            from core.person import DigitalPerson
-            dp = DigitalPerson(person_dir, shared_dir)
+            from core.anima import DigitalAnima
+            dp = DigitalAnima(anima_dir, shared_dir)
 
             # No notifications queued
             dp.agent.drain_notifications = MagicMock(return_value=[])
@@ -159,14 +159,14 @@ class TestWebSocketNotificationQueueLifecycle:
         assert len(manager.active_connections) == 0
 
         await manager.broadcast_notification({
-            "person": "alice",
+            "anima": "alice",
             "subject": "Offline Alert 1",
             "body": "First notification while offline",
             "priority": "normal",
             "timestamp": "2026-02-16T10:00:00",
         })
         await manager.broadcast_notification({
-            "person": "alice",
+            "anima": "alice",
             "subject": "Offline Alert 2",
             "body": "Second notification while offline",
             "priority": "high",
@@ -189,10 +189,10 @@ class TestWebSocketNotificationQueueLifecycle:
         msg1 = json.loads(mock_ws.send_text.call_args_list[0][0][0])
         msg2 = json.loads(mock_ws.send_text.call_args_list[1][0][0])
 
-        assert msg1["type"] == "person.notification"
+        assert msg1["type"] == "anima.notification"
         assert msg1["data"]["subject"] == "Offline Alert 1"
 
-        assert msg2["type"] == "person.notification"
+        assert msg2["type"] == "anima.notification"
         assert msg2["data"]["subject"] == "Offline Alert 2"
 
     async def test_new_notifications_broadcast_after_connect(self):
@@ -220,7 +220,7 @@ class TestWebSocketNotificationQueueLifecycle:
         assert mock_ws.send_text.call_count == 1
 
         sent = json.loads(mock_ws.send_text.call_args[0][0])
-        assert sent["type"] == "person.notification"
+        assert sent["type"] == "anima.notification"
         assert sent["data"]["subject"] == "online"
 
     async def test_queue_persists_across_disconnect_reconnect(self):
@@ -252,19 +252,19 @@ class TestWebSocketNotificationQueueLifecycle:
         flushed = json.loads(ws2.send_text.call_args[0][0])
         assert flushed["data"]["subject"] == "while-disconnected"
 
-    async def test_full_pipeline_stream_to_websocket(self, data_dir, make_person):
+    async def test_full_pipeline_stream_to_websocket(self, data_dir, make_anima):
         """Full pipeline: agent notify_human -> stream event -> WebSocket broadcast.
 
-        This tests the integration between DigitalPerson stream events and
+        This tests the integration between DigitalAnima stream events and
         the WebSocket manager, simulating what the server chat route does.
         """
-        person_dir = make_person("pipeline-test")
+        anima_dir = make_anima("pipeline-test")
         shared_dir = data_dir / "shared"
 
-        with patch("core.person.AgentCore"), \
-             patch("core.person.MemoryManager") as MockMM, \
-             patch("core.person.Messenger"), \
-             patch("core.person.ConversationMemory") as MockConv:
+        with patch("core.anima.AgentCore"), \
+             patch("core.anima.MemoryManager") as MockMM, \
+             patch("core.anima.Messenger"), \
+             patch("core.anima.ConversationMemory") as MockConv:
             MockMM.return_value.read_model_config.return_value = MagicMock()
             MockConv.return_value.compress_if_needed = AsyncMock()
             MockConv.return_value.finalize_session = AsyncMock(return_value=False)
@@ -272,13 +272,13 @@ class TestWebSocketNotificationQueueLifecycle:
             MockConv.return_value.append_turn = MagicMock()
             MockConv.return_value.save = MagicMock()
 
-            from core.person import DigitalPerson
-            dp = DigitalPerson(person_dir, shared_dir)
+            from core.anima import DigitalAnima
+            dp = DigitalAnima(anima_dir, shared_dir)
 
             # Simulate one pending notification
             dp.agent.drain_notifications = MagicMock(
                 return_value=[{
-                    "person": "pipeline-test",
+                    "anima": "pipeline-test",
                     "subject": "Pipeline Test",
                     "body": "Full pipeline verification",
                     "priority": "normal",
@@ -310,6 +310,6 @@ class TestWebSocketNotificationQueueLifecycle:
             # Verify the notification was broadcast to the WebSocket client
             assert mock_ws.send_text.call_count == 1
             broadcast_msg = json.loads(mock_ws.send_text.call_args[0][0])
-            assert broadcast_msg["type"] == "person.notification"
+            assert broadcast_msg["type"] == "anima.notification"
             assert broadcast_msg["data"]["subject"] == "Pipeline Test"
-            assert broadcast_msg["data"]["person"] == "pipeline-test"
+            assert broadcast_msg["data"]["anima"] == "pipeline-test"

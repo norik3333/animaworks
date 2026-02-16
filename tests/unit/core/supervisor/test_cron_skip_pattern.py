@@ -8,24 +8,24 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from core.schemas import CronTask
-from core.supervisor.runner import PersonRunner
+from core.supervisor.runner import AnimaRunner
 
 
 # ── Helpers ──────────────────────────────────────────────────
 
 
-def _make_runner() -> PersonRunner:
-    """Create a PersonRunner with minimal config for unit testing."""
-    runner = PersonRunner(
-        person_name="test",
+def _make_runner() -> AnimaRunner:
+    """Create a AnimaRunner with minimal config for unit testing."""
+    runner = AnimaRunner(
+        anima_name="test",
         socket_path=Path("/tmp/test.sock"),
-        persons_dir=Path("/tmp/persons"),
+        animas_dir=Path("/tmp/animas"),
         shared_dir=Path("/tmp/shared"),
     )
-    runner.person = MagicMock()
-    runner.person.memory = MagicMock()
-    runner.person.run_cron_command = AsyncMock()
-    runner.person.run_heartbeat = AsyncMock()
+    runner.anima = MagicMock()
+    runner.anima.memory = MagicMock()
+    runner.anima.run_cron_command = AsyncMock()
+    runner.anima.run_heartbeat = AsyncMock()
     return runner
 
 
@@ -52,7 +52,7 @@ class TestSkipPatternFiltering:
     async def test_empty_array_matches_skip_pattern(self):
         """stdout of '[]' matches skip_pattern '^\\[\\s*\\]$' and suppresses heartbeat."""
         runner = _make_runner()
-        runner.person.run_cron_command.return_value = {
+        runner.anima.run_cron_command.return_value = {
             "task": "test_task",
             "exit_code": 0,
             "stdout": "[]",
@@ -66,13 +66,13 @@ class TestSkipPatternFiltering:
             await runner._run_cron_task(task)
 
         # heartbeat should NOT be triggered
-        runner.person.memory.update_pending.assert_not_called()
+        runner.anima.memory.update_pending.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_non_empty_array_does_not_match_skip_pattern(self):
         """stdout with actual data does not match skip_pattern, heartbeat triggers."""
         runner = _make_runner()
-        runner.person.run_cron_command.return_value = {
+        runner.anima.run_cron_command.return_value = {
             "task": "test_task",
             "exit_code": 0,
             "stdout": '[{"message_id": "123"}]',
@@ -87,13 +87,13 @@ class TestSkipPatternFiltering:
             await runner._run_cron_task(task)
 
         # heartbeat SHOULD be triggered
-        runner.person.memory.update_pending.assert_called_once()
+        runner.anima.memory.update_pending.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_no_skip_pattern_triggers_heartbeat(self):
         """Without skip_pattern, any non-empty stdout triggers heartbeat."""
         runner = _make_runner()
-        runner.person.run_cron_command.return_value = {
+        runner.anima.run_cron_command.return_value = {
             "task": "test_task",
             "exit_code": 0,
             "stdout": "[]",
@@ -108,7 +108,7 @@ class TestSkipPatternFiltering:
             await runner._run_cron_task(task)
 
         # Without skip_pattern, even '[]' triggers heartbeat
-        runner.person.memory.update_pending.assert_called_once()
+        runner.anima.memory.update_pending.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_invalid_regex_continues_to_heartbeat(self, caplog):
@@ -116,7 +116,7 @@ class TestSkipPatternFiltering:
         import logging
 
         runner = _make_runner()
-        runner.person.run_cron_command.return_value = {
+        runner.anima.run_cron_command.return_value = {
             "task": "test_task",
             "exit_code": 0,
             "stdout": "some output",
@@ -132,14 +132,14 @@ class TestSkipPatternFiltering:
             await runner._run_cron_task(task)
 
         # Should still trigger heartbeat despite invalid pattern
-        runner.person.memory.update_pending.assert_called_once()
+        runner.anima.memory.update_pending.assert_called_once()
         assert "Invalid skip_pattern" in caplog.text
 
     @pytest.mark.asyncio
     async def test_empty_stdout_no_heartbeat(self):
         """Empty stdout (after strip) does not trigger heartbeat."""
         runner = _make_runner()
-        runner.person.run_cron_command.return_value = {
+        runner.anima.run_cron_command.return_value = {
             "task": "test_task",
             "exit_code": 0,
             "stdout": "   \n  ",
@@ -152,13 +152,13 @@ class TestSkipPatternFiltering:
         with patch.object(runner, "_emit_event"):
             await runner._run_cron_task(task)
 
-        runner.person.memory.update_pending.assert_not_called()
+        runner.anima.memory.update_pending.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_nonzero_exit_code_no_heartbeat(self):
         """Non-zero exit code does not trigger heartbeat regardless of stdout."""
         runner = _make_runner()
-        runner.person.run_cron_command.return_value = {
+        runner.anima.run_cron_command.return_value = {
             "task": "test_task",
             "exit_code": 1,
             "stdout": "error occurred",
@@ -171,4 +171,4 @@ class TestSkipPatternFiltering:
         with patch.object(runner, "_emit_event"):
             await runner._run_cron_task(task)
 
-        runner.person.memory.update_pending.assert_not_called()
+        runner.anima.memory.update_pending.assert_not_called()

@@ -1,4 +1,4 @@
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
@@ -34,8 +34,8 @@ def get_data_dir() -> Path:
     return _DEFAULT_DATA_DIR
 
 
-def get_persons_dir() -> Path:
-    return get_data_dir() / "persons"
+def get_animas_dir() -> Path:
+    return get_data_dir() / "animas"
 
 
 def get_shared_dir() -> Path:
@@ -69,7 +69,7 @@ _prompt_cache: dict[str, str] = {}
 def load_prompt(name: str, **kwargs: object) -> str:
     """Load a prompt template from templates/prompts/{name}.md and format it.
 
-    Templates use Python str.format_map() placeholders like {person_dir}.
+    Templates use Python str.format_map() placeholders like {anima_dir}.
     Literal braces in templates should be doubled: {{ and }}.
 
     Args:

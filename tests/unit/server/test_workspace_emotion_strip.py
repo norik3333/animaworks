@@ -3,7 +3,7 @@
 Tests the server-side contract that the workspace frontend relies on:
 1. The done SSE event contains both clean `summary` and `emotion` fields
 2. text_delta events pass raw text (frontend must handle stripping)
-3. Status events include person name and status for deduplication
+3. Status events include anima name and status for deduplication
 """
 from __future__ import annotations
 
@@ -171,7 +171,7 @@ class TestExtractEmotionEdgeCases:
 
 
 class TestStatusEventStructure:
-    """Tests that person.status WebSocket events contain the fields
+    """Tests that anima.status WebSocket events contain the fields
     needed by the frontend's deduplication logic (data.name + data.status)."""
 
     def test_status_event_format(self):
@@ -183,7 +183,7 @@ class TestStatusEventStructure:
         assert "status" in event_data
 
     def test_status_dedup_logic(self):
-        """Simulate the frontend dedup: same person+status → skip."""
+        """Simulate the frontend dedup: same anima+status → skip."""
         last_status = {}
         events_logged = []
 
@@ -200,8 +200,8 @@ class TestStatusEventStructure:
         assert events_logged[0] == ("sakura", "thinking")
         assert events_logged[1] == ("sakura", "idle")
 
-    def test_status_dedup_different_persons(self):
-        """Different persons with same status should both be logged."""
+    def test_status_dedup_different_animas(self):
+        """Different animas with same status should both be logged."""
         last_status = {}
         events_logged = []
 

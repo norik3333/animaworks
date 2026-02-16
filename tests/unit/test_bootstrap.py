@@ -2,8 +2,8 @@
 Unit tests for bootstrap background execution feature.
 
 Tests cover:
-1. DigitalPerson.run_bootstrap() — skip, status transitions, error handling
-2. PersonRunner._handle_run_bootstrap() — IPC handler dispatch and get_status
+1. DigitalAnima.run_bootstrap() — skip, status transitions, error handling
+2. AnimaRunner._handle_run_bootstrap() — IPC handler dispatch and get_status
 3. ProcessSupervisor bootstrap management — is_bootstrapping, broadcasts, set cleanup
 4. Chat endpoint bootstrap guard — stream SSE, non-streaming 503, greet 503
 """
@@ -33,57 +33,57 @@ from core.supervisor.process_handle import ProcessHandle, ProcessState
 # ── Helpers ─────────────────────────────────────────────────────────
 
 
-def _make_person_dir(tmp_path: Path, *, with_bootstrap: bool = True) -> Path:
-    """Create a minimal person directory for testing."""
-    person_dir = tmp_path / "persons" / "test-person"
-    person_dir.mkdir(parents=True)
-    (person_dir / "identity.md").write_text("# Test Person", encoding="utf-8")
+def _make_anima_dir(tmp_path: Path, *, with_bootstrap: bool = True) -> Path:
+    """Create a minimal anima directory for testing."""
+    anima_dir = tmp_path / "animas" / "test-anima"
+    anima_dir.mkdir(parents=True)
+    (anima_dir / "identity.md").write_text("# Test Anima", encoding="utf-8")
     if with_bootstrap:
-        (person_dir / "bootstrap.md").write_text(
+        (anima_dir / "bootstrap.md").write_text(
             "# Bootstrap instructions", encoding="utf-8"
         )
     for sub in [
         "episodes", "knowledge", "procedures", "skills",
         "state", "shortterm", "shortterm/archive", "transcripts",
     ]:
-        (person_dir / sub).mkdir(parents=True, exist_ok=True)
-    (person_dir / "state" / "current_task.md").write_text(
+        (anima_dir / sub).mkdir(parents=True, exist_ok=True)
+    (anima_dir / "state" / "current_task.md").write_text(
         "status: idle\n", encoding="utf-8"
     )
-    (person_dir / "state" / "pending.md").write_text("", encoding="utf-8")
-    return person_dir
+    (anima_dir / "state" / "pending.md").write_text("", encoding="utf-8")
+    return anima_dir
 
 
-def _make_shared_dir(tmp_path: Path, person_name: str = "test-person") -> Path:
+def _make_shared_dir(tmp_path: Path, anima_name: str = "test-anima") -> Path:
     """Create a minimal shared directory for testing."""
     shared_dir = tmp_path / "shared"
     shared_dir.mkdir(parents=True)
-    (shared_dir / "inbox" / person_name).mkdir(parents=True)
+    (shared_dir / "inbox" / anima_name).mkdir(parents=True)
     (shared_dir / "users").mkdir(parents=True)
     return shared_dir
 
 
-def _make_digital_person(tmp_path: Path, *, with_bootstrap: bool = True):
-    """Create a DigitalPerson with mocked heavy dependencies."""
-    from core.person import DigitalPerson
+def _make_digital_anima(tmp_path: Path, *, with_bootstrap: bool = True):
+    """Create a DigitalAnima with mocked heavy dependencies."""
+    from core.anima import DigitalAnima
 
-    person_dir = _make_person_dir(tmp_path, with_bootstrap=with_bootstrap)
+    anima_dir = _make_anima_dir(tmp_path, with_bootstrap=with_bootstrap)
     shared_dir = _make_shared_dir(tmp_path)
 
     with (
-        patch("core.person.MemoryManager"),
-        patch("core.person.AgentCore"),
-        patch("core.person.Messenger"),
+        patch("core.anima.MemoryManager"),
+        patch("core.anima.AgentCore"),
+        patch("core.anima.Messenger"),
     ):
-        person = DigitalPerson(person_dir, shared_dir)
+        dp = DigitalAnima(anima_dir, shared_dir)
 
-    return person
+    return dp
 
 
 def _make_supervisor(tmp_path: Path, *, ws_manager=None) -> ProcessSupervisor:
     """Create a ProcessSupervisor for testing."""
     return ProcessSupervisor(
-        persons_dir=tmp_path / "persons",
+        animas_dir=tmp_path / "animas",
         shared_dir=tmp_path / "shared",
         run_dir=tmp_path / "run",
         restart_policy=RestartPolicy(
@@ -101,10 +101,10 @@ def _make_supervisor(tmp_path: Path, *, ws_manager=None) -> ProcessSupervisor:
     )
 
 
-def _make_mock_handle(person_name: str = "test-person") -> MagicMock:
+def _make_mock_handle(anima_name: str = "test-anima") -> MagicMock:
     """Create a mock ProcessHandle."""
     handle = MagicMock(spec=ProcessHandle)
-    handle.person_name = person_name
+    handle.anima_name = anima_name
     handle.state = ProcessState.RUNNING
     handle.get_pid.return_value = 12345
     handle.stats = MagicMock()
@@ -116,21 +116,21 @@ def _make_mock_handle(person_name: str = "test-person") -> MagicMock:
 
 
 # ════════════════════════════════════════════════════════════════════
-# 1. DigitalPerson.run_bootstrap()
+# 1. DigitalAnima.run_bootstrap()
 # ════════════════════════════════════════════════════════════════════
 
 
-class TestDigitalPersonRunBootstrap:
-    """Tests for DigitalPerson.run_bootstrap()."""
+class TestDigitalAnimaRunBootstrap:
+    """Tests for DigitalAnima.run_bootstrap()."""
 
     @pytest.mark.asyncio
     async def test_run_bootstrap_skips_when_no_bootstrap_md(self, tmp_path: Path):
         """When needs_bootstrap is False, should return CycleResult with action='skipped'."""
-        person = _make_digital_person(tmp_path, with_bootstrap=False)
+        dp = _make_digital_anima(tmp_path, with_bootstrap=False)
 
-        assert person.needs_bootstrap is False
+        assert dp.needs_bootstrap is False
 
-        result = await person.run_bootstrap()
+        result = await dp.run_bootstrap()
 
         assert isinstance(result, CycleResult)
         assert result.action == "skipped"
@@ -140,13 +140,13 @@ class TestDigitalPersonRunBootstrap:
     @pytest.mark.asyncio
     async def test_run_bootstrap_sets_status_to_bootstrapping(self, tmp_path: Path):
         """During run_bootstrap, self._status should be set to 'bootstrapping'."""
-        person = _make_digital_person(tmp_path, with_bootstrap=True)
+        dp = _make_digital_anima(tmp_path, with_bootstrap=True)
 
         observed_statuses: list[str] = []
 
         async def mock_run_cycle(prompt, trigger=""):
             # Capture status while inside the cycle
-            observed_statuses.append(person._status)
+            observed_statuses.append(dp._status)
             return CycleResult(
                 trigger=trigger,
                 action="completed",
@@ -154,23 +154,23 @@ class TestDigitalPersonRunBootstrap:
                 duration_ms=100,
             )
 
-        person.agent.run_cycle = mock_run_cycle
+        dp.agent.run_cycle = mock_run_cycle
 
-        with patch("core.person.ConversationMemory") as mock_conv_cls:
+        with patch("core.anima.ConversationMemory") as mock_conv_cls:
             mock_conv = MagicMock()
             mock_conv.build_chat_prompt = MagicMock(return_value="prompt")
             mock_conv_cls.return_value = mock_conv
 
-            await person.run_bootstrap()
+            await dp.run_bootstrap()
 
         assert "bootstrapping" in observed_statuses
 
     @pytest.mark.asyncio
     async def test_run_bootstrap_resets_status_on_completion(self, tmp_path: Path):
         """After run_bootstrap completes successfully, status should be 'idle'."""
-        person = _make_digital_person(tmp_path, with_bootstrap=True)
+        dp = _make_digital_anima(tmp_path, with_bootstrap=True)
 
-        person.agent.run_cycle = AsyncMock(
+        dp.agent.run_cycle = AsyncMock(
             return_value=CycleResult(
                 trigger="bootstrap",
                 action="completed",
@@ -179,54 +179,54 @@ class TestDigitalPersonRunBootstrap:
             )
         )
 
-        with patch("core.person.ConversationMemory") as mock_conv_cls:
+        with patch("core.anima.ConversationMemory") as mock_conv_cls:
             mock_conv = MagicMock()
             mock_conv.build_chat_prompt = MagicMock(return_value="prompt")
             mock_conv_cls.return_value = mock_conv
 
-            result = await person.run_bootstrap()
+            result = await dp.run_bootstrap()
 
-        assert person._status == "idle"
+        assert dp._status == "idle"
         assert result.action == "completed"
 
     @pytest.mark.asyncio
     async def test_run_bootstrap_resets_status_on_failure(self, tmp_path: Path):
         """Even if agent.run_cycle raises, status should be reset to 'idle'."""
-        person = _make_digital_person(tmp_path, with_bootstrap=True)
+        dp = _make_digital_anima(tmp_path, with_bootstrap=True)
 
-        person.agent.run_cycle = AsyncMock(
+        dp.agent.run_cycle = AsyncMock(
             side_effect=RuntimeError("LLM API error")
         )
 
-        with patch("core.person.ConversationMemory") as mock_conv_cls:
+        with patch("core.anima.ConversationMemory") as mock_conv_cls:
             mock_conv = MagicMock()
             mock_conv.build_chat_prompt = MagicMock(return_value="prompt")
             mock_conv_cls.return_value = mock_conv
 
             with pytest.raises(RuntimeError, match="LLM API error"):
-                await person.run_bootstrap()
+                await dp.run_bootstrap()
 
-        assert person._status == "idle"
-        assert person._current_task == ""
+        assert dp._status == "idle"
+        assert dp._current_task == ""
 
 
 # ════════════════════════════════════════════════════════════════════
-# 2. PersonRunner._handle_run_bootstrap()
+# 2. AnimaRunner._handle_run_bootstrap()
 # ════════════════════════════════════════════════════════════════════
 
 
-class TestPersonRunnerBootstrap:
-    """Tests for PersonRunner bootstrap handler dispatch and get_status."""
+class TestAnimaRunnerBootstrap:
+    """Tests for AnimaRunner bootstrap handler dispatch and get_status."""
 
     @pytest.mark.asyncio
     async def test_runner_run_bootstrap_handler(self, tmp_path: Path):
-        """PersonRunner should have 'run_bootstrap' in its handler dispatch."""
-        from core.supervisor.runner import PersonRunner
+        """AnimaRunner should have 'run_bootstrap' in its handler dispatch."""
+        from core.supervisor.runner import AnimaRunner
 
-        runner = PersonRunner(
-            person_name="test-person",
+        runner = AnimaRunner(
+            anima_name="test-anima",
             socket_path=tmp_path / "test.sock",
-            persons_dir=tmp_path / "persons",
+            animas_dir=tmp_path / "animas",
             shared_dir=tmp_path / "shared",
         )
 
@@ -235,19 +235,19 @@ class TestPersonRunnerBootstrap:
         assert handler == runner._handle_run_bootstrap
 
     @pytest.mark.asyncio
-    async def test_runner_run_bootstrap_calls_person(self, tmp_path: Path):
-        """_handle_run_bootstrap should call person.run_bootstrap() and return result."""
-        from core.supervisor.runner import PersonRunner
+    async def test_runner_run_bootstrap_calls_anima(self, tmp_path: Path):
+        """_handle_run_bootstrap should call dp.run_bootstrap() and return result."""
+        from core.supervisor.runner import AnimaRunner
 
-        runner = PersonRunner(
-            person_name="test-person",
+        runner = AnimaRunner(
+            anima_name="test-anima",
             socket_path=tmp_path / "test.sock",
-            persons_dir=tmp_path / "persons",
+            animas_dir=tmp_path / "animas",
             shared_dir=tmp_path / "shared",
         )
 
-        mock_person = MagicMock()
-        mock_person.run_bootstrap = AsyncMock(
+        mock_anima = MagicMock()
+        mock_anima.run_bootstrap = AsyncMock(
             return_value=CycleResult(
                 trigger="bootstrap",
                 action="completed",
@@ -255,11 +255,11 @@ class TestPersonRunnerBootstrap:
                 duration_ms=200,
             )
         )
-        runner.person = mock_person
+        runner.anima = mock_anima
 
         result = await runner._handle_run_bootstrap({})
 
-        mock_person.run_bootstrap.assert_awaited_once()
+        mock_anima.run_bootstrap.assert_awaited_once()
         assert result["status"] == "completed"
         assert result["summary"] == "Bootstrap finished"
         assert result["duration_ms"] == 200
@@ -267,20 +267,20 @@ class TestPersonRunnerBootstrap:
     @pytest.mark.asyncio
     async def test_runner_get_status_includes_needs_bootstrap(self, tmp_path: Path):
         """get_status response should include needs_bootstrap field."""
-        from core.supervisor.runner import PersonRunner
+        from core.supervisor.runner import AnimaRunner
 
-        runner = PersonRunner(
-            person_name="test-person",
+        runner = AnimaRunner(
+            anima_name="test-anima",
             socket_path=tmp_path / "test.sock",
-            persons_dir=tmp_path / "persons",
+            animas_dir=tmp_path / "animas",
             shared_dir=tmp_path / "shared",
         )
 
-        mock_person = MagicMock()
-        mock_person._status = "idle"
-        mock_person._current_task = ""
-        mock_person.needs_bootstrap = True
-        runner.person = mock_person
+        mock_anima = MagicMock()
+        mock_anima._status = "idle"
+        mock_anima._current_task = ""
+        mock_anima.needs_bootstrap = True
+        runner.anima = mock_anima
 
         result = await runner._handle_get_status({})
 
@@ -290,20 +290,20 @@ class TestPersonRunnerBootstrap:
     @pytest.mark.asyncio
     async def test_runner_get_status_needs_bootstrap_false(self, tmp_path: Path):
         """get_status should show needs_bootstrap=False when no bootstrap.md."""
-        from core.supervisor.runner import PersonRunner
+        from core.supervisor.runner import AnimaRunner
 
-        runner = PersonRunner(
-            person_name="test-person",
+        runner = AnimaRunner(
+            anima_name="test-anima",
             socket_path=tmp_path / "test.sock",
-            persons_dir=tmp_path / "persons",
+            animas_dir=tmp_path / "animas",
             shared_dir=tmp_path / "shared",
         )
 
-        mock_person = MagicMock()
-        mock_person._status = "idle"
-        mock_person._current_task = ""
-        mock_person.needs_bootstrap = False
-        runner.person = mock_person
+        mock_anima = MagicMock()
+        mock_anima._status = "idle"
+        mock_anima._current_task = ""
+        mock_anima.needs_bootstrap = False
+        runner.anima = mock_anima
 
         result = await runner._handle_get_status({})
 
@@ -320,14 +320,14 @@ class TestSupervisorBootstrap:
 
     @pytest.mark.asyncio
     async def test_supervisor_is_bootstrapping_default_false(self, tmp_path: Path):
-        """is_bootstrapping should return False for unknown person."""
+        """is_bootstrapping should return False for unknown anima."""
         supervisor = _make_supervisor(tmp_path)
 
         assert supervisor.is_bootstrapping("nonexistent") is False
 
     @pytest.mark.asyncio
     async def test_supervisor_is_bootstrapping_during_bootstrap(self, tmp_path: Path):
-        """When person is in _bootstrapping set, is_bootstrapping returns True."""
+        """When anima is in _bootstrapping set, is_bootstrapping returns True."""
         supervisor = _make_supervisor(tmp_path)
 
         supervisor._bootstrapping.add("alice")
@@ -362,7 +362,7 @@ class TestSupervisorBootstrap:
         ]
         assert len(started_calls) >= 1
         started_data = started_calls[0][0][0]
-        assert started_data["type"] == "person.bootstrap"
+        assert started_data["type"] == "anima.bootstrap"
         assert started_data["data"]["name"] == "alice"
 
     @pytest.mark.asyncio
@@ -391,7 +391,7 @@ class TestSupervisorBootstrap:
         ]
         assert len(completed_calls) >= 1
         completed_data = completed_calls[0][0][0]
-        assert completed_data["type"] == "person.bootstrap"
+        assert completed_data["type"] == "anima.bootstrap"
         assert completed_data["data"]["name"] == "alice"
 
     @pytest.mark.asyncio
@@ -422,7 +422,7 @@ class TestSupervisorBootstrap:
         ]
         assert len(failed_calls) >= 1
         failed_data = failed_calls[0][0][0]
-        assert failed_data["type"] == "person.bootstrap"
+        assert failed_data["type"] == "anima.bootstrap"
         assert failed_data["data"]["name"] == "alice"
 
     @pytest.mark.asyncio
@@ -451,7 +451,7 @@ class TestSupervisorBootstrap:
     async def test_supervisor_run_bootstrap_removes_from_set_on_success(
         self, tmp_path: Path
     ):
-        """After successful completion, person is removed from _bootstrapping set."""
+        """After successful completion, anima is removed from _bootstrapping set."""
         supervisor = _make_supervisor(tmp_path)
 
         handle = _make_mock_handle("alice")
@@ -471,7 +471,7 @@ class TestSupervisorBootstrap:
     async def test_supervisor_run_bootstrap_removes_from_set_on_failure(
         self, tmp_path: Path
     ):
-        """After failure, person is removed from _bootstrapping set."""
+        """After failure, anima is removed from _bootstrapping set."""
         supervisor = _make_supervisor(tmp_path)
 
         handle = _make_mock_handle("alice")
@@ -491,7 +491,7 @@ class TestSupervisorBootstrap:
     async def test_supervisor_run_bootstrap_removes_from_set_on_exception(
         self, tmp_path: Path
     ):
-        """After exception, person is removed from _bootstrapping set."""
+        """After exception, anima is removed from _bootstrapping set."""
         supervisor = _make_supervisor(tmp_path)
 
         handle = _make_mock_handle("alice")
@@ -506,7 +506,7 @@ class TestSupervisorBootstrap:
     async def test_supervisor_process_status_shows_bootstrapping(
         self, tmp_path: Path
     ):
-        """get_process_status returns 'bootstrapping' when person is bootstrapping."""
+        """get_process_status returns 'bootstrapping' when anima is bootstrapping."""
         supervisor = _make_supervisor(tmp_path)
 
         handle = _make_mock_handle("alice")
@@ -572,9 +572,9 @@ def _make_test_app(*, is_bootstrapping: bool = False):
     supervisor.is_bootstrapping = MagicMock(return_value=is_bootstrapping)
 
     # Non-streaming send_request
-    async def _send_request(person_name, method, params, timeout=60.0):
-        if person_name not in supervisor.processes:
-            raise KeyError(person_name)
+    async def _send_request(anima_name, method, params, timeout=60.0):
+        if anima_name not in supervisor.processes:
+            raise KeyError(anima_name)
         return {
             "response": "Hello from alice",
             "replied_to": [],
@@ -585,9 +585,9 @@ def _make_test_app(*, is_bootstrapping: bool = False):
     supervisor.send_request = _send_request
 
     # Streaming send_request_stream
-    async def _send_request_stream(person_name, method, params, timeout=120.0):
-        if person_name not in supervisor.processes:
-            raise KeyError(person_name)
+    async def _send_request_stream(anima_name, method, params, timeout=120.0):
+        if anima_name not in supervisor.processes:
+            raise KeyError(anima_name)
         yield IPCResponse(
             id="test",
             stream=True,
@@ -630,7 +630,7 @@ class TestChatEndpointBootstrapGuard:
             base_url="http://test",
         ) as client:
             response = await client.post(
-                "/api/persons/alice/chat/stream",
+                "/api/animas/alice/chat/stream",
                 json={"message": "hello"},
             )
 
@@ -652,7 +652,7 @@ class TestChatEndpointBootstrapGuard:
             base_url="http://test",
         ) as client:
             response = await client.post(
-                "/api/persons/alice/chat",
+                "/api/animas/alice/chat",
                 json={"message": "hello"},
             )
 
@@ -669,7 +669,7 @@ class TestChatEndpointBootstrapGuard:
             transport=ASGITransport(app=app),
             base_url="http://test",
         ) as client:
-            response = await client.post("/api/persons/alice/greet")
+            response = await client.post("/api/animas/alice/greet")
 
         assert response.status_code == 503
         data = response.json()
@@ -685,7 +685,7 @@ class TestChatEndpointBootstrapGuard:
             base_url="http://test",
         ) as client:
             response = await client.post(
-                "/api/persons/alice/chat",
+                "/api/animas/alice/chat",
                 json={"message": "hello"},
             )
 
@@ -703,7 +703,7 @@ class TestChatEndpointBootstrapGuard:
             base_url="http://test",
         ) as client:
             response = await client.post(
-                "/api/persons/alice/chat/stream",
+                "/api/animas/alice/chat/stream",
                 json={"message": "hello"},
             )
 
@@ -722,7 +722,7 @@ class TestChatEndpointBootstrapGuard:
             transport=ASGITransport(app=app),
             base_url="http://test",
         ) as client:
-            response = await client.post("/api/persons/alice/greet")
+            response = await client.post("/api/animas/alice/greet")
 
         assert response.status_code == 200
         data = response.json()

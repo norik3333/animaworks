@@ -61,22 +61,22 @@ def model_config() -> ModelConfig:
 
 
 @pytest.fixture
-def person_dir(tmp_path: Path) -> Path:
-    d = tmp_path / "persons" / "test"
+def anima_dir(tmp_path: Path) -> Path:
+    d = tmp_path / "animas" / "test"
     d.mkdir(parents=True)
     for sub in ["episodes", "knowledge", "procedures", "skills", "state"]:
         (d / sub).mkdir(exist_ok=True)
-    (d / "identity.md").write_text("# Test Person\nA test person.", encoding="utf-8")
+    (d / "identity.md").write_text("# Test Anima\nA test anima.", encoding="utf-8")
     (d / "injection.md").write_text("Be helpful.", encoding="utf-8")
     return d
 
 
 @pytest.fixture
-def memory(person_dir: Path) -> MagicMock:
+def memory(anima_dir: Path) -> MagicMock:
     from core.memory import MemoryManager
     m = MagicMock(spec=MemoryManager)
-    m.person_dir = person_dir
-    m.read_identity.return_value = "# Test Person\nA test person."
+    m.anima_dir = anima_dir
+    m.read_identity.return_value = "# Test Anima\nA test anima."
     m.read_injection.return_value = "Be helpful."
     m.read_recent_episodes.return_value = "- 10:00 did something"
     m.search_memory_text.return_value = [("knowledge/k1.md", "relevant info")]
@@ -93,14 +93,14 @@ def messenger() -> MagicMock:
 @pytest.fixture
 def executor(
     model_config: ModelConfig,
-    person_dir: Path,
+    anima_dir: Path,
     memory: MagicMock,
 ):
     _ensure_litellm_mock()
     from core.execution.assisted import AssistedExecutor
     return AssistedExecutor(
         model_config=model_config,
-        person_dir=person_dir,
+        anima_dir=anima_dir,
         memory=memory,
     )
 
@@ -108,7 +108,7 @@ def executor(
 @pytest.fixture
 def executor_with_messenger(
     model_config: ModelConfig,
-    person_dir: Path,
+    anima_dir: Path,
     memory: MagicMock,
     messenger: MagicMock,
 ):
@@ -116,7 +116,7 @@ def executor_with_messenger(
     from core.execution.assisted import AssistedExecutor
     return AssistedExecutor(
         model_config=model_config,
-        person_dir=person_dir,
+        anima_dir=anima_dir,
         memory=memory,
         messenger=messenger,
     )
@@ -155,14 +155,14 @@ class TestCallLlm:
             call_kwargs = mock.call_args
             assert call_kwargs.kwargs.get("api_key") == "sk-test"
 
-    async def test_includes_api_base(self, person_dir: Path, memory: MagicMock):
+    async def test_includes_api_base(self, anima_dir: Path, memory: MagicMock):
         config = ModelConfig(
             model="openai/gpt-4o", api_key="sk-test",
             api_base_url="http://localhost:11434/v1",
         )
         _ensure_litellm_mock()
         from core.execution.assisted import AssistedExecutor
-        ex = AssistedExecutor(model_config=config, person_dir=person_dir, memory=memory)
+        ex = AssistedExecutor(model_config=config, anima_dir=anima_dir, memory=memory)
         resp = make_litellm_response(content="response")
         mock = AsyncMock(return_value=resp)
         with patch("litellm.acompletion", mock):
@@ -302,7 +302,7 @@ class TestPostCallSend:
         messenger.send.assert_not_called()
 
     async def test_auto_report_on_heartbeat(
-        self, person_dir, memory, messenger,
+        self, anima_dir, memory, messenger,
     ):
         config = ModelConfig(
             model="openai/gpt-4o",
@@ -314,7 +314,7 @@ class TestPostCallSend:
         from core.execution.assisted import AssistedExecutor
         ex = AssistedExecutor(
             model_config=config,
-            person_dir=person_dir,
+            anima_dir=anima_dir,
             memory=memory,
             messenger=messenger,
         )

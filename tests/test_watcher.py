@@ -1,5 +1,5 @@
 from __future__ import annotations
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
@@ -19,7 +19,7 @@ class MockIndexer:
     """Mock indexer for testing."""
 
     def __init__(self):
-        self.person_name = "test_person"
+        self.anima_name = "test_anima"
         self.indexed_files = []
 
     def index_file(self, file_path, memory_type, force):
@@ -29,25 +29,25 @@ class MockIndexer:
 
 
 @pytest.fixture
-def temp_person_dir():
-    """Create temporary person directory structure."""
+def temp_anima_dir():
+    """Create temporary anima directory structure."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        person_dir = Path(tmpdir)
+        anima_dir = Path(tmpdir)
 
         # Create memory directories
-        (person_dir / "knowledge").mkdir()
-        (person_dir / "episodes").mkdir()
-        (person_dir / "procedures").mkdir()
-        (person_dir / "skills").mkdir()
+        (anima_dir / "knowledge").mkdir()
+        (anima_dir / "episodes").mkdir()
+        (anima_dir / "procedures").mkdir()
+        (anima_dir / "skills").mkdir()
 
-        yield person_dir
+        yield anima_dir
 
 
 @pytest.mark.asyncio
-async def test_file_watcher_start_stop(temp_person_dir):
+async def test_file_watcher_start_stop(temp_anima_dir):
     """Test starting and stopping file watcher."""
     indexer = MockIndexer()
-    watcher = FileWatcher(temp_person_dir, indexer)
+    watcher = FileWatcher(temp_anima_dir, indexer)
 
     # Start watcher
     watcher.start()
@@ -62,16 +62,16 @@ async def test_file_watcher_start_stop(temp_person_dir):
 
 
 @pytest.mark.asyncio
-async def test_file_creation_triggers_indexing(temp_person_dir):
+async def test_file_creation_triggers_indexing(temp_anima_dir):
     """Test that file creation triggers indexing."""
     indexer = MockIndexer()
-    watcher = FileWatcher(temp_person_dir, indexer)
+    watcher = FileWatcher(temp_anima_dir, indexer)
 
     # Start watcher
     watcher.start()
 
     # Create a file
-    test_file = temp_person_dir / "knowledge" / "test.md"
+    test_file = temp_anima_dir / "knowledge" / "test.md"
     test_file.write_text("# Test\n\nContent")
 
     # Wait for debounce + processing
@@ -86,16 +86,16 @@ async def test_file_creation_triggers_indexing(temp_person_dir):
 
 
 @pytest.mark.asyncio
-async def test_debouncing(temp_person_dir):
+async def test_debouncing(temp_anima_dir):
     """Test that rapid file modifications are debounced."""
     indexer = MockIndexer()
-    watcher = FileWatcher(temp_person_dir, indexer)
+    watcher = FileWatcher(temp_anima_dir, indexer)
 
     # Start watcher
     watcher.start()
 
     # Create and modify file rapidly
-    test_file = temp_person_dir / "knowledge" / "test.md"
+    test_file = temp_anima_dir / "knowledge" / "test.md"
     for i in range(5):
         test_file.write_text(f"# Test\n\nContent {i}")
         await asyncio.sleep(0.05)  # 50ms between writes
@@ -112,12 +112,12 @@ async def test_debouncing(temp_person_dir):
     assert indexing_count <= 2
 
 
-def test_queue_file(temp_person_dir):
+def test_queue_file(temp_anima_dir):
     """Test manual file queuing."""
     indexer = MockIndexer()
-    watcher = FileWatcher(temp_person_dir, indexer)
+    watcher = FileWatcher(temp_anima_dir, indexer)
 
-    test_file = temp_person_dir / "knowledge" / "test.md"
+    test_file = temp_anima_dir / "knowledge" / "test.md"
     test_file.write_text("# Test\n\nContent")
 
     # Queue file manually
@@ -127,16 +127,16 @@ def test_queue_file(temp_person_dir):
     assert test_file in watcher._queue
 
 
-def test_memory_type_detection(temp_person_dir):
+def test_memory_type_detection(temp_anima_dir):
     """Test memory type detection from file path."""
     indexer = MockIndexer()
-    watcher = FileWatcher(temp_person_dir, indexer)
+    watcher = FileWatcher(temp_anima_dir, indexer)
 
     # Test different memory types
-    assert watcher._get_memory_type(temp_person_dir / "knowledge" / "test.md") == "knowledge"
-    assert watcher._get_memory_type(temp_person_dir / "episodes" / "test.md") == "episodes"
-    assert watcher._get_memory_type(temp_person_dir / "procedures" / "test.md") == "procedures"
-    assert watcher._get_memory_type(temp_person_dir / "skills" / "test.md") == "skills"
+    assert watcher._get_memory_type(temp_anima_dir / "knowledge" / "test.md") == "knowledge"
+    assert watcher._get_memory_type(temp_anima_dir / "episodes" / "test.md") == "episodes"
+    assert watcher._get_memory_type(temp_anima_dir / "procedures" / "test.md") == "procedures"
+    assert watcher._get_memory_type(temp_anima_dir / "skills" / "test.md") == "skills"
 
-    # Test file outside person_dir
+    # Test file outside anima_dir
     assert watcher._get_memory_type(Path("/tmp/test.md")) is None

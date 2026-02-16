@@ -41,7 +41,7 @@ class TestModeA2Mock:
         )
 
         # Write a knowledge file so search has results
-        (agent.person_dir / "knowledge" / "facts.md").write_text(
+        (agent.anima_dir / "knowledge" / "facts.md").write_text(
             "The answer to everything is 42.\n", encoding="utf-8"
         )
 
@@ -62,14 +62,14 @@ class TestModeA2Mock:
         assert "42" in result.summary
 
     async def test_read_file_permission_allowed(self, make_agent_core, tmp_path):
-        """A2: read_file succeeds for paths within person_dir."""
+        """A2: read_file succeeds for paths within anima_dir."""
         agent = make_agent_core(
             name="a2-read-ok",
             model="openai/gpt-4o",
         )
 
-        # Write a file inside person_dir
-        test_file = agent.person_dir / "knowledge" / "test_data.md"
+        # Write a file inside anima_dir
+        test_file = agent.anima_dir / "knowledge" / "test_data.md"
         test_file.write_text("Secret knowledge content.", encoding="utf-8")
 
         tc = make_tool_call(
@@ -159,7 +159,7 @@ class TestModeA2Mock:
             model="openai/gpt-4o",
         )
 
-        target = agent.person_dir / "knowledge" / "new_file.md"
+        target = agent.anima_dir / "knowledge" / "new_file.md"
 
         # Tool call 1: write_file
         tc_write = make_tool_call(
@@ -287,7 +287,7 @@ class TestModeA2AzureLive:
         agent._sdk_available = False
 
         # Seed knowledge that the model must discover
-        (agent.person_dir / "knowledge" / "secret.md").write_text(
+        (agent.anima_dir / "knowledge" / "secret.md").write_text(
             "# Secret Knowledge\nThe project codename is PHOENIX-42.\n",
             encoding="utf-8",
         )
@@ -315,7 +315,7 @@ class TestModeA2AzureLive:
         )
         agent._sdk_available = False
 
-        target = agent.person_dir / "knowledge" / "report.md"
+        target = agent.anima_dir / "knowledge" / "report.md"
         target.write_text(
             "# Monthly Report\nRevenue: 1,234,567 JPY\nStatus: On track\n",
             encoding="utf-8",
@@ -343,7 +343,7 @@ class TestModeA2AzureLive:
         )
         agent._sdk_available = False
 
-        target = agent.person_dir / "knowledge" / "output.md"
+        target = agent.anima_dir / "knowledge" / "output.md"
 
         result = await agent.run_cycle(
             f"Use write_file with path='{target}' and "
@@ -371,16 +371,16 @@ class TestModeA2AzureLive:
         agent._sdk_available = False
 
         # Create files for search_code to find
-        (agent.person_dir / "knowledge" / "alpha.md").write_text(
+        (agent.anima_dir / "knowledge" / "alpha.md").write_text(
             "This file contains MARKER_ALPHA_999.\n", encoding="utf-8",
         )
-        (agent.person_dir / "knowledge" / "beta.md").write_text(
+        (agent.anima_dir / "knowledge" / "beta.md").write_text(
             "No special markers here.\n", encoding="utf-8",
         )
 
         result = await agent.run_cycle(
             "Use search_code with pattern='MARKER_ALPHA' and "
-            f"directory='{agent.person_dir}' to search for the marker. "
+            f"directory='{agent.anima_dir}' to search for the marker. "
             "Tell me the exact marker string you found."
         )
 
@@ -402,7 +402,7 @@ class TestModeA2AzureLive:
         agent._sdk_available = False
 
         # Create recognizable files
-        knowledge_dir = agent.person_dir / "knowledge"
+        knowledge_dir = agent.anima_dir / "knowledge"
         (knowledge_dir / "unique_file_xyz.md").write_text(
             "test", encoding="utf-8",
         )
@@ -429,7 +429,7 @@ class TestModeA2AzureLive:
         )
         agent._sdk_available = False
 
-        chain_path = agent.person_dir / "knowledge" / "chain_test.md"
+        chain_path = agent.anima_dir / "knowledge" / "chain_test.md"
 
         result = await agent.run_cycle(
             f"Use write_file with path='{chain_path}' and "

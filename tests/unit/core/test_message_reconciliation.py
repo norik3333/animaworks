@@ -21,7 +21,7 @@ def shared_dir(tmp_path: Path) -> Path:
 def _create_processed_message(
     shared_dir: Path,
     *,
-    person: str = "alice",
+    anima: str = "alice",
     from_person: str = "bob",
     to_person: str = "alice",
     content: str = "hello",
@@ -29,7 +29,7 @@ def _create_processed_message(
     thread_id: str | None = None,
     timestamp: datetime | None = None,
 ) -> Message:
-    """Helper: create a processed message file under shared/inbox/{person}/processed/."""
+    """Helper: create a processed message file under shared/inbox/{anima}/processed/."""
     msg = Message(
         from_person=from_person,
         to_person=to_person,
@@ -44,7 +44,7 @@ def _create_processed_message(
     if timestamp is not None:
         msg.timestamp = timestamp
 
-    processed_dir = shared_dir / "inbox" / person / "processed"
+    processed_dir = shared_dir / "inbox" / anima / "processed"
     processed_dir.mkdir(parents=True, exist_ok=True)
     filepath = processed_dir / f"{msg.id}.json"
     filepath.write_text(msg.model_dump_json(indent=2), encoding="utf-8")
@@ -75,13 +75,13 @@ class TestReconcileFindsUnloggedMessages:
         count = reconcile_message_log(shared_dir)
         assert count == 2
 
-    def test_finds_messages_across_multiple_persons(self, shared_dir: Path) -> None:
+    def test_finds_messages_across_multiple_animas(self, shared_dir: Path) -> None:
         _create_processed_message(
-            shared_dir, person="alice", from_person="bob",
+            shared_dir, anima="alice", from_person="bob",
             to_person="alice", msg_id="msg-a", content="to alice",
         )
         _create_processed_message(
-            shared_dir, person="bob", from_person="alice",
+            shared_dir, anima="bob", from_person="alice",
             to_person="bob", msg_id="msg-b", content="to bob",
         )
         count = reconcile_message_log(shared_dir)

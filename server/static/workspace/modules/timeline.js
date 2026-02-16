@@ -12,7 +12,7 @@
  * @typedef {Object} TimelineEvent
  * @property {string}  id         — unique ID (timestamp-based)
  * @property {string}  type       — "message" | "heartbeat" | "cron" | "chat" | "status"
- * @property {string[]} persons   — related Person names
+ * @property {string[]} animas   — related Anima names
  * @property {string}  timestamp  — ISO 8601
  * @property {string}  summary    — display text
  * @property {Object}  [metadata] — extra data for replay
@@ -231,11 +231,11 @@ function _createEventElement(evt) {
   iconEl.textContent = TYPE_ICONS[evt.type] || "\u2022";
   iconEl.style.cssText = "flex-shrink:0;";
 
-  // Persons
-  const personsEl = document.createElement("span");
-  personsEl.className = "tl-event-persons";
-  personsEl.textContent = evt.persons.join(", ");
-  personsEl.style.cssText = "font-weight:600; color:#2563eb; flex-shrink:0; max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;";
+  // Animas
+  const animasEl = document.createElement("span");
+  animasEl.className = "tl-event-animas";
+  animasEl.textContent = evt.animas.join(", ");
+  animasEl.style.cssText = "font-weight:600; color:#2563eb; flex-shrink:0; max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;";
 
   // Summary
   const summaryEl = document.createElement("span");
@@ -245,7 +245,7 @@ function _createEventElement(evt) {
 
   el.appendChild(timeEl);
   el.appendChild(iconEl);
-  el.appendChild(personsEl);
+  el.appendChild(animasEl);
   el.appendChild(summaryEl);
 
   // Click → replay
@@ -271,7 +271,7 @@ function _formatTime(isoString) {
 // ── Replay ─────────────────────────────────────────
 
 function _replayEvent(event, el) {
-  const { type, persons, metadata } = event;
+  const { type, animas, metadata } = event;
 
   // Visual feedback
   el.classList.add("replaying");
@@ -281,18 +281,18 @@ function _replayEvent(event, el) {
 
   switch (type) {
     case "message":
-      if (_interactionManager && persons.length >= 2) {
+      if (_interactionManager && animas.length >= 2) {
         _interactionManager.showMessageEffect(
-          persons[0],
-          persons[1],
+          animas[0],
+          animas[1],
           (metadata && metadata.text) || "",
         );
       }
       break;
 
     case "chat":
-      if (_highlightDesk && persons.length >= 1) {
-        _highlightDesk(persons[0]);
+      if (_highlightDesk && animas.length >= 1) {
+        _highlightDesk(animas[0]);
         setTimeout(() => {
           if (_clearHighlight) _clearHighlight();
         }, 3000);
@@ -301,8 +301,8 @@ function _replayEvent(event, el) {
 
     case "heartbeat":
     case "cron":
-      if (_highlightDesk && persons.length >= 1) {
-        _highlightDesk(persons[0]);
+      if (_highlightDesk && animas.length >= 1) {
+        _highlightDesk(animas[0]);
         setTimeout(() => {
           if (_clearHighlight) _clearHighlight();
         }, 3000);

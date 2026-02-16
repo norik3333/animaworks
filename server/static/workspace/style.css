@@ -209,9 +209,9 @@ html, body {
 }
 
 
-/* ── Person Dropdown ────────────────────── */
+/* ── Anima Dropdown ────────────────────── */
 
-.person-dropdown {
+.anima-dropdown {
   min-width: 220px;
   max-width: 360px;
   padding: 6px 12px;
@@ -223,13 +223,13 @@ html, body {
   transition: border-color 0.15s;
 }
 
-.person-dropdown:focus {
+.anima-dropdown:focus {
   border-color: #2563eb;
 }
 
-/* ── Person Status Panel ────────────────── */
+/* ── Anima Status Panel ────────────────── */
 
-.person-status-panel {
+.anima-status-panel {
   padding: 12px;
   display: flex;
   flex-direction: column;
@@ -244,7 +244,7 @@ html, body {
   border-bottom: 1px solid #eee;
 }
 
-.status-person-name {
+.status-anima-name {
   font-weight: 700;
   font-size: 1rem;
 }
@@ -440,7 +440,7 @@ html, body {
   flex-shrink: 0;
 }
 
-.activity-person {
+.activity-anima {
   font-weight: 600;
   color: #2563eb;
   flex-shrink: 0;
@@ -1108,7 +1108,7 @@ html, body {
   color: #333;
 }
 
-.ws-conv-person-name {
+.ws-conv-anima-name {
   font-size: 1rem;
   font-weight: 700;
   color: #1a1a1a;
@@ -1264,7 +1264,7 @@ html, body {
     justify-content: flex-start;
   }
 
-  .person-dropdown {
+  .anima-dropdown {
     width: 100%;
     min-width: unset;
     max-width: unset;
@@ -1291,33 +1291,33 @@ html, body {
   }
 }
 
-/* ── Person Visual States ────────────────────── */
+/* ── Anima Visual States ────────────────────── */
 
-.person-item--sleeping {
+.anima-item--sleeping {
     opacity: 0.45;
     filter: grayscale(0.85) brightness(0.8);
 }
 
-.person-item--sleeping .person-avatar-placeholder {
+.anima-item--sleeping .anima-avatar-placeholder {
     filter: grayscale(1);
     opacity: 0.4;
 }
 
-.person-item--loading {
+.anima-item--loading {
     opacity: 0.75;
     pointer-events: none;
 }
 
-.person-item--loading .person-status {
+.anima-item--loading .anima-status {
     background: rgba(245, 158, 11, 0.12);
     color: #f59e0b;
 }
 
-.person-item {
+.anima-item {
     transition: opacity 0.4s ease, filter 0.4s ease, transform 0.3s ease;
 }
 
-.person-item--just-activated {
+.anima-item--just-activated {
     animation: activate-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
 
@@ -1328,10 +1328,10 @@ html, body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .person-item--sleeping .person-avatar-img {
+    .anima-item--sleeping .anima-avatar-img {
         animation: none;
     }
-    .person-item--just-activated {
+    .anima-item--just-activated {
         animation: none;
     }
 }
@@ -1431,7 +1431,7 @@ html, body {
   background: #fff3cd;
 }
 
-/* ── Reveal Animation (Person Birth) ────────────────── */
+/* ── Reveal Animation (Anima Birth) ────────────────── */
 
 .ws-reveal-overlay {
   position: fixed;

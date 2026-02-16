@@ -14,9 +14,9 @@ from core.tools.image_gen import ImageGenPipeline, PipelineResult
 
 
 @pytest.fixture()
-def person_dir(tmp_path: Path) -> Path:
-    """Return a temporary person directory with an assets subdirectory."""
-    d = tmp_path / "persons" / "test-person"
+def anima_dir(tmp_path: Path) -> Path:
+    """Return a temporary anima directory with an assets subdirectory."""
+    d = tmp_path / "animas" / "test-anima"
     d.mkdir(parents=True)
     return d
 
@@ -34,7 +34,7 @@ class TestVibeImageOverridesConfig:
     """When vibe_image is passed directly, it takes precedence over config."""
 
     def test_vibe_image_overrides_config_style_reference(
-        self, person_dir: Path, tmp_path: Path,
+        self, anima_dir: Path, tmp_path: Path,
     ):
         """Direct vibe_image bytes override config.style_reference path."""
         # Create a style reference file configured via ImageGenConfig
@@ -46,7 +46,7 @@ class TestVibeImageOverridesConfig:
             vibe_strength=0.3,
             vibe_info_extracted=0.5,
         )
-        pipeline = ImageGenPipeline(person_dir, config=config)
+        pipeline = ImageGenPipeline(anima_dir, config=config)
 
         direct_vibe = b"DIRECT_VIBE_IMAGE"
 
@@ -74,13 +74,13 @@ class TestVibeImageOverridesConfig:
 class TestVibeStrengthOverride:
     """When vibe_strength is passed, it overrides config.vibe_strength."""
 
-    def test_vibe_strength_override(self, person_dir: Path):
+    def test_vibe_strength_override(self, anima_dir: Path):
         """Direct vibe_strength overrides config value."""
         config = ImageGenConfig(
             vibe_strength=0.3,
             vibe_info_extracted=0.5,
         )
-        pipeline = ImageGenPipeline(person_dir, config=config)
+        pipeline = ImageGenPipeline(anima_dir, config=config)
 
         with (
             patch("core.tools.image_gen.os.environ", {"NOVELAI_TOKEN": "test-token"}),
@@ -104,13 +104,13 @@ class TestVibeStrengthOverride:
         assert call_kwargs["vibe_strength"] == 0.9
         assert call_kwargs["vibe_info_extracted"] == 0.7
 
-    def test_falls_back_to_config_when_none(self, person_dir: Path):
+    def test_falls_back_to_config_when_none(self, anima_dir: Path):
         """When vibe_strength/info are None, config values are used."""
         config = ImageGenConfig(
             vibe_strength=0.4,
             vibe_info_extracted=0.6,
         )
-        pipeline = ImageGenPipeline(person_dir, config=config)
+        pipeline = ImageGenPipeline(anima_dir, config=config)
 
         with (
             patch("core.tools.image_gen.os.environ", {"NOVELAI_TOKEN": "test-token"}),
@@ -139,9 +139,9 @@ class TestVibeStrengthOverride:
 class TestProgressCallback:
     """Verify progress_callback is invoked at step transitions."""
 
-    def test_progress_callback_called(self, person_dir: Path):
+    def test_progress_callback_called(self, anima_dir: Path):
         """progress_callback receives generating/completed for fullbody step."""
-        pipeline = ImageGenPipeline(person_dir)
+        pipeline = ImageGenPipeline(anima_dir)
         callback = MagicMock()
 
         with (
@@ -165,9 +165,9 @@ class TestProgressCallback:
         assert ("fullbody", "generating") in step_status_pairs
         assert ("fullbody", "completed") in step_status_pairs
 
-    def test_progress_callback_error_on_failure(self, person_dir: Path):
+    def test_progress_callback_error_on_failure(self, anima_dir: Path):
         """progress_callback receives 'error' when a step fails."""
-        pipeline = ImageGenPipeline(person_dir)
+        pipeline = ImageGenPipeline(anima_dir)
         callback = MagicMock()
 
         with (
@@ -197,9 +197,9 @@ class TestProgressCallback:
 class TestSeedPassedToClient:
     """Verify seed parameter reaches the underlying client."""
 
-    def test_seed_passed_to_client(self, person_dir: Path):
+    def test_seed_passed_to_client(self, anima_dir: Path):
         """Seed is forwarded to NovelAIClient.generate_fullbody."""
-        pipeline = ImageGenPipeline(person_dir)
+        pipeline = ImageGenPipeline(anima_dir)
 
         with (
             patch("core.tools.image_gen.os.environ", {"NOVELAI_TOKEN": "test-token"}),
@@ -219,9 +219,9 @@ class TestSeedPassedToClient:
         call_kwargs = mock_client.generate_fullbody.call_args[1]
         assert call_kwargs["seed"] == 12345
 
-    def test_seed_none_passed_to_client(self, person_dir: Path):
+    def test_seed_none_passed_to_client(self, anima_dir: Path):
         """When seed is None, it is still forwarded (client decides default)."""
-        pipeline = ImageGenPipeline(person_dir)
+        pipeline = ImageGenPipeline(anima_dir)
 
         with (
             patch("core.tools.image_gen.os.environ", {"NOVELAI_TOKEN": "test-token"}),

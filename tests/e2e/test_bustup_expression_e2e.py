@@ -75,7 +75,7 @@ class TestBustupExpressionE2E:
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.post(
-                "/api/persons/alice/chat/stream",
+                "/api/animas/alice/chat/stream",
                 json={"message": "Can you help me?", "from_person": "tester"},
             )
 
@@ -118,7 +118,7 @@ class TestBustupExpressionE2E:
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.post(
-                "/api/persons/alice/chat/stream",
+                "/api/animas/alice/chat/stream",
                 json={"message": "What is 2+2?"},
             )
 
@@ -152,7 +152,7 @@ class TestBustupExpressionE2E:
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.post(
-                "/api/persons/alice/chat/stream",
+                "/api/animas/alice/chat/stream",
                 json={"message": "This is hard"},
             )
 
@@ -185,7 +185,7 @@ class TestBustupExpressionE2E:
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.post(
-                "/api/persons/alice/chat/stream",
+                "/api/animas/alice/chat/stream",
                 json={"message": "Test"},
             )
 
@@ -217,7 +217,7 @@ class TestBustupExpressionE2E:
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             await client.post(
-                "/api/persons/alice/chat/stream",
+                "/api/animas/alice/chat/stream",
                 json={"message": "Hi"},
             )
 
@@ -253,7 +253,7 @@ class TestBustupExpressionE2E:
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.post(
-                "/api/persons/alice/chat/stream",
+                "/api/animas/alice/chat/stream",
                 json={"message": "Test"},
             )
 

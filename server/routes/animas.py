@@ -1,5 +1,5 @@
 from __future__ import annotations
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
@@ -10,15 +10,15 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from core.config.models import PersonModelConfig, load_config
-from server.dependencies import get_person
+from core.config.models import AnimaModelConfig, load_config
+from server.dependencies import get_anima
 
-logger = logging.getLogger("animaworks.routes.persons")
+logger = logging.getLogger("animaworks.routes.animas")
 
 
-def _read_appearance(person_dir: Path) -> dict | None:
-    """Read appearance.json from a person directory."""
-    path = person_dir / "appearance.json"
+def _read_appearance(anima_dir: Path) -> dict | None:
+    """Read appearance.json from an anima directory."""
+    path = anima_dir / "appearance.json"
     if not path.exists():
         return None
     try:
@@ -28,29 +28,29 @@ def _read_appearance(person_dir: Path) -> dict | None:
         return None
 
 
-def create_persons_router() -> APIRouter:
+def create_animas_router() -> APIRouter:
     router = APIRouter()
 
-    @router.get("/persons")
-    async def list_persons(request: Request):
+    @router.get("/animas")
+    async def list_animas(request: Request):
         supervisor = request.app.state.supervisor
-        persons_dir = request.app.state.persons_dir
-        person_names = request.app.state.person_names
+        animas_dir = request.app.state.animas_dir
+        anima_names = request.app.state.anima_names
 
         config = load_config()
 
         result = []
-        for name in person_names:
-            person_dir = persons_dir / name
+        for name in anima_names:
+            anima_dir = animas_dir / name
 
             # Get process status
             proc_status = supervisor.get_process_status(name)
 
             # Read static files
-            appearance = _read_appearance(person_dir)
+            appearance = _read_appearance(anima_dir)
 
             # Read supervisor from config
-            person_cfg = config.persons.get(name, PersonModelConfig())
+            anima_cfg = config.animas.get(name, AnimaModelConfig())
 
             # Combine data
             data = {
@@ -60,21 +60,21 @@ def create_persons_router() -> APIRouter:
                 "pid": proc_status.get("pid"),
                 "uptime_sec": proc_status.get("uptime_sec"),
                 "appearance": appearance,
-                "supervisor": person_cfg.supervisor,
+                "supervisor": anima_cfg.supervisor,
             }
             result.append(data)
 
         return result
 
-    @router.get("/persons/{name}")
-    async def get_person_detail(name: str, request: Request):
+    @router.get("/animas/{name}")
+    async def get_anima_detail(name: str, request: Request):
         supervisor = request.app.state.supervisor
-        persons_dir = request.app.state.persons_dir
-        person_dir = persons_dir / name
+        animas_dir = request.app.state.animas_dir
+        anima_dir = animas_dir / name
 
-        if not person_dir.exists():
+        if not anima_dir.exists():
             from fastapi import HTTPException
-            raise HTTPException(status_code=404, detail=f"Person not found: {name}")
+            raise HTTPException(status_code=404, detail=f"Anima not found: {name}")
 
         # Get process status
         proc_status = supervisor.get_process_status(name)
@@ -82,7 +82,7 @@ def create_persons_router() -> APIRouter:
         # Read memory files from disk — parallelised via thread pool
         from core.memory.manager import MemoryManager
 
-        memory = MemoryManager(person_dir)
+        memory = MemoryManager(anima_dir)
 
         identity, injection, cur_state, pending, k_files, e_files, p_files = (
             await asyncio.gather(
@@ -107,14 +107,14 @@ def create_persons_router() -> APIRouter:
             "procedure_files": p_files,
         }
 
-    @router.post("/persons/{name}/trigger")
+    @router.post("/animas/{name}/trigger")
     async def trigger_heartbeat(name: str, request: Request):
         supervisor = request.app.state.supervisor
 
         try:
             # Send IPC request to run heartbeat
             result = await supervisor.send_request(
-                person_name=name,
+                anima_name=name,
                 method="run_heartbeat",
                 params={},
                 timeout=120.0  # Heartbeat can take longer
@@ -124,41 +124,41 @@ def create_persons_router() -> APIRouter:
 
         except KeyError:
             from fastapi import HTTPException
-            raise HTTPException(status_code=404, detail=f"Person not found: {name}")
+            raise HTTPException(status_code=404, detail=f"Anima not found: {name}")
         except ValueError as e:
             from fastapi import HTTPException
             raise HTTPException(status_code=500, detail=str(e))
         except asyncio.TimeoutError:
-            logger.error("Timeout waiting for heartbeat from person=%s", name)
+            logger.error("Timeout waiting for heartbeat from anima=%s", name)
             from fastapi.responses import JSONResponse
             return JSONResponse(
                 {"error": "Request timed out"}, status_code=504,
             )
         except RuntimeError as e:
-            logger.exception("Runtime error in trigger for person=%s", name)
+            logger.exception("Runtime error in trigger for anima=%s", name)
             from fastapi.responses import JSONResponse
             return JSONResponse(
                 {"error": f"Internal server error: {e}"}, status_code=500,
             )
 
-    # ── Person Config ─────────────────────────────────────
+    # ── Anima Config ─────────────────────────────────────
 
-    @router.get("/persons/{name}/config")
-    async def get_person_config(name: str, request: Request):
-        """Return resolved model configuration for a person."""
-        persons_dir = request.app.state.persons_dir
-        person_dir = persons_dir / name
-        if not person_dir.exists():
+    @router.get("/animas/{name}/config")
+    async def get_anima_config(name: str, request: Request):
+        """Return resolved model configuration for an anima."""
+        animas_dir = request.app.state.animas_dir
+        anima_dir = animas_dir / name
+        if not anima_dir.exists():
             from fastapi import HTTPException
-            raise HTTPException(status_code=404, detail=f"Person not found: {name}")
+            raise HTTPException(status_code=404, detail=f"Anima not found: {name}")
 
-        from core.config.models import load_config, resolve_person_config
+        from core.config.models import load_config, resolve_anima_config
 
         config = load_config()
-        resolved, credential = resolve_person_config(config, name)
+        resolved, credential = resolve_anima_config(config, name)
 
         return {
-            "person": name,
+            "anima": name,
             "model": resolved.model,
             "execution_mode": resolved.execution_mode,
             "config": resolved.model_dump(),
@@ -166,17 +166,17 @@ def create_persons_router() -> APIRouter:
 
     # ── Enable / Disable ─────────────────────────────────────
 
-    @router.post("/persons/{name}/enable")
-    async def enable_person(name: str, request: Request):
-        """Enable a Person (set status.json to enabled: true)."""
-        persons_dir = request.app.state.persons_dir
-        person_dir = persons_dir / name
-        if not person_dir.exists() or not (person_dir / "identity.md").exists():
+    @router.post("/animas/{name}/enable")
+    async def enable_anima(name: str, request: Request):
+        """Enable an Anima (set status.json to enabled: true)."""
+        animas_dir = request.app.state.animas_dir
+        anima_dir = animas_dir / name
+        if not anima_dir.exists() or not (anima_dir / "identity.md").exists():
             raise HTTPException(
-                status_code=404, detail=f"Person '{name}' not found"
+                status_code=404, detail=f"Anima '{name}' not found"
             )
 
-        status_file = person_dir / "status.json"
+        status_file = anima_dir / "status.json"
         status_file.write_text(
             json.dumps({"enabled": True}, indent=2), encoding="utf-8"
         )
@@ -184,23 +184,23 @@ def create_persons_router() -> APIRouter:
         # Start immediately (don't wait for reconciliation)
         supervisor = request.app.state.supervisor
         if name not in supervisor.processes:
-            await supervisor.start_person(name)
-            if name not in request.app.state.person_names:
-                request.app.state.person_names.append(name)
+            await supervisor.start_anima(name)
+            if name not in request.app.state.anima_names:
+                request.app.state.anima_names.append(name)
 
         return {"name": name, "enabled": True}
 
-    @router.post("/persons/{name}/disable")
-    async def disable_person(name: str, request: Request):
-        """Disable a Person (set status.json to enabled: false and stop process)."""
-        persons_dir = request.app.state.persons_dir
-        person_dir = persons_dir / name
-        if not person_dir.exists() or not (person_dir / "identity.md").exists():
+    @router.post("/animas/{name}/disable")
+    async def disable_anima(name: str, request: Request):
+        """Disable an Anima (set status.json to enabled: false and stop process)."""
+        animas_dir = request.app.state.animas_dir
+        anima_dir = animas_dir / name
+        if not anima_dir.exists() or not (anima_dir / "identity.md").exists():
             raise HTTPException(
-                status_code=404, detail=f"Person '{name}' not found"
+                status_code=404, detail=f"Anima '{name}' not found"
             )
 
-        status_file = person_dir / "status.json"
+        status_file = anima_dir / "status.json"
         status_file.write_text(
             json.dumps({"enabled": False}, indent=2), encoding="utf-8"
         )
@@ -208,23 +208,23 @@ def create_persons_router() -> APIRouter:
         # Stop immediately
         supervisor = request.app.state.supervisor
         if name in supervisor.processes:
-            await supervisor.stop_person(name)
-            if name in request.app.state.person_names:
-                request.app.state.person_names.remove(name)
+            await supervisor.stop_anima(name)
+            if name in request.app.state.anima_names:
+                request.app.state.anima_names.remove(name)
 
         return {"name": name, "enabled": False}
 
     # ── Background Tasks ────────────────────────────────────
 
-    @router.get("/persons/{name}/background-tasks")
+    @router.get("/animas/{name}/background-tasks")
     async def list_background_tasks(name: str, request: Request):
-        """List background tasks for a person (reads from state dir)."""
-        persons_dir = request.app.state.persons_dir
-        person_dir = persons_dir / name
-        if not person_dir.exists():
-            raise HTTPException(status_code=404, detail=f"Person not found: {name}")
+        """List background tasks for an anima (reads from state dir)."""
+        animas_dir = request.app.state.animas_dir
+        anima_dir = animas_dir / name
+        if not anima_dir.exists():
+            raise HTTPException(status_code=404, detail=f"Anima not found: {name}")
 
-        bg_dir = person_dir / "state" / "background_tasks"
+        bg_dir = anima_dir / "state" / "background_tasks"
         if not bg_dir.exists():
             return {"tasks": []}
 
@@ -238,12 +238,12 @@ def create_persons_router() -> APIRouter:
 
         return {"tasks": tasks}
 
-    @router.get("/persons/{name}/background-tasks/{task_id}")
+    @router.get("/animas/{name}/background-tasks/{task_id}")
     async def get_background_task(name: str, task_id: str, request: Request):
         """Get a specific background task by ID."""
-        persons_dir = request.app.state.persons_dir
-        person_dir = persons_dir / name
-        task_file = person_dir / "state" / "background_tasks" / f"{task_id}.json"
+        animas_dir = request.app.state.animas_dir
+        anima_dir = animas_dir / name
+        task_file = anima_dir / "state" / "background_tasks" / f"{task_id}.json"
 
         if not task_file.exists():
             raise HTTPException(
@@ -258,21 +258,21 @@ def create_persons_router() -> APIRouter:
 
     # ── Start (from UI) ──────────────────────────────────────
 
-    @router.post("/persons/{name}/start")
-    async def start_person(name: str, request: Request):
-        """Start a stopped person process."""
+    @router.post("/animas/{name}/start")
+    async def start_anima(name: str, request: Request):
+        """Start a stopped anima process."""
         supervisor = request.app.state.supervisor
-        person_names = request.app.state.person_names
+        anima_names = request.app.state.anima_names
 
-        if name not in person_names:
-            raise HTTPException(status_code=404, detail=f"Person not found: {name}")
+        if name not in anima_names:
+            raise HTTPException(status_code=404, detail=f"Anima not found: {name}")
 
         proc_status = supervisor.get_process_status(name)
         current = proc_status.get("status", "unknown")
         if current not in ("not_found", "stopped", "unknown"):
             return {"status": "already_running", "current_status": current}
 
-        await supervisor.start_person(name)
+        await supervisor.start_anima(name)
         return {"status": "started", "name": name}
 
     return router

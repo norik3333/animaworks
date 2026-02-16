@@ -1,5 +1,5 @@
 from __future__ import annotations
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
@@ -61,7 +61,7 @@ class ValidateKeyRequest(BaseModel):
     ollama_url: str = ""
 
 
-class PersonSetup(BaseModel):
+class AnimaSetup(BaseModel):
     name: str
 
 
@@ -74,7 +74,7 @@ class UserSetup(BaseModel):
 class SetupCompleteRequest(BaseModel):
     locale: str = "ja"
     credentials: dict[str, dict[str, str]] = {}
-    person: PersonSetup | None = None
+    anima: AnimaSetup | None = None
     user: UserSetup | None = None
 
 
@@ -140,15 +140,15 @@ def create_setup_router() -> APIRouter:
         body: SetupCompleteRequest,
         request: Request,
     ) -> dict[str, Any]:
-        """Finalize setup: save config, create person, mark complete."""
+        """Finalize setup: save config, create anima, mark complete."""
         from core.config import (
             CredentialConfig,
-            PersonModelConfig,
+            AnimaModelConfig,
             invalidate_cache,
             load_config,
             save_config,
         )
-        from core.paths import get_persons_dir
+        from core.paths import get_animas_dir
 
         config = load_config()
 
@@ -162,34 +162,34 @@ def create_setup_router() -> APIRouter:
                 base_url=cred_data.get("base_url"),
             )
 
-        # Create person if specified
-        if body.person:
-            from core.person_factory import create_blank
+        # Create anima if specified
+        if body.anima:
+            from core.anima_factory import create_blank
 
-            persons_dir = get_persons_dir()
-            person_name = body.person.name
+            animas_dir = get_animas_dir()
+            anima_name = body.anima.name
 
             try:
-                create_blank(persons_dir, person_name)
+                create_blank(animas_dir, anima_name)
                 # Read supervisor from status.json if present
-                from core.config import read_person_supervisor
+                from core.config import read_anima_supervisor
 
-                person_dir = persons_dir / person_name
+                anima_dir = animas_dir / anima_name
                 supervisor = (
-                    read_person_supervisor(person_dir)
-                    if person_dir.exists()
+                    read_anima_supervisor(anima_dir)
+                    if anima_dir.exists()
                     else None
                 )
-                config.persons[person_name] = PersonModelConfig(
+                config.animas[anima_name] = AnimaModelConfig(
                     supervisor=supervisor,
                 )
-                logger.info("Created person '%s' during setup", person_name)
+                logger.info("Created anima '%s' during setup", anima_name)
             except FileExistsError:
-                logger.warning("Person '%s' already exists, skipping creation", person_name)
+                logger.warning("Anima '%s' already exists, skipping creation", anima_name)
             except Exception:
-                logger.error("Failed to create person during setup", exc_info=True)
+                logger.error("Failed to create anima during setup", exc_info=True)
                 return JSONResponse(
-                    {"error": "Failed to create person"},
+                    {"error": "Failed to create anima"},
                     status_code=500,
                 )
 
@@ -228,21 +228,21 @@ def create_setup_router() -> APIRouter:
                 profile_path.write_text("".join(profile_lines), encoding="utf-8")
                 logger.info("Created user profile for '%s'", body.user.username)
 
-        # Re-scan persons and start processes
-        persons_dir = request.app.state.persons_dir
-        new_person_names: list[str] = []
-        if persons_dir.exists():
-            for person_dir in sorted(persons_dir.iterdir()):
-                if person_dir.is_dir() and (person_dir / "identity.md").exists():
-                    new_person_names.append(person_dir.name)
-        request.app.state.person_names = new_person_names
+        # Re-scan animas and start processes
+        animas_dir = request.app.state.animas_dir
+        new_anima_names: list[str] = []
+        if animas_dir.exists():
+            for anima_dir in sorted(animas_dir.iterdir()):
+                if anima_dir.is_dir() and (anima_dir / "identity.md").exists():
+                    new_anima_names.append(anima_dir.name)
+        request.app.state.anima_names = new_anima_names
 
-        if new_person_names:
+        if new_anima_names:
             try:
-                await request.app.state.supervisor.start_all(new_person_names)
-                logger.info("Started %d person(s) after setup", len(new_person_names))
+                await request.app.state.supervisor.start_all(new_anima_names)
+                logger.info("Started %d anima(s) after setup", len(new_anima_names))
             except Exception:
-                logger.error("Failed to start persons after setup", exc_info=True)
+                logger.error("Failed to start animas after setup", exc_info=True)
 
         logger.info("Setup completed successfully")
         return {"status": "ok", "message": "Setup complete. Reload to access the dashboard."}

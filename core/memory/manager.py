@@ -1,5 +1,5 @@
 from __future__ import annotations
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
@@ -26,16 +26,16 @@ class MemoryManager:
     This class handles the Python-side read/write operations.
     """
 
-    def __init__(self, person_dir: Path, base_dir: Path | None = None) -> None:
-        self.person_dir = person_dir
+    def __init__(self, anima_dir: Path, base_dir: Path | None = None) -> None:
+        self.anima_dir = anima_dir
         self.company_dir = get_company_dir()
         self.common_skills_dir = get_common_skills_dir()
         self.common_knowledge_dir = get_common_knowledge_dir()
-        self.episodes_dir = person_dir / "episodes"
-        self.knowledge_dir = person_dir / "knowledge"
-        self.procedures_dir = person_dir / "procedures"
-        self.skills_dir = person_dir / "skills"
-        self.state_dir = person_dir / "state"
+        self.episodes_dir = anima_dir / "episodes"
+        self.knowledge_dir = anima_dir / "knowledge"
+        self.procedures_dir = anima_dir / "procedures"
+        self.skills_dir = anima_dir / "skills"
+        self.state_dir = anima_dir / "state"
         for d in (
             self.episodes_dir,
             self.knowledge_dir,
@@ -47,7 +47,7 @@ class MemoryManager:
 
         # RAG indexer is initialized lazily on first access to avoid
         # heavy model loading (sentence-transformers / CUDA) during
-        # DigitalPerson construction.  See: _get_indexer()
+        # DigitalAnima construction.  See: _get_indexer()
         self._indexer = None
         self._indexer_initialized = False
 
@@ -70,9 +70,9 @@ class MemoryManager:
             from core.memory.rag.singleton import get_vector_store
 
             vector_store = get_vector_store()
-            person_name = self.person_dir.name
-            self._indexer = MemoryIndexer(vector_store, person_name, self.person_dir)
-            logger.debug("RAG indexer initialized for person=%s", person_name)
+            anima_name = self.anima_dir.name
+            self._indexer = MemoryIndexer(vector_store, anima_name, self.anima_dir)
+            logger.debug("RAG indexer initialized for anima=%s", anima_name)
 
             # Ensure shared_common_knowledge collection exists
             self._ensure_shared_knowledge_indexed(vector_store)
@@ -85,7 +85,7 @@ class MemoryManager:
         """Index common_knowledge/ into ``shared_common_knowledge`` collection.
 
         Uses the existing hash-based dedup so repeated calls (once per
-        person process) are effectively no-ops after the first indexing.
+        anima process) are effectively no-ops after the first indexing.
         """
         ck_dir = self.common_knowledge_dir
         if not ck_dir.is_dir() or not any(ck_dir.rglob("*.md")):
@@ -99,8 +99,8 @@ class MemoryManager:
             data_dir = get_data_dir()
             shared_indexer = MemoryIndexer(
                 vector_store,
-                person_name="shared",
-                person_dir=data_dir,
+                anima_name="shared",
+                anima_dir=data_dir,
                 collection_prefix="shared",
                 embedding_model=self._indexer.embedding_model if self._indexer else None,
             )
@@ -127,13 +127,13 @@ class MemoryManager:
         return self._read(self.company_dir / "vision.md")
 
     def read_identity(self) -> str:
-        return self._read(self.person_dir / "identity.md")
+        return self._read(self.anima_dir / "identity.md")
 
     def read_injection(self) -> str:
-        return self._read(self.person_dir / "injection.md")
+        return self._read(self.anima_dir / "injection.md")
 
     def read_permissions(self) -> str:
-        return self._read(self.person_dir / "permissions.md")
+        return self._read(self.anima_dir / "permissions.md")
 
     def read_current_state(self) -> str:
         return self._read(self.state_dir / "current_task.md") or "status: idle"
@@ -142,10 +142,10 @@ class MemoryManager:
         return self._read(self.state_dir / "pending.md")
 
     def read_heartbeat_config(self) -> str:
-        return self._read(self.person_dir / "heartbeat.md")
+        return self._read(self.anima_dir / "heartbeat.md")
 
     def read_cron_config(self) -> str:
-        return self._read(self.person_dir / "cron.md")
+        return self._read(self.anima_dir / "cron.md")
 
     def read_model_config(self) -> ModelConfig:
         """Load model config from unified config.json, with config.md fallback."""
@@ -153,14 +153,14 @@ class MemoryManager:
             get_config_path,
             load_config,
             resolve_execution_mode,
-            resolve_person_config,
+            resolve_anima_config,
         )
 
         config_path = get_config_path()
         if config_path.exists():
             config = load_config(config_path)
-            person_name = self.person_dir.name
-            resolved, credential = resolve_person_config(config, person_name)
+            anima_name = self.anima_dir.name
+            resolved, credential = resolve_anima_config(config, anima_name)
             # Derive env var name from credential name (e.g. "anthropic" -> "ANTHROPIC_API_KEY")
             cred_name = resolved.credential
             api_key_env = f"{cred_name.upper()}_API_KEY"
@@ -189,7 +189,7 @@ class MemoryManager:
 
     def _read_model_config_from_md(self) -> ModelConfig:
         """Legacy parser for config.md (fallback when config.json absent)."""
-        raw = self._read(self.person_dir / "config.md")
+        raw = self._read(self.anima_dir / "config.md")
         if not raw:
             return ModelConfig()
 
@@ -222,15 +222,15 @@ class MemoryManager:
         return os.environ.get(cfg.api_key_env)
 
     def read_bootstrap(self) -> str:
-        return self._read(self.person_dir / "bootstrap.md")
+        return self._read(self.anima_dir / "bootstrap.md")
 
     def read_today_episodes(self) -> str:
         path = self.episodes_dir / f"{date.today().isoformat()}.md"
         return self._read(path)
 
     def read_file(self, relpath: str) -> str:
-        """Read an arbitrary file relative to person_dir."""
-        return self._read(self.person_dir / relpath)
+        """Read an arbitrary file relative to anima_dir."""
+        return self._read(self.anima_dir / relpath)
 
     def list_knowledge_files(self) -> list[str]:
         return [f.stem for f in sorted(self.knowledge_dir.glob("*.md"))]
@@ -288,7 +288,7 @@ class MemoryManager:
         self, task_name: str, *, summary: str, duration_ms: int,
     ) -> None:
         """Append a cron execution result to the daily log."""
-        log_dir = self.person_dir / self._CRON_LOG_DIR
+        log_dir = self.anima_dir / self._CRON_LOG_DIR
         log_dir.mkdir(parents=True, exist_ok=True)
         path = log_dir / f"{date.today().isoformat()}.jsonl"
 
@@ -323,7 +323,7 @@ class MemoryManager:
 
         Logs include exit code, line counts, and previews (first+last 5 lines).
         """
-        log_dir = self.person_dir / self._CRON_LOG_DIR
+        log_dir = self.anima_dir / self._CRON_LOG_DIR
         log_dir.mkdir(parents=True, exist_ok=True)
         path = log_dir / f"{date.today().isoformat()}.jsonl"
 
@@ -373,7 +373,7 @@ class MemoryManager:
 
     def read_cron_log(self, days: int = 1) -> str:
         """Read cron logs for the last *days* days."""
-        log_dir = self.person_dir / self._CRON_LOG_DIR
+        log_dir = self.anima_dir / self._CRON_LOG_DIR
         if not log_dir.is_dir():
             return ""
 
@@ -516,7 +516,7 @@ class MemoryManager:
         """
         from core.memory.rag.retriever import MemoryRetriever
 
-        person_name = self.person_dir.name
+        anima_name = self.anima_dir.name
         retriever = MemoryRetriever(
             self._indexer.vector_store,
             self._indexer,
@@ -526,7 +526,7 @@ class MemoryManager:
         include_shared = scope in ("common_knowledge", "all")
         rag_results = retriever.search(
             query=query,
-            person_name=person_name,
+            anima_name=anima_name,
             memory_type="knowledge",
             top_k=5,
             include_shared=include_shared,
@@ -534,7 +534,7 @@ class MemoryManager:
 
         # Record access (Hebbian LTP: strengthen frequently accessed memories)
         if rag_results:
-            retriever.record_access(rag_results, person_name)
+            retriever.record_access(rag_results, anima_name)
 
         hits: list[tuple[str, str]] = []
         for r in rag_results:

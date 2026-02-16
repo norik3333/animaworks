@@ -1,5 +1,5 @@
 from __future__ import annotations
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
@@ -21,17 +21,17 @@ chromadb = pytest.importorskip("chromadb", reason="ChromaDB not installed. Insta
 
 
 @pytest.fixture
-def temp_person_dir():
-    """Create a temporary person directory with sample memory files."""
+def temp_anima_dir():
+    """Create a temporary anima directory with sample memory files."""
     tmpdir = Path(tempfile.mkdtemp())
-    person_dir = tmpdir / "test_person"
-    person_dir.mkdir()
+    anima_dir = tmpdir / "test_anima"
+    anima_dir.mkdir()
 
     # Create memory directories
-    knowledge_dir = person_dir / "knowledge"
-    episodes_dir = person_dir / "episodes"
-    procedures_dir = person_dir / "procedures"
-    skills_dir = person_dir / "skills"
+    knowledge_dir = anima_dir / "knowledge"
+    episodes_dir = anima_dir / "episodes"
+    procedures_dir = anima_dir / "procedures"
+    skills_dir = anima_dir / "skills"
 
     for d in [knowledge_dir, episodes_dir, procedures_dir, skills_dir]:
         d.mkdir()
@@ -108,27 +108,27 @@ Python でのコーディング支援。
         encoding="utf-8",
     )
 
-    yield person_dir
+    yield anima_dir
 
     # Cleanup
     shutil.rmtree(tmpdir)
 
 
 @pytest.fixture
-def temp_vector_store(temp_person_dir):
+def temp_vector_store(temp_anima_dir):
     """Create a temporary ChromaDB vector store."""
     pytest.importorskip("chromadb")
     pytest.importorskip("sentence_transformers")
 
     from core.memory.rag.store import ChromaVectorStore
 
-    vectordb_dir = temp_person_dir / "vectordb"
+    vectordb_dir = temp_anima_dir / "vectordb"
     vectordb_dir.mkdir()
 
     store = ChromaVectorStore(persist_dir=vectordb_dir)
     yield store
 
-    # Cleanup is handled by temp_person_dir fixture
+    # Cleanup is handled by temp_anima_dir fixture
 
 
 # ── ChromaDB Vector Store Tests ────────────────────────────────────
@@ -226,49 +226,49 @@ def test_chromadb_metadata_filter(temp_vector_store):
 # ── MemoryIndexer Tests ─────────────────────────────────────────────
 
 
-def test_indexer_chunk_by_markdown_headings(temp_person_dir, temp_vector_store):
+def test_indexer_chunk_by_markdown_headings(temp_anima_dir, temp_vector_store):
     """Test chunking knowledge files by Markdown headings."""
     pytest.importorskip("sentence_transformers")
 
     from core.memory.rag.indexer import MemoryIndexer
 
     indexer = MemoryIndexer(
-        temp_vector_store, "test_person", temp_person_dir
+        temp_vector_store, "test_anima", temp_anima_dir
     )
 
-    knowledge_file = temp_person_dir / "knowledge" / "chatwork-policy.md"
+    knowledge_file = temp_anima_dir / "knowledge" / "chatwork-policy.md"
     chunks_indexed = indexer.index_file(knowledge_file, "knowledge")
 
     assert chunks_indexed > 0  # Should create multiple chunks
 
 
-def test_indexer_chunk_by_time_headings(temp_person_dir, temp_vector_store):
+def test_indexer_chunk_by_time_headings(temp_anima_dir, temp_vector_store):
     """Test chunking episode files by time headings."""
     pytest.importorskip("sentence_transformers")
 
     from core.memory.rag.indexer import MemoryIndexer
 
     indexer = MemoryIndexer(
-        temp_vector_store, "test_person", temp_person_dir
+        temp_vector_store, "test_anima", temp_anima_dir
     )
 
-    episode_file = temp_person_dir / "episodes" / "2026-02-14.md"
+    episode_file = temp_anima_dir / "episodes" / "2026-02-14.md"
     chunks_indexed = indexer.index_file(episode_file, "episodes")
 
     assert chunks_indexed >= 2  # Should have 2 time-based sections
 
 
-def test_indexer_incremental_indexing(temp_person_dir, temp_vector_store):
+def test_indexer_incremental_indexing(temp_anima_dir, temp_vector_store):
     """Test that unchanged files are not re-indexed."""
     pytest.importorskip("sentence_transformers")
 
     from core.memory.rag.indexer import MemoryIndexer
 
     indexer = MemoryIndexer(
-        temp_vector_store, "test_person", temp_person_dir
+        temp_vector_store, "test_anima", temp_anima_dir
     )
 
-    knowledge_file = temp_person_dir / "knowledge" / "chatwork-policy.md"
+    knowledge_file = temp_anima_dir / "knowledge" / "chatwork-policy.md"
 
     # First index
     chunks1 = indexer.index_file(knowledge_file, "knowledge")
@@ -283,14 +283,14 @@ def test_indexer_incremental_indexing(temp_person_dir, temp_vector_store):
     assert chunks3 > 0
 
 
-def test_indexer_metadata_extraction(temp_person_dir, temp_vector_store):
+def test_indexer_metadata_extraction(temp_anima_dir, temp_vector_store):
     """Test metadata extraction (tags, importance, timestamps)."""
     pytest.importorskip("sentence_transformers")
 
     from core.memory.rag.indexer import MemoryIndexer
 
     # Create file with importance marker
-    knowledge_file = temp_person_dir / "knowledge" / "important.md"
+    knowledge_file = temp_anima_dir / "knowledge" / "important.md"
     knowledge_file.write_text(
         """# Important Policy
 
@@ -300,14 +300,14 @@ def test_indexer_metadata_extraction(temp_person_dir, temp_vector_store):
     )
 
     indexer = MemoryIndexer(
-        temp_vector_store, "test_person", temp_person_dir
+        temp_vector_store, "test_anima", temp_anima_dir
     )
 
     chunks_indexed = indexer.index_file(knowledge_file, "knowledge")
     assert chunks_indexed > 0
 
     # Verify metadata in vector store
-    collection_name = "test_person_knowledge"
+    collection_name = "test_anima_knowledge"
     results = indexer.vector_store.query(
         collection=collection_name,
         embedding=[0.0] * 384,  # Dummy query
@@ -327,7 +327,7 @@ def test_indexer_metadata_extraction(temp_person_dir, temp_vector_store):
 # ── MemoryRetriever Tests ──────────────────────────────────────────
 
 
-def test_memory_retriever_vector_search(temp_person_dir, temp_vector_store):
+def test_memory_retriever_vector_search(temp_anima_dir, temp_vector_store):
     """Test vector search component of MemoryRetriever."""
     pytest.importorskip("sentence_transformers")
 
@@ -336,10 +336,10 @@ def test_memory_retriever_vector_search(temp_person_dir, temp_vector_store):
 
     # Index knowledge files
     indexer = MemoryIndexer(
-        temp_vector_store, "test_person", temp_person_dir
+        temp_vector_store, "test_anima", temp_anima_dir
     )
 
-    knowledge_dir = temp_person_dir / "knowledge"
+    knowledge_dir = temp_anima_dir / "knowledge"
     indexer.index_directory(knowledge_dir, "knowledge")
 
     # Create retriever
@@ -352,7 +352,7 @@ def test_memory_retriever_vector_search(temp_person_dir, temp_vector_store):
     # Search for Chatwork-related content
     results = retriever._vector_search(
         query="Chatwork対応方針",
-        person_name="test_person",
+        anima_name="test_anima",
         memory_type="knowledge",
         top_k=3,
     )
@@ -362,7 +362,7 @@ def test_memory_retriever_vector_search(temp_person_dir, temp_vector_store):
     assert any("chatwork" in r[0].lower() for r in results)
 
 
-def test_temporal_decay(temp_person_dir, temp_vector_store):
+def test_temporal_decay(temp_anima_dir, temp_vector_store):
     """Test temporal decay scoring."""
     from datetime import datetime, timedelta
     from core.memory.rag.retriever import MemoryRetriever, RetrievalResult
@@ -371,7 +371,7 @@ def test_temporal_decay(temp_person_dir, temp_vector_store):
     retriever = MemoryRetriever(
         temp_vector_store,
         indexer,
-        temp_person_dir / "knowledge",
+        temp_anima_dir / "knowledge",
     )
 
     # Create results with different ages
@@ -405,7 +405,7 @@ def test_temporal_decay(temp_person_dir, temp_vector_store):
     assert recent_result.score > old_result.score
 
 
-def test_memory_retriever_search_with_temporal_decay(temp_person_dir, temp_vector_store):
+def test_memory_retriever_search_with_temporal_decay(temp_anima_dir, temp_vector_store):
     """Test full search pipeline: Vector + temporal decay integration."""
     pytest.importorskip("sentence_transformers")
 
@@ -414,10 +414,10 @@ def test_memory_retriever_search_with_temporal_decay(temp_person_dir, temp_vecto
 
     # Index knowledge files
     indexer = MemoryIndexer(
-        temp_vector_store, "test_person", temp_person_dir
+        temp_vector_store, "test_anima", temp_anima_dir
     )
 
-    knowledge_dir = temp_person_dir / "knowledge"
+    knowledge_dir = temp_anima_dir / "knowledge"
     indexer.index_directory(knowledge_dir, "knowledge")
 
     # Create retriever
@@ -430,7 +430,7 @@ def test_memory_retriever_search_with_temporal_decay(temp_person_dir, temp_vecto
     # Perform search
     results = retriever.search(
         query="Chatwork での山田さんからの依頼対応",
-        person_name="test_person",
+        anima_name="test_anima",
         memory_type="knowledge",
         top_k=3,
     )
@@ -446,7 +446,7 @@ def test_memory_retriever_search_with_temporal_decay(temp_person_dir, temp_vecto
 
 
 @pytest.mark.asyncio
-async def test_priming_with_vector_search(temp_person_dir, temp_vector_store):
+async def test_priming_with_vector_search(temp_anima_dir, temp_vector_store):
     """Test priming layer with vector search integration."""
     pytest.importorskip("sentence_transformers")
 
@@ -455,19 +455,19 @@ async def test_priming_with_vector_search(temp_person_dir, temp_vector_store):
 
     # Index knowledge
     indexer = MemoryIndexer(
-        temp_vector_store, "test_person", temp_person_dir
+        temp_vector_store, "test_anima", temp_anima_dir
     )
 
-    knowledge_dir = temp_person_dir / "knowledge"
+    knowledge_dir = temp_anima_dir / "knowledge"
     indexer.index_directory(knowledge_dir, "knowledge")
 
     # Create priming engine and inject retriever using the same vector store
-    engine = PrimingEngine(temp_person_dir)
+    engine = PrimingEngine(temp_anima_dir)
 
     from core.memory.rag.retriever import MemoryRetriever
 
     engine._retriever = MemoryRetriever(
-        temp_vector_store, indexer, temp_person_dir / "knowledge"
+        temp_vector_store, indexer, temp_anima_dir / "knowledge"
     )
 
     # Prime memories

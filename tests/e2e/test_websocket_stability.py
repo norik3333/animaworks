@@ -200,7 +200,7 @@ class TestWebSocketNotificationQueueFlush:
 
         loop = asyncio.new_event_loop()
         loop.run_until_complete(ws_manager.broadcast_notification({
-            "person": "test-person",
+            "anima": "test-anima",
             "subject": "Queued Alert",
             "body": "This was queued while offline",
         }))
@@ -212,7 +212,7 @@ class TestWebSocketNotificationQueueFlush:
             with client.websocket_connect("/ws") as ws:
                 # The queued notification should be flushed immediately
                 data = ws.receive_json()
-                assert data["type"] == "person.notification"
+                assert data["type"] == "anima.notification"
                 assert data["data"]["subject"] == "Queued Alert"
                 assert data["data"]["body"] == "This was queued while offline"
 
@@ -230,7 +230,7 @@ class TestWebSocketNotificationQueueFlush:
         loop = asyncio.new_event_loop()
         for i in range(3):
             loop.run_until_complete(ws_manager.broadcast_notification({
-                "person": "test-person",
+                "anima": "test-anima",
                 "subject": f"Alert {i}",
                 "body": f"Notification {i}",
             }))
@@ -242,7 +242,7 @@ class TestWebSocketNotificationQueueFlush:
             with client.websocket_connect("/ws") as ws:
                 for i in range(3):
                     data = ws.receive_json()
-                    assert data["type"] == "person.notification"
+                    assert data["type"] == "anima.notification"
                     assert data["data"]["subject"] == f"Alert {i}"
 
                 assert len(ws_manager._notification_queue) == 0
@@ -257,7 +257,7 @@ class TestWebSocketNotificationQueueFlush:
 
         loop = asyncio.new_event_loop()
         loop.run_until_complete(ws_manager.broadcast_notification({
-            "person": "test-person",
+            "anima": "test-anima",
             "subject": "Flush me",
             "body": "Should be drained",
         }))
@@ -288,7 +288,7 @@ class TestWebSocketNotificationQueueCap:
         # Queue more than the maximum
         for i in range(max_size + 5):
             loop.run_until_complete(ws_manager.broadcast_notification({
-                "person": "test-person",
+                "anima": "test-anima",
                 "subject": f"Notification {i}",
             }))
         loop.close()

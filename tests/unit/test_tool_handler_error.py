@@ -11,16 +11,16 @@ from core.tooling.handler import ToolHandler
 
 def _make_handler(tmp_path: Path) -> ToolHandler:
     """Create a ToolHandler with minimal mocked dependencies."""
-    person_dir = tmp_path / "persons" / "test"
-    person_dir.mkdir(parents=True)
-    (person_dir / "permissions.md").write_text("", encoding="utf-8")
+    anima_dir = tmp_path / "animas" / "test"
+    anima_dir.mkdir(parents=True)
+    (anima_dir / "permissions.md").write_text("", encoding="utf-8")
 
     memory = MagicMock()
     memory.read_permissions.return_value = ""
     memory.search_memory_text.return_value = []
 
     handler = ToolHandler(
-        person_dir=person_dir,
+        anima_dir=anima_dir,
         memory=memory,
         messenger=None,
         tool_registry=[],

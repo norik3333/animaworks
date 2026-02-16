@@ -13,9 +13,9 @@ export function render(container) {
     </div>
 
     <div class="card-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-bottom: 1.5rem;">
-      <div class="stat-card" id="homeStatPersons">
-        <div class="stat-label">パーソン数</div>
-        <div class="stat-value" id="homePersonCount">--</div>
+      <div class="stat-card" id="homeStatAnimas">
+        <div class="stat-label">Anima数</div>
+        <div class="stat-value" id="homeAnimaCount">--</div>
       </div>
       <div class="stat-card" id="homeStatScheduler">
         <div class="stat-label">スケジューラ</div>
@@ -28,9 +28,9 @@ export function render(container) {
     </div>
 
     <div class="card" style="margin-bottom: 1.5rem;">
-      <div class="card-header">パーソン一覧</div>
+      <div class="card-header">Anima一覧</div>
       <div class="card-body">
-        <div class="card-grid" id="homePersonCards" style="grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));">
+        <div class="card-grid" id="homeAnimaCards" style="grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));">
           <div class="loading-placeholder">読み込み中...</div>
         </div>
       </div>
@@ -50,7 +50,7 @@ export function render(container) {
       <div class="card-body" style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
         <a href="/workspace/" class="btn-primary" style="text-decoration:none;">Workspace</a>
         <a href="#/chat" class="btn-secondary" style="text-decoration:none;">チャット</a>
-        <a href="#/persons" class="btn-secondary" style="text-decoration:none;">パーソン管理</a>
+        <a href="#/animas" class="btn-secondary" style="text-decoration:none;">Anima管理</a>
         <a href="#/memory" class="btn-secondary" style="text-decoration:none;">記憶ブラウザ</a>
       </div>
     </div>
@@ -71,40 +71,40 @@ export function destroy() {
 
 async function _loadAll() {
   _loadSystemStatus();
-  _loadPersonCards();
+  _loadAnimaCards();
   _loadActivity();
 }
 
 async function _loadSystemStatus() {
   try {
     const data = await api("/api/system/status");
-    const personCountEl = document.getElementById("homePersonCount");
+    const animaCountEl = document.getElementById("homeAnimaCount");
     const schedulerEl = document.getElementById("homeSchedulerStatus");
     const processCountEl = document.getElementById("homeProcessCount");
-    if (personCountEl) personCountEl.textContent = data.persons ?? 0;
+    if (animaCountEl) animaCountEl.textContent = data.animas ?? 0;
     if (schedulerEl) schedulerEl.textContent = data.scheduler_running ? "稼働中" : "停止";
     const processes = data.processes || {};
     const runningCount = Object.values(processes).filter(p => p.status === "running").length;
     if (processCountEl) processCountEl.textContent = runningCount;
   } catch {
-    const el = document.getElementById("homePersonCount");
+    const el = document.getElementById("homeAnimaCount");
     if (el) el.textContent = "取得失敗";
   }
 }
 
-async function _loadPersonCards() {
-  const grid = document.getElementById("homePersonCards");
+async function _loadAnimaCards() {
+  const grid = document.getElementById("homeAnimaCards");
   if (!grid) return;
 
   try {
-    const persons = await api("/api/persons");
-    if (persons.length === 0) {
-      grid.innerHTML = '<div class="loading-placeholder">パーソンが登録されていません</div>';
+    const animas = await api("/api/animas");
+    if (animas.length === 0) {
+      grid.innerHTML = '<div class="loading-placeholder">Animaが登録されていません</div>';
       return;
     }
 
     grid.innerHTML = "";
-    for (const p of persons) {
+    for (const p of animas) {
       const card = document.createElement("div");
       card.className = "card";
       card.style.cssText = "cursor:pointer; transition: transform 0.15s;";
@@ -115,7 +115,7 @@ async function _loadPersonCards() {
       const statusLabel = p.status || "offline";
 
       // Avatar: try HEAD check, fallback to initial
-      let avatarHtml = `<div class="person-avatar-placeholder" style="width:48px;height:48px;font-size:1.2rem;margin:0 auto 0.5rem;">${escapeHtml(p.name.charAt(0).toUpperCase())}</div>`;
+      let avatarHtml = `<div class="anima-avatar-placeholder" style="width:48px;height:48px;font-size:1.2rem;margin:0 auto 0.5rem;">${escapeHtml(p.name.charAt(0).toUpperCase())}</div>`;
 
       card.innerHTML = `
         <div class="card-body" style="text-align:center; padding: 1rem;">
@@ -129,7 +129,7 @@ async function _loadPersonCards() {
       `;
 
       card.addEventListener("click", () => {
-        location.hash = "#/persons";
+        location.hash = "#/animas";
       });
 
       grid.appendChild(card);
@@ -148,7 +148,7 @@ async function _tryLoadAvatar(name) {
 
   const candidates = ["avatar_bustup.png", "avatar_chibi.png"];
   for (const filename of candidates) {
-    const url = `/api/persons/${encodeURIComponent(name)}/assets/${encodeURIComponent(filename)}`;
+    const url = `/api/animas/${encodeURIComponent(name)}/assets/${encodeURIComponent(filename)}`;
     try {
       const resp = await fetch(url, { method: "HEAD" });
       if (resp.ok) {
@@ -197,13 +197,13 @@ async function _loadActivity() {
       .map(evt => {
         const icon = TYPE_ICONS[evt.type] || TYPE_ICONS.system;
         const ts = timeStr(evt.timestamp);
-        const persons = (evt.persons || []).join(", ") || evt.person || evt.name || "";
+        const animas = (evt.animas || []).join(", ") || evt.anima || evt.name || "";
         const summary = evt.summary || evt.message || JSON.stringify(evt).slice(0, 100);
         return `
           <div style="display:flex; align-items:flex-start; gap:0.5rem; padding:0.4rem 0; border-bottom:1px solid var(--border-color, #eee);">
             <span style="flex-shrink:0;">${icon}</span>
             <span style="color:var(--text-secondary, #666); flex-shrink:0; min-width:3rem;">${escapeHtml(ts)}</span>
-            <span style="font-weight:500; flex-shrink:0; max-width:140px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(persons)}</span>
+            <span style="font-weight:500; flex-shrink:0; max-width:140px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(animas)}</span>
             <span style="color:var(--text-secondary, #666); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(summary)}</span>
           </div>
         `;

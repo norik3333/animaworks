@@ -13,7 +13,7 @@ const TYPE_ICONS = {
 
 let activityEmpty = true;
 
-export function addActivity(type, personName, summary) {
+export function addActivity(type, animaName, summary) {
   const feed = dom.activityFeed || document.getElementById("activityFeed");
   if (!feed) return; // Activity feed not in DOM (page not active)
 
@@ -29,7 +29,7 @@ export function addActivity(type, personName, summary) {
     <span class="activity-icon">${icon}</span>
     <span class="activity-time">${nowTimeStr()}</span>
     <div class="activity-body">
-      <span class="activity-person">${escapeHtml(personName)}</span>
+      <span class="activity-anima">${escapeHtml(animaName)}</span>
       <span class="activity-summary"> ${escapeHtml(summary)}</span>
     </div>`;
   feed.appendChild(entry);

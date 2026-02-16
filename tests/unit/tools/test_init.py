@@ -153,7 +153,7 @@ class TestCliDispatch:
             "called = False\ndef cli_main(argv):\n    global called; called = True\n"
         )
 
-        with patch.dict("os.environ", {"ANIMAWORKS_PERSON_DIR": str(tmp_path)}):
+        with patch.dict("os.environ", {"ANIMAWORKS_ANIMA_DIR": str(tmp_path)}):
             with patch.object(sys, "argv", ["animaworks-tool", "my_personal"]):
                 cli_dispatch()
 
@@ -163,7 +163,7 @@ class TestCliDispatch:
         tool_file = tools_dir / "no_cli.py"
         tool_file.write_text("x = 1\n")
 
-        with patch.dict("os.environ", {"ANIMAWORKS_PERSON_DIR": str(tmp_path)}):
+        with patch.dict("os.environ", {"ANIMAWORKS_ANIMA_DIR": str(tmp_path)}):
             with patch.object(sys, "argv", ["animaworks-tool", "no_cli"]):
                 with pytest.raises(SystemExit) as exc_info:
                     cli_dispatch()

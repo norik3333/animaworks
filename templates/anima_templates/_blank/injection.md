@@ -4,12 +4,12 @@
 
 ## 雇用ルール（commanderのみ該当）
 
-新しいPersonを雇用する際は、**必ず `create_person` ツールを使用すること**。
+新しいAnimaを雇用する際は、**必ず `create_anima` ツールを使用すること**。
 手動でファイルを1つずつ作成してはいけない。
 
 手順:
 1. キャラクターシート（character_sheet.md）を1ファイルで作成
-2. `create_person` ツールを呼び出す
+2. `create_anima` ツールを呼び出す
 3. サーバーにreloadをかける
 
 詳細は `newstaff` スキルを参照。

@@ -99,13 +99,13 @@ class TestParserCommands:
         parser = argparse.ArgumentParser()
         sub = parser.add_subparsers(dest="command")
         p_chat = sub.add_parser("chat")
-        p_chat.add_argument("person")
+        p_chat.add_argument("anima")
         p_chat.add_argument("message")
         p_chat.add_argument("--local", action="store_true")
         p_chat.add_argument("--from", dest="from_person", default="human")
 
         args = parser.parse_args(["chat", "alice", "Hello"])
-        assert args.person == "alice"
+        assert args.anima == "alice"
         assert args.message == "Hello"
         assert args.local is False
         assert args.from_person == "human"
@@ -114,7 +114,7 @@ class TestParserCommands:
         parser = argparse.ArgumentParser()
         sub = parser.add_subparsers(dest="command")
         p_chat = sub.add_parser("chat")
-        p_chat.add_argument("person")
+        p_chat.add_argument("anima")
         p_chat.add_argument("message")
         p_chat.add_argument("--local", action="store_true")
         p_chat.add_argument("--from", dest="from_person", default="human")
@@ -141,11 +141,11 @@ class TestParserCommands:
         parser = argparse.ArgumentParser()
         sub = parser.add_subparsers(dest="command")
         p_hb = sub.add_parser("heartbeat")
-        p_hb.add_argument("person")
+        p_hb.add_argument("anima")
         p_hb.add_argument("--local", action="store_true")
 
         args = parser.parse_args(["heartbeat", "alice"])
-        assert args.person == "alice"
+        assert args.anima == "alice"
         assert args.local is False
 
     def test_list_command(self):
@@ -164,15 +164,15 @@ class TestParserCommands:
         args = parser.parse_args(["--data-dir", "/custom/path"])
         assert args.data_dir == "/custom/path"
 
-    def test_create_person_command(self):
+    def test_create_anima_command(self):
         parser = argparse.ArgumentParser()
         sub = parser.add_subparsers(dest="command")
-        p = sub.add_parser("create-person")
+        p = sub.add_parser("create-anima")
         p.add_argument("--name", default=None)
         p.add_argument("--template", default=None)
         p.add_argument("--from-md", default=None)
 
-        args = parser.parse_args(["create-person", "--name", "bob", "--template", "basic"])
+        args = parser.parse_args(["create-anima", "--name", "bob", "--template", "basic"])
         assert args.name == "bob"
         assert args.template == "basic"
 
@@ -214,12 +214,12 @@ class TestLazyImportWrappers:
         _lazy_init(args)
         mock_cmd.assert_called_once_with(args)
 
-    @patch("cli.commands.person.cmd_create_person")
-    def test_lazy_create_person(self, mock_cmd):
-        from cli.parser import _lazy_create_person
+    @patch("cli.commands.anima.cmd_create_anima")
+    def test_lazy_create_anima(self, mock_cmd):
+        from cli.parser import _lazy_create_anima
 
         args = MagicMock()
-        _lazy_create_person(args)
+        _lazy_create_anima(args)
         mock_cmd.assert_called_once_with(args)
 
     @patch("cli.commands.server.cmd_start")
@@ -278,7 +278,7 @@ class TestLazyImportWrappers:
         _lazy_worker(args)
         mock_cmd.assert_called_once_with(args)
 
-    @patch("cli.commands.person.cmd_chat")
+    @patch("cli.commands.anima.cmd_chat")
     def test_lazy_chat(self, mock_cmd):
         from cli.parser import _lazy_chat
 
@@ -286,7 +286,7 @@ class TestLazyImportWrappers:
         _lazy_chat(args)
         mock_cmd.assert_called_once_with(args)
 
-    @patch("cli.commands.person.cmd_heartbeat")
+    @patch("cli.commands.anima.cmd_heartbeat")
     def test_lazy_heartbeat(self, mock_cmd):
         from cli.parser import _lazy_heartbeat
 

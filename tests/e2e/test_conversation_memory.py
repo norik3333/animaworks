@@ -1,6 +1,6 @@
 """Tests for conversation memory (append + compression).
 
-ConversationMemory manages a rolling conversation history per DigitalPerson.
+ConversationMemory manages a rolling conversation history per DigitalAnima.
 When the token count exceeds the threshold, older turns are compressed.
 """
 
@@ -22,9 +22,9 @@ from tests.helpers.mocks import (
 class TestConversationMemory:
     """Conversation memory tests."""
 
-    async def test_append_and_persist(self, make_digital_person):
+    async def test_append_and_persist(self, make_digital_anima):
         """process_message appends turns and persists to disk."""
-        person = make_digital_person(
+        dp = make_digital_anima(
             name="conv-append",
             model="openai/gpt-4o",
             execution_mode="assisted",
@@ -35,17 +35,17 @@ class TestConversationMemory:
         extract_resp1 = make_litellm_response(content="なし")
 
         with patch_litellm(main_resp1, extract_resp1):
-            await person.process_message("Hi there", from_person="human")
+            await dp.process_message("Hi there", from_person="human")
 
         # Second message
         main_resp2 = make_litellm_response(content="I'm doing great, thanks!")
         extract_resp2 = make_litellm_response(content="なし")
 
         with patch_litellm(main_resp2, extract_resp2):
-            await person.process_message("How are you?", from_person="human")
+            await dp.process_message("How are you?", from_person="human")
 
         # Verify conversation.json
-        conv_path = person.person_dir / "state" / "conversation.json"
+        conv_path = dp.anima_dir / "state" / "conversation.json"
         assert conv_path.exists()
 
         data = json.loads(conv_path.read_text(encoding="utf-8"))
@@ -58,9 +58,9 @@ class TestConversationMemory:
         assert turns[2]["role"] == "human"
         assert turns[3]["role"] == "assistant"
 
-    async def test_compression_triggered(self, make_person, data_dir):
+    async def test_compression_triggered(self, make_anima, data_dir):
         """Conversation compression fires when threshold is exceeded."""
-        person_dir = make_person(
+        anima_dir = make_anima(
             name="conv-compress",
             model="claude-sonnet-4-20250514",
             conversation_history_threshold=0.001,  # Very low threshold
@@ -70,7 +70,7 @@ class TestConversationMemory:
             model="claude-sonnet-4-20250514",
             conversation_history_threshold=0.001,
         )
-        conv_mem = ConversationMemory(person_dir, model_config)
+        conv_mem = ConversationMemory(anima_dir, model_config)
 
         # Pre-populate with many turns to exceed threshold
         state = conv_mem.load()
@@ -94,7 +94,7 @@ class TestConversationMemory:
         assert compressed is True
 
         # Verify state after compression
-        fresh = ConversationMemory(person_dir, model_config)
+        fresh = ConversationMemory(anima_dir, model_config)
         state = fresh.load()
         assert state.compressed_summary
         assert "Summary" in state.compressed_summary

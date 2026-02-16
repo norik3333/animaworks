@@ -18,7 +18,7 @@ function renderLoginScreen() {
     <div class="login-screen" id="wsLoginScreen">
       <div class="login-card">
         <div class="login-title">AnimaWorks</div>
-        <div class="login-subtitle">Digital Person Workspace</div>
+        <div class="login-subtitle">Digital Anima Workspace</div>
         <div class="user-list" id="wsUserList">
           <div class="loading-placeholder">Loading users...</div>
         </div>

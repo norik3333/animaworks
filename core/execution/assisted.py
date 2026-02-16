@@ -1,5 +1,5 @@
 from __future__ import annotations
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
@@ -11,7 +11,7 @@ from __future__ import annotations
 
 The framework reads memory, injects context, calls the LLM once without
 tools, then records the episode, extracts knowledge, and optionally
-sends reply/report messages on behalf of the person.
+sends reply/report messages on behalf of the anima.
 """
 
 import logging
@@ -77,17 +77,17 @@ class AssistedExecutor(BaseExecutor):
       2. LLM 1-shot call (no tools)
       3. Post-call: record episode
       4. Post-call: knowledge extraction + send judgement (unified 1-shot)
-      5. If send needed: framework sends message on behalf of the person
+      5. If send needed: framework sends message on behalf of the anima
     """
 
     def __init__(
         self,
         model_config: ModelConfig,
-        person_dir: Path,
+        anima_dir: Path,
         memory: MemoryManager,
         messenger: Messenger | None = None,
     ) -> None:
-        super().__init__(model_config, person_dir)
+        super().__init__(model_config, anima_dir)
         self._memory = memory
         self._messenger = messenger
 
@@ -218,7 +218,7 @@ class AssistedExecutor(BaseExecutor):
                 self._memory.write_knowledge(topic, post.knowledge)
                 logger.info("Knowledge extracted: %s", post.knowledge[:100])
 
-            # ── 5. Send message on behalf of the person ──
+            # ── 5. Send message on behalf of the anima ──
             if post.send_needed and self._messenger:
                 if trigger.startswith("message:"):
                     sender = trigger.split(":", 1)[1]

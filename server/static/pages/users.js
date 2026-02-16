@@ -47,7 +47,7 @@ async function _loadUsers() {
         ${users.map(name => `
           <div class="card">
             <div class="card-body" style="text-align:center; padding:1.25rem;">
-              <div class="person-avatar-placeholder" style="width:56px;height:56px;font-size:1.5rem;margin:0 auto 0.75rem;">
+              <div class="anima-avatar-placeholder" style="width:56px;height:56px;font-size:1.5rem;margin:0 auto 0.75rem;">
                 ${escapeHtml(name.charAt(0).toUpperCase())}
               </div>
               <div style="font-weight:600; font-size:1.05rem; margin-bottom:0.25rem;">${escapeHtml(name)}</div>

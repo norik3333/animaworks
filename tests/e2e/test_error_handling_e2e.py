@@ -20,7 +20,7 @@ import pytest
 from core.config import invalidate_cache
 from core.supervisor.ipc import IPCResponse
 from server.app import create_app
-from tests.helpers.filesystem import create_person_dir, create_test_data_dir
+from tests.helpers.filesystem import create_anima_dir, create_test_data_dir
 
 
 # ── Fixtures ───────────────────────────────────────────────────────────
@@ -37,12 +37,12 @@ def e2e_data_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 
 @pytest.fixture
-def e2e_person_dir(e2e_data_dir: Path) -> Path:
-    """Create a test person directory."""
+def e2e_anima_dir(e2e_data_dir: Path) -> Path:
+    """Create a test anima directory."""
     invalidate_cache()
-    person_dir = create_person_dir(e2e_data_dir, "alice")
+    anima_dir = create_anima_dir(e2e_data_dir, "alice")
     invalidate_cache()
-    return person_dir
+    return anima_dir
 
 
 @pytest.fixture
@@ -59,16 +59,16 @@ def mock_supervisor() -> MagicMock:
 
 
 @pytest.fixture
-def app(e2e_data_dir: Path, e2e_person_dir: Path, mock_supervisor: MagicMock):
+def app(e2e_data_dir: Path, e2e_anima_dir: Path, mock_supervisor: MagicMock):
     """Create the FastAPI app with mocked supervisor."""
-    persons_dir = e2e_data_dir / "persons"
+    animas_dir = e2e_data_dir / "animas"
     shared_dir = e2e_data_dir / "shared"
 
-    application = create_app(persons_dir, shared_dir)
+    application = create_app(animas_dir, shared_dir)
 
     # Override the supervisor and setup_complete state
     application.state.supervisor = mock_supervisor
-    application.state.person_names = ["alice"]
+    application.state.anima_names = ["alice"]
     application.state.setup_complete = True
 
     return application
@@ -103,7 +103,7 @@ async def test_streaming_chat_error_returns_sse_error_event(
     mock_supervisor.send_request_stream.return_value = _failing_stream()
 
     resp = await client.post(
-        "/api/persons/alice/chat/stream",
+        "/api/animas/alice/chat/stream",
         json={"message": "Hi", "from_person": "human"},
     )
 
@@ -144,7 +144,7 @@ async def test_non_streaming_chat_timeout_returns_504(
     mock_supervisor.send_request.side_effect = asyncio.TimeoutError()
 
     resp = await client.post(
-        "/api/persons/alice/chat",
+        "/api/animas/alice/chat",
         json={"message": "Hi", "from_person": "human"},
     )
 
@@ -157,13 +157,13 @@ async def test_non_streaming_chat_timeout_returns_504(
 
 
 async def test_memory_episode_io_error_returns_500(
-    client: httpx.AsyncClient, e2e_person_dir: Path,
+    client: httpx.AsyncClient, e2e_anima_dir: Path,
 ):
     """When an episode file has no read permission, GET episodes/{date}
     should return HTTP 500."""
 
     # Create an episode file with restricted permissions
-    episodes_dir = e2e_person_dir / "episodes"
+    episodes_dir = e2e_anima_dir / "episodes"
     episodes_dir.mkdir(parents=True, exist_ok=True)
     episode_file = episodes_dir / "2026-01-01.md"
     episode_file.write_text("# Episode content", encoding="utf-8")
@@ -172,7 +172,7 @@ async def test_memory_episode_io_error_returns_500(
     episode_file.chmod(0o000)
 
     try:
-        resp = await client.get("/api/persons/alice/episodes/2026-01-01")
+        resp = await client.get("/api/animas/alice/episodes/2026-01-01")
         assert resp.status_code == 500
         data = resp.json()
         assert "detail" in data or "error" in data
@@ -185,18 +185,18 @@ async def test_memory_episode_io_error_returns_500(
 
 
 async def test_global_exception_handler(
-    e2e_data_dir: Path, e2e_person_dir: Path, mock_supervisor: MagicMock,
+    e2e_data_dir: Path, e2e_anima_dir: Path, mock_supervisor: MagicMock,
 ):
     """Unhandled exceptions in routes should be caught by the global
     exception handler and return a 500 JSON response."""
     from fastapi import APIRouter
 
-    persons_dir = e2e_data_dir / "persons"
+    animas_dir = e2e_data_dir / "animas"
     shared_dir = e2e_data_dir / "shared"
 
-    application = create_app(persons_dir, shared_dir)
+    application = create_app(animas_dir, shared_dir)
     application.state.supervisor = mock_supervisor
-    application.state.person_names = ["alice"]
+    application.state.anima_names = ["alice"]
     application.state.setup_complete = True
 
     # Add a test route that raises an unhandled exception.

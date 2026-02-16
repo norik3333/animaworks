@@ -18,8 +18,8 @@ import { probeAsset } from "./api.js";
 const _profileCache = new Map();
 
 /**
- * Register appearance data for a person from the server API.
- * Call before setCharacter() with data from /api/persons.
+ * Register appearance data for an anima from the server API.
+ * Call before setCharacter() with data from /api/animas.
  * @param {string} name
  * @param {{hairColor?: string, eyeColor?: string, bodyColor?: string, clothingColor?: string}} appearance
  */

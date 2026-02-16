@@ -15,8 +15,8 @@ from core.tooling.handler import ToolHandler
 
 
 @pytest.fixture
-def person_dir(tmp_path: Path) -> Path:
-    d = tmp_path / "persons" / "test-person"
+def anima_dir(tmp_path: Path) -> Path:
+    d = tmp_path / "animas" / "test-anima"
     d.mkdir(parents=True)
     (d / "permissions.md").write_text("", encoding="utf-8")
     return d
@@ -36,8 +36,8 @@ def external_dispatcher() -> MagicMock:
 
 
 @pytest.fixture
-def background_manager(person_dir: Path) -> BackgroundTaskManager:
-    return BackgroundTaskManager(person_dir, person_name="test-person")
+def background_manager(anima_dir: Path) -> BackgroundTaskManager:
+    return BackgroundTaskManager(anima_dir, anima_name="test-anima")
 
 
 # ── Background execution in handle() ─────────────────────────
@@ -48,14 +48,14 @@ def background_manager(person_dir: Path) -> BackgroundTaskManager:
 class TestHandleBackgroundExecution:
     async def test_handle_eligible_tool_returns_background_response(
         self,
-        person_dir: Path,
+        anima_dir: Path,
         memory: MagicMock,
         background_manager: BackgroundTaskManager,
     ):
         """When BackgroundTaskManager is set and tool is eligible,
         handle() returns JSON with status='background'."""
         handler = ToolHandler(
-            person_dir=person_dir,
+            anima_dir=anima_dir,
             memory=memory,
             messenger=None,
             tool_registry=[],
@@ -80,13 +80,13 @@ class TestHandleBackgroundExecution:
 
     def test_handle_non_eligible_tool_proceeds_normally(
         self,
-        person_dir: Path,
+        anima_dir: Path,
         memory: MagicMock,
         background_manager: BackgroundTaskManager,
     ):
         """Non-eligible tools still go through normal dispatch."""
         handler = ToolHandler(
-            person_dir=person_dir,
+            anima_dir=anima_dir,
             memory=memory,
             messenger=None,
             tool_registry=[],
@@ -106,12 +106,12 @@ class TestHandleBackgroundExecution:
 
     def test_handle_no_background_manager(
         self,
-        person_dir: Path,
+        anima_dir: Path,
         memory: MagicMock,
     ):
         """When background_manager is None, all tools go through normal path."""
         handler = ToolHandler(
-            person_dir=person_dir,
+            anima_dir=anima_dir,
             memory=memory,
             messenger=None,
             tool_registry=[],
@@ -125,15 +125,15 @@ class TestHandleBackgroundExecution:
         assert result == "sync result"
         handler._external.dispatch.assert_called_once()
 
-    async def test_handle_eligible_tool_passes_person_dir_in_args(
+    async def test_handle_eligible_tool_passes_anima_dir_in_args(
         self,
-        person_dir: Path,
+        anima_dir: Path,
         memory: MagicMock,
         background_manager: BackgroundTaskManager,
     ):
-        """Background submission includes person_dir in the tool args."""
+        """Background submission includes anima_dir in the tool args."""
         handler = ToolHandler(
-            person_dir=person_dir,
+            anima_dir=anima_dir,
             memory=memory,
             messenger=None,
             tool_registry=[],
@@ -143,21 +143,21 @@ class TestHandleBackgroundExecution:
 
         handler.handle("generate_character_assets", {"prompt": "cat"})
 
-        # Verify the task was submitted with person_dir in args
+        # Verify the task was submitted with anima_dir in args
         task = background_manager.list_tasks()[0]
-        assert "person_dir" in task.tool_args
-        assert task.tool_args["person_dir"] == str(person_dir)
+        assert "anima_dir" in task.tool_args
+        assert task.tool_args["anima_dir"] == str(anima_dir)
         assert task.tool_args["prompt"] == "cat"
 
     async def test_handle_multiple_eligible_tools(
         self,
-        person_dir: Path,
+        anima_dir: Path,
         memory: MagicMock,
         background_manager: BackgroundTaskManager,
     ):
         """Multiple eligible tool calls each get their own background task."""
         handler = ToolHandler(
-            person_dir=person_dir,
+            anima_dir=anima_dir,
             memory=memory,
             messenger=None,
             tool_registry=[],
@@ -184,7 +184,7 @@ class TestHandleBackgroundExecution:
 
     def test_handle_memory_tools_not_affected_by_background_manager(
         self,
-        person_dir: Path,
+        anima_dir: Path,
         memory: MagicMock,
         background_manager: BackgroundTaskManager,
     ):
@@ -194,7 +194,7 @@ class TestHandleBackgroundExecution:
             ("knowledge/test.md", "found it"),
         ]
         handler = ToolHandler(
-            person_dir=person_dir,
+            anima_dir=anima_dir,
             memory=memory,
             messenger=None,
             tool_registry=[],

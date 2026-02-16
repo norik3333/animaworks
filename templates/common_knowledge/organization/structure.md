@@ -5,16 +5,16 @@ AnimaWorks における組織構造は `config.json` の設定から動的に構
 
 ## supervisorフィールドによる階層定義
 
-組織の上下関係は、各 Person の `supervisor` フィールドのみで定義される。
+組織の上下関係は、各 Anima の `supervisor` フィールドのみで定義される。
 
-- `supervisor: null` または未設定 → その Person はトップレベル（最上位）
+- `supervisor: null` または未設定 → その Anima はトップレベル（最上位）
 - `supervisor: "alice"` → alice が上司
 
 config.json での設定例:
 
 ```json
 {
-  "persons": {
+  "animas": {
     "alice": {
       "supervisor": null,
       "speciality": "経営戦略・全体統括"
@@ -45,17 +45,17 @@ alice（経営戦略・全体統括）
 ```
 
 重要な制約:
-- supervisor に指定する名前は `persons` に存在する Person 名でなければならない
+- supervisor に指定する名前は `animas` に存在する Anima 名でなければならない
 - 循環参照（alice → bob → alice）は避けなければならない
-- 1人の Person が持てる supervisor は1名のみ
+- 1人の Anima が持てる supervisor は1名のみ
 
 ## 組織コンテキストの構築プロセス
 
 `core/prompt/builder.py` の `_build_org_context()` が、config.json から以下の情報を動的に算出する:
 
 1. **上司（supervisor）**: 自分の `supervisor` フィールドの値。未設定なら「あなたがトップです」
-2. **部下（subordinates）**: `supervisor` が自分の名前になっている全 Person
-3. **同僚（peers）**: 自分と同じ `supervisor` を持つ Person（自分を除く）
+2. **部下（subordinates）**: `supervisor` が自分の名前になっている全 Anima
+3. **同僚（peers）**: 自分と同じ `supervisor` を持つ Anima（自分を除く）
 
 算出結果はシステムプロンプトに「あなたの組織上の位置」として注入される:
 
@@ -76,8 +76,8 @@ alice（経営戦略・全体統括）
 | 項目 | 意味 | 行動への影響 |
 |------|------|-------------|
 | あなたの専門 | `speciality` フィールドの値 | この分野に関する質問や判断は自分が責任を持つ |
-| 上司 | 報告先の Person | 進捗報告・問題のエスカレーション先 |
-| 部下 | 自分の配下の Person | タスクの委任先・進捗確認の対象 |
+| 上司 | 報告先の Anima | 進捗報告・問題のエスカレーション先 |
+| 部下 | 自分の配下の Anima | タスクの委任先・進捗確認の対象 |
 | 同僚 | 同じ上司を持つ仲間 | 関連業務で直接連携する相手 |
 
 ### 確認すべきポイント
@@ -90,14 +90,14 @@ alice（経営戦略・全体統括）
 
 組織構造の変更は以下の手順で反映される:
 
-1. `config.json` の `persons` セクションを編集（supervisor / speciality の変更）
+1. `config.json` の `animas` セクションを編集（supervisor / speciality の変更）
 2. サーバーを再起動（`animaworks start`）
 3. 次回の起動時（メッセージ受信・ハートビート・cron）に新しい組織コンテキストが構築される
 
 注意点:
-- config.json を変更しただけではすぐには反映されない。Person の次回起動まで旧コンテキストが使われる
-- Person の追加・削除も config.json の編集 + サーバー再起動で行う
-- 組織変更後は、影響を受ける Person にメッセージで通知することを SHOULD（推奨）
+- config.json を変更しただけではすぐには反映されない。Anima の次回起動まで旧コンテキストが使われる
+- Anima の追加・削除も config.json の編集 + サーバー再起動で行う
+- 組織変更後は、影響を受ける Anima にメッセージで通知することを SHOULD（推奨）
 
 ## 組織構造のパターン例
 
@@ -107,7 +107,7 @@ alice（経営戦略・全体統括）
 
 ```json
 {
-  "persons": {
+  "animas": {
     "alice": { "supervisor": null, "speciality": "企画" },
     "bob":   { "supervisor": null, "speciality": "開発" },
     "carol": { "supervisor": null, "speciality": "デザイン" }
@@ -132,7 +132,7 @@ carol（デザイン）
 
 ```json
 {
-  "persons": {
+  "animas": {
     "alice": { "supervisor": null,    "speciality": "CEO・全体統括" },
     "bob":   { "supervisor": "alice", "speciality": "開発部長" },
     "carol": { "supervisor": "alice", "speciality": "営業部長" },
@@ -163,7 +163,7 @@ alice（CEO・全体統括）
 
 ```json
 {
-  "persons": {
+  "animas": {
     "manager": { "supervisor": null,      "speciality": "プロジェクト管理" },
     "dev1":    { "supervisor": "manager", "speciality": "API開発" },
     "dev2":    { "supervisor": "manager", "speciality": "DB設計" },
@@ -188,10 +188,10 @@ manager（プロジェクト管理）
 
 ## specialityフィールドの活用
 
-`speciality` は自由テキストで、Person の専門領域を記述する。
+`speciality` は自由テキストで、Anima の専門領域を記述する。
 
-- 組織コンテキストで各 Person の名前の横に表示される（例: `bob (開発リード)`）
-- 他の Person がタスクの相談先や委任先を判断する手がかりになる
+- 組織コンテキストで各 Anima の名前の横に表示される（例: `bob (開発リード)`）
+- 他の Anima がタスクの相談先や委任先を判断する手がかりになる
 - 未設定の場合は「(未設定)」と表示される
 
 効果的な speciality の書き方:

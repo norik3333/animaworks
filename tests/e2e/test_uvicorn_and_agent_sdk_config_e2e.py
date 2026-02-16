@@ -23,13 +23,13 @@ class TestUvicornConfigE2E:
     @patch("uvicorn.run")
     @patch("server.app.create_app")
     @patch("core.paths.get_shared_dir", return_value=Path("/tmp/shared"))
-    @patch("core.paths.get_persons_dir", return_value=Path("/tmp/persons"))
+    @patch("core.paths.get_animas_dir", return_value=Path("/tmp/animas"))
     @patch("core.init.ensure_runtime_dir")
     @patch("cli.commands.server._write_pid_file")
     @patch("cli.commands.server._read_pid", return_value=None)
     def test_server_start_passes_all_uvicorn_settings(
         self, mock_pid, mock_write_pid,
-        mock_ensure, mock_persons, mock_shared, mock_create, mock_uvicorn,
+        mock_ensure, mock_animas, mock_shared, mock_create, mock_uvicorn,
         mock_remove,
     ):
         """Full integration: cmd_start configures uvicorn for SSE + WebSocket."""
@@ -58,8 +58,8 @@ class TestAgentSDKEnvE2E:
         """Agent SDK child process env must disable Claude Code skill improvement."""
         from tests.helpers.mocks import patch_agent_sdk
 
-        person_dir = tmp_path / "persons" / "test-person"
-        person_dir.mkdir(parents=True)
+        anima_dir = tmp_path / "animas" / "test-anima"
+        anima_dir.mkdir(parents=True)
 
         from core.schemas import ModelConfig
         config = ModelConfig(
@@ -69,7 +69,7 @@ class TestAgentSDKEnvE2E:
 
         with patch_agent_sdk():
             from core.execution.agent_sdk import AgentSDKExecutor
-            executor = AgentSDKExecutor(model_config=config, person_dir=person_dir)
+            executor = AgentSDKExecutor(model_config=config, anima_dir=anima_dir)
             env = executor._build_env()
 
         assert env["CLAUDE_CODE_DISABLE_SKILL_IMPROVEMENT"] == "true"
@@ -78,8 +78,8 @@ class TestAgentSDKEnvE2E:
         """Skill improvement flag does not break existing env keys."""
         from tests.helpers.mocks import patch_agent_sdk
 
-        person_dir = tmp_path / "persons" / "test-person"
-        person_dir.mkdir(parents=True)
+        anima_dir = tmp_path / "animas" / "test-anima"
+        anima_dir.mkdir(parents=True)
 
         from core.schemas import ModelConfig
         config = ModelConfig(
@@ -90,10 +90,10 @@ class TestAgentSDKEnvE2E:
 
         with patch_agent_sdk():
             from core.execution.agent_sdk import AgentSDKExecutor
-            executor = AgentSDKExecutor(model_config=config, person_dir=person_dir)
+            executor = AgentSDKExecutor(model_config=config, anima_dir=anima_dir)
             env = executor._build_env()
 
-        assert env["ANIMAWORKS_PERSON_DIR"] == str(person_dir)
+        assert env["ANIMAWORKS_ANIMA_DIR"] == str(anima_dir)
         assert env["ANTHROPIC_API_KEY"] == "sk-test-key"
         assert env["ANTHROPIC_BASE_URL"] == "https://custom.api"
         assert env["CLAUDE_CODE_DISABLE_SKILL_IMPROVEMENT"] == "true"

@@ -1,4 +1,4 @@
-"""Unit tests for the create_person tool in core/tooling/handler.py."""
+"""Unit tests for the create_anima tool in core/tooling/handler.py."""
 from __future__ import annotations
 
 import json
@@ -12,35 +12,35 @@ from core.tooling.handler import ToolHandler
 
 def _make_handler(tmp_path: Path) -> ToolHandler:
     """Build a minimal ToolHandler with mocked dependencies."""
-    person_dir = tmp_path / "persons" / "boss"
-    person_dir.mkdir(parents=True)
-    (person_dir / "permissions.md").write_text("", encoding="utf-8")
+    anima_dir = tmp_path / "animas" / "boss"
+    anima_dir.mkdir(parents=True)
+    (anima_dir / "permissions.md").write_text("", encoding="utf-8")
 
     memory = MagicMock()
     memory.read_permissions.return_value = ""
     messenger = MagicMock()
 
     return ToolHandler(
-        person_dir=person_dir,
+        anima_dir=anima_dir,
         memory=memory,
         messenger=messenger,
     )
 
 
-class TestHandleCreatePerson:
+class TestHandleCreateAnima:
     def test_successful_creation(self, tmp_path):
         handler = _make_handler(tmp_path)
         sheet = tmp_path / "sheet.md"
         sheet.write_text("# Character: Hinata", encoding="utf-8")
 
-        fake_person_dir = tmp_path / "persons" / "hinata"
-        fake_person_dir.mkdir(parents=True)
+        fake_anima_dir = tmp_path / "animas" / "hinata"
+        fake_anima_dir.mkdir(parents=True)
 
-        with patch("core.person_factory.create_from_md", return_value=fake_person_dir) as mock_create, \
-             patch("core.paths.get_persons_dir", return_value=tmp_path / "persons"), \
+        with patch("core.anima_factory.create_from_md", return_value=fake_anima_dir) as mock_create, \
+             patch("core.paths.get_animas_dir", return_value=tmp_path / "animas"), \
              patch("core.paths.get_data_dir", return_value=tmp_path), \
-             patch("cli.commands.init_cmd._register_person_in_config"):
-            result = handler.handle("create_person", {"character_sheet_path": str(sheet)})
+             patch("cli.commands.init_cmd._register_anima_in_config"):
+            result = handler.handle("create_anima", {"character_sheet_path": str(sheet)})
 
         assert "hinata" in result
         assert "created successfully" in result
@@ -49,32 +49,32 @@ class TestHandleCreatePerson:
     def test_file_not_found(self, tmp_path):
         handler = _make_handler(tmp_path)
         result = handler.handle(
-            "create_person",
+            "create_anima",
             {"character_sheet_path": str(tmp_path / "nonexistent.md")},
         )
         parsed = json.loads(result)
         assert parsed["status"] == "error"
         assert parsed["error_type"] == "FileNotFound"
 
-    def test_duplicate_person(self, tmp_path):
+    def test_duplicate_anima(self, tmp_path):
         handler = _make_handler(tmp_path)
         sheet = tmp_path / "sheet.md"
         sheet.write_text("# Character: Hinata", encoding="utf-8")
 
         with patch(
-            "core.person_factory.create_from_md",
-            side_effect=FileExistsError("Person 'hinata' already exists"),
+            "core.anima_factory.create_from_md",
+            side_effect=FileExistsError("Anima 'hinata' already exists"),
         ), \
-             patch("core.paths.get_persons_dir", return_value=tmp_path / "persons"), \
+             patch("core.paths.get_animas_dir", return_value=tmp_path / "animas"), \
              patch("core.paths.get_data_dir", return_value=tmp_path):
             result = handler.handle(
-                "create_person",
+                "create_anima",
                 {"character_sheet_path": str(sheet), "name": "hinata"},
             )
 
         parsed = json.loads(result)
         assert parsed["status"] == "error"
-        assert parsed["error_type"] == "PersonExists"
+        assert parsed["error_type"] == "AnimaExists"
 
     def test_invalid_character_sheet(self, tmp_path):
         handler = _make_handler(tmp_path)
@@ -82,13 +82,13 @@ class TestHandleCreatePerson:
         sheet.write_text("# Character: Hinata", encoding="utf-8")
 
         with patch(
-            "core.person_factory.create_from_md",
+            "core.anima_factory.create_from_md",
             side_effect=ValueError("Missing required sections: 基本情報"),
         ), \
-             patch("core.paths.get_persons_dir", return_value=tmp_path / "persons"), \
+             patch("core.paths.get_animas_dir", return_value=tmp_path / "animas"), \
              patch("core.paths.get_data_dir", return_value=tmp_path):
             result = handler.handle(
-                "create_person",
+                "create_anima",
                 {"character_sheet_path": str(sheet)},
             )
 

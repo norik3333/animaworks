@@ -33,7 +33,7 @@ class StubChannel(NotificationChannel):
         body: str,
         priority: str = "normal",
         *,
-        person_name: str = "",
+        anima_name: str = "",
     ) -> str:
         if self._fail:
             raise RuntimeError("stub failure")
@@ -41,7 +41,7 @@ class StubChannel(NotificationChannel):
             "subject": subject,
             "body": body,
             "priority": priority,
-            "person_name": person_name,
+            "anima_name": anima_name,
         })
         return "stub: OK"
 
@@ -50,8 +50,8 @@ class StubChannel(NotificationChannel):
 
 
 @pytest.fixture
-def person_dir(tmp_path: Path) -> Path:
-    d = tmp_path / "persons" / "test-person"
+def anima_dir(tmp_path: Path) -> Path:
+    d = tmp_path / "animas" / "test-anima"
     d.mkdir(parents=True)
     (d / "permissions.md").write_text("", encoding="utf-8")
     return d
@@ -76,10 +76,10 @@ def notifier(stub_channel: StubChannel) -> HumanNotifier:
 
 @pytest.fixture
 def handler_with_notifier(
-    person_dir: Path, memory: MagicMock, notifier: HumanNotifier,
+    anima_dir: Path, memory: MagicMock, notifier: HumanNotifier,
 ) -> ToolHandler:
     return ToolHandler(
-        person_dir=person_dir,
+        anima_dir=anima_dir,
         memory=memory,
         human_notifier=notifier,
     )
@@ -87,10 +87,10 @@ def handler_with_notifier(
 
 @pytest.fixture
 def handler_without_notifier(
-    person_dir: Path, memory: MagicMock,
+    anima_dir: Path, memory: MagicMock,
 ) -> ToolHandler:
     return ToolHandler(
-        person_dir=person_dir,
+        anima_dir=anima_dir,
         memory=memory,
     )
 
@@ -113,7 +113,7 @@ class TestNotifyHumanHandler:
         assert len(stub_channel.calls) == 1
         assert stub_channel.calls[0]["subject"] == "Test Alert"
         assert stub_channel.calls[0]["priority"] == "high"
-        assert stub_channel.calls[0]["person_name"] == "test-person"
+        assert stub_channel.calls[0]["anima_name"] == "test-anima"
 
     def test_notify_human_default_priority(
         self, handler_with_notifier: ToolHandler, stub_channel: StubChannel,
@@ -138,11 +138,11 @@ class TestNotifyHumanHandler:
         assert parsed["error_type"] == "NotConfigured"
 
     def test_notify_human_no_channels(
-        self, person_dir: Path, memory: MagicMock,
+        self, anima_dir: Path, memory: MagicMock,
     ):
         empty_notifier = HumanNotifier([])
         handler = ToolHandler(
-            person_dir=person_dir,
+            anima_dir=anima_dir,
             memory=memory,
             human_notifier=empty_notifier,
         )
@@ -175,13 +175,13 @@ class TestNotifyHumanHandler:
         assert parsed["error_type"] == "InvalidArguments"
 
     def test_notify_human_channel_partial_failure(
-        self, person_dir: Path, memory: MagicMock,
+        self, anima_dir: Path, memory: MagicMock,
     ):
         ok_ch = StubChannel()
         fail_ch = StubChannel(fail=True)
         notifier = HumanNotifier([ok_ch, fail_ch])
         handler = ToolHandler(
-            person_dir=person_dir,
+            anima_dir=anima_dir,
             memory=memory,
             human_notifier=notifier,
         )

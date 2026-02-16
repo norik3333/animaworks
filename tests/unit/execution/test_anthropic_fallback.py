@@ -33,8 +33,8 @@ def model_config() -> ModelConfig:
 
 
 @pytest.fixture
-def person_dir(tmp_path: Path) -> Path:
-    d = tmp_path / "persons" / "test"
+def anima_dir(tmp_path: Path) -> Path:
+    d = tmp_path / "animas" / "test"
     d.mkdir(parents=True)
     for sub in ["episodes", "knowledge", "procedures", "skills", "state", "shortterm"]:
         (d / sub).mkdir(exist_ok=True)
@@ -44,29 +44,29 @@ def person_dir(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def memory(person_dir: Path) -> MagicMock:
+def memory(anima_dir: Path) -> MagicMock:
     m = MagicMock(spec=MemoryManager)
     m.read_permissions.return_value = ""
     m.search_memory_text.return_value = []
-    m.person_dir = person_dir
+    m.anima_dir = anima_dir
     return m
 
 
 @pytest.fixture
-def tool_handler(person_dir: Path, memory: MagicMock) -> ToolHandler:
-    return ToolHandler(person_dir=person_dir, memory=memory, tool_registry=[])
+def tool_handler(anima_dir: Path, memory: MagicMock) -> ToolHandler:
+    return ToolHandler(anima_dir=anima_dir, memory=memory, tool_registry=[])
 
 
 @pytest.fixture
 def executor(
     model_config: ModelConfig,
-    person_dir: Path,
+    anima_dir: Path,
     tool_handler: ToolHandler,
     memory: MagicMock,
 ) -> AnthropicFallbackExecutor:
     return AnthropicFallbackExecutor(
         model_config=model_config,
-        person_dir=person_dir,
+        anima_dir=anima_dir,
         tool_handler=tool_handler,
         tool_registry=[],
         memory=memory,
@@ -158,13 +158,13 @@ class TestExecuteSimple:
             assert call_kwargs.get("api_key") == "sk-test"
 
     async def test_passes_base_url(
-        self, model_config: ModelConfig, person_dir: Path,
+        self, model_config: ModelConfig, anima_dir: Path,
         tool_handler: ToolHandler, memory: MagicMock,
     ):
         model_config.api_base_url = "https://custom.api"
         executor = AnthropicFallbackExecutor(
             model_config=model_config,
-            person_dir=person_dir,
+            anima_dir=anima_dir,
             tool_handler=tool_handler,
             tool_registry=[],
             memory=memory,
@@ -261,10 +261,10 @@ class TestExecuteContextTracking:
         assert tracker.usage_ratio > 0
 
     async def test_session_chaining(
-        self, executor: AnthropicFallbackExecutor, person_dir: Path,
+        self, executor: AnthropicFallbackExecutor, anima_dir: Path,
     ):
         tracker = ContextTracker(model="claude-sonnet-4-20250514", threshold=0.50)
-        shortterm = ShortTermMemory(person_dir)
+        shortterm = ShortTermMemory(anima_dir)
 
         # First response crosses threshold
         resp_threshold = _make_response(
@@ -297,11 +297,11 @@ class TestExecuteContextTracking:
         assert "Continued" in result.text or "Partial" in result.text
 
     async def test_chaining_limited_by_max_chains(
-        self, executor: AnthropicFallbackExecutor, person_dir: Path,
+        self, executor: AnthropicFallbackExecutor, anima_dir: Path,
     ):
         executor._model_config.max_chains = 0  # No chaining allowed
         tracker = ContextTracker(model="claude-sonnet-4-20250514", threshold=0.50)
-        shortterm = ShortTermMemory(person_dir)
+        shortterm = ShortTermMemory(anima_dir)
 
         # Response crosses threshold but chaining is not allowed
         resp = _make_response(

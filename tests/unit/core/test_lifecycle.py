@@ -198,7 +198,7 @@ class TestParseSchedule:
 class TestLifecycleManager:
     def test_init(self):
         lm = LifecycleManager()
-        assert lm.persons == {}
+        assert lm.animas == {}
         assert lm._ws_broadcast is None
 
     def test_set_broadcast(self):
@@ -207,52 +207,52 @@ class TestLifecycleManager:
         lm.set_broadcast(fn)
         assert lm._ws_broadcast is fn
 
-    def test_register_person(self):
+    def test_register_anima(self):
         lm = LifecycleManager()
-        person = MagicMock()
-        person.name = "alice"
-        person.memory.read_heartbeat_config.return_value = ""
-        person.memory.read_cron_config.return_value = ""
-        person.set_on_lock_released = MagicMock()
+        dp = MagicMock()
+        dp.name = "alice"
+        dp.memory.read_heartbeat_config.return_value = ""
+        dp.memory.read_cron_config.return_value = ""
+        dp.set_on_lock_released = MagicMock()
 
-        lm.register_person(person)
-        assert "alice" in lm.persons
-        person.set_on_lock_released.assert_called_once()
+        lm.register_anima(dp)
+        assert "alice" in lm.animas
+        dp.set_on_lock_released.assert_called_once()
 
-    def test_unregister_person(self):
+    def test_unregister_anima(self):
         lm = LifecycleManager()
-        person = MagicMock()
-        person.name = "alice"
-        person.memory.read_heartbeat_config.return_value = ""
-        person.memory.read_cron_config.return_value = ""
-        person.set_on_lock_released = MagicMock()
+        dp = MagicMock()
+        dp.name = "alice"
+        dp.memory.read_heartbeat_config.return_value = ""
+        dp.memory.read_cron_config.return_value = ""
+        dp.set_on_lock_released = MagicMock()
 
-        lm.register_person(person)
-        lm.unregister_person("alice")
-        assert "alice" not in lm.persons
+        lm.register_anima(dp)
+        lm.unregister_anima("alice")
+        assert "alice" not in lm.animas
 
     def test_unregister_nonexistent(self):
         lm = LifecycleManager()
-        lm.unregister_person("nobody")  # should not raise
+        lm.unregister_anima("nobody")  # should not raise
 
 
 class TestHeartbeatWrapper:
     async def test_heartbeat_with_broadcast(self):
         lm = LifecycleManager()
-        person = MagicMock()
-        person.name = "alice"
-        person.run_heartbeat = AsyncMock(return_value=MagicMock())
-        person.run_heartbeat.return_value.model_dump.return_value = {}
-        lm.persons["alice"] = person
+        dp = MagicMock()
+        dp.name = "alice"
+        dp.run_heartbeat = AsyncMock(return_value=MagicMock())
+        dp.run_heartbeat.return_value.model_dump.return_value = {}
+        lm.animas["alice"] = dp
 
         broadcast = AsyncMock()
         lm._ws_broadcast = broadcast
 
         await lm._heartbeat_wrapper("alice")
-        person.run_heartbeat.assert_called_once()
+        dp.run_heartbeat.assert_called_once()
         broadcast.assert_called_once()
 
-    async def test_heartbeat_no_person(self):
+    async def test_heartbeat_no_anima(self):
         lm = LifecycleManager()
         # Should return silently
         await lm._heartbeat_wrapper("nobody")
@@ -263,11 +263,11 @@ class TestCronWrapper:
         import asyncio
 
         lm = LifecycleManager()
-        person = MagicMock()
-        person.name = "alice"
-        person.run_cron_task = AsyncMock(return_value=MagicMock())
-        person.run_cron_task.return_value.model_dump.return_value = {}
-        lm.persons["alice"] = person
+        dp = MagicMock()
+        dp.name = "alice"
+        dp.run_cron_task = AsyncMock(return_value=MagicMock())
+        dp.run_cron_task.return_value.model_dump.return_value = {}
+        lm.animas["alice"] = dp
 
         broadcast = AsyncMock()
         lm._ws_broadcast = broadcast
@@ -282,10 +282,10 @@ class TestCronWrapper:
         await lm._cron_wrapper("alice", task)
         # _cron_wrapper creates a background task; let it run
         await asyncio.sleep(0)
-        person.run_cron_task.assert_called_once_with("daily_report", "Generate report")
+        dp.run_cron_task.assert_called_once_with("daily_report", "Generate report")
         broadcast.assert_called_once()
 
-    async def test_cron_no_person(self):
+    async def test_cron_no_anima(self):
         lm = LifecycleManager()
         task = CronTask(name="task", schedule="0 10 * * *", description="desc")
         await lm._cron_wrapper("nobody", task)
@@ -295,14 +295,14 @@ class TestSetupHeartbeat:
     def test_interval_is_always_30_minutes(self):
         """Heartbeat interval is fixed at 30 minutes regardless of config."""
         lm = LifecycleManager()
-        person = MagicMock()
-        person.name = "alice"
+        dp = MagicMock()
+        dp.name = "alice"
         # Even if config says 15 minutes, interval should remain 30
-        person.memory.read_heartbeat_config.return_value = "巡回間隔: 15分"
-        person.memory.read_cron_config.return_value = ""
-        person.set_on_lock_released = MagicMock()
+        dp.memory.read_heartbeat_config.return_value = "巡回間隔: 15分"
+        dp.memory.read_cron_config.return_value = ""
+        dp.set_on_lock_released = MagicMock()
 
-        lm.register_person(person)
+        lm.register_anima(dp)
         jobs = lm.scheduler.get_jobs()
         hb_job = next(j for j in jobs if j.id == "alice_heartbeat")
         # CronTrigger fields: verify minute is */30
@@ -311,26 +311,26 @@ class TestSetupHeartbeat:
     def test_interval_fixed_with_5min_config(self):
         """Ensure 5-minute config is ignored; interval stays 30."""
         lm = LifecycleManager()
-        person = MagicMock()
-        person.name = "bob"
-        person.memory.read_heartbeat_config.return_value = "5分ごと"
-        person.memory.read_cron_config.return_value = ""
-        person.set_on_lock_released = MagicMock()
+        dp = MagicMock()
+        dp.name = "bob"
+        dp.memory.read_heartbeat_config.return_value = "5分ごと"
+        dp.memory.read_cron_config.return_value = ""
+        dp.set_on_lock_released = MagicMock()
 
-        lm.register_person(person)
+        lm.register_anima(dp)
         jobs = lm.scheduler.get_jobs()
         hb_job = next(j for j in jobs if j.id == "bob_heartbeat")
         assert str(hb_job.trigger).find("*/30") != -1
 
     def test_parses_active_hours(self):
         lm = LifecycleManager()
-        person = MagicMock()
-        person.name = "bob"
-        person.memory.read_heartbeat_config.return_value = "稼働時間: 8:00 - 20:00"
-        person.memory.read_cron_config.return_value = ""
-        person.set_on_lock_released = MagicMock()
+        dp = MagicMock()
+        dp.name = "bob"
+        dp.memory.read_heartbeat_config.return_value = "稼働時間: 8:00 - 20:00"
+        dp.memory.read_cron_config.return_value = ""
+        dp.set_on_lock_released = MagicMock()
 
-        lm.register_person(person)
+        lm.register_anima(dp)
         jobs = lm.scheduler.get_jobs()
         assert any(j.id == "bob_heartbeat" for j in jobs)
 
@@ -338,41 +338,41 @@ class TestSetupHeartbeat:
 class TestMessageTriggeredHeartbeat:
     async def test_triggered_heartbeat_success(self):
         lm = LifecycleManager()
-        person = MagicMock()
-        person.name = "alice"
-        person.run_heartbeat = AsyncMock(return_value=MagicMock())
-        person.run_heartbeat.return_value.model_dump.return_value = {}
-        lm.persons["alice"] = person
+        dp = MagicMock()
+        dp.name = "alice"
+        dp.run_heartbeat = AsyncMock(return_value=MagicMock())
+        dp.run_heartbeat.return_value.model_dump.return_value = {}
+        lm.animas["alice"] = dp
         lm._pending_triggers.add("alice")
 
         await lm._message_triggered_heartbeat("alice")
-        person.run_heartbeat.assert_called_once()
+        dp.run_heartbeat.assert_called_once()
         assert "alice" not in lm._pending_triggers
 
-    async def test_triggered_heartbeat_no_person(self):
+    async def test_triggered_heartbeat_no_anima(self):
         lm = LifecycleManager()
         lm._pending_triggers.add("nobody")
         await lm._message_triggered_heartbeat("nobody")
         assert "nobody" not in lm._pending_triggers
 
 
-class TestOnPersonLockReleased:
+class TestOnAnimaLockReleased:
     async def test_triggers_heartbeat_when_deferred(self):
         lm = LifecycleManager()
-        person = MagicMock()
-        person.name = "alice"
-        person.messenger.has_unread.return_value = True
-        lm.persons["alice"] = person
+        dp = MagicMock()
+        dp.name = "alice"
+        dp.messenger.has_unread.return_value = True
+        lm.animas["alice"] = dp
         lm._deferred_inbox.add("alice")
 
         with patch.object(lm, "_message_triggered_heartbeat", new_callable=AsyncMock):
-            await lm._on_person_lock_released("alice")
+            await lm._on_anima_lock_released("alice")
             assert "alice" not in lm._deferred_inbox
 
     async def test_no_action_when_not_deferred(self):
         lm = LifecycleManager()
         # alice not in _deferred_inbox
-        await lm._on_person_lock_released("alice")
+        await lm._on_anima_lock_released("alice")
 
 
 class TestLifecycleStartShutdown:
@@ -396,23 +396,23 @@ class TestCommandTypeCron:
         """Test successful bash command execution in cron."""
         from pathlib import Path
         from unittest.mock import patch, MagicMock
-        from core.person import DigitalPerson
+        from core.anima import DigitalAnima
         from core.memory import MemoryManager
 
-        # Create mock person
-        person_dir = Path("/tmp/test_person")
+        # Create mock anima
+        anima_dir = Path("/tmp/test_anima")
         shared_dir = Path("/tmp/shared")
-        person_dir.mkdir(parents=True, exist_ok=True)
+        anima_dir.mkdir(parents=True, exist_ok=True)
         shared_dir.mkdir(parents=True, exist_ok=True)
 
         with patch.object(MemoryManager, "read_model_config"):
-            person = DigitalPerson(person_dir, shared_dir)
+            dp = DigitalAnima(anima_dir, shared_dir)
 
         # Mock append_cron_command_log
-        person.memory.append_cron_command_log = MagicMock()
+        dp.memory.append_cron_command_log = MagicMock()
 
         # Execute command
-        result = await person.run_cron_command(
+        result = await dp.run_cron_command(
             "test_task",
             command="echo 'Hello World'",
         )
@@ -421,57 +421,57 @@ class TestCommandTypeCron:
         assert result["exit_code"] == 0
         assert "Hello World" in result["stdout"]
         assert result["stderr"] == ""
-        person.memory.append_cron_command_log.assert_called_once()
+        dp.memory.append_cron_command_log.assert_called_once()
 
     async def test_run_cron_command_bash_failure(self):
         """Test bash command that returns non-zero exit code."""
         from pathlib import Path
         from unittest.mock import patch, MagicMock
-        from core.person import DigitalPerson
+        from core.anima import DigitalAnima
         from core.memory import MemoryManager
 
-        person_dir = Path("/tmp/test_person2")
+        anima_dir = Path("/tmp/test_anima2")
         shared_dir = Path("/tmp/shared2")
-        person_dir.mkdir(parents=True, exist_ok=True)
+        anima_dir.mkdir(parents=True, exist_ok=True)
         shared_dir.mkdir(parents=True, exist_ok=True)
 
         with patch.object(MemoryManager, "read_model_config"):
-            person = DigitalPerson(person_dir, shared_dir)
+            dp = DigitalAnima(anima_dir, shared_dir)
 
-        person.memory.append_cron_command_log = MagicMock()
+        dp.memory.append_cron_command_log = MagicMock()
 
         # Execute failing command
-        result = await person.run_cron_command(
+        result = await dp.run_cron_command(
             "failing_task",
             command="exit 1",
         )
 
         # Verify non-zero exit code
         assert result["exit_code"] == 1
-        person.memory.append_cron_command_log.assert_called_once()
+        dp.memory.append_cron_command_log.assert_called_once()
 
     async def test_run_cron_command_tool(self):
         """Test internal tool execution in cron."""
         from pathlib import Path
         from unittest.mock import patch, MagicMock
-        from core.person import DigitalPerson
+        from core.anima import DigitalAnima
         from core.memory import MemoryManager
 
-        person_dir = Path("/tmp/test_person3")
+        anima_dir = Path("/tmp/test_anima3")
         shared_dir = Path("/tmp/shared3")
-        person_dir.mkdir(parents=True, exist_ok=True)
+        anima_dir.mkdir(parents=True, exist_ok=True)
         shared_dir.mkdir(parents=True, exist_ok=True)
 
         with patch.object(MemoryManager, "read_model_config"):
-            person = DigitalPerson(person_dir, shared_dir)
+            dp = DigitalAnima(anima_dir, shared_dir)
 
-        person.memory.append_cron_command_log = MagicMock()
+        dp.memory.append_cron_command_log = MagicMock()
 
         # Mock tool_handler.handle
-        person.agent._tool_handler.handle = MagicMock(return_value="Tool executed successfully")
+        dp.agent._tool_handler.handle = MagicMock(return_value="Tool executed successfully")
 
         # Execute tool
-        result = await person.run_cron_command(
+        result = await dp.run_cron_command(
             "tool_task",
             tool="test_tool",
             args={"key": "value"},
@@ -480,38 +480,38 @@ class TestCommandTypeCron:
         # Verify result
         assert result["exit_code"] == 0
         assert "Tool executed successfully" in result["stdout"]
-        person.agent._tool_handler.handle.assert_called_once_with(
+        dp.agent._tool_handler.handle.assert_called_once_with(
             "test_tool",
             {"key": "value"},
         )
-        person.memory.append_cron_command_log.assert_called_once()
+        dp.memory.append_cron_command_log.assert_called_once()
 
 
-# ── ReloadPersonSchedule ─────────────────────────────────
+# ── ReloadAnimaSchedule ─────────────────────────────────
 
 
-class TestReloadPersonSchedule:
-    def test_reload_nonexistent_person(self):
+class TestReloadAnimaSchedule:
+    def test_reload_nonexistent_anima(self):
         lm = LifecycleManager()
-        result = lm.reload_person_schedule("nobody")
+        result = lm.reload_anima_schedule("nobody")
         assert "error" in result
 
-    def test_reload_registered_person(self):
+    def test_reload_registered_anima(self):
         lm = LifecycleManager()
-        person = MagicMock()
-        person.name = "alice"
-        person.memory.read_heartbeat_config.return_value = "9:00 - 22:00"
-        person.memory.read_cron_config.return_value = ""
-        person.set_on_lock_released = MagicMock()
-        person.set_on_schedule_changed = MagicMock()
+        dp = MagicMock()
+        dp.name = "alice"
+        dp.memory.read_heartbeat_config.return_value = "9:00 - 22:00"
+        dp.memory.read_cron_config.return_value = ""
+        dp.set_on_lock_released = MagicMock()
+        dp.set_on_schedule_changed = MagicMock()
 
-        lm.register_person(person)
+        lm.register_anima(dp)
         initial_jobs = [j.id for j in lm.scheduler.get_jobs() if j.id.startswith("alice_")]
         assert len(initial_jobs) >= 1
 
         # Change active hours only; interval stays 30
-        person.memory.read_heartbeat_config.return_value = "8:00 - 23:00"
-        result = lm.reload_person_schedule("alice")
+        dp.memory.read_heartbeat_config.return_value = "8:00 - 23:00"
+        result = lm.reload_anima_schedule("alice")
 
         assert result["reloaded"] == "alice"
         assert result["removed"] >= 1
@@ -524,35 +524,35 @@ class TestReloadPersonSchedule:
 
     def test_reload_with_cron_tasks(self):
         lm = LifecycleManager()
-        person = MagicMock()
-        person.name = "bob"
-        person.memory.read_heartbeat_config.return_value = "30分ごと\n9:00 - 22:00"
-        person.memory.read_cron_config.return_value = ""
-        person.set_on_lock_released = MagicMock()
-        person.set_on_schedule_changed = MagicMock()
+        dp = MagicMock()
+        dp.name = "bob"
+        dp.memory.read_heartbeat_config.return_value = "30分ごと\n9:00 - 22:00"
+        dp.memory.read_cron_config.return_value = ""
+        dp.set_on_lock_released = MagicMock()
+        dp.set_on_schedule_changed = MagicMock()
 
-        lm.register_person(person)
+        lm.register_anima(dp)
 
         # Add a cron task and reload
-        person.memory.read_cron_config.return_value = """\
+        dp.memory.read_cron_config.return_value = """\
 ## ログチェック
 schedule: 0 10 * * *
 type: llm
 サーバーログを確認する。
 """
-        result = lm.reload_person_schedule("bob")
+        result = lm.reload_anima_schedule("bob")
         assert result["reloaded"] == "bob"
         # Should have heartbeat + cron job
         assert len(result["new_jobs"]) >= 2
 
-    def test_register_person_wires_schedule_callback(self):
+    def test_register_anima_wires_schedule_callback(self):
         lm = LifecycleManager()
-        person = MagicMock()
-        person.name = "alice"
-        person.memory.read_heartbeat_config.return_value = ""
-        person.memory.read_cron_config.return_value = ""
-        person.set_on_lock_released = MagicMock()
-        person.set_on_schedule_changed = MagicMock()
+        dp = MagicMock()
+        dp.name = "alice"
+        dp.memory.read_heartbeat_config.return_value = ""
+        dp.memory.read_cron_config.return_value = ""
+        dp.set_on_lock_released = MagicMock()
+        dp.set_on_schedule_changed = MagicMock()
 
-        lm.register_person(person)
-        person.set_on_schedule_changed.assert_called_once_with(lm.reload_person_schedule)
+        lm.register_anima(dp)
+        dp.set_on_schedule_changed.assert_called_once_with(lm.reload_anima_schedule)

@@ -1,8 +1,8 @@
 """E2E tests for hiring_context injection into system prompts.
 
-Verifies that a solo top-level person sees the hiring context before
+Verifies that a solo top-level anima sees the hiring context before
 behavior_rules, and that the context is omitted when peers exist or
-the person has a supervisor.
+the anima has a supervisor.
 """
 
 from __future__ import annotations
@@ -19,23 +19,23 @@ class TestHiringContextE2E:
     """End-to-end: hiring_context placement in system prompt."""
 
     def _build_prompt_for(self, data_dir: Path, name: str) -> str:
-        """Helper: build system prompt for the named person."""
-        person_dir = data_dir / "persons" / name
-        memory = MemoryManager(person_dir)
+        """Helper: build system prompt for the named anima."""
+        anima_dir = data_dir / "animas" / name
+        memory = MemoryManager(anima_dir)
         return build_system_prompt(memory)
 
-    def test_solo_person_sees_hiring_context(self, data_dir: Path, make_person):
-        """Solo top-level person should see hiring context."""
-        make_person("solo")
+    def test_solo_anima_sees_hiring_context(self, data_dir: Path, make_anima):
+        """Solo top-level anima should see hiring context."""
+        make_anima("solo")
 
         prompt = self._build_prompt_for(data_dir, "solo")
 
         assert "チーム構成について" in prompt
         assert "唯一の社員" in prompt
 
-    def test_hiring_context_before_behavior_rules(self, data_dir: Path, make_person):
+    def test_hiring_context_before_behavior_rules(self, data_dir: Path, make_anima):
         """hiring_context must appear before behavior_rules."""
-        make_person("solo")
+        make_anima("solo")
 
         prompt = self._build_prompt_for(data_dir, "solo")
 
@@ -43,21 +43,21 @@ class TestHiringContextE2E:
         rules_pos = prompt.index("行動ルール")
         assert hiring_pos < rules_pos
 
-    def test_person_with_peers_no_hiring_context(self, data_dir: Path, make_person):
-        """Person with peers should NOT see hiring context."""
-        make_person("alice")
-        make_person("bob")
+    def test_anima_with_peers_no_hiring_context(self, data_dir: Path, make_anima):
+        """Anima with peers should NOT see hiring context."""
+        make_anima("alice")
+        make_anima("bob")
 
         prompt = self._build_prompt_for(data_dir, "alice")
 
         assert "チーム構成について" not in prompt
 
-    def test_person_with_supervisor_no_hiring_context(
-        self, data_dir: Path, make_person
+    def test_anima_with_supervisor_no_hiring_context(
+        self, data_dir: Path, make_anima
     ):
-        """Person with a supervisor should NOT see hiring context."""
-        make_person("boss")
-        make_person("worker", supervisor="boss")
+        """Anima with a supervisor should NOT see hiring context."""
+        make_anima("boss")
+        make_anima("worker", supervisor="boss")
 
         # worker has a supervisor → no hiring context
         prompt = self._build_prompt_for(data_dir, "worker")

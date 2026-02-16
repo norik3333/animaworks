@@ -25,7 +25,7 @@ def temp_dirs():
     with TemporaryDirectory() as tmpdir:
         tmp = Path(tmpdir)
         yield {
-            "persons_dir": tmp / "persons",
+            "animas_dir": tmp / "animas",
             "shared_dir": tmp / "shared",
             "run_dir": tmp / "run"
         }
@@ -35,7 +35,7 @@ def temp_dirs():
 def supervisor(temp_dirs):
     """Create a ProcessSupervisor instance."""
     return ProcessSupervisor(
-        persons_dir=temp_dirs["persons_dir"],
+        animas_dir=temp_dirs["animas_dir"],
         shared_dir=temp_dirs["shared_dir"],
         run_dir=temp_dirs["run_dir"],
         restart_policy=RestartPolicy(
@@ -55,7 +55,7 @@ def supervisor(temp_dirs):
 @pytest.mark.asyncio
 async def test_supervisor_initialization(supervisor, temp_dirs):
     """Test supervisor initialization."""
-    assert supervisor.persons_dir == temp_dirs["persons_dir"]
+    assert supervisor.animas_dir == temp_dirs["animas_dir"]
     assert supervisor.shared_dir == temp_dirs["shared_dir"]
     assert supervisor.run_dir == temp_dirs["run_dir"]
     assert len(supervisor.processes) == 0
@@ -104,7 +104,7 @@ async def test_supervisor_process_tracking(supervisor):
     """Test process handle tracking."""
     # Mock handle
     handle = MagicMock(spec=ProcessHandle)
-    handle.person_name = "test_person"
+    handle.anima_name = "test_anima"
     handle.state = ProcessState.RUNNING
     handle.get_pid.return_value = 12345
     handle.stats = MagicMock()
@@ -113,10 +113,10 @@ async def test_supervisor_process_tracking(supervisor):
     handle.stats.missed_pings = 0
     handle.stats.last_ping_at = None
 
-    supervisor.processes["test_person"] = handle
+    supervisor.processes["test_anima"] = handle
 
     # Get status
-    status = supervisor.get_process_status("test_person")
+    status = supervisor.get_process_status("test_anima")
     assert status["pid"] == 12345
     assert status["status"] == "running"
 
@@ -127,7 +127,7 @@ async def test_get_all_status(supervisor):
     # Add mock handles
     for name in ["alice", "bob"]:
         handle = MagicMock(spec=ProcessHandle)
-        handle.person_name = name
+        handle.anima_name = name
         handle.state = ProcessState.RUNNING
         handle.get_pid.return_value = 12345
         handle.stats = MagicMock()
@@ -151,8 +151,8 @@ async def test_supervisor_shutdown(supervisor):
     """Test graceful shutdown."""
     # Add mock handle
     handle = AsyncMock(spec=ProcessHandle)
-    handle.person_name = "test_person"
-    supervisor.processes["test_person"] = handle
+    handle.anima_name = "test_anima"
+    supervisor.processes["test_anima"] = handle
 
     # Shutdown
     await supervisor.shutdown_all()

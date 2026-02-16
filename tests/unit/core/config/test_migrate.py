@@ -93,21 +93,21 @@ class TestMigrateToConfigJson:
         yield
         invalidate_cache()
 
-    def test_migrate_no_persons(self, tmp_path):
+    def test_migrate_no_animas(self, tmp_path):
         data_dir = tmp_path / "data"
         data_dir.mkdir()
-        # No persons dir
+        # No animas dir
         with patch("core.config.models.get_config_path", return_value=data_dir / "config.json"):
             migrate_to_config_json(data_dir)
         config_path = data_dir / "config.json"
         assert config_path.exists()
         data = json.loads(config_path.read_text(encoding="utf-8"))
-        assert data["persons"] == {}
+        assert data["animas"] == {}
 
-    def test_migrate_with_person(self, tmp_path):
+    def test_migrate_with_anima(self, tmp_path):
         data_dir = tmp_path / "data"
-        persons_dir = data_dir / "persons"
-        alice_dir = persons_dir / "alice"
+        animas_dir = data_dir / "animas"
+        alice_dir = animas_dir / "alice"
         alice_dir.mkdir(parents=True)
         (alice_dir / "config.md").write_text(
             "- model: gpt-4o\n- max_tokens: 2048\n- api_key_env: OPENAI_API_KEY\n",
@@ -121,16 +121,16 @@ class TestMigrateToConfigJson:
 
         config_path = data_dir / "config.json"
         data = json.loads(config_path.read_text(encoding="utf-8"))
-        assert "alice" in data["persons"]
-        assert data["persons"]["alice"]["model"] == "gpt-4o"
-        assert data["persons"]["alice"]["max_tokens"] == 2048
+        assert "alice" in data["animas"]
+        assert data["animas"]["alice"]["model"] == "gpt-4o"
+        assert data["animas"]["alice"]["max_tokens"] == 2048
         assert "openai" in data["credentials"]
         assert data["credentials"]["openai"]["api_key"] == "sk-test123"
 
     def test_ensures_anthropic_credential(self, tmp_path):
         data_dir = tmp_path / "data"
-        persons_dir = data_dir / "persons"
-        bob_dir = persons_dir / "bob"
+        animas_dir = data_dir / "animas"
+        bob_dir = animas_dir / "bob"
         bob_dir.mkdir(parents=True)
         (bob_dir / "config.md").write_text(
             "- model: custom\n- api_key_env: CUSTOM_API_KEY\n",
@@ -147,21 +147,21 @@ class TestMigrateToConfigJson:
 
     def test_skips_non_directory(self, tmp_path):
         data_dir = tmp_path / "data"
-        persons_dir = data_dir / "persons"
-        persons_dir.mkdir(parents=True)
-        (persons_dir / "not_a_dir.txt").write_text("file", encoding="utf-8")
+        animas_dir = data_dir / "animas"
+        animas_dir.mkdir(parents=True)
+        (animas_dir / "not_a_dir.txt").write_text("file", encoding="utf-8")
 
         with patch("core.config.models.get_config_path", return_value=data_dir / "config.json"):
             invalidate_cache()
             migrate_to_config_json(data_dir)
 
         data = json.loads((data_dir / "config.json").read_text(encoding="utf-8"))
-        assert data["persons"] == {}
+        assert data["animas"] == {}
 
-    def test_skips_person_without_config_md(self, tmp_path):
+    def test_skips_anima_without_config_md(self, tmp_path):
         data_dir = tmp_path / "data"
-        persons_dir = data_dir / "persons"
-        (persons_dir / "alice").mkdir(parents=True)
+        animas_dir = data_dir / "animas"
+        (animas_dir / "alice").mkdir(parents=True)
         # No config.md
 
         with patch("core.config.models.get_config_path", return_value=data_dir / "config.json"):
@@ -169,4 +169,4 @@ class TestMigrateToConfigJson:
             migrate_to_config_json(data_dir)
 
         data = json.loads((data_dir / "config.json").read_text(encoding="utf-8"))
-        assert data["persons"] == {}
+        assert data["animas"] == {}

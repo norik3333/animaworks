@@ -37,8 +37,8 @@ def _install_litellm_mock(acompletion_mock: AsyncMock) -> MagicMock:
 
 
 @pytest.fixture
-def person_dir(tmp_path: Path) -> Path:
-    d = tmp_path / "persons" / "test"
+def anima_dir(tmp_path: Path) -> Path:
+    d = tmp_path / "animas" / "test"
     d.mkdir(parents=True)
     (d / "permissions.md").write_text("", encoding="utf-8")
     (d / "identity.md").write_text("# Test", encoding="utf-8")
@@ -60,19 +60,19 @@ def model_config() -> ModelConfig:
 
 
 @pytest.fixture
-def memory(person_dir: Path) -> MagicMock:
+def memory(anima_dir: Path) -> MagicMock:
     from core.memory import MemoryManager
     m = MagicMock(spec=MemoryManager)
     m.read_permissions.return_value = ""
     m.search_memory_text.return_value = []
-    m.person_dir = person_dir
+    m.anima_dir = anima_dir
     return m
 
 
 @pytest.fixture
-def tool_handler(person_dir: Path, memory: MagicMock) -> ToolHandler:
+def tool_handler(anima_dir: Path, memory: MagicMock) -> ToolHandler:
     return ToolHandler(
-        person_dir=person_dir,
+        anima_dir=anima_dir,
         memory=memory,
         tool_registry=[],
     )
@@ -81,14 +81,14 @@ def tool_handler(person_dir: Path, memory: MagicMock) -> ToolHandler:
 @pytest.fixture
 def executor(
     model_config: ModelConfig,
-    person_dir: Path,
+    anima_dir: Path,
     tool_handler: ToolHandler,
     memory: MagicMock,
 ):
     from core.execution.litellm_loop import LiteLLMExecutor
     return LiteLLMExecutor(
         model_config=model_config,
-        person_dir=person_dir,
+        anima_dir=anima_dir,
         tool_handler=tool_handler,
         tool_registry=[],
         memory=memory,
@@ -144,13 +144,13 @@ class TestBuildLlmKwargs:
         kwargs = executor._build_llm_kwargs()
         assert kwargs["api_key"] == "sk-test"
 
-    def test_includes_api_base(self, model_config: ModelConfig, person_dir: Path, memory: MagicMock):
+    def test_includes_api_base(self, model_config: ModelConfig, anima_dir: Path, memory: MagicMock):
         model_config.api_base_url = "http://localhost:11434/v1"
-        th = ToolHandler(person_dir=person_dir, memory=memory, tool_registry=[])
+        th = ToolHandler(anima_dir=anima_dir, memory=memory, tool_registry=[])
         from core.execution.litellm_loop import LiteLLMExecutor
         ex = LiteLLMExecutor(
             model_config=model_config,
-            person_dir=person_dir,
+            anima_dir=anima_dir,
             tool_handler=th,
             tool_registry=[],
             memory=memory,
@@ -231,9 +231,9 @@ class TestExecuteContextTracking:
             await executor.execute("test", system_prompt="sys", tracker=tracker)
         assert tracker.usage_ratio > 0
 
-    async def test_session_chaining(self, executor, person_dir: Path):
+    async def test_session_chaining(self, executor, anima_dir: Path):
         tracker = ContextTracker(model="openai/gpt-4o", threshold=0.50)
-        shortterm = ShortTermMemory(person_dir)
+        shortterm = ShortTermMemory(anima_dir)
 
         resp_threshold = make_litellm_response(
             content="Partial",
@@ -419,11 +419,11 @@ class TestToolExecutionErrorHandling:
 class TestSessionChainingExecutionMode:
     """H1: Session chaining partial must pass execution_mode='a2'."""
 
-    async def test_session_chaining_preserves_a2_mode(self, executor, person_dir: Path):
+    async def test_session_chaining_preserves_a2_mode(self, executor, anima_dir: Path):
         """When session chaining triggers, build_system_prompt must be called
         with execution_mode='a2'."""
         tracker = ContextTracker(model="openai/gpt-4o", threshold=0.50)
-        shortterm = ShortTermMemory(person_dir)
+        shortterm = ShortTermMemory(anima_dir)
 
         resp_threshold = make_litellm_response(
             content="Partial",

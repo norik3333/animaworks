@@ -140,29 +140,29 @@ class TestCmdList:
 
 
 class TestListLocal:
-    @patch("core.paths.get_persons_dir")
+    @patch("core.paths.get_animas_dir")
     @patch("core.init.ensure_runtime_dir")
-    def test_no_persons_dir(self, mock_ensure, mock_dir, tmp_path, capsys):
+    def test_no_animas_dir(self, mock_ensure, mock_dir, tmp_path, capsys):
         from cli.commands.messaging import _list_local
 
         mock_dir.return_value = tmp_path / "nonexistent"
         _list_local()
 
         captured = capsys.readouterr()
-        assert "No persons" in captured.out
+        assert "No animas" in captured.out
 
-    @patch("core.paths.get_persons_dir")
+    @patch("core.paths.get_animas_dir")
     @patch("core.init.ensure_runtime_dir")
-    def test_with_persons(self, mock_ensure, mock_dir, tmp_path, capsys):
+    def test_with_animas(self, mock_ensure, mock_dir, tmp_path, capsys):
         from cli.commands.messaging import _list_local
 
-        persons_dir = tmp_path / "persons"
-        persons_dir.mkdir()
-        alice_dir = persons_dir / "alice"
+        animas_dir = tmp_path / "animas"
+        animas_dir.mkdir()
+        alice_dir = animas_dir / "alice"
         alice_dir.mkdir()
         (alice_dir / "identity.md").write_text("# Alice", encoding="utf-8")
 
-        mock_dir.return_value = persons_dir
+        mock_dir.return_value = animas_dir
         _list_local()
 
         captured = capsys.readouterr()
@@ -179,7 +179,7 @@ class TestCmdStatus:
 
         mock_resp = MagicMock()
         mock_resp.json.return_value = {
-            "persons": 2,
+            "animas": 2,
             "scheduler_running": True,
             "jobs": [{"id": "hb1", "name": "heartbeat", "next_run": "2026-01-01"}],
         }
@@ -189,7 +189,7 @@ class TestCmdStatus:
         cmd_status(args)
 
         captured = capsys.readouterr()
-        assert "Persons: 2" in captured.out
+        assert "Animas: 2" in captured.out
         assert "running" in captured.out
 
     @patch("httpx.request", side_effect=__import__("httpx").ConnectError("fail"))

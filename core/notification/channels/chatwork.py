@@ -1,5 +1,5 @@
 from __future__ import annotations
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
@@ -31,7 +31,7 @@ class ChatworkChannel(NotificationChannel):
         body: str,
         priority: str = "normal",
         *,
-        person_name: str = "",
+        anima_name: str = "",
     ) -> str:
         token = self._resolve_env("api_token_env")
         if not token:
@@ -44,7 +44,7 @@ class ChatworkChannel(NotificationChannel):
             return "chatwork: ERROR - room_id must be numeric"
 
         prefix = f"[{priority.upper()}] " if priority in ("high", "urgent") else ""
-        sender = f" (from {person_name})" if person_name else ""
+        sender = f" (from {anima_name})" if anima_name else ""
         message = f"[info][title]{prefix}{subject}{sender}[/title]{body}[/info]"[:28000]
 
         url = _CHATWORK_API_URL.format(room_id=room_id)

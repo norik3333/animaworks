@@ -1,7 +1,7 @@
-"""Unit tests for the send wrapper script in person templates."""
+"""Unit tests for the send wrapper script in anima templates."""
 from __future__ import annotations
 
-from core.person_factory import BLANK_TEMPLATE_DIR
+from core.anima_factory import BLANK_TEMPLATE_DIR
 
 
 class TestSendScript:
@@ -16,7 +16,7 @@ class TestSendScript:
         assert content.startswith("#!/")
 
     def test_send_script_uses_basename_pwd(self):
-        """The send script should derive person name from pwd."""
+        """The send script should derive anima name from pwd."""
         content = (BLANK_TEMPLATE_DIR / "send").read_text(encoding="utf-8")
         assert "$(basename" in content or "basename" in content
 

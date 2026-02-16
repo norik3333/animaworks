@@ -27,7 +27,7 @@ def temp_dirs():
     with TemporaryDirectory() as tmpdir:
         tmp = Path(tmpdir)
         yield {
-            "persons_dir": tmp / "persons",
+            "animas_dir": tmp / "animas",
             "shared_dir": tmp / "shared",
             "run_dir": tmp / "run",
         }
@@ -37,7 +37,7 @@ def temp_dirs():
 def supervisor(temp_dirs):
     """Create a ProcessSupervisor instance."""
     return ProcessSupervisor(
-        persons_dir=temp_dirs["persons_dir"],
+        animas_dir=temp_dirs["animas_dir"],
         shared_dir=temp_dirs["shared_dir"],
         run_dir=temp_dirs["run_dir"],
         restart_policy=RestartPolicy(
@@ -54,72 +54,72 @@ def supervisor(temp_dirs):
     )
 
 
-# ── read_person_enabled ──────────────────────────────────────────
+# ── read_anima_enabled ──────────────────────────────────────────
 
 
 @pytest.mark.asyncio
-async def test_read_person_enabled_no_status_file(temp_dirs):
+async def test_read_anima_enabled_no_status_file(temp_dirs):
     """No status.json → returns True (backward compatibility)."""
-    person_dir = temp_dirs["persons_dir"] / "alice"
-    person_dir.mkdir(parents=True)
+    anima_dir = temp_dirs["animas_dir"] / "alice"
+    anima_dir.mkdir(parents=True)
 
-    result = ProcessSupervisor.read_person_enabled(person_dir)
+    result = ProcessSupervisor.read_anima_enabled(anima_dir)
 
     assert result is True
 
 
 @pytest.mark.asyncio
-async def test_read_person_enabled_true(temp_dirs):
+async def test_read_anima_enabled_true(temp_dirs):
     """status.json with enabled: true → returns True."""
-    person_dir = temp_dirs["persons_dir"] / "alice"
-    person_dir.mkdir(parents=True)
-    (person_dir / "status.json").write_text(
+    anima_dir = temp_dirs["animas_dir"] / "alice"
+    anima_dir.mkdir(parents=True)
+    (anima_dir / "status.json").write_text(
         json.dumps({"enabled": True}), encoding="utf-8"
     )
 
-    result = ProcessSupervisor.read_person_enabled(person_dir)
+    result = ProcessSupervisor.read_anima_enabled(anima_dir)
 
     assert result is True
 
 
 @pytest.mark.asyncio
-async def test_read_person_enabled_false(temp_dirs):
+async def test_read_anima_enabled_false(temp_dirs):
     """status.json with enabled: false → returns False."""
-    person_dir = temp_dirs["persons_dir"] / "alice"
-    person_dir.mkdir(parents=True)
-    (person_dir / "status.json").write_text(
+    anima_dir = temp_dirs["animas_dir"] / "alice"
+    anima_dir.mkdir(parents=True)
+    (anima_dir / "status.json").write_text(
         json.dumps({"enabled": False}), encoding="utf-8"
     )
 
-    result = ProcessSupervisor.read_person_enabled(person_dir)
+    result = ProcessSupervisor.read_anima_enabled(anima_dir)
 
     assert result is False
 
 
 @pytest.mark.asyncio
-async def test_read_person_enabled_missing_key(temp_dirs):
+async def test_read_anima_enabled_missing_key(temp_dirs):
     """status.json with empty object → returns True (default)."""
-    person_dir = temp_dirs["persons_dir"] / "alice"
-    person_dir.mkdir(parents=True)
-    (person_dir / "status.json").write_text(
+    anima_dir = temp_dirs["animas_dir"] / "alice"
+    anima_dir.mkdir(parents=True)
+    (anima_dir / "status.json").write_text(
         json.dumps({}), encoding="utf-8"
     )
 
-    result = ProcessSupervisor.read_person_enabled(person_dir)
+    result = ProcessSupervisor.read_anima_enabled(anima_dir)
 
     assert result is True
 
 
 @pytest.mark.asyncio
-async def test_read_person_enabled_invalid_json(temp_dirs):
+async def test_read_anima_enabled_invalid_json(temp_dirs):
     """status.json with invalid JSON → returns True (safe fallback)."""
-    person_dir = temp_dirs["persons_dir"] / "alice"
-    person_dir.mkdir(parents=True)
-    (person_dir / "status.json").write_text(
+    anima_dir = temp_dirs["animas_dir"] / "alice"
+    anima_dir.mkdir(parents=True)
+    (anima_dir / "status.json").write_text(
         "not valid json!!!", encoding="utf-8"
     )
 
-    result = ProcessSupervisor.read_person_enabled(person_dir)
+    result = ProcessSupervisor.read_anima_enabled(anima_dir)
 
     assert result is True
 
@@ -128,35 +128,35 @@ async def test_read_person_enabled_invalid_json(temp_dirs):
 
 
 @pytest.mark.asyncio
-async def test_reconcile_starts_enabled_person(supervisor, temp_dirs):
-    """Enabled person on disk, not running → start_person() + on_person_added called."""
-    persons_dir = temp_dirs["persons_dir"]
-    persons_dir.mkdir(parents=True)
-    alice_dir = persons_dir / "alice"
+async def test_reconcile_starts_enabled_anima(supervisor, temp_dirs):
+    """Enabled anima on disk, not running → start_anima() + on_anima_added called."""
+    animas_dir = temp_dirs["animas_dir"]
+    animas_dir.mkdir(parents=True)
+    alice_dir = animas_dir / "alice"
     alice_dir.mkdir()
     (alice_dir / "identity.md").write_text("Alice identity", encoding="utf-8")
     (alice_dir / "status.json").write_text(
         json.dumps({"enabled": True}), encoding="utf-8"
     )
 
-    supervisor.start_person = AsyncMock()
-    supervisor.stop_person = AsyncMock()
+    supervisor.start_anima = AsyncMock()
+    supervisor.stop_anima = AsyncMock()
     callback = MagicMock()
-    supervisor.on_person_added = callback
+    supervisor.on_anima_added = callback
 
     await supervisor._reconcile()
 
-    supervisor.start_person.assert_called_once_with("alice")
+    supervisor.start_anima.assert_called_once_with("alice")
     callback.assert_called_once_with("alice")
-    supervisor.stop_person.assert_not_called()
+    supervisor.stop_anima.assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_reconcile_stops_disabled_person(supervisor, temp_dirs):
-    """Disabled person on disk, running → stop_person() + on_person_removed called."""
-    persons_dir = temp_dirs["persons_dir"]
-    persons_dir.mkdir(parents=True)
-    alice_dir = persons_dir / "alice"
+async def test_reconcile_stops_disabled_anima(supervisor, temp_dirs):
+    """Disabled anima on disk, running → stop_anima() + on_anima_removed called."""
+    animas_dir = temp_dirs["animas_dir"]
+    animas_dir.mkdir(parents=True)
+    alice_dir = animas_dir / "alice"
     alice_dir.mkdir()
     (alice_dir / "identity.md").write_text("Alice identity", encoding="utf-8")
     (alice_dir / "status.json").write_text(
@@ -165,89 +165,89 @@ async def test_reconcile_stops_disabled_person(supervisor, temp_dirs):
 
     # Simulate running process
     handle = MagicMock(spec=ProcessHandle)
-    handle.person_name = "alice"
+    handle.anima_name = "alice"
     supervisor.processes["alice"] = handle
 
-    supervisor.start_person = AsyncMock()
-    supervisor.stop_person = AsyncMock()
+    supervisor.start_anima = AsyncMock()
+    supervisor.stop_anima = AsyncMock()
     callback = MagicMock()
-    supervisor.on_person_removed = callback
+    supervisor.on_anima_removed = callback
 
     await supervisor._reconcile()
 
-    supervisor.stop_person.assert_called_once_with("alice")
+    supervisor.stop_anima.assert_called_once_with("alice")
     callback.assert_called_once_with("alice")
-    supervisor.start_person.assert_not_called()
+    supervisor.start_anima.assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_reconcile_stops_removed_person(supervisor, temp_dirs):
-    """Person in processes but not on disk → stop_person() + on_person_removed called."""
-    persons_dir = temp_dirs["persons_dir"]
-    persons_dir.mkdir(parents=True)
+async def test_reconcile_stops_removed_anima(supervisor, temp_dirs):
+    """Anima in processes but not on disk → stop_anima() + on_anima_removed called."""
+    animas_dir = temp_dirs["animas_dir"]
+    animas_dir.mkdir(parents=True)
 
     # Process running but no directory on disk
     handle = MagicMock(spec=ProcessHandle)
-    handle.person_name = "alice"
+    handle.anima_name = "alice"
     supervisor.processes["alice"] = handle
 
-    supervisor.start_person = AsyncMock()
-    supervisor.stop_person = AsyncMock()
+    supervisor.start_anima = AsyncMock()
+    supervisor.stop_anima = AsyncMock()
     callback = MagicMock()
-    supervisor.on_person_removed = callback
+    supervisor.on_anima_removed = callback
 
     await supervisor._reconcile()
 
-    supervisor.stop_person.assert_called_once_with("alice")
+    supervisor.stop_anima.assert_called_once_with("alice")
     callback.assert_called_once_with("alice")
-    supervisor.start_person.assert_not_called()
+    supervisor.start_anima.assert_not_called()
 
 
 @pytest.mark.asyncio
 async def test_reconcile_no_status_file_backward_compat(supervisor, temp_dirs):
-    """Person with identity.md but no status.json → treated as enabled, started."""
-    persons_dir = temp_dirs["persons_dir"]
-    persons_dir.mkdir(parents=True)
-    alice_dir = persons_dir / "alice"
+    """Anima with identity.md but no status.json → treated as enabled, started."""
+    animas_dir = temp_dirs["animas_dir"]
+    animas_dir.mkdir(parents=True)
+    alice_dir = animas_dir / "alice"
     alice_dir.mkdir()
     (alice_dir / "identity.md").write_text("Alice identity", encoding="utf-8")
     # No status.json
 
-    supervisor.start_person = AsyncMock()
-    supervisor.stop_person = AsyncMock()
+    supervisor.start_anima = AsyncMock()
+    supervisor.stop_anima = AsyncMock()
     callback = MagicMock()
-    supervisor.on_person_added = callback
+    supervisor.on_anima_added = callback
 
     await supervisor._reconcile()
 
-    supervisor.start_person.assert_called_once_with("alice")
+    supervisor.start_anima.assert_called_once_with("alice")
     callback.assert_called_once_with("alice")
 
 
 @pytest.mark.asyncio
 async def test_reconcile_skips_dir_without_identity(supervisor, temp_dirs):
     """Directory exists but no identity.md → skipped."""
-    persons_dir = temp_dirs["persons_dir"]
-    persons_dir.mkdir(parents=True)
-    alice_dir = persons_dir / "alice"
+    animas_dir = temp_dirs["animas_dir"]
+    animas_dir.mkdir(parents=True)
+    alice_dir = animas_dir / "alice"
     alice_dir.mkdir()
     # No identity.md
 
-    supervisor.start_person = AsyncMock()
-    supervisor.stop_person = AsyncMock()
+    supervisor.start_anima = AsyncMock()
+    supervisor.stop_anima = AsyncMock()
 
     await supervisor._reconcile()
 
-    supervisor.start_person.assert_not_called()
-    supervisor.stop_person.assert_not_called()
+    supervisor.start_anima.assert_not_called()
+    supervisor.stop_anima.assert_not_called()
 
 
 @pytest.mark.asyncio
 async def test_reconcile_skips_already_running(supervisor, temp_dirs):
-    """Enabled person already running → no action."""
-    persons_dir = temp_dirs["persons_dir"]
-    persons_dir.mkdir(parents=True)
-    alice_dir = persons_dir / "alice"
+    """Enabled anima already running → no action."""
+    animas_dir = temp_dirs["animas_dir"]
+    animas_dir.mkdir(parents=True)
+    alice_dir = animas_dir / "alice"
     alice_dir.mkdir()
     (alice_dir / "identity.md").write_text("Alice identity", encoding="utf-8")
     (alice_dir / "status.json").write_text(
@@ -256,45 +256,45 @@ async def test_reconcile_skips_already_running(supervisor, temp_dirs):
 
     # Already running
     handle = MagicMock(spec=ProcessHandle)
-    handle.person_name = "alice"
+    handle.anima_name = "alice"
     supervisor.processes["alice"] = handle
 
-    supervisor.start_person = AsyncMock()
-    supervisor.stop_person = AsyncMock()
+    supervisor.start_anima = AsyncMock()
+    supervisor.stop_anima = AsyncMock()
 
     await supervisor._reconcile()
 
-    supervisor.start_person.assert_not_called()
-    supervisor.stop_person.assert_not_called()
+    supervisor.start_anima.assert_not_called()
+    supervisor.stop_anima.assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_reconcile_start_person_failure(supervisor, temp_dirs):
-    """start_person raises → exception logged, other persons still processed."""
-    persons_dir = temp_dirs["persons_dir"]
-    persons_dir.mkdir(parents=True)
-    alice_dir = persons_dir / "alice"
+async def test_reconcile_start_anima_failure(supervisor, temp_dirs):
+    """start_anima raises → exception logged, other animas still processed."""
+    animas_dir = temp_dirs["animas_dir"]
+    animas_dir.mkdir(parents=True)
+    alice_dir = animas_dir / "alice"
     alice_dir.mkdir()
     (alice_dir / "identity.md").write_text("Alice identity", encoding="utf-8")
-    bob_dir = persons_dir / "bob"
+    bob_dir = animas_dir / "bob"
     bob_dir.mkdir()
     (bob_dir / "identity.md").write_text("Bob identity", encoding="utf-8")
 
-    # start_person fails for alice but succeeds for bob
+    # start_anima fails for alice but succeeds for bob
     async def start_side_effect(name: str) -> None:
         if name == "alice":
             raise RuntimeError("spawn failed")
 
-    supervisor.start_person = AsyncMock(side_effect=start_side_effect)
-    supervisor.stop_person = AsyncMock()
+    supervisor.start_anima = AsyncMock(side_effect=start_side_effect)
+    supervisor.stop_anima = AsyncMock()
     added_callback = MagicMock()
-    supervisor.on_person_added = added_callback
+    supervisor.on_anima_added = added_callback
 
     # Should not raise — failure is caught internally
     await supervisor._reconcile()
 
     # alice attempted but failed; bob attempted and succeeded
-    assert supervisor.start_person.call_count == 2
+    assert supervisor.start_anima.call_count == 2
     # Callback only invoked for successful starts (bob)
     added_callback.assert_called_once_with("bob")
 
@@ -302,24 +302,24 @@ async def test_reconcile_start_person_failure(supervisor, temp_dirs):
 @pytest.mark.asyncio
 async def test_reconcile_callback_not_set(supervisor, temp_dirs):
     """Callbacks are None → no error when reconciliation triggers actions."""
-    persons_dir = temp_dirs["persons_dir"]
-    persons_dir.mkdir(parents=True)
-    alice_dir = persons_dir / "alice"
+    animas_dir = temp_dirs["animas_dir"]
+    animas_dir.mkdir(parents=True)
+    alice_dir = animas_dir / "alice"
     alice_dir.mkdir()
     (alice_dir / "identity.md").write_text("Alice identity", encoding="utf-8")
     (alice_dir / "status.json").write_text(
         json.dumps({"enabled": True}), encoding="utf-8"
     )
 
-    supervisor.start_person = AsyncMock()
-    supervisor.stop_person = AsyncMock()
-    supervisor.on_person_added = None
-    supervisor.on_person_removed = None
+    supervisor.start_anima = AsyncMock()
+    supervisor.stop_anima = AsyncMock()
+    supervisor.on_anima_added = None
+    supervisor.on_anima_removed = None
 
     # Should not raise
     await supervisor._reconcile()
 
-    supervisor.start_person.assert_called_once_with("alice")
+    supervisor.start_anima.assert_called_once_with("alice")
 
 
 # ── ReconciliationConfig ─────────────────────────────────────────

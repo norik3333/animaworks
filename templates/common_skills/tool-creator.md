@@ -188,12 +188,12 @@ refresh_tools()
 
 ### Step 5: 共有（任意）
 
-他のPersonにも使ってほしい場合は共有ツールに:
+他のAnimaにも使ってほしい場合は共有ツールに:
 ```
 share_tool(tool_name="my_tool")
 ```
 
-これにより `common_tools/` にコピーされ、全Personから利用可能になります。
+これにより `common_tools/` にコピーされ、全Animaから利用可能になります。
 
 ## 必須インターフェース
 
@@ -238,7 +238,7 @@ share_tool(tool_name="my_tool")
    api_key = get_credential("service_name", "tool_name", env_var="ENV_VAR_NAME")
    ```
 
-2. **アクセス制限**: 他のPersonのディレクトリにはアクセスしない
+2. **アクセス制限**: 他のAnimaのディレクトリにはアクセスしない
 
 3. **タイムアウト**: 外部APIには必ずタイムアウトを設定する（推奨: 30秒）
 

@@ -1,5 +1,5 @@
 from __future__ import annotations
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
@@ -18,24 +18,24 @@ def create_memory_router() -> APIRouter:
 
     # ── Episodes ──────────────────────────────────────────
 
-    @router.get("/persons/{name}/episodes")
+    @router.get("/animas/{name}/episodes")
     async def list_episodes(name: str, request: Request):
-        persons_dir = request.app.state.persons_dir
-        person_dir = persons_dir / name
-        if not person_dir.exists():
-            raise HTTPException(status_code=404, detail=f"Person not found: {name}")
+        animas_dir = request.app.state.animas_dir
+        anima_dir = animas_dir / name
+        if not anima_dir.exists():
+            raise HTTPException(status_code=404, detail=f"Anima not found: {name}")
 
-        memory = MemoryManager(person_dir)
+        memory = MemoryManager(anima_dir)
         return {"files": memory.list_episode_files()}
 
-    @router.get("/persons/{name}/episodes/{date}")
+    @router.get("/animas/{name}/episodes/{date}")
     async def get_episode(name: str, date: str, request: Request):
-        persons_dir = request.app.state.persons_dir
-        person_dir = persons_dir / name
-        if not person_dir.exists():
-            raise HTTPException(status_code=404, detail=f"Person not found: {name}")
+        animas_dir = request.app.state.animas_dir
+        anima_dir = animas_dir / name
+        if not anima_dir.exists():
+            raise HTTPException(status_code=404, detail=f"Anima not found: {name}")
 
-        memory = MemoryManager(person_dir)
+        memory = MemoryManager(anima_dir)
         path = memory.episodes_dir / f"{date}.md"
         if not path.exists():
             raise HTTPException(status_code=404, detail="Episode not found")
@@ -47,24 +47,24 @@ def create_memory_router() -> APIRouter:
 
     # ── Knowledge ─────────────────────────────────────────
 
-    @router.get("/persons/{name}/knowledge")
+    @router.get("/animas/{name}/knowledge")
     async def list_knowledge(name: str, request: Request):
-        persons_dir = request.app.state.persons_dir
-        person_dir = persons_dir / name
-        if not person_dir.exists():
-            raise HTTPException(status_code=404, detail=f"Person not found: {name}")
+        animas_dir = request.app.state.animas_dir
+        anima_dir = animas_dir / name
+        if not anima_dir.exists():
+            raise HTTPException(status_code=404, detail=f"Anima not found: {name}")
 
-        memory = MemoryManager(person_dir)
+        memory = MemoryManager(anima_dir)
         return {"files": memory.list_knowledge_files()}
 
-    @router.get("/persons/{name}/knowledge/{topic}")
+    @router.get("/animas/{name}/knowledge/{topic}")
     async def get_knowledge(name: str, topic: str, request: Request):
-        persons_dir = request.app.state.persons_dir
-        person_dir = persons_dir / name
-        if not person_dir.exists():
-            raise HTTPException(status_code=404, detail=f"Person not found: {name}")
+        animas_dir = request.app.state.animas_dir
+        anima_dir = animas_dir / name
+        if not anima_dir.exists():
+            raise HTTPException(status_code=404, detail=f"Anima not found: {name}")
 
-        memory = MemoryManager(person_dir)
+        memory = MemoryManager(anima_dir)
         path = memory.knowledge_dir / f"{topic}.md"
         if not path.exists():
             raise HTTPException(status_code=404, detail="Knowledge not found")
@@ -76,24 +76,24 @@ def create_memory_router() -> APIRouter:
 
     # ── Procedures ────────────────────────────────────────
 
-    @router.get("/persons/{name}/procedures")
+    @router.get("/animas/{name}/procedures")
     async def list_procedures(name: str, request: Request):
-        persons_dir = request.app.state.persons_dir
-        person_dir = persons_dir / name
-        if not person_dir.exists():
-            raise HTTPException(status_code=404, detail=f"Person not found: {name}")
+        animas_dir = request.app.state.animas_dir
+        anima_dir = animas_dir / name
+        if not anima_dir.exists():
+            raise HTTPException(status_code=404, detail=f"Anima not found: {name}")
 
-        memory = MemoryManager(person_dir)
+        memory = MemoryManager(anima_dir)
         return {"files": memory.list_procedure_files()}
 
-    @router.get("/persons/{name}/procedures/{proc}")
+    @router.get("/animas/{name}/procedures/{proc}")
     async def get_procedure(name: str, proc: str, request: Request):
-        persons_dir = request.app.state.persons_dir
-        person_dir = persons_dir / name
-        if not person_dir.exists():
-            raise HTTPException(status_code=404, detail=f"Person not found: {name}")
+        animas_dir = request.app.state.animas_dir
+        anima_dir = animas_dir / name
+        if not anima_dir.exists():
+            raise HTTPException(status_code=404, detail=f"Anima not found: {name}")
 
-        memory = MemoryManager(person_dir)
+        memory = MemoryManager(anima_dir)
         path = memory.procedures_dir / f"{proc}.md"
         if not path.exists():
             raise HTTPException(status_code=404, detail="Procedure not found")
@@ -105,22 +105,22 @@ def create_memory_router() -> APIRouter:
 
     # ── Conversation ──────────────────────────────────────
 
-    @router.get("/persons/{name}/conversation")
+    @router.get("/animas/{name}/conversation")
     async def get_conversation(name: str, request: Request):
         """View current conversation state."""
-        persons_dir = request.app.state.persons_dir
-        person_dir = persons_dir / name
-        if not person_dir.exists():
-            raise HTTPException(status_code=404, detail=f"Person not found: {name}")
+        animas_dir = request.app.state.animas_dir
+        anima_dir = animas_dir / name
+        if not anima_dir.exists():
+            raise HTTPException(status_code=404, detail=f"Anima not found: {name}")
 
-        # Read model config from person directory
+        # Read model config from anima directory
         from core.config.models import load_model_config
-        model_config = load_model_config(person_dir)
+        model_config = load_model_config(anima_dir)
 
-        conv = ConversationMemory(person_dir, model_config)
+        conv = ConversationMemory(anima_dir, model_config)
         state = conv.load()
         return {
-            "person": name,
+            "anima": name,
             "total_turn_count": state.total_turn_count,
             "raw_turns": len(state.turns),
             "compressed_turn_count": state.compressed_turn_count,
@@ -146,21 +146,21 @@ def create_memory_router() -> APIRouter:
             ],
         }
 
-    @router.get("/persons/{name}/conversation/full")
+    @router.get("/animas/{name}/conversation/full")
     async def get_conversation_full(
         name: str, limit: int = 50, offset: int = 0,
         request: Request = None,
     ):
         """View full conversation history (not truncated)."""
-        persons_dir = request.app.state.persons_dir
-        person_dir = persons_dir / name
-        if not person_dir.exists():
-            raise HTTPException(status_code=404, detail=f"Person not found: {name}")
+        animas_dir = request.app.state.animas_dir
+        anima_dir = animas_dir / name
+        if not anima_dir.exists():
+            raise HTTPException(status_code=404, detail=f"Anima not found: {name}")
 
         from core.config.models import load_model_config
-        model_config = load_model_config(person_dir)
+        model_config = load_model_config(anima_dir)
 
-        conv = ConversationMemory(person_dir, model_config)
+        conv = ConversationMemory(anima_dir, model_config)
         state = conv.load()
 
         total = len(state.turns)
@@ -169,7 +169,7 @@ def create_memory_router() -> APIRouter:
         paginated = state.turns[start:end]
 
         return {
-            "person": name,
+            "anima": name,
             "total_turn_count": state.total_turn_count,
             "raw_turns": total,
             "compressed_turn_count": state.compressed_turn_count,
@@ -187,53 +187,53 @@ def create_memory_router() -> APIRouter:
             ],
         }
 
-    @router.delete("/persons/{name}/conversation")
+    @router.delete("/animas/{name}/conversation")
     async def clear_conversation(name: str, request: Request):
         """Clear conversation history for a fresh start."""
-        persons_dir = request.app.state.persons_dir
-        person_dir = persons_dir / name
-        if not person_dir.exists():
-            raise HTTPException(status_code=404, detail=f"Person not found: {name}")
+        animas_dir = request.app.state.animas_dir
+        anima_dir = animas_dir / name
+        if not anima_dir.exists():
+            raise HTTPException(status_code=404, detail=f"Anima not found: {name}")
 
         from core.config.models import load_model_config
-        model_config = load_model_config(person_dir)
+        model_config = load_model_config(anima_dir)
 
-        conv = ConversationMemory(person_dir, model_config)
+        conv = ConversationMemory(anima_dir, model_config)
         conv.clear()
-        return {"status": "cleared", "person": name}
+        return {"status": "cleared", "anima": name}
 
-    @router.post("/persons/{name}/conversation/compress")
+    @router.post("/animas/{name}/conversation/compress")
     async def compress_conversation(name: str, request: Request):
         """Manually trigger conversation compression."""
-        persons_dir = request.app.state.persons_dir
-        person_dir = persons_dir / name
-        if not person_dir.exists():
-            raise HTTPException(status_code=404, detail=f"Person not found: {name}")
+        animas_dir = request.app.state.animas_dir
+        anima_dir = animas_dir / name
+        if not anima_dir.exists():
+            raise HTTPException(status_code=404, detail=f"Anima not found: {name}")
 
         from core.config.models import load_model_config
-        model_config = load_model_config(person_dir)
+        model_config = load_model_config(anima_dir)
 
-        conv = ConversationMemory(person_dir, model_config)
+        conv = ConversationMemory(anima_dir, model_config)
         compressed = await conv.compress_if_needed()
         state = conv.load()
         return {
             "compressed": compressed,
-            "person": name,
+            "anima": name,
             "total_turn_count": state.total_turn_count,
             "total_token_estimate": state.total_token_estimate,
         }
 
     # ── Stats ─────────────────────────────────────────────
 
-    @router.get("/persons/{name}/memory/stats")
+    @router.get("/animas/{name}/memory/stats")
     async def memory_stats(name: str, request: Request):
-        """Return memory storage statistics for a person."""
-        persons_dir = request.app.state.persons_dir
-        person_dir = persons_dir / name
-        if not person_dir.exists():
-            raise HTTPException(status_code=404, detail=f"Person not found: {name}")
+        """Return memory storage statistics for an anima."""
+        animas_dir = request.app.state.animas_dir
+        anima_dir = animas_dir / name
+        if not anima_dir.exists():
+            raise HTTPException(status_code=404, detail=f"Anima not found: {name}")
 
-        memory = MemoryManager(person_dir)
+        memory = MemoryManager(anima_dir)
 
         def dir_stats(directory):
             if not directory.exists():
@@ -245,7 +245,7 @@ def create_memory_router() -> APIRouter:
             }
 
         return {
-            "person": name,
+            "anima": name,
             "episodes": dir_stats(memory.episodes_dir),
             "knowledge": dir_stats(memory.knowledge_dir),
             "procedures": dir_stats(memory.procedures_dir),

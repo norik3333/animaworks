@@ -18,7 +18,7 @@ def cli_main() -> None:
     )
 
     parser = argparse.ArgumentParser(
-        description="AnimaWorks - Digital Person Framework"
+        description="AnimaWorks - Digital Anima Framework"
     )
     parser.add_argument("--gateway-url", default=None, help="Gateway URL")
     parser.add_argument(
@@ -37,33 +37,33 @@ def cli_main() -> None:
     )
     init_mode.add_argument(
         "--template", metavar="NAME",
-        help="Non-interactive: create person from named template",
+        help="Non-interactive: create anima from named template",
     )
     init_mode.add_argument(
         "--from-md", metavar="PATH",
-        help="Non-interactive: create person from MD file",
+        help="Non-interactive: create anima from MD file",
     )
     init_mode.add_argument(
         "--blank", metavar="NAME",
-        help="Non-interactive: create blank person with given name",
+        help="Non-interactive: create blank anima with given name",
     )
     init_mode.add_argument(
-        "--skip-person", action="store_true",
-        help="Initialize infrastructure only, skip person creation",
+        "--skip-anima", action="store_true",
+        help="Initialize infrastructure only, skip anima creation",
     )
     p_init.add_argument(
         "--name", default=None,
-        help="Override person name (used with --from-md)",
+        help="Override anima name (used with --from-md)",
     )
     p_init.set_defaults(func=_lazy_init)
 
-    # ── Create Person ─────────────────────────────────────
+    # ── Create Anima ─────────────────────────────────────
     p_create = sub.add_parser(
-        "create-person", help="Create a new Digital Person"
+        "create-anima", help="Create a new Digital Anima"
     )
     p_create.add_argument(
         "--name", default=None,
-        help="Person name (required for blank, optional for template/md)",
+        help="Anima name (required for blank, optional for template/md)",
     )
     p_create.add_argument(
         "--template", default=None,
@@ -73,7 +73,7 @@ def cli_main() -> None:
         "--from-md", default=None, metavar="PATH",
         help="Create from an MD file",
     )
-    p_create.set_defaults(func=_lazy_create_person)
+    p_create.set_defaults(func=_lazy_create_anima)
 
     # ── Start ─────────────────────────────────────────────
     p_start = sub.add_parser("start", help="Start the AnimaWorks server")
@@ -116,8 +116,8 @@ def cli_main() -> None:
     p_wk.set_defaults(func=_lazy_worker)
 
     # ── Chat ──────────────────────────────────────────────
-    p_chat = sub.add_parser("chat", help="Chat with a person")
-    p_chat.add_argument("person", help="Person name")
+    p_chat = sub.add_parser("chat", help="Chat with an anima")
+    p_chat.add_argument("anima", help="Anima name")
     p_chat.add_argument("message", help="Message to send")
     p_chat.add_argument(
         "--local", action="store_true", help="Direct mode (no gateway)"
@@ -130,14 +130,14 @@ def cli_main() -> None:
 
     # ── Heartbeat ─────────────────────────────────────────
     p_hb = sub.add_parser("heartbeat", help="Trigger heartbeat")
-    p_hb.add_argument("person", help="Person name")
+    p_hb.add_argument("anima", help="Anima name")
     p_hb.add_argument(
         "--local", action="store_true", help="Direct mode (no gateway)"
     )
     p_hb.set_defaults(func=_lazy_heartbeat)
 
     # ── Send ──────────────────────────────────────────────
-    p_send = sub.add_parser("send", help="Send message between persons")
+    p_send = sub.add_parser("send", help="Send message between animas")
     p_send.add_argument("from_person", help="Sender name")
     p_send.add_argument("to_person", help="Recipient name")
     p_send.add_argument("message", help="Message content")
@@ -146,7 +146,7 @@ def cli_main() -> None:
     p_send.set_defaults(func=_lazy_send)
 
     # ── List ──────────────────────────────────────────────
-    p_list = sub.add_parser("list", help="List all persons")
+    p_list = sub.add_parser("list", help="List all animas")
     p_list.add_argument(
         "--local", action="store_true", help="Scan filesystem directly"
     )
@@ -196,32 +196,32 @@ def cli_main() -> None:
     )
     p_cfg_list.set_defaults(func=cmd_config_list)
 
-    # ── Person Management ─────────────────────────────────────
-    p_person = sub.add_parser("person", help="Manage person processes")
-    person_sub = p_person.add_subparsers(dest="person_command")
+    # ── Anima Management ─────────────────────────────────────
+    p_anima = sub.add_parser("anima", help="Manage anima processes")
+    anima_sub = p_anima.add_subparsers(dest="anima_command")
 
-    # person restart
-    p_person_restart = person_sub.add_parser("restart", help="Restart a person process")
-    p_person_restart.add_argument("person", help="Person name")
-    p_person_restart.set_defaults(func=_lazy_person_restart)
+    # anima restart
+    p_anima_restart = anima_sub.add_parser("restart", help="Restart an anima process")
+    p_anima_restart.add_argument("anima", help="Anima name")
+    p_anima_restart.set_defaults(func=_lazy_anima_restart)
 
-    # person status
-    p_person_status = person_sub.add_parser("status", help="Show person process status")
-    p_person_status.add_argument(
-        "person", nargs="?", default=None,
-        help="Person name (omit for all persons)"
+    # anima status
+    p_anima_status = anima_sub.add_parser("status", help="Show anima process status")
+    p_anima_status.add_argument(
+        "anima", nargs="?", default=None,
+        help="Anima name (omit for all animas)"
     )
-    p_person_status.set_defaults(func=_lazy_person_status)
+    p_anima_status.set_defaults(func=_lazy_anima_status)
 
     # ── Logs ──────────────────────────────────────────────────
-    p_logs = sub.add_parser("logs", help="View person logs")
+    p_logs = sub.add_parser("logs", help="View anima logs")
     p_logs.add_argument(
-        "person", nargs="?", default=None,
-        help="Person name (required unless --all)"
+        "anima", nargs="?", default=None,
+        help="Anima name (required unless --all)"
     )
     p_logs.add_argument(
         "--all", action="store_true",
-        help="Show all logs (server + all persons)"
+        help="Show all logs (server + all animas)"
     )
     p_logs.add_argument(
         "--lines", type=int, default=50,
@@ -271,10 +271,10 @@ def _lazy_init(args: argparse.Namespace) -> None:
     cmd_init(args)
 
 
-def _lazy_create_person(args: argparse.Namespace) -> None:
-    from cli.commands.person import cmd_create_person
+def _lazy_create_anima(args: argparse.Namespace) -> None:
+    from cli.commands.anima import cmd_create_anima
 
-    cmd_create_person(args)
+    cmd_create_anima(args)
 
 
 def _lazy_start(args: argparse.Namespace) -> None:
@@ -320,13 +320,13 @@ def _lazy_worker(args: argparse.Namespace) -> None:
 
 
 def _lazy_chat(args: argparse.Namespace) -> None:
-    from cli.commands.person import cmd_chat
+    from cli.commands.anima import cmd_chat
 
     cmd_chat(args)
 
 
 def _lazy_heartbeat(args: argparse.Namespace) -> None:
-    from cli.commands.person import cmd_heartbeat
+    from cli.commands.anima import cmd_heartbeat
 
     cmd_heartbeat(args)
 
@@ -343,16 +343,16 @@ def _lazy_list(args: argparse.Namespace) -> None:
     cmd_list(args)
 
 
-def _lazy_person_restart(args: argparse.Namespace) -> None:
-    from cli.commands.person_mgmt import cmd_person_restart
+def _lazy_anima_restart(args: argparse.Namespace) -> None:
+    from cli.commands.anima_mgmt import cmd_anima_restart
 
-    cmd_person_restart(args)
+    cmd_anima_restart(args)
 
 
-def _lazy_person_status(args: argparse.Namespace) -> None:
-    from cli.commands.person_mgmt import cmd_person_status
+def _lazy_anima_status(args: argparse.Namespace) -> None:
+    from cli.commands.anima_mgmt import cmd_anima_status
 
-    cmd_person_status(args)
+    cmd_anima_status(args)
 
 
 def _lazy_logs(args: argparse.Namespace) -> None:
@@ -371,9 +371,9 @@ def _lazy_migrate_cron(args: argparse.Namespace) -> None:
     from core.config.migrate import migrate_all_cron
     from core.paths import get_data_dir
 
-    persons_dir = get_data_dir() / "persons"
-    count = migrate_all_cron(persons_dir)
+    animas_dir = get_data_dir() / "animas"
+    count = migrate_all_cron(animas_dir)
     if count:
-        print(f"Migrated {count} person(s) to standard cron format.")
+        print(f"Migrated {count} anima(s) to standard cron format.")
     else:
         print("No migration needed — all cron.md files are already in standard format.")

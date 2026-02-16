@@ -1,4 +1,4 @@
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
@@ -7,12 +7,12 @@
 
 """Conversation memory (会話記憶 / ワーキングメモリ) management.
 
-Maintains a rolling history of chat turns per DigitalPerson.
+Maintains a rolling history of chat turns per DigitalAnima.
 When the accumulated history exceeds the configured threshold,
 older turns are compressed into an LLM-generated summary while
 recent turns are kept verbatim.
 
-Storage: ``{person_dir}/state/conversation.json``
+Storage: ``{anima_dir}/state/conversation.json``
 """
 
 from __future__ import annotations
@@ -60,7 +60,7 @@ class ConversationTurn:
 class ConversationState:
     """Full conversation state including compressed summary."""
 
-    person_name: str = ""
+    anima_name: str = ""
     turns: list[ConversationTurn] = field(default_factory=list)
     compressed_summary: str = ""
     compressed_turn_count: int = 0
@@ -82,19 +82,19 @@ class ConversationState:
 
 
 class ConversationMemory:
-    """Manages per-person conversation history with automatic compression."""
+    """Manages per-anima conversation history with automatic compression."""
 
     def __init__(
         self,
-        person_dir: Path,
+        anima_dir: Path,
         model_config: ModelConfig,
     ) -> None:
-        self.person_dir = person_dir
-        self.person_name = person_dir.name
+        self.anima_dir = anima_dir
+        self.anima_name = anima_dir.name
         self.model_config = model_config
-        self._state_dir = person_dir / "state"
+        self._state_dir = anima_dir / "state"
         self._state_path = self._state_dir / "conversation.json"
-        self._transcript_dir = person_dir / "transcripts"
+        self._transcript_dir = anima_dir / "transcripts"
         self._state: ConversationState | None = None
 
     # ── Load / Save ──────────────────────────────────────────
@@ -113,16 +113,16 @@ class ConversationMemory:
                     ConversationTurn(**t) for t in data.get("turns", [])
                 ]
                 self._state = ConversationState(
-                    person_name=data.get("person_name", self.person_name),
+                    anima_name=data.get("anima_name", self.anima_name),
                     turns=turns,
                     compressed_summary=data.get("compressed_summary", ""),
                     compressed_turn_count=data.get("compressed_turn_count", 0),
                 )
             except (json.JSONDecodeError, TypeError):
                 logger.warning("Failed to parse conversation state; starting fresh")
-                self._state = ConversationState(person_name=self.person_name)
+                self._state = ConversationState(anima_name=self.anima_name)
         else:
-            self._state = ConversationState(person_name=self.person_name)
+            self._state = ConversationState(anima_name=self.anima_name)
 
         return self._state
 
@@ -131,7 +131,7 @@ class ConversationMemory:
         state = self.load()
         self._state_dir.mkdir(parents=True, exist_ok=True)
         data = {
-            "person_name": state.person_name,
+            "anima_name": state.anima_name,
             "turns": [asdict(t) for t in state.turns],
             "compressed_summary": state.compressed_summary,
             "compressed_turn_count": state.compressed_turn_count,
@@ -163,7 +163,7 @@ class ConversationMemory:
             with open(path, "a", encoding="utf-8") as f:
                 f.write(entry + "\n")
         except Exception:
-            logger.exception("Failed to append transcript for %s", self.person_name)
+            logger.exception("Failed to append transcript for %s", self.anima_name)
 
     def list_transcript_dates(self) -> list[str]:
         """Return sorted list of dates that have transcript files (newest first)."""
@@ -204,10 +204,10 @@ class ConversationMemory:
 
     def clear(self) -> None:
         """Clear all conversation history."""
-        self._state = ConversationState(person_name=self.person_name)
+        self._state = ConversationState(anima_name=self.anima_name)
         if self._state_path.exists():
             self._state_path.unlink()
-        logger.info("Conversation memory cleared for %s", self.person_name)
+        logger.info("Conversation memory cleared for %s", self.anima_name)
 
     # ── Prompt building ──────────────────────────────────────
 
@@ -321,7 +321,7 @@ class ConversationMemory:
         logger.info(
             "Conversation compressed for %s: %d turns -> summary (%d chars), "
             "keeping %d recent turns",
-            self.person_name,
+            self.anima_name,
             len(to_compress),
             len(summary),
             len(to_keep),
@@ -419,7 +419,7 @@ class ConversationMemory:
         # Write to episodes/{date}.md
         from core.memory.manager import MemoryManager
 
-        memory_mgr = MemoryManager(self.person_dir)
+        memory_mgr = MemoryManager(self.anima_dir)
         timestamp = datetime.now()
         time_str = timestamp.strftime("%H:%M")
 

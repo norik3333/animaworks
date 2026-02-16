@@ -19,8 +19,8 @@ from core.schemas import ModelConfig
 
 
 @pytest.fixture
-def person_dir(tmp_path: Path) -> Path:
-    d = tmp_path / "persons" / "alice"
+def anima_dir(tmp_path: Path) -> Path:
+    d = tmp_path / "animas" / "alice"
     (d / "state").mkdir(parents=True)
     (d / "transcripts").mkdir(parents=True)
     return d
@@ -35,8 +35,8 @@ def model_config() -> ModelConfig:
 
 
 @pytest.fixture
-def conv(person_dir: Path, model_config: ModelConfig) -> ConversationMemory:
-    return ConversationMemory(person_dir, model_config)
+def conv(anima_dir: Path, model_config: ModelConfig) -> ConversationMemory:
+    return ConversationMemory(anima_dir, model_config)
 
 
 # ── ConversationTurn ──────────────────────────────────────
@@ -67,7 +67,7 @@ class TestConversationTurn:
 class TestConversationState:
     def test_defaults(self):
         state = ConversationState()
-        assert state.person_name == ""
+        assert state.anima_name == ""
         assert state.turns == []
         assert state.compressed_summary == ""
         assert state.compressed_turn_count == 0
@@ -99,7 +99,7 @@ class TestLoadSave:
     def test_load_fresh(self, conv):
         state = conv.load()
         assert isinstance(state, ConversationState)
-        assert state.person_name == "alice"
+        assert state.anima_name == "alice"
         assert state.turns == []
 
     def test_save_and_load(self, conv):
@@ -108,7 +108,7 @@ class TestLoadSave:
         conv.save()
 
         # Create new instance to test loading from disk
-        conv2 = ConversationMemory(conv.person_dir, conv.model_config)
+        conv2 = ConversationMemory(conv.anima_dir, conv.model_config)
         state = conv2.load()
         assert len(state.turns) == 2
         assert state.turns[0].role == "human"
@@ -119,29 +119,29 @@ class TestLoadSave:
         s2 = conv.load()
         assert s1 is s2
 
-    def test_load_malformed_json(self, conv, person_dir):
-        (person_dir / "state" / "conversation.json").write_text(
+    def test_load_malformed_json(self, conv, anima_dir):
+        (anima_dir / "state" / "conversation.json").write_text(
             "not valid json", encoding="utf-8"
         )
         state = conv.load()
         assert state.turns == []
 
     def test_save_creates_state_dir(self, tmp_path, model_config):
-        person_dir = tmp_path / "persons" / "bob"
-        person_dir.mkdir(parents=True)
-        conv = ConversationMemory(person_dir, model_config)
+        anima_dir = tmp_path / "animas" / "bob"
+        anima_dir.mkdir(parents=True)
+        conv = ConversationMemory(anima_dir, model_config)
         conv.append_turn("human", "test")
         conv.save()
-        assert (person_dir / "state" / "conversation.json").exists()
+        assert (anima_dir / "state" / "conversation.json").exists()
 
 
 # ── Transcript ────────────────────────────────────────────
 
 
 class TestTranscript:
-    def test_append_transcript(self, conv, person_dir):
+    def test_append_transcript(self, conv, anima_dir):
         conv._append_transcript("human", "hello", "2026-01-15T10:00:00")
-        path = person_dir / "transcripts" / "2026-01-15.jsonl"
+        path = anima_dir / "transcripts" / "2026-01-15.jsonl"
         assert path.exists()
         lines = path.read_text(encoding="utf-8").strip().split("\n")
         assert len(lines) == 1
@@ -149,21 +149,21 @@ class TestTranscript:
         assert data["role"] == "human"
         assert data["content"] == "hello"
 
-    def test_list_transcript_dates(self, conv, person_dir):
-        (person_dir / "transcripts" / "2026-01-15.jsonl").write_text(
+    def test_list_transcript_dates(self, conv, anima_dir):
+        (anima_dir / "transcripts" / "2026-01-15.jsonl").write_text(
             '{"role":"human","content":"a","timestamp":"ts"}\n', encoding="utf-8"
         )
-        (person_dir / "transcripts" / "2026-01-16.jsonl").write_text(
+        (anima_dir / "transcripts" / "2026-01-16.jsonl").write_text(
             '{"role":"human","content":"b","timestamp":"ts"}\n', encoding="utf-8"
         )
         dates = conv.list_transcript_dates()
         assert dates == ["2026-01-16", "2026-01-15"]
 
-    def test_list_transcript_dates_empty(self, conv, person_dir):
+    def test_list_transcript_dates_empty(self, conv, anima_dir):
         assert conv.list_transcript_dates() == []
 
-    def test_load_transcript(self, conv, person_dir):
-        (person_dir / "transcripts" / "2026-01-15.jsonl").write_text(
+    def test_load_transcript(self, conv, anima_dir):
+        (anima_dir / "transcripts" / "2026-01-15.jsonl").write_text(
             '{"role":"human","content":"msg1","timestamp":"ts1"}\n'
             '{"role":"assistant","content":"msg2","timestamp":"ts2"}\n',
             encoding="utf-8",
@@ -178,8 +178,8 @@ class TestTranscript:
     def test_load_transcript_missing(self, conv):
         assert conv.load_transcript("2099-01-01") == []
 
-    def test_load_transcript_malformed_lines(self, conv, person_dir):
-        (person_dir / "transcripts" / "2026-01-15.jsonl").write_text(
+    def test_load_transcript_malformed_lines(self, conv, anima_dir):
+        (anima_dir / "transcripts" / "2026-01-15.jsonl").write_text(
             '{"role":"human","content":"ok","timestamp":"ts"}\n'
             'not json\n'
             '{"role":"assistant","content":"ok2","timestamp":"ts2"}\n',
@@ -213,11 +213,11 @@ class TestAppendTurn:
 
 
 class TestClear:
-    def test_clears_state(self, conv, person_dir):
+    def test_clears_state(self, conv, anima_dir):
         conv.append_turn("human", "Hello")
         conv.save()
         conv.clear()
-        assert not (person_dir / "state" / "conversation.json").exists()
+        assert not (anima_dir / "state" / "conversation.json").exists()
         state = conv.load()
         assert state.turns == []
 
@@ -226,7 +226,7 @@ class TestClear:
 
 
 class TestBuildChatPrompt:
-    def test_no_history(self, conv, person_dir):
+    def test_no_history(self, conv, anima_dir):
         with patch("core.paths.load_prompt") as mock_load:
             mock_load.return_value = "prompt text"
             result = conv.build_chat_prompt("Hello", from_person="human")
@@ -234,7 +234,7 @@ class TestBuildChatPrompt:
                 "chat_message", from_person="human", content="Hello"
             )
 
-    def test_with_history(self, conv, person_dir):
+    def test_with_history(self, conv, anima_dir):
         conv.append_turn("human", "Previous question")
         conv.append_turn("assistant", "Previous answer")
 
@@ -248,13 +248,13 @@ class TestBuildChatPrompt:
 
 class TestFormatHistory:
     def test_empty_history(self, conv):
-        state = ConversationState(person_name="alice")
+        state = ConversationState(anima_name="alice")
         result = conv._format_history(state)
         assert result == ""
 
     def test_with_summary_only(self, conv):
         state = ConversationState(
-            person_name="alice",
+            anima_name="alice",
             compressed_summary="Summary of past conversations",
             compressed_turn_count=10,
         )
@@ -264,7 +264,7 @@ class TestFormatHistory:
 
     def test_with_turns_only(self, conv):
         state = ConversationState(
-            person_name="alice",
+            anima_name="alice",
             turns=[
                 ConversationTurn(
                     role="human", content="Q", timestamp="2026-01-15T10:00:00"
@@ -281,7 +281,7 @@ class TestFormatHistory:
     def test_long_assistant_response_truncated(self, conv):
         long_response = "x" * (_MAX_RESPONSE_CHARS_IN_HISTORY + 500)
         state = ConversationState(
-            person_name="alice",
+            anima_name="alice",
             turns=[
                 ConversationTurn(
                     role="assistant", content=long_response,

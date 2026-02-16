@@ -1,5 +1,5 @@
 from __future__ import annotations
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
@@ -26,11 +26,11 @@ class Messenger:
     def __init__(
         self,
         shared_dir: Path,
-        person_name: str,
+        anima_name: str,
     ) -> None:
         self.shared_dir = shared_dir
-        self.person_name = person_name
-        self.inbox_dir = shared_dir / "inbox" / person_name
+        self.anima_name = anima_name
+        self.inbox_dir = shared_dir / "inbox" / anima_name
         self.inbox_dir.mkdir(parents=True, exist_ok=True)
 
     def send(
@@ -42,7 +42,7 @@ class Messenger:
         reply_to: str = "",
     ) -> Message:
         msg = Message(
-            from_person=self.person_name,
+            from_person=self.anima_name,
             to_person=to,
             type=msg_type,
             content=content,
@@ -56,7 +56,7 @@ class Messenger:
         target_dir.mkdir(parents=True, exist_ok=True)
         filepath = target_dir / f"{msg.id}.json"
         filepath.write_text(msg.model_dump_json(indent=2), encoding="utf-8")
-        logger.info("Message sent: %s -> %s (%s)", self.person_name, to, msg.id)
+        logger.info("Message sent: %s -> %s (%s)", self.anima_name, to, msg.id)
         # Append to shared message log for activity timeline
         self._append_message_log(msg)
         return msg
@@ -205,7 +205,7 @@ def reconcile_message_log(shared_dir: Path) -> int:
         except OSError:
             logger.warning("Failed to read log file: %s", log_file)
 
-    # Scan all processed messages across all person inboxes
+    # Scan all processed messages across all anima inboxes
     added = 0
     for processed_dir in sorted(inbox_dir.glob("*/processed")):
         for msg_file in sorted(processed_dir.glob("*.json")):

@@ -1,4 +1,4 @@
-"""CLI commands for person process management."""
+"""CLI commands for anima process management."""
 
 from __future__ import annotations
 
@@ -7,8 +7,8 @@ import sys
 from pathlib import Path
 
 
-def cmd_person_restart(args: argparse.Namespace) -> None:
-    """Restart a specific person process."""
+def cmd_anima_restart(args: argparse.Namespace) -> None:
+    """Restart a specific anima process."""
     import requests
 
     from core.paths import get_data_dir, get_run_dir
@@ -26,20 +26,20 @@ def cmd_person_restart(args: argparse.Namespace) -> None:
 
     try:
         response = requests.post(
-            f"{gateway_url}/api/persons/{args.person}/restart",
+            f"{gateway_url}/api/animas/{args.anima}/restart",
             timeout=30.0
         )
         response.raise_for_status()
         result = response.json()
-        print(f"Person '{args.person}' restarted successfully")
+        print(f"Anima '{args.anima}' restarted successfully")
         print(f"PID: {result.get('pid', 'N/A')}")
     except requests.exceptions.RequestException as e:
-        print(f"Error: Failed to restart person: {e}")
+        print(f"Error: Failed to restart anima: {e}")
         sys.exit(1)
 
 
-def cmd_person_status(args: argparse.Namespace) -> None:
-    """Show status of person processes."""
+def cmd_anima_status(args: argparse.Namespace) -> None:
+    """Show status of anima processes."""
     import requests
 
     from core.paths import get_run_dir
@@ -64,38 +64,38 @@ def cmd_person_status(args: argparse.Namespace) -> None:
 
     try:
         # Get status from API
-        if args.person:
-            # Specific person
+        if args.anima:
+            # Specific anima
             response = requests.get(
-                f"{gateway_url}/api/persons/{args.person}/status",
+                f"{gateway_url}/api/animas/{args.anima}/status",
                 timeout=10.0
             )
             response.raise_for_status()
             status = response.json()
-            _print_person_status(args.person, status)
+            _print_anima_status(args.anima, status)
         else:
-            # All persons
+            # All animas
             response = requests.get(
-                f"{gateway_url}/api/persons",
+                f"{gateway_url}/api/animas",
                 timeout=10.0
             )
             response.raise_for_status()
-            persons = response.json()
+            animas = response.json()
 
-            print(f"\nTotal persons: {len(persons)}")
+            print(f"\nTotal animas: {len(animas)}")
             print("-" * 60)
 
-            for person in persons:
-                name = person.get("name", "unknown")
+            for anima in animas:
+                name = anima.get("name", "unknown")
                 # Get individual status
                 try:
                     status_resp = requests.get(
-                        f"{gateway_url}/api/persons/{name}/status",
+                        f"{gateway_url}/api/animas/{name}/status",
                         timeout=5.0
                     )
                     status_resp.raise_for_status()
                     status = status_resp.json()
-                    _print_person_status(name, status)
+                    _print_anima_status(name, status)
                 except Exception as e:
                     print(f"\n{name}:")
                     print(f"  Status: ERROR ({e})")
@@ -106,8 +106,8 @@ def cmd_person_status(args: argparse.Namespace) -> None:
         sys.exit(1)
 
 
-def _print_person_status(name: str, status: dict) -> None:
-    """Print formatted person status."""
+def _print_anima_status(name: str, status: dict) -> None:
+    """Print formatted anima status."""
     print(f"\n{name}:")
     print(f"  State: {status.get('state', 'unknown')}")
     print(f"  PID: {status.get('pid', 'N/A')}")

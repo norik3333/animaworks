@@ -12,7 +12,7 @@ from core.schemas import ModelConfig
 # ── Helper to construct AgentCore with mocked dependencies ─────
 
 
-def _make_agent(person_dir: Path):
+def _make_agent(anima_dir: Path):
     """Create AgentCore with all external dependencies mocked."""
     mc = ModelConfig(
         model="claude-sonnet-4-20250514",
@@ -21,7 +21,7 @@ def _make_agent(person_dir: Path):
     )
     memory = MagicMock()
     memory.read_permissions.return_value = ""
-    memory.person_dir = person_dir
+    memory.anima_dir = anima_dir
     messenger = MagicMock()
 
     with (
@@ -35,7 +35,7 @@ def _make_agent(person_dir: Path):
         mock_create.return_value = mock_executor
         from core.agent import AgentCore
 
-        agent = AgentCore(person_dir, memory, mc, messenger)
+        agent = AgentCore(anima_dir, memory, mc, messenger)
         agent._executor = mock_executor
     return agent
 
@@ -47,13 +47,13 @@ class TestPrimingEngineCache:
     @pytest.mark.asyncio
     async def test_priming_engine_cached_on_agent(self, tmp_path):
         """AgentCore should cache PrimingEngine across _run_priming calls."""
-        person_dir = tmp_path / "persons" / "test-person"
-        person_dir.mkdir(parents=True)
-        (person_dir / "knowledge").mkdir()
-        (person_dir / "episodes").mkdir()
-        (person_dir / "skills").mkdir()
+        anima_dir = tmp_path / "animas" / "test-anima"
+        anima_dir.mkdir(parents=True)
+        (anima_dir / "knowledge").mkdir()
+        (anima_dir / "episodes").mkdir()
+        (anima_dir / "skills").mkdir()
 
-        agent = _make_agent(person_dir)
+        agent = _make_agent(anima_dir)
 
         mock_result = MagicMock()
         mock_result.is_empty.return_value = True
@@ -72,13 +72,13 @@ class TestPrimingEngineCache:
     @pytest.mark.asyncio
     async def test_priming_engine_same_instance(self, tmp_path):
         """Multiple _run_priming calls should use the same PrimingEngine instance."""
-        person_dir = tmp_path / "persons" / "test-person"
-        person_dir.mkdir(parents=True)
-        (person_dir / "knowledge").mkdir()
-        (person_dir / "episodes").mkdir()
-        (person_dir / "skills").mkdir()
+        anima_dir = tmp_path / "animas" / "test-anima"
+        anima_dir.mkdir(parents=True)
+        (anima_dir / "knowledge").mkdir()
+        (anima_dir / "episodes").mkdir()
+        (anima_dir / "skills").mkdir()
 
-        agent = _make_agent(person_dir)
+        agent = _make_agent(anima_dir)
 
         engines_seen: list[object] = []
 

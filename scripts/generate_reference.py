@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
@@ -80,13 +80,13 @@ def _generate_tool_parameters() -> str:
 
 def _generate_config_fields() -> str:
     """Generate config field reference from core/config/models.py."""
-    from core.config.models import AnimaWorksConfig, PersonDefaults, PersonModelConfig
+    from core.config.models import AnimaWorksConfig, AnimaDefaults, AnimaModelConfig
 
     lines: list[str] = ["### 設定項目リファレンス（自動生成）", ""]
 
     for cls, title in [
-        (PersonModelConfig, "Person設定 (per-person overrides)"),
-        (PersonDefaults, "デフォルト値 (person_defaults)"),
+        (AnimaModelConfig, "Anima設定 (per-anima overrides)"),
+        (AnimaDefaults, "デフォルト値 (anima_defaults)"),
     ]:
         lines.append(f"#### {title}")
         lines.append("")
@@ -119,8 +119,8 @@ def _generate_config_fields() -> str:
         "system": "システム設定（モード、ログレベル）",
         "credentials": "API認証情報",
         "model_modes": "モデル名→実行モードマッピング",
-        "person_defaults": "Person設定デフォルト値",
-        "persons": "Person別設定オーバーライド",
+        "anima_defaults": "Anima設定デフォルト値",
+        "animas": "Anima別設定オーバーライド",
         "consolidation": "記憶統合設定",
         "rag": "RAG（検索拡張生成）設定",
         "priming": "プライミング（自動記憶想起）設定",

@@ -30,8 +30,8 @@ class TestMessengerInit:
         m = Messenger(shared_dir, "bob")
         assert (shared_dir / "inbox" / "bob").is_dir()
 
-    def test_person_name(self, messenger):
-        assert messenger.person_name == "alice"
+    def test_anima_name(self, messenger):
+        assert messenger.anima_name == "alice"
 
     def test_shared_dir(self, shared_dir, messenger):
         assert messenger.shared_dir == shared_dir
@@ -115,7 +115,7 @@ class TestReceive:
         assert messages == []
 
     def test_receive_messages(self, shared_dir, messenger):
-        # Send a message to alice (from another person)
+        # Send a message to alice (from another anima)
         bob = Messenger(shared_dir, "bob")
         bob.send("alice", "Hello Alice!")
         bob.send("alice", "Second message")

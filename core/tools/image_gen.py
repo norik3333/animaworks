@@ -1,4 +1,4 @@
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
@@ -124,7 +124,7 @@ assert set(_EXPRESSION_PROMPTS.keys()) == _VALID_EXPRESSION_NAMES, (
     f"Expression prompts mismatch: {set(_EXPRESSION_PROMPTS.keys())} != {_VALID_EXPRESSION_NAMES}"
 )
 
-# Default animation presets for office digital persons
+# Default animation presets for office digital animas
 # See https://docs.meshy.ai/api/animation-library for full catalog
 _DEFAULT_ANIMATIONS: dict[str, int] = {
     "idle": 0,           # Standing idle
@@ -989,13 +989,13 @@ class ImageGenPipeline:
 
     def __init__(
         self,
-        person_dir: Path,
+        anima_dir: Path,
         config: "ImageGenConfig | None" = None,
     ) -> None:
         from core.config.models import ImageGenConfig
 
-        self._person_dir = person_dir
-        self._assets_dir = person_dir / "assets"
+        self._anima_dir = anima_dir
+        self._assets_dir = anima_dir / "assets"
         self._config = config or ImageGenConfig()
 
     def generate_bustup_expression(
@@ -1422,7 +1422,7 @@ def get_tool_schemas() -> list[dict]:
                     "supervisor_name": {
                         "type": "string",
                         "description": (
-                            "Supervisor person name. When specified, the "
+                            "Supervisor anima name. When specified, the "
                             "supervisor's avatar_fullbody.png is used as "
                             "the Vibe Transfer reference image for style "
                             "consistency."
@@ -1620,13 +1620,13 @@ A2モードのツール名: `generate_character_assets` / `generate_fullbody` / 
 
 ```bash
 # 全6ステップ一括生成（推奨）
-animaworks-tool image_gen pipeline "1girl, black hair, ..." --negative "lowres, bad anatomy, ..." --person-dir <person_dir> -j
+animaworks-tool image_gen pipeline "1girl, black hair, ..." --negative "lowres, bad anatomy, ..." --anima-dir <anima_dir> -j
 
 # 個別ステップ
-animaworks-tool image_gen fullbody "prompt" --person-dir <person_dir> -j
-animaworks-tool image_gen bustup --person-dir <person_dir> -j
-animaworks-tool image_gen chibi --person-dir <person_dir> -j
-animaworks-tool image_gen 3d --person-dir <person_dir> -j
+animaworks-tool image_gen fullbody "prompt" --anima-dir <anima_dir> -j
+animaworks-tool image_gen bustup --anima-dir <anima_dir> -j
+animaworks-tool image_gen chibi --anima-dir <anima_dir> -j
+animaworks-tool image_gen 3d --anima-dir <anima_dir> -j
 animaworks-tool image_gen rigging <model.glb> -o <output_dir> -j
 animaworks-tool image_gen animations <model.glb> -o <output_dir> -j
 ```"""
@@ -1644,7 +1644,7 @@ def cli_main(argv: list[str] | None = None) -> None:
     p_pipe.add_argument("prompt", help="Character appearance tags")
     p_pipe.add_argument("-n", "--negative", default="", help="Negative prompt")
     p_pipe.add_argument(
-        "-d", "--person-dir", required=True, help="Person data directory",
+        "-d", "--anima-dir", required=True, help="Anima data directory",
     )
     p_pipe.add_argument(
         "--steps", nargs="*",
@@ -1717,7 +1717,7 @@ def cli_main(argv: list[str] | None = None) -> None:
     # ── Execute ────────────────────────────────────────────
 
     if args.command == "pipeline":
-        pipe = ImageGenPipeline(Path(args.person_dir))
+        pipe = ImageGenPipeline(Path(args.anima_dir))
         result = pipe.generate_all(
             prompt=args.prompt,
             negative_prompt=args.negative,
@@ -1902,9 +1902,9 @@ def dispatch(tool_name: str, args: dict[str, Any]) -> Any:
     """Dispatch a tool call to the appropriate handler."""
     if tool_name == "generate_character_assets":
         from core.config.models import load_config
-        from core.paths import get_persons_dir
+        from core.paths import get_animas_dir
 
-        person_dir = Path(args.pop("person_dir", ""))
+        anima_dir = Path(args.pop("anima_dir", ""))
         supervisor_name: str | None = args.pop("supervisor_name", None)
         config = load_config()
         image_config = config.image_gen
@@ -1912,7 +1912,7 @@ def dispatch(tool_name: str, args: dict[str, Any]) -> Any:
         # Use supervisor's fullbody image as Vibe Transfer reference
         if supervisor_name:
             supervisor_fullbody = (
-                get_persons_dir() / supervisor_name / "assets" / "avatar_fullbody.png"
+                get_animas_dir() / supervisor_name / "assets" / "avatar_fullbody.png"
             )
             if supervisor_fullbody.exists():
                 image_config = image_config.model_copy(
@@ -1923,7 +1923,7 @@ def dispatch(tool_name: str, args: dict[str, Any]) -> Any:
                     supervisor_fullbody,
                 )
 
-        pipeline = ImageGenPipeline(person_dir, config=image_config)
+        pipeline = ImageGenPipeline(anima_dir, config=image_config)
         result = pipeline.generate_all(
             prompt=args["prompt"],
             negative_prompt=args.get("negative_prompt", ""),
@@ -1934,8 +1934,8 @@ def dispatch(tool_name: str, args: dict[str, Any]) -> Any:
         return result.to_dict()
 
     if tool_name == "generate_fullbody":
-        person_dir = Path(args.pop("person_dir", ""))
-        assets_dir = person_dir / "assets"
+        anima_dir = Path(args.pop("anima_dir", ""))
+        assets_dir = anima_dir / "assets"
         assets_dir.mkdir(parents=True, exist_ok=True)
         client = NovelAIClient()
         img = client.generate_fullbody(
@@ -1950,8 +1950,8 @@ def dispatch(tool_name: str, args: dict[str, Any]) -> Any:
         return {"path": str(out), "size": len(img)}
 
     if tool_name == "generate_bustup":
-        person_dir = Path(args.pop("person_dir", ""))
-        assets_dir = person_dir / "assets"
+        anima_dir = Path(args.pop("anima_dir", ""))
+        assets_dir = anima_dir / "assets"
         ref_path = assets_dir / "avatar_fullbody.png"
         if not ref_path.exists():
             return {"error": "No full-body reference image found"}
@@ -1966,8 +1966,8 @@ def dispatch(tool_name: str, args: dict[str, Any]) -> Any:
         return {"path": str(out), "size": len(img)}
 
     if tool_name == "generate_chibi":
-        person_dir = Path(args.pop("person_dir", ""))
-        assets_dir = person_dir / "assets"
+        anima_dir = Path(args.pop("anima_dir", ""))
+        assets_dir = anima_dir / "assets"
         ref_path = assets_dir / "avatar_fullbody.png"
         if not ref_path.exists():
             return {"error": "No full-body reference image found"}
@@ -1982,8 +1982,8 @@ def dispatch(tool_name: str, args: dict[str, Any]) -> Any:
         return {"path": str(out), "size": len(img)}
 
     if tool_name == "generate_3d_model":
-        person_dir = Path(args.pop("person_dir", ""))
-        assets_dir = person_dir / "assets"
+        anima_dir = Path(args.pop("anima_dir", ""))
+        assets_dir = anima_dir / "assets"
         chibi_path = assets_dir / "avatar_chibi.png"
         if not chibi_path.exists():
             return {"error": "No chibi image found for 3D conversion"}
@@ -2002,8 +2002,8 @@ def dispatch(tool_name: str, args: dict[str, Any]) -> Any:
     if tool_name == "generate_rigged_model":
         import httpx as _httpx
 
-        person_dir = Path(args.pop("person_dir", ""))
-        assets_dir = person_dir / "assets"
+        anima_dir = Path(args.pop("anima_dir", ""))
+        assets_dir = anima_dir / "assets"
         glb_path = assets_dir / "avatar_chibi.glb"
         if not glb_path.exists():
             return {"error": "No 3D model found for rigging"}
@@ -2042,8 +2042,8 @@ def dispatch(tool_name: str, args: dict[str, Any]) -> Any:
     if tool_name == "generate_animations":
         import httpx as _httpx
 
-        person_dir = Path(args.pop("person_dir", ""))
-        assets_dir = person_dir / "assets"
+        anima_dir = Path(args.pop("anima_dir", ""))
+        assets_dir = anima_dir / "assets"
         glb_path = assets_dir / "avatar_chibi.glb"
         if not glb_path.exists():
             return {"error": "No 3D model found for animation"}

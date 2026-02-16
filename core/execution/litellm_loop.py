@@ -1,5 +1,5 @@
 from __future__ import annotations
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
@@ -93,13 +93,13 @@ class LiteLLMExecutor(BaseExecutor):
     def __init__(
         self,
         model_config: ModelConfig,
-        person_dir: Path,
+        anima_dir: Path,
         tool_handler: ToolHandler,
         tool_registry: list[str],
         memory: MemoryManager,
         personal_tools: dict[str, str] | None = None,
     ) -> None:
-        super().__init__(model_config, person_dir)
+        super().__init__(model_config, anima_dir)
         self._tool_handler = tool_handler
         self._tool_registry = tool_registry
         self._memory = memory
@@ -112,7 +112,7 @@ class LiteLLMExecutor(BaseExecutor):
             include_search_tools=True,
             include_discovery_tools=True,
             include_notification_tools=self._tool_handler._human_notifier is not None,
-            include_admin_tools=(self._person_dir / "skills" / "newstaff.md").exists(),
+            include_admin_tools=(self._anima_dir / "skills" / "newstaff.md").exists(),
             include_tool_management=True,
         )
         return to_litellm_format(canonical)
@@ -158,7 +158,7 @@ class LiteLLMExecutor(BaseExecutor):
         from core.tools import discover_common_tools, discover_personal_tools
         from core.tooling.schemas import load_personal_tool_schemas
 
-        personal = discover_personal_tools(self._person_dir)
+        personal = discover_personal_tools(self._anima_dir)
         common = discover_common_tools()
         merged = {**common, **personal}
 

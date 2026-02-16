@@ -1,5 +1,5 @@
 from __future__ import annotations
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
@@ -82,20 +82,20 @@ This is knowledge document number {i} for performance testing.
 
 
 @pytest.fixture
-def person_dir_with_data(tmp_path):
-    """Create a Person directory with test data."""
-    person_dir = tmp_path / "test_person"
+def anima_dir_with_data(tmp_path):
+    """Create a Anima directory with test data."""
+    anima_dir = tmp_path / "test_anima"
 
     # Create directory structure
-    (person_dir / "knowledge").mkdir(parents=True)
-    (person_dir / "episodes").mkdir(parents=True)
-    (person_dir / "skills").mkdir(parents=True)
-    (person_dir / "state").mkdir(parents=True)
+    (anima_dir / "knowledge").mkdir(parents=True)
+    (anima_dir / "episodes").mkdir(parents=True)
+    (anima_dir / "skills").mkdir(parents=True)
+    (anima_dir / "state").mkdir(parents=True)
 
     # Create 50 knowledge files
     for i in range(50):
         content = f"# Knowledge {i}\n\n" + "Content " * 100
-        (person_dir / "knowledge" / f"knowledge_{i:03d}.md").write_text(
+        (anima_dir / "knowledge" / f"knowledge_{i:03d}.md").write_text(
             content, encoding="utf-8"
         )
 
@@ -113,7 +113,7 @@ def person_dir_with_data(tmp_path):
 - 進捗確認
 - 報告作成
 """
-        (person_dir / "episodes" / f"{episode_date}.md").write_text(
+        (anima_dir / "episodes" / f"{episode_date}.md").write_text(
             content, encoding="utf-8"
         )
 
@@ -121,7 +121,7 @@ def person_dir_with_data(tmp_path):
     shared_users_dir = tmp_path / "shared" / "users"
     shared_users_dir.mkdir(parents=True)
 
-    return person_dir
+    return anima_dir
 
 
 @pytest.fixture
@@ -189,9 +189,9 @@ def test_indexing_throughput(large_knowledge_base):
     from core.memory.rag import MemoryIndexer
     from core.memory.rag.store import ChromaVectorStore
 
-    # Create temporary Person directory
-    person_dir = large_knowledge_base.parent
-    chroma_dir = person_dir / ".chroma"
+    # Create temporary Anima directory
+    anima_dir = large_knowledge_base.parent
+    chroma_dir = anima_dir / ".chroma"
     chroma_dir.mkdir(exist_ok=True)
 
     # Create vector store
@@ -199,8 +199,8 @@ def test_indexing_throughput(large_knowledge_base):
 
     indexer = MemoryIndexer(
         vector_store=vector_store,
-        person_name="test_person",
-        person_dir=person_dir,
+        anima_name="test_anima",
+        anima_dir=anima_dir,
     )
 
     # Get all files
@@ -248,9 +248,9 @@ def test_search_latency_comparison(large_knowledge_base):
     from core.memory.rag import MemoryIndexer, MemoryRetriever
     from core.memory.rag.store import ChromaVectorStore
 
-    # Create temporary Person directory
-    person_dir = large_knowledge_base.parent
-    chroma_dir = person_dir / ".chroma"
+    # Create temporary Anima directory
+    anima_dir = large_knowledge_base.parent
+    chroma_dir = anima_dir / ".chroma"
     chroma_dir.mkdir(exist_ok=True)
 
     # Create vector store
@@ -259,8 +259,8 @@ def test_search_latency_comparison(large_knowledge_base):
     # Index all files
     indexer = MemoryIndexer(
         vector_store=vector_store,
-        person_name="test_person",
-        person_dir=person_dir,
+        anima_name="test_anima",
+        anima_dir=anima_dir,
     )
 
     for file_path in sorted(large_knowledge_base.glob("*.md")):
@@ -270,7 +270,7 @@ def test_search_latency_comparison(large_knowledge_base):
     retriever = MemoryRetriever(
         vector_store=vector_store,
         indexer=indexer,
-        knowledge_dir=person_dir / "knowledge",
+        knowledge_dir=anima_dir / "knowledge",
     )
 
     # Test queries
@@ -292,7 +292,7 @@ def test_search_latency_comparison(large_knowledge_base):
         start = time.perf_counter()
         retriever.search(
             query=query,
-            person_name="test_person",
+            anima_name="test_anima",
             memory_type="knowledge",
             top_k=5,
         )
@@ -310,7 +310,7 @@ def test_search_latency_comparison(large_knowledge_base):
 @pytest.mark.performance
 @pytest.mark.skipif(not PSUTIL_AVAILABLE, reason="psutil not installed")
 @pytest.mark.asyncio
-async def test_memory_usage_baseline(person_dir_with_data, memory_tracker):
+async def test_memory_usage_baseline(anima_dir_with_data, memory_tracker):
     """Test memory usage baseline during repeated priming.
 
     Goal: Memory increase < 50MB (no memory leak)
@@ -320,8 +320,8 @@ async def test_memory_usage_baseline(person_dir_with_data, memory_tracker):
     - Multiple priming runs don't leak memory
     - Final memory increase is within acceptable range
     """
-    with patch("core.paths.get_shared_dir", return_value=person_dir_with_data.parent / "shared"):
-        engine = PrimingEngine(person_dir_with_data)
+    with patch("core.paths.get_shared_dir", return_value=anima_dir_with_data.parent / "shared"):
+        engine = PrimingEngine(anima_dir_with_data)
 
         # Reset memory tracker
         memory_tracker.reset()
@@ -352,7 +352,7 @@ async def test_memory_usage_baseline(person_dir_with_data, memory_tracker):
 @pytest.mark.performance
 @pytest.mark.asyncio
 async def test_concurrent_priming(tmp_path):
-    """Test concurrent priming with multiple Person instances.
+    """Test concurrent priming with multiple Anima instances.
 
     Verifies:
     - 10 parallel priming operations complete successfully
@@ -360,35 +360,35 @@ async def test_concurrent_priming(tmp_path):
     - No data corruption
     - All results are valid
     """
-    # Create 10 Person directories
-    person_dirs = []
+    # Create 10 Anima directories
+    anima_dirs = []
     for i in range(10):
-        person_dir = tmp_path / f"person_{i}"
-        (person_dir / "knowledge").mkdir(parents=True)
-        (person_dir / "episodes").mkdir(parents=True)
-        (person_dir / "skills").mkdir(parents=True)
+        anima_dir = tmp_path / f"anima_{i}"
+        (anima_dir / "knowledge").mkdir(parents=True)
+        (anima_dir / "episodes").mkdir(parents=True)
+        (anima_dir / "skills").mkdir(parents=True)
 
         # Add some content
-        (person_dir / "knowledge" / "test.md").write_text(
-            f"# Knowledge for Person {i}\n\nContent here.",
+        (anima_dir / "knowledge" / "test.md").write_text(
+            f"# Knowledge for Anima {i}\n\nContent here.",
             encoding="utf-8",
         )
 
         today = datetime.now().date()
-        (person_dir / "episodes" / f"{today}.md").write_text(
-            f"# {today} Log for Person {i}\n\n## 10:00 — Task\n\nContent.",
+        (anima_dir / "episodes" / f"{today}.md").write_text(
+            f"# {today} Log for Anima {i}\n\n## 10:00 — Task\n\nContent.",
             encoding="utf-8",
         )
 
-        person_dirs.append(person_dir)
+        anima_dirs.append(anima_dir)
 
     # Create engines
-    engines = [PrimingEngine(person_dir) for person_dir in person_dirs]
+    engines = [PrimingEngine(anima_dir) for anima_dir in anima_dirs]
 
     # Run concurrent priming
     async def prime_one(engine, index):
         return await engine.prime_memories(
-            message=f"Test message for person {index}",
+            message=f"Test message for anima {index}",
             sender_name="system",
             channel="chat",
         )
@@ -403,7 +403,7 @@ async def test_concurrent_priming(tmp_path):
 
     print(f"\n=== Concurrent Priming ===")
     print(f"Total time: {total_time*1000:.2f} ms")
-    print(f"Average per person: {total_time/len(engines)*1000:.2f} ms")
+    print(f"Average per anima: {total_time/len(engines)*1000:.2f} ms")
 
     # Verify all completed successfully
     assert len(results) == 10
@@ -453,8 +453,8 @@ def test_large_dataset_scalability(tmp_path):
 
     indexer = MemoryIndexer(
         vector_store=vector_store,
-        person_name="test_person",
-        person_dir=tmp_path,
+        anima_name="test_anima",
+        anima_dir=tmp_path,
     )
 
     print("Indexing 1000 files...")
@@ -486,7 +486,7 @@ def test_large_dataset_scalability(tmp_path):
         start = time.perf_counter()
         retriever.search(
             query=f"Content for file {i * 20}",
-            person_name="test_person",
+            anima_name="test_anima",
             memory_type="knowledge",
             top_k=10,
         )
@@ -505,15 +505,15 @@ def test_large_dataset_scalability(tmp_path):
 
 @pytest.mark.performance
 @pytest.mark.asyncio
-async def test_priming_latency_percentiles(person_dir_with_data):
+async def test_priming_latency_percentiles(anima_dir_with_data):
     """Test priming latency distribution with detailed percentiles.
 
     Measures:
     - Mean, median, P50, P75, P90, P95, P99
     - Ensures consistent performance
     """
-    with patch("core.paths.get_shared_dir", return_value=person_dir_with_data.parent / "shared"):
-        engine = PrimingEngine(person_dir_with_data)
+    with patch("core.paths.get_shared_dir", return_value=anima_dir_with_data.parent / "shared"):
+        engine = PrimingEngine(anima_dir_with_data)
 
         # Test messages
         messages = [
@@ -567,7 +567,7 @@ async def test_priming_latency_percentiles(person_dir_with_data):
 
 @pytest.mark.performance
 @pytest.mark.asyncio
-async def test_empty_cache_vs_warm_cache(person_dir_with_data):
+async def test_empty_cache_vs_warm_cache(anima_dir_with_data):
     """Test priming performance: cold start vs warm cache.
 
     Verifies:
@@ -575,8 +575,8 @@ async def test_empty_cache_vs_warm_cache(person_dir_with_data):
     - Subsequent runs (warm cache) are faster
     - Cache improves performance
     """
-    with patch("core.paths.get_shared_dir", return_value=person_dir_with_data.parent / "shared"):
-        engine = PrimingEngine(person_dir_with_data)
+    with patch("core.paths.get_shared_dir", return_value=anima_dir_with_data.parent / "shared"):
+        engine = PrimingEngine(anima_dir_with_data)
 
         # Cold cache run
         start = time.perf_counter()
@@ -614,7 +614,7 @@ async def test_empty_cache_vs_warm_cache(person_dir_with_data):
 
 @pytest.mark.performance
 @pytest.mark.asyncio
-async def test_budget_allocation_performance(person_dir_with_data):
+async def test_budget_allocation_performance(anima_dir_with_data):
     """Test performance of different budget allocations.
 
     Verifies:
@@ -622,8 +622,8 @@ async def test_budget_allocation_performance(person_dir_with_data):
     - Large budget (3000 tokens) is slower but more complete
     - Budget affects processing time
     """
-    with patch("core.paths.get_shared_dir", return_value=person_dir_with_data.parent / "shared"):
-        engine = PrimingEngine(person_dir_with_data)
+    with patch("core.paths.get_shared_dir", return_value=anima_dir_with_data.parent / "shared"):
+        engine = PrimingEngine(anima_dir_with_data)
 
         # Small budget (greeting)
         small_budget_times = []

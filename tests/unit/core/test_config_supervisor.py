@@ -1,7 +1,7 @@
 """Unit tests for supervisor-related functions in core/config/models.py.
 
-Tests _resolve_supervisor_name(), read_person_supervisor(), and
-register_person_in_config().
+Tests _resolve_supervisor_name(), read_anima_supervisor(), and
+register_anima_in_config().
 """
 from __future__ import annotations
 
@@ -13,12 +13,12 @@ import pytest
 
 from core.config.models import (
     AnimaWorksConfig,
-    PersonModelConfig,
+    AnimaModelConfig,
     _resolve_supervisor_name,
     invalidate_cache,
     load_config,
-    read_person_supervisor,
-    register_person_in_config,
+    read_anima_supervisor,
+    register_anima_in_config,
     save_config,
 )
 
@@ -34,22 +34,22 @@ def _reset_config_cache() -> None:
     invalidate_cache()
 
 
-def _make_person(
+def _make_anima(
     tmp_path: Path,
     name: str,
     identity_content: str | None = None,
     status_content: dict | None = None,
 ) -> Path:
-    """Helper to create a person directory with optional identity.md and status.json."""
-    person_dir = tmp_path / name
-    person_dir.mkdir(parents=True, exist_ok=True)
+    """Helper to create an anima directory with optional identity.md and status.json."""
+    anima_dir = tmp_path / name
+    anima_dir.mkdir(parents=True, exist_ok=True)
     if identity_content is not None:
-        (person_dir / "identity.md").write_text(identity_content, encoding="utf-8")
+        (anima_dir / "identity.md").write_text(identity_content, encoding="utf-8")
     if status_content is not None:
-        (person_dir / "status.json").write_text(
+        (anima_dir / "status.json").write_text(
             json.dumps(status_content, ensure_ascii=False), encoding="utf-8",
         )
-    return person_dir
+    return anima_dir
 
 
 # ── _resolve_supervisor_name ─────────────────────────────────────
@@ -122,34 +122,34 @@ class TestResolveSupervisorName:
         assert _resolve_supervisor_name("  sakura  ") == "sakura"
 
 
-# ── read_person_supervisor ───────────────────────────────────────
+# ── read_anima_supervisor ───────────────────────────────────────
 
 
-class TestReadPersonSupervisor:
+class TestReadAnimaSupervisor:
     """Tests for reading supervisor from status.json / identity.md."""
 
     def test_status_json_with_supervisor(self, tmp_path: Path) -> None:
         """Reads supervisor from status.json when present."""
-        person_dir = _make_person(
+        anima_dir = _make_anima(
             tmp_path, "hinata",
             status_content={"supervisor": "kotoha"},
         )
-        assert read_person_supervisor(person_dir) == "kotoha"
+        assert read_anima_supervisor(anima_dir) == "kotoha"
 
     def test_status_json_without_supervisor_falls_to_identity(
         self, tmp_path: Path,
     ) -> None:
         """Falls through to identity.md when status.json lacks supervisor."""
-        person_dir = _make_person(
+        anima_dir = _make_anima(
             tmp_path, "hinata",
             identity_content="| 上司 | 琴葉（kotoha） |\n",
             status_content={"enabled": True},
         )
-        assert read_person_supervisor(person_dir) == "kotoha"
+        assert read_anima_supervisor(anima_dir) == "kotoha"
 
     def test_identity_md_table_fullwidth_parens(self, tmp_path: Path) -> None:
         """Parses supervisor from identity.md table with full-width parens."""
-        person_dir = _make_person(
+        anima_dir = _make_anima(
             tmp_path, "hinata",
             identity_content=(
                 "| 項目 | 設定 |\n"
@@ -157,61 +157,61 @@ class TestReadPersonSupervisor:
                 "| 上司 | 琴葉（kotoha） |\n"
             ),
         )
-        assert read_person_supervisor(person_dir) == "kotoha"
+        assert read_anima_supervisor(anima_dir) == "kotoha"
 
     def test_no_status_json_no_identity_md(self, tmp_path: Path) -> None:
         """Returns None when neither file exists."""
-        person_dir = _make_person(tmp_path, "hinata")
-        assert read_person_supervisor(person_dir) is None
+        anima_dir = _make_anima(tmp_path, "hinata")
+        assert read_anima_supervisor(anima_dir) is None
 
     def test_status_json_empty_supervisor_falls_to_identity(
         self, tmp_path: Path,
     ) -> None:
         """Falls through to identity.md when status.json supervisor is empty."""
-        person_dir = _make_person(
+        anima_dir = _make_anima(
             tmp_path, "hinata",
             identity_content="| 上司 | sakura |\n",
             status_content={"supervisor": ""},
         )
-        assert read_person_supervisor(person_dir) == "sakura"
+        assert read_anima_supervisor(anima_dir) == "sakura"
 
     def test_status_json_takes_priority(self, tmp_path: Path) -> None:
         """status.json supervisor wins over identity.md when both present."""
-        person_dir = _make_person(
+        anima_dir = _make_anima(
             tmp_path, "hinata",
             identity_content="| 上司 | alice |\n",
             status_content={"supervisor": "bob"},
         )
-        assert read_person_supervisor(person_dir) == "bob"
+        assert read_anima_supervisor(anima_dir) == "bob"
 
     def test_status_json_nashi_falls_to_identity(self, tmp_path: Path) -> None:
         """status.json with なし resolves to None, falls to identity.md."""
-        person_dir = _make_person(
+        anima_dir = _make_anima(
             tmp_path, "hinata",
             identity_content="| 上司 | sakura |\n",
             status_content={"supervisor": "なし"},
         )
         # "なし" resolves to None in _resolve_supervisor_name, so it falls through
-        assert read_person_supervisor(person_dir) == "sakura"
+        assert read_anima_supervisor(anima_dir) == "sakura"
 
     def test_identity_no_supervisor_row(self, tmp_path: Path) -> None:
         """Returns None when identity.md has no supervisor row."""
-        person_dir = _make_person(
+        anima_dir = _make_anima(
             tmp_path, "hinata",
             identity_content="# Identity\n| 項目 | 設定 |\n| 誕生日 | 1月1日 |\n",
         )
-        assert read_person_supervisor(person_dir) is None
+        assert read_anima_supervisor(anima_dir) is None
 
     def test_invalid_status_json(self, tmp_path: Path) -> None:
         """Returns None when status.json is invalid JSON."""
-        person_dir = tmp_path / "hinata"
-        person_dir.mkdir(parents=True)
-        (person_dir / "status.json").write_text("not valid json", encoding="utf-8")
-        assert read_person_supervisor(person_dir) is None
+        anima_dir = tmp_path / "hinata"
+        anima_dir.mkdir(parents=True)
+        (anima_dir / "status.json").write_text("not valid json", encoding="utf-8")
+        assert read_anima_supervisor(anima_dir) is None
 
     def test_identity_embedded_in_real_file(self, tmp_path: Path) -> None:
         """Extracts supervisor from a realistic multi-row identity.md."""
-        person_dir = _make_person(
+        anima_dir = _make_anima(
             tmp_path, "hinata",
             identity_content=(
                 "# Identity: hinata\n\n"
@@ -224,97 +224,97 @@ class TestReadPersonSupervisor:
                 "## 性格\nGenki.\n"
             ),
         )
-        assert read_person_supervisor(person_dir) == "rin"
+        assert read_anima_supervisor(anima_dir) == "rin"
 
-    def test_nonexistent_person_dir(self, tmp_path: Path) -> None:
-        """Returns None when person directory does not exist."""
-        assert read_person_supervisor(tmp_path / "nonexistent") is None
-
-
-# ── register_person_in_config ────────────────────────────────────
+    def test_nonexistent_anima_dir(self, tmp_path: Path) -> None:
+        """Returns None when anima directory does not exist."""
+        assert read_anima_supervisor(tmp_path / "nonexistent") is None
 
 
-class TestRegisterPersonInConfig:
-    """Tests for registering a person in config.json with supervisor synced."""
+# ── register_anima_in_config ────────────────────────────────────
 
-    def test_registers_new_person_with_supervisor(self, tmp_path: Path) -> None:
-        """New person with status.json supervisor is registered correctly."""
+
+class TestRegisterAnimaInConfig:
+    """Tests for registering an anima in config.json with supervisor synced."""
+
+    def test_registers_new_anima_with_supervisor(self, tmp_path: Path) -> None:
+        """New anima with status.json supervisor is registered correctly."""
         data_dir = tmp_path / "data"
         data_dir.mkdir()
-        persons_dir = data_dir / "persons"
-        persons_dir.mkdir()
+        animas_dir = data_dir / "animas"
+        animas_dir.mkdir()
 
         # Create config.json
         config = AnimaWorksConfig(setup_complete=True)
         save_config(config, data_dir / "config.json")
         invalidate_cache()
 
-        # Create person directory with supervisor
-        _make_person(
-            persons_dir, "hinata",
+        # Create anima directory with supervisor
+        _make_anima(
+            animas_dir, "hinata",
             identity_content="| 上司 | sakura |\n",
         )
 
-        register_person_in_config(data_dir, "hinata")
+        register_anima_in_config(data_dir, "hinata")
 
         invalidate_cache()
         cfg = load_config(data_dir / "config.json")
-        assert "hinata" in cfg.persons
-        assert cfg.persons["hinata"].supervisor == "sakura"
+        assert "hinata" in cfg.animas
+        assert cfg.animas["hinata"].supervisor == "sakura"
 
-    def test_registers_new_person_without_supervisor(self, tmp_path: Path) -> None:
-        """New person without supervisor source is registered with supervisor=None."""
+    def test_registers_new_anima_without_supervisor(self, tmp_path: Path) -> None:
+        """New anima without supervisor source is registered with supervisor=None."""
         data_dir = tmp_path / "data"
         data_dir.mkdir()
-        persons_dir = data_dir / "persons"
-        persons_dir.mkdir()
+        animas_dir = data_dir / "animas"
+        animas_dir.mkdir()
 
         # Create config.json
         config = AnimaWorksConfig(setup_complete=True)
         save_config(config, data_dir / "config.json")
         invalidate_cache()
 
-        # Create person directory without supervisor info
-        _make_person(
-            persons_dir, "hinata",
+        # Create anima directory without supervisor info
+        _make_anima(
+            animas_dir, "hinata",
             identity_content="# Identity\nNo supervisor info.\n",
         )
 
-        register_person_in_config(data_dir, "hinata")
+        register_anima_in_config(data_dir, "hinata")
 
         invalidate_cache()
         cfg = load_config(data_dir / "config.json")
-        assert "hinata" in cfg.persons
-        assert cfg.persons["hinata"].supervisor is None
+        assert "hinata" in cfg.animas
+        assert cfg.animas["hinata"].supervisor is None
 
-    def test_existing_person_is_noop(self, tmp_path: Path) -> None:
-        """Person already in config is not modified."""
+    def test_existing_anima_is_noop(self, tmp_path: Path) -> None:
+        """Anima already in config is not modified."""
         data_dir = tmp_path / "data"
         data_dir.mkdir()
-        persons_dir = data_dir / "persons"
-        persons_dir.mkdir()
+        animas_dir = data_dir / "animas"
+        animas_dir.mkdir()
 
-        # Create config.json with existing person
+        # Create config.json with existing anima
         config = AnimaWorksConfig(setup_complete=True)
-        config.persons["hinata"] = PersonModelConfig(
+        config.animas["hinata"] = AnimaModelConfig(
             model="openai/gpt-4o",
             supervisor="original",
         )
         save_config(config, data_dir / "config.json")
         invalidate_cache()
 
-        # Create person directory with different supervisor
-        _make_person(
-            persons_dir, "hinata",
+        # Create anima directory with different supervisor
+        _make_anima(
+            animas_dir, "hinata",
             identity_content="| 上司 | different |\n",
         )
 
-        register_person_in_config(data_dir, "hinata")
+        register_anima_in_config(data_dir, "hinata")
 
         invalidate_cache()
         cfg = load_config(data_dir / "config.json")
-        assert cfg.persons["hinata"].supervisor == "original"
-        assert cfg.persons["hinata"].model == "openai/gpt-4o"
+        assert cfg.animas["hinata"].supervisor == "original"
+        assert cfg.animas["hinata"].model == "openai/gpt-4o"
 
     def test_config_json_does_not_exist(self, tmp_path: Path) -> None:
         """No error when config.json does not exist."""
@@ -322,45 +322,45 @@ class TestRegisterPersonInConfig:
         data_dir.mkdir()
 
         # No config.json created — should return without error
-        register_person_in_config(data_dir, "hinata")
+        register_anima_in_config(data_dir, "hinata")
         # No assertion needed — just verifying no exception is raised
 
-    def test_person_dir_does_not_exist(self, tmp_path: Path) -> None:
-        """Registers person with supervisor=None when person dir is missing."""
+    def test_anima_dir_does_not_exist(self, tmp_path: Path) -> None:
+        """Registers anima with supervisor=None when anima dir is missing."""
         data_dir = tmp_path / "data"
         data_dir.mkdir()
 
-        # Create config.json but no persons directory
+        # Create config.json but no animas directory
         config = AnimaWorksConfig(setup_complete=True)
         save_config(config, data_dir / "config.json")
         invalidate_cache()
 
-        register_person_in_config(data_dir, "hinata")
+        register_anima_in_config(data_dir, "hinata")
 
         invalidate_cache()
         cfg = load_config(data_dir / "config.json")
-        assert "hinata" in cfg.persons
-        assert cfg.persons["hinata"].supervisor is None
+        assert "hinata" in cfg.animas
+        assert cfg.animas["hinata"].supervisor is None
 
     def test_registers_with_status_json_supervisor(self, tmp_path: Path) -> None:
-        """Person registered with supervisor from status.json when identity.md has none."""
+        """Anima registered with supervisor from status.json when identity.md has none."""
         data_dir = tmp_path / "data"
         data_dir.mkdir()
-        persons_dir = data_dir / "persons"
-        persons_dir.mkdir()
+        animas_dir = data_dir / "animas"
+        animas_dir.mkdir()
 
         config = AnimaWorksConfig(setup_complete=True)
         save_config(config, data_dir / "config.json")
         invalidate_cache()
 
-        _make_person(
-            persons_dir, "hinata",
+        _make_anima(
+            animas_dir, "hinata",
             identity_content="# Identity\nNo supervisor.\n",
             status_content={"supervisor": "kotoha"},
         )
 
-        register_person_in_config(data_dir, "hinata")
+        register_anima_in_config(data_dir, "hinata")
 
         invalidate_cache()
         cfg = load_config(data_dir / "config.json")
-        assert cfg.persons["hinata"].supervisor == "kotoha"
+        assert cfg.animas["hinata"].supervisor == "kotoha"

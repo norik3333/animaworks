@@ -1,5 +1,5 @@
 from __future__ import annotations
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
@@ -29,54 +29,54 @@ from server.websocket import WebSocketManager
 logger = logging.getLogger("animaworks.server")
 
 
-async def _reconcile_assets_at_startup(persons_dir: Path) -> None:
-    """Background task: generate missing person assets after startup."""
+async def _reconcile_assets_at_startup(animas_dir: Path) -> None:
+    """Background task: generate missing anima assets after startup."""
     try:
         from core.asset_reconciler import reconcile_all_assets
 
-        results = await reconcile_all_assets(persons_dir)
+        results = await reconcile_all_assets(animas_dir)
         if results:
-            logger.info("Startup asset reconciliation: %d person(s) processed", len(results))
+            logger.info("Startup asset reconciliation: %d anima(s) processed", len(results))
     except Exception:
         logger.exception("Startup asset reconciliation failed")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Only start person processes when setup is complete
+    # Only start anima processes when setup is complete
     if app.state.setup_complete:
-        # Register person lifecycle callbacks for reconciliation
-        def _on_person_added(name: str) -> None:
-            if name not in app.state.person_names:
-                app.state.person_names.append(name)
-                # Sync full org structure (registers new person + repairs others)
+        # Register anima lifecycle callbacks for reconciliation
+        def _on_anima_added(name: str) -> None:
+            if name not in app.state.anima_names:
+                app.state.anima_names.append(name)
+                # Sync full org structure (registers new anima + repairs others)
                 from core.org_sync import sync_org_structure
 
-                sync_org_structure(app.state.persons_dir)
-                logger.info("Person added via reconciliation: %s", name)
+                sync_org_structure(app.state.animas_dir)
+                logger.info("Anima added via reconciliation: %s", name)
 
-        def _on_person_removed(name: str) -> None:
-            if name in app.state.person_names:
-                app.state.person_names.remove(name)
-                logger.info("Person removed via reconciliation: %s", name)
+        def _on_anima_removed(name: str) -> None:
+            if name in app.state.anima_names:
+                app.state.anima_names.remove(name)
+                logger.info("Anima removed via reconciliation: %s", name)
 
-        app.state.supervisor.on_person_added = _on_person_added
-        app.state.supervisor.on_person_removed = _on_person_removed
+        app.state.supervisor.on_anima_added = _on_anima_added
+        app.state.supervisor.on_anima_removed = _on_anima_removed
 
-        await app.state.supervisor.start_all(app.state.person_names)
+        await app.state.supervisor.start_all(app.state.anima_names)
 
         # Sync org structure from identity.md/status.json → config.json
         try:
             from core.org_sync import sync_org_structure
 
-            sync_org_structure(app.state.persons_dir)
+            sync_org_structure(app.state.animas_dir)
         except Exception:
             logger.exception("Org structure sync failed at startup")
 
-        # Reconcile missing person assets (fallback for failed bootstrap)
+        # Reconcile missing anima assets (fallback for failed bootstrap)
         import asyncio
 
-        asyncio.create_task(_reconcile_assets_at_startup(app.state.persons_dir))
+        asyncio.create_task(_reconcile_assets_at_startup(app.state.animas_dir))
 
         # ── Message log reconciliation ─────────────────────
         shared_dir = app.state.shared_dir
@@ -95,20 +95,20 @@ async def lifespan(app: FastAPI):
             replace_existing=True,
         )
 
-        # ── Orphan person detection ───────────────────────
-        from core.org_sync import detect_orphan_persons
+        # ── Orphan anima detection ───────────────────────
+        from core.org_sync import detect_orphan_animas
 
         def _detect_orphans_task() -> None:
             try:
-                detect_orphan_persons(app.state.persons_dir, shared_dir)
+                detect_orphan_animas(app.state.animas_dir, shared_dir)
             except Exception:
                 logger.exception("Orphan detection failed")
 
         msg_log_scheduler.add_job(
             _detect_orphans_task,
             IntervalTrigger(minutes=10),
-            id="orphan_person_detection",
-            name="System: Orphan Person Detection",
+            id="orphan_anima_detection",
+            name="System: Orphan Anima Detection",
             replace_existing=True,
         )
 
@@ -131,10 +131,20 @@ async def lifespan(app: FastAPI):
     logger.info("Server stopped")
 
 
-def create_app(persons_dir: Path, shared_dir: Path) -> FastAPI:
+def create_app(animas_dir: Path, shared_dir: Path) -> FastAPI:
     app = FastAPI(title="AnimaWorks", version="0.1.0", lifespan=lifespan)
 
     ws_manager = WebSocketManager()
+
+    # Run Person→Anima rename migration before any animas_dir access
+    try:
+        from core.config.migrate import migrate_person_to_anima
+        from core.paths import get_data_dir as _get_data_dir
+
+        migrate_person_to_anima(_get_data_dir())
+    except Exception:
+        logger.exception("Person-to-Anima migration failed")
+
     config = load_config()
 
     # Create run directory for sockets and PID files
@@ -147,45 +157,45 @@ def create_app(persons_dir: Path, shared_dir: Path) -> FastAPI:
     log_dir.mkdir(parents=True, exist_ok=True)
 
     supervisor = ProcessSupervisor(
-        persons_dir=persons_dir,
+        animas_dir=animas_dir,
         shared_dir=shared_dir,
         run_dir=run_dir,
         log_dir=log_dir,
         ws_manager=ws_manager,
     )
 
-    # Ensure every person has the send wrapper script
-    from core.person_factory import ensure_send_scripts
+    # Ensure every anima has the send wrapper script
+    from core.anima_factory import ensure_send_scripts
 
-    ensure_send_scripts(persons_dir)
+    ensure_send_scripts(animas_dir)
 
     # Auto-migrate old Japanese cron.md format to standard cron expressions
     try:
         from core.config.migrate import migrate_all_cron
 
-        migrated = migrate_all_cron(persons_dir)
+        migrated = migrate_all_cron(animas_dir)
         if migrated:
-            logger.info("Auto-migrated %d person(s) cron.md to standard cron format", migrated)
+            logger.info("Auto-migrated %d anima(s) cron.md to standard cron format", migrated)
     except Exception:
         logger.exception("Cron format auto-migration failed")
 
-    # Discover person names from disk (respect status.json)
+    # Discover anima names from disk (respect status.json)
     from core.supervisor.manager import ProcessSupervisor as _PS
 
-    person_names: list[str] = []
-    if persons_dir.exists():
-        for person_dir in sorted(persons_dir.iterdir()):
-            if person_dir.is_dir() and (person_dir / "identity.md").exists():
-                if not _PS.read_person_enabled(person_dir):
-                    logger.info("Skipping disabled person: %s", person_dir.name)
+    anima_names: list[str] = []
+    if animas_dir.exists():
+        for anima_dir in sorted(animas_dir.iterdir()):
+            if anima_dir.is_dir() and (anima_dir / "identity.md").exists():
+                if not _PS.read_anima_enabled(anima_dir):
+                    logger.info("Skipping disabled anima: %s", anima_dir.name)
                     continue
-                person_names.append(person_dir.name)
-                logger.info("Discovered person: %s", person_dir.name)
+                anima_names.append(anima_dir.name)
+                logger.info("Discovered anima: %s", anima_dir.name)
 
     app.state.supervisor = supervisor
-    app.state.person_names = person_names
+    app.state.anima_names = anima_names
     app.state.ws_manager = ws_manager
-    app.state.persons_dir = persons_dir
+    app.state.animas_dir = animas_dir
     app.state.shared_dir = shared_dir
     app.state.setup_complete = config.setup_complete
 

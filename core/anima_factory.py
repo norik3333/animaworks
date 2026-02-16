@@ -1,11 +1,11 @@
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
 # This file is part of AnimaWorks core/server, licensed under AGPL-3.0.
 # See LICENSES/AGPL-3.0.txt for the full license text.
 
-"""Person creation factory: create new Digital Persons from templates, blank, or MD files."""
+"""Anima creation factory: create new Digital Animas from templates, blank, or MD files."""
 
 from __future__ import annotations
 
@@ -17,13 +17,13 @@ from pathlib import Path
 
 from core.paths import TEMPLATES_DIR
 
-logger = logging.getLogger("animaworks.person_factory")
+logger = logging.getLogger("animaworks.anima_factory")
 
-PERSON_TEMPLATES_DIR = TEMPLATES_DIR / "person_templates"
-BLANK_TEMPLATE_DIR = PERSON_TEMPLATES_DIR / "_blank"
+ANIMA_TEMPLATES_DIR = TEMPLATES_DIR / "anima_templates"
+BLANK_TEMPLATE_DIR = ANIMA_TEMPLATES_DIR / "_blank"
 BOOTSTRAP_TEMPLATE = TEMPLATES_DIR / "bootstrap.md"
 
-# Subdirectories every person needs at runtime
+# Subdirectories every anima needs at runtime
 _RUNTIME_SUBDIRS = [
     "episodes",
     "knowledge",
@@ -35,121 +35,121 @@ _RUNTIME_SUBDIRS = [
 ]
 
 
-def list_person_templates() -> list[str]:
-    """List available person templates (excluding _blank)."""
-    if not PERSON_TEMPLATES_DIR.exists():
+def list_anima_templates() -> list[str]:
+    """List available anima templates (excluding _blank)."""
+    if not ANIMA_TEMPLATES_DIR.exists():
         return []
     return [
         d.name
-        for d in sorted(PERSON_TEMPLATES_DIR.iterdir())
+        for d in sorted(ANIMA_TEMPLATES_DIR.iterdir())
         if d.is_dir() and not d.name.startswith("_")
     ]
 
 
 def create_from_template(
-    persons_dir: Path, template_name: str, *, person_name: str | None = None
+    animas_dir: Path, template_name: str, *, anima_name: str | None = None
 ) -> Path:
-    """Create a person by copying a named template.
+    """Create an anima by copying a named template.
 
     Args:
-        persons_dir: Runtime persons directory (~/.animaworks/persons/).
-        template_name: Template directory name under person_templates/.
-        person_name: Override the directory name.  Defaults to template_name.
+        animas_dir: Runtime animas directory (~/.animaworks/animas/).
+        template_name: Template directory name under anima_templates/.
+        anima_name: Override the directory name.  Defaults to template_name.
 
     Returns:
-        Path to the created person directory.
+        Path to the created anima directory.
     """
-    template_dir = PERSON_TEMPLATES_DIR / template_name
+    template_dir = ANIMA_TEMPLATES_DIR / template_name
     if not template_dir.exists():
         raise FileNotFoundError(f"Template not found: {template_name}")
 
-    name = person_name or template_name
-    person_dir = persons_dir / name
-    if person_dir.exists():
-        raise FileExistsError(f"Person already exists: {name}")
+    name = anima_name or template_name
+    anima_dir = animas_dir / name
+    if anima_dir.exists():
+        raise FileExistsError(f"Anima already exists: {name}")
 
-    shutil.copytree(template_dir, person_dir)
-    _ensure_runtime_subdirs(person_dir)
-    _init_state_files(person_dir)
-    _place_bootstrap(person_dir)
-    _place_send_script(person_dir)
+    shutil.copytree(template_dir, anima_dir)
+    _ensure_runtime_subdirs(anima_dir)
+    _init_state_files(anima_dir)
+    _place_bootstrap(anima_dir)
+    _place_send_script(anima_dir)
 
-    logger.info("Created person '%s' from template '%s'", name, template_name)
-    return person_dir
+    logger.info("Created anima '%s' from template '%s'", name, template_name)
+    return anima_dir
 
 
-def create_blank(persons_dir: Path, name: str) -> Path:
-    """Create a blank person with skeleton files.
+def create_blank(animas_dir: Path, name: str) -> Path:
+    """Create a blank anima with skeleton files.
 
     The {name} placeholder in skeleton files is replaced with the actual name.
     Copies the entire _blank template tree (including subdirectories like skills/).
 
     Args:
-        persons_dir: Runtime persons directory.
-        name: Person name (lowercase alphanumeric).
+        animas_dir: Runtime animas directory.
+        name: Anima name (lowercase alphanumeric).
 
     Returns:
-        Path to the created person directory.
+        Path to the created anima directory.
     """
-    person_dir = persons_dir / name
-    if person_dir.exists():
-        raise FileExistsError(f"Person already exists: {name}")
+    anima_dir = animas_dir / name
+    if anima_dir.exists():
+        raise FileExistsError(f"Anima already exists: {name}")
 
     try:
         if BLANK_TEMPLATE_DIR.exists():
-            shutil.copytree(BLANK_TEMPLATE_DIR, person_dir)
+            shutil.copytree(BLANK_TEMPLATE_DIR, anima_dir)
             # Replace {name} placeholder in all markdown files
-            for md_file in person_dir.rglob("*.md"):
+            for md_file in anima_dir.rglob("*.md"):
                 content = md_file.read_text(encoding="utf-8")
                 if "{name}" in content:
                     md_file.write_text(
                         content.replace("{name}", name), encoding="utf-8"
                     )
         else:
-            person_dir.mkdir(parents=True, exist_ok=True)
+            anima_dir.mkdir(parents=True, exist_ok=True)
 
-        _ensure_runtime_subdirs(person_dir)
-        _init_state_files(person_dir)
-        _place_bootstrap(person_dir)
-        _place_send_script(person_dir)
+        _ensure_runtime_subdirs(anima_dir)
+        _init_state_files(anima_dir)
+        _place_bootstrap(anima_dir)
+        _place_send_script(anima_dir)
     except Exception:
-        logger.error("Failed to create blank person '%s'; rolling back", name)
-        shutil.rmtree(person_dir, ignore_errors=True)
+        logger.error("Failed to create blank anima '%s'; rolling back", name)
+        shutil.rmtree(anima_dir, ignore_errors=True)
         raise
 
-    logger.info("Created blank person '%s'", name)
-    return person_dir
+    logger.info("Created blank anima '%s'", name)
+    return anima_dir
 
 
 def create_from_md(
-    persons_dir: Path,
+    animas_dir: Path,
     md_path: Path | None = None,
     name: str | None = None,
     *,
     content: str | None = None,
     supervisor: str | None = None,
 ) -> Path:
-    """Create a person from an MD character-sheet file or content string.
+    """Create an anima from an MD character-sheet file or content string.
 
     The MD content is validated, then placed as ``character_sheet.md`` in the
-    new person directory.  Sections in the sheet are applied to identity.md,
+    new anima directory.  Sections in the sheet are applied to identity.md,
     injection.md, permissions.md, and status.json.
 
-    On any failure after the person directory has been created the directory
+    On any failure after the anima directory has been created the directory
     is rolled back (removed) so no partial state is left behind.
 
     Args:
-        persons_dir: Runtime persons directory.
+        animas_dir: Runtime animas directory.
         md_path: Path to the source MD file.  Either *md_path* or *content*
             must be provided.
-        name: Person name.  If None, extracted from MD content.
+        name: Anima name.  If None, extracted from MD content.
         content: Character sheet content as a string.  If provided, *md_path*
             is ignored.
         supervisor: Explicit supervisor name.  If given, overrides the value
             parsed from the character sheet's ``基本情報`` table.
 
     Returns:
-        Path to the created person directory.
+        Path to the created anima directory.
 
     Raises:
         FileNotFoundError: If *md_path* is given but does not exist.
@@ -172,33 +172,33 @@ def create_from_md(
         name = _extract_name_from_md(md_content)
     if not name:
         raise ValueError(
-            "Could not extract person name from MD file. "
+            "Could not extract anima name from MD file. "
             "Add a '# Character: name' heading or specify --name."
         )
 
     # Create blank skeleton first, then layer character sheet on top
-    person_dir = create_blank(persons_dir, name)
+    anima_dir = create_blank(animas_dir, name)
     try:
-        (person_dir / "character_sheet.md").write_text(md_content, encoding="utf-8")
-        _apply_defaults_from_sheet(person_dir, md_content)
+        (anima_dir / "character_sheet.md").write_text(md_content, encoding="utf-8")
+        _apply_defaults_from_sheet(anima_dir, md_content)
         _create_status_json(
-            person_dir,
+            anima_dir,
             _parse_character_sheet_info(md_content),
             supervisor_override=supervisor,
         )
     except Exception:
         logger.error(
-            "Failed to set up person '%s' from MD file; rolling back", name
+            "Failed to set up anima '%s' from MD file; rolling back", name
         )
-        shutil.rmtree(person_dir, ignore_errors=True)
+        shutil.rmtree(anima_dir, ignore_errors=True)
         raise
 
-    logger.info("Created person '%s' from MD file '%s'", name, md_path)
-    return person_dir
+    logger.info("Created anima '%s' from MD file '%s'", name, md_path)
+    return anima_dir
 
 
 def _extract_name_from_md(content: str) -> str | None:
-    """Try to extract a person name from MD content.
+    """Try to extract an anima name from MD content.
 
     Looks for patterns like:
         # Character: Hinata
@@ -303,18 +303,18 @@ def _validate_character_sheet(content: str) -> None:
 
 
 def _create_status_json(
-    person_dir: Path,
+    anima_dir: Path,
     info: dict[str, str],
     *,
     supervisor_override: str | None = None,
 ) -> None:
-    """Create status.json in *person_dir* from parsed character-sheet info.
+    """Create status.json in *anima_dir* from parsed character-sheet info.
 
     The JSON contains supervisor, role, execution mode, model, and credential
     extracted from the ``基本情報`` table.
 
     Args:
-        person_dir: Target person directory.
+        anima_dir: Target anima directory.
         info: Dict returned by :func:`_parse_character_sheet_info`.
         supervisor_override: If given, takes priority over the value in
             *info* (the ``上司`` field from the character sheet).
@@ -332,11 +332,11 @@ def _create_status_json(
         "model": info.get("モデル", ""),
         "credential": info.get("credential", ""),
     }
-    (person_dir / "status.json").write_text(
+    (anima_dir / "status.json").write_text(
         json.dumps(status, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
-    logger.debug("Created status.json in %s", person_dir)
+    logger.debug("Created status.json in %s", anima_dir)
 
 
 def _extract_section_content(md_content: str, heading: str) -> str | None:
@@ -365,8 +365,8 @@ def _extract_section_content(md_content: str, heading: str) -> str | None:
     return body
 
 
-def _apply_defaults_from_sheet(person_dir: Path, md_content: str) -> None:
-    """Apply character-sheet sections to person files, keeping template defaults.
+def _apply_defaults_from_sheet(anima_dir: Path, md_content: str) -> None:
+    """Apply character-sheet sections to anima files, keeping template defaults.
 
     For sections marked ``[省略可]`` in the sheet, if they are omitted or
     empty the existing template files (heartbeat.md, cron.md, permissions.md)
@@ -378,56 +378,56 @@ def _apply_defaults_from_sheet(person_dir: Path, md_content: str) -> None:
         - ``## 権限``          → ``permissions.md``
 
     Args:
-        person_dir: Target person directory (already populated by create_blank).
+        anima_dir: Target anima directory (already populated by create_blank).
         md_content: Full markdown content of the character sheet.
     """
     # Identity
     personality = _extract_section_content(md_content, "人格")
     if personality:
-        (person_dir / "identity.md").write_text(
+        (anima_dir / "identity.md").write_text(
             personality + "\n", encoding="utf-8"
         )
-        logger.debug("Wrote identity.md from character sheet for %s", person_dir.name)
+        logger.debug("Wrote identity.md from character sheet for %s", anima_dir.name)
 
     # Injection
     injection = _extract_section_content(md_content, "役割・行動方針")
     if injection:
-        (person_dir / "injection.md").write_text(
+        (anima_dir / "injection.md").write_text(
             injection + "\n", encoding="utf-8"
         )
-        logger.debug("Wrote injection.md from character sheet for %s", person_dir.name)
+        logger.debug("Wrote injection.md from character sheet for %s", anima_dir.name)
 
     # Permissions
     permissions = _extract_section_content(md_content, "権限")
     if permissions:
-        (person_dir / "permissions.md").write_text(
+        (anima_dir / "permissions.md").write_text(
             permissions + "\n", encoding="utf-8"
         )
-        logger.debug("Wrote permissions.md from character sheet for %s", person_dir.name)
+        logger.debug("Wrote permissions.md from character sheet for %s", anima_dir.name)
 
 
 # ── Runtime Helpers ──────────
 
 
-def _ensure_runtime_subdirs(person_dir: Path) -> None:
+def _ensure_runtime_subdirs(anima_dir: Path) -> None:
     """Create runtime-only subdirectories."""
     for subdir in _RUNTIME_SUBDIRS:
-        (person_dir / subdir).mkdir(parents=True, exist_ok=True)
+        (anima_dir / subdir).mkdir(parents=True, exist_ok=True)
 
 
-def _init_state_files(person_dir: Path) -> None:
+def _init_state_files(anima_dir: Path) -> None:
     """Create initial state files if they don't exist."""
-    current_task = person_dir / "state" / "current_task.md"
+    current_task = anima_dir / "state" / "current_task.md"
     if not current_task.exists():
         current_task.write_text("status: idle\n", encoding="utf-8")
 
-    pending = person_dir / "state" / "pending.md"
+    pending = anima_dir / "state" / "pending.md"
     if not pending.exists():
         pending.write_text("", encoding="utf-8")
 
 
-def _should_create_bootstrap(person_dir: Path) -> bool:
-    """Check if bootstrap.md should be created for this person.
+def _should_create_bootstrap(anima_dir: Path) -> bool:
+    """Check if bootstrap.md should be created for this anima.
 
     Bootstrap is needed when:
     - identity.md doesn't exist
@@ -440,7 +440,7 @@ def _should_create_bootstrap(person_dir: Path) -> bool:
     Returns:
         True if bootstrap.md should be created, False otherwise.
     """
-    identity = person_dir / "identity.md"
+    identity = anima_dir / "identity.md"
     if not identity.exists():
         return True
 
@@ -448,56 +448,56 @@ def _should_create_bootstrap(person_dir: Path) -> bool:
     if not content.strip() or "未定義" in content:
         return True
 
-    if (person_dir / "character_sheet.md").exists():
+    if (anima_dir / "character_sheet.md").exists():
         return True
 
     return False
 
 
-def _place_bootstrap(person_dir: Path) -> None:
-    """Copy the bootstrap template into the person directory if needed."""
-    if not _should_create_bootstrap(person_dir):
-        logger.debug("Skipping bootstrap for %s (identity already defined)", person_dir)
+def _place_bootstrap(anima_dir: Path) -> None:
+    """Copy the bootstrap template into the anima directory if needed."""
+    if not _should_create_bootstrap(anima_dir):
+        logger.debug("Skipping bootstrap for %s (identity already defined)", anima_dir)
         return
 
     if BOOTSTRAP_TEMPLATE.exists():
-        shutil.copy2(BOOTSTRAP_TEMPLATE, person_dir / "bootstrap.md")
-        logger.debug("Placed bootstrap.md in %s", person_dir)
+        shutil.copy2(BOOTSTRAP_TEMPLATE, anima_dir / "bootstrap.md")
+        logger.debug("Placed bootstrap.md in %s", anima_dir)
 
 
-def _place_send_script(person_dir: Path) -> None:
-    """Place the send wrapper script in person_dir if not already present."""
+def _place_send_script(anima_dir: Path) -> None:
+    """Place the send wrapper script in anima_dir if not already present."""
     src = BLANK_TEMPLATE_DIR / "send"
-    dst = person_dir / "send"
+    dst = anima_dir / "send"
     if src.exists() and not dst.exists():
         shutil.copy2(src, dst)
         dst.chmod(0o755)
-        logger.debug("Placed send script in %s", person_dir)
+        logger.debug("Placed send script in %s", anima_dir)
 
 
-def ensure_send_scripts(persons_dir: Path) -> None:
-    """Ensure every person directory has the send wrapper script.
+def ensure_send_scripts(animas_dir: Path) -> None:
+    """Ensure every anima directory has the send wrapper script.
 
-    Iterates all subdirectories under *persons_dir* that contain an
-    ``identity.md`` file (i.e. valid person directories) and calls
+    Iterates all subdirectories under *animas_dir* that contain an
+    ``identity.md`` file (i.e. valid anima directories) and calls
     :func:`_place_send_script` for each.  Existing send scripts are
     never overwritten.
 
-    This should be called during server startup so that persons created
+    This should be called during server startup so that animas created
     before the send script feature was added also get the script.
 
     Args:
-        persons_dir: Runtime persons directory (e.g. ``~/.animaworks/persons/``).
+        animas_dir: Runtime animas directory (e.g. ``~/.animaworks/animas/``).
     """
-    if not persons_dir.exists():
+    if not animas_dir.exists():
         return
-    for person_dir in sorted(persons_dir.iterdir()):
-        if person_dir.is_dir() and (person_dir / "identity.md").exists():
-            _place_send_script(person_dir)
+    for anima_dir in sorted(animas_dir.iterdir()):
+        if anima_dir.is_dir() and (anima_dir / "identity.md").exists():
+            _place_send_script(anima_dir)
 
 
-def validate_person_name(name: str) -> str | None:
-    """Validate a person name.  Returns error message or None if valid."""
+def validate_anima_name(name: str) -> str | None:
+    """Validate an anima name.  Returns error message or None if valid."""
     if not name:
         return "Name cannot be empty"
     if not re.match(r"^[a-z][a-z0-9_-]*$", name):

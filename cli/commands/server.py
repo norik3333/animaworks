@@ -119,7 +119,7 @@ def cmd_start(args: argparse.Namespace) -> None:
     import uvicorn
 
     from core.init import ensure_runtime_dir
-    from core.paths import get_persons_dir, get_shared_dir
+    from core.paths import get_animas_dir, get_shared_dir
     from server.app import create_app
 
     existing_pid = _read_pid()
@@ -140,12 +140,12 @@ def cmd_start(args: argparse.Namespace) -> None:
     display_host = "localhost" if args.host == "0.0.0.0" else args.host
     config = load_config()
     if not config.setup_complete:
-        print(f"Open http://{display_host}:{args.port}/setup/ to configure your persons and settings.")
+        print(f"Open http://{display_host}:{args.port}/setup/ to configure your animas and settings.")
     else:
         print(f"Dashboard ready at http://{display_host}:{args.port}/")
 
     try:
-        app = create_app(get_persons_dir(), get_shared_dir())
+        app = create_app(get_animas_dir(), get_shared_dir())
         uvicorn.run(
             app,
             host=args.host,

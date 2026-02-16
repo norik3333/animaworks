@@ -1,5 +1,5 @@
 from __future__ import annotations
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
@@ -18,24 +18,24 @@ import pytest
 
 
 @pytest.fixture
-def temp_person_dir(tmp_path: Path) -> Path:
-    """Create a temporary person directory structure."""
-    person_dir = tmp_path / "test_person"
-    episodes_dir = person_dir / "episodes"
-    knowledge_dir = person_dir / "knowledge"
+def temp_anima_dir(tmp_path: Path) -> Path:
+    """Create a temporary anima directory structure."""
+    anima_dir = tmp_path / "test_anima"
+    episodes_dir = anima_dir / "episodes"
+    knowledge_dir = anima_dir / "knowledge"
     episodes_dir.mkdir(parents=True)
     knowledge_dir.mkdir(parents=True)
-    return person_dir
+    return anima_dir
 
 
 @pytest.fixture
-def consolidation_engine(temp_person_dir: Path):
+def consolidation_engine(temp_anima_dir: Path):
     """Create a ConsolidationEngine instance."""
     from core.memory.consolidation import ConsolidationEngine
 
     return ConsolidationEngine(
-        person_dir=temp_person_dir,
-        person_name="test_person",
+        anima_dir=temp_anima_dir,
+        anima_name="test_anima",
     )
 
 

@@ -43,7 +43,7 @@ export function getErrorMessage(data) {
     'TOOL_ERROR': 'ツール実行中にエラーが発生しました',
     'LLM_ERROR': 'AIモデルとの通信でエラーが発生しました',
     'STREAM_ERROR': '通信エラーが発生しました',
-    'PERSON_NOT_FOUND': 'Personが見つかりませんでした',
+    'ANIMA_NOT_FOUND': 'Animaが見つかりませんでした',
   };
   return messages[data.code] || data.error || data.message || 'エラーが発生しました';
 }

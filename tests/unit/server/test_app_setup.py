@@ -18,8 +18,8 @@ def _make_app(setup_complete: bool, tmp_path: Path):
     save_config(config, config_path)
     invalidate_cache()
 
-    persons_dir = tmp_path / "persons"
-    persons_dir.mkdir(exist_ok=True)
+    animas_dir = tmp_path / "animas"
+    animas_dir.mkdir(exist_ok=True)
     shared_dir = tmp_path / "shared"
     shared_dir.mkdir(exist_ok=True)
 
@@ -31,7 +31,7 @@ def _make_app(setup_complete: bool, tmp_path: Path):
         mock_sup_cls.return_value = mock_sup
 
         from server.app import create_app
-        app = create_app(persons_dir, shared_dir)
+        app = create_app(animas_dir, shared_dir)
 
     return app
 
@@ -63,7 +63,7 @@ class TestSetupGuardNotComplete:
         app = _make_app(False, tmp_path)
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            resp = await client.get("/api/persons")
+            resp = await client.get("/api/animas")
 
         assert resp.status_code == 503
         data = resp.json()
@@ -109,7 +109,7 @@ class TestSetupGuardComplete:
         app = _make_app(True, tmp_path)
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            resp = await client.get("/api/persons")
+            resp = await client.get("/api/animas")
 
         # Should get 200 (even if empty list)
         assert resp.status_code == 200
@@ -191,5 +191,5 @@ class TestSetupGuardTransition:
 
         # And dashboard API should work
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            resp = await client.get("/api/persons")
+            resp = await client.get("/api/animas")
             assert resp.status_code == 200

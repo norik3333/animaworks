@@ -27,7 +27,7 @@ class TestRegister:
             "remake-assets", "rin", "--style-from", "miku",
         ])
         assert args.command == "remake-assets"
-        assert args.person == "rin"
+        assert args.anima == "rin"
         assert args.style_from == "miku"
         assert args.dry_run is False
         assert args.no_backup is False
@@ -45,7 +45,7 @@ class TestRegister:
 def _make_namespace(**overrides) -> argparse.Namespace:
     """Build a Namespace with all remake-assets defaults, applying overrides."""
     defaults = {
-        "person": "rin",
+        "anima": "rin",
         "style_from": "miku",
         "steps": None,
         "prompt": None,
@@ -59,18 +59,18 @@ def _make_namespace(**overrides) -> argparse.Namespace:
     return argparse.Namespace(**defaults)
 
 
-class TestValidateTargetPerson:
-    """Target person must exist in data_dir."""
+class TestValidateTargetAnima:
+    """Target anima must exist in data_dir."""
 
-    def test_validate_target_person_missing(self, data_dir, make_person, capsys):
-        """Error when the target person directory does not exist."""
-        # Create style-from person but NOT the target
-        style_dir = make_person("miku")
+    def test_validate_target_anima_missing(self, data_dir, make_anima, capsys):
+        """Error when the target anima directory does not exist."""
+        # Create style-from anima but NOT the target
+        style_dir = make_anima("miku")
         assets = style_dir / "assets"
         assets.mkdir(exist_ok=True)
         (assets / "avatar_fullbody.png").write_bytes(b"PNG_FAKE")
 
-        args = _make_namespace(person="nonexistent", style_from="miku")
+        args = _make_namespace(anima="nonexistent", style_from="miku")
         _run(args)
 
         captured = capsys.readouterr()
@@ -79,26 +79,26 @@ class TestValidateTargetPerson:
 
 
 class TestValidateStyleFrom:
-    """Style-from person must exist and have a fullbody image."""
+    """Style-from anima must exist and have a fullbody image."""
 
-    def test_validate_style_from_missing(self, data_dir, make_person, capsys):
-        """Error when style-from person does not exist."""
-        make_person("rin")
-        args = _make_namespace(person="rin", style_from="nonexistent")
+    def test_validate_style_from_missing(self, data_dir, make_anima, capsys):
+        """Error when style-from anima does not exist."""
+        make_anima("rin")
+        args = _make_namespace(anima="rin", style_from="nonexistent")
         _run(args)
 
         captured = capsys.readouterr()
         assert "Error" in captured.out
         assert "nonexistent" in captured.out
 
-    def test_validate_style_from_no_fullbody(self, data_dir, make_person, capsys):
-        """Error when style-from person exists but lacks avatar_fullbody.png."""
-        make_person("rin")
-        style_dir = make_person("miku")
+    def test_validate_style_from_no_fullbody(self, data_dir, make_anima, capsys):
+        """Error when style-from anima exists but lacks avatar_fullbody.png."""
+        make_anima("rin")
+        style_dir = make_anima("miku")
         # assets dir exists but no fullbody image
         (style_dir / "assets").mkdir(exist_ok=True)
 
-        args = _make_namespace(person="rin", style_from="miku")
+        args = _make_namespace(anima="rin", style_from="miku")
         _run(args)
 
         captured = capsys.readouterr()
@@ -109,10 +109,10 @@ class TestValidateStyleFrom:
 class TestValidatePrompt:
     """Prompt must be available from --prompt or prompt.txt."""
 
-    def test_validate_no_prompt(self, data_dir, make_person, capsys):
+    def test_validate_no_prompt(self, data_dir, make_anima, capsys):
         """Error when no prompt.txt and no --prompt flag."""
-        target_dir = make_person("rin")
-        style_dir = make_person("miku")
+        target_dir = make_anima("rin")
+        style_dir = make_anima("miku")
 
         # Target has no prompt.txt
         (target_dir / "assets").mkdir(exist_ok=True)
@@ -122,7 +122,7 @@ class TestValidatePrompt:
         style_assets.mkdir(exist_ok=True)
         (style_assets / "avatar_fullbody.png").write_bytes(b"PNG_FAKE")
 
-        args = _make_namespace(person="rin", style_from="miku", prompt=None)
+        args = _make_namespace(anima="rin", style_from="miku", prompt=None)
         _run(args)
 
         captured = capsys.readouterr()
@@ -133,10 +133,10 @@ class TestValidatePrompt:
 class TestValidateSteps:
     """Invalid step names should be rejected."""
 
-    def test_validate_invalid_steps(self, data_dir, make_person, capsys):
+    def test_validate_invalid_steps(self, data_dir, make_anima, capsys):
         """Error on unrecognised step names."""
-        target_dir = make_person("rin")
-        style_dir = make_person("miku")
+        target_dir = make_anima("rin")
+        style_dir = make_anima("miku")
 
         assets = target_dir / "assets"
         assets.mkdir(exist_ok=True)
@@ -147,7 +147,7 @@ class TestValidateSteps:
         (style_assets / "avatar_fullbody.png").write_bytes(b"PNG_FAKE")
 
         args = _make_namespace(
-            person="rin", style_from="miku", steps="fullbody,bogus_step",
+            anima="rin", style_from="miku", steps="fullbody,bogus_step",
         )
         _run(args)
 
@@ -169,11 +169,11 @@ class TestValidateVibeStrength:
         ],
     )
     def test_validate_vibe_strength_range(
-        self, data_dir, make_person, capsys, strength, info,
+        self, data_dir, make_anima, capsys, strength, info,
     ):
         """Error when vibe-strength or vibe-info-extracted is out of range."""
-        target_dir = make_person("rin")
-        style_dir = make_person("miku")
+        target_dir = make_anima("rin")
+        style_dir = make_anima("miku")
 
         assets = target_dir / "assets"
         assets.mkdir(exist_ok=True)
@@ -184,7 +184,7 @@ class TestValidateVibeStrength:
         (style_assets / "avatar_fullbody.png").write_bytes(b"PNG_FAKE")
 
         args = _make_namespace(
-            person="rin",
+            anima="rin",
             style_from="miku",
             vibe_strength=strength,
             vibe_info_extracted=info,
@@ -202,10 +202,10 @@ class TestDryRun:
     """--dry-run prints a plan without calling the pipeline."""
 
     @patch("cli.commands.remake_cmd.ImageGenPipeline", create=True)
-    def test_dry_run_output(self, mock_pipeline_cls, data_dir, make_person, capsys):
+    def test_dry_run_output(self, mock_pipeline_cls, data_dir, make_anima, capsys):
         """Dry-run prints the plan and does not invoke the pipeline."""
-        target_dir = make_person("rin")
-        style_dir = make_person("miku")
+        target_dir = make_anima("rin")
+        style_dir = make_anima("miku")
 
         # Set up target assets with prompt
         assets = target_dir / "assets"
@@ -218,7 +218,7 @@ class TestDryRun:
         style_assets.mkdir(exist_ok=True)
         (style_assets / "avatar_fullbody.png").write_bytes(b"PNG_STYLE_DATA")
 
-        args = _make_namespace(person="rin", style_from="miku", dry_run=True)
+        args = _make_namespace(anima="rin", style_from="miku", dry_run=True)
         _run(args)
 
         captured = capsys.readouterr()
@@ -234,10 +234,10 @@ class TestDryRun:
 class TestBackup:
     """Backup is created before pipeline runs unless --no-backup."""
 
-    def test_backup_created(self, data_dir, make_person, capsys):
+    def test_backup_created(self, data_dir, make_anima, capsys):
         """Existing assets are backed up when running the pipeline."""
-        target_dir = make_person("rin")
-        style_dir = make_person("miku")
+        target_dir = make_anima("rin")
+        style_dir = make_anima("miku")
 
         # Create target assets
         assets = target_dir / "assets"
@@ -264,7 +264,7 @@ class TestBackup:
         mock_pipeline.generate_all.return_value = mock_result
 
         mock_pipeline_cls = MagicMock(return_value=mock_pipeline)
-        args = _make_namespace(person="rin", style_from="miku")
+        args = _make_namespace(anima="rin", style_from="miku")
 
         with patch("core.tools.image_gen.ImageGenPipeline", mock_pipeline_cls):
             _run(args)
@@ -283,10 +283,10 @@ class TestBackup:
         backup_dir = backup_dirs[0]
         assert (backup_dir / "avatar_fullbody.png").read_bytes() == b"PNG_ORIGINAL"
 
-    def test_no_backup_flag(self, data_dir, make_person, capsys):
+    def test_no_backup_flag(self, data_dir, make_anima, capsys):
         """--no-backup skips creating a backup directory."""
-        target_dir = make_person("rin")
-        style_dir = make_person("miku")
+        target_dir = make_anima("rin")
+        style_dir = make_anima("miku")
 
         assets = target_dir / "assets"
         assets.mkdir(exist_ok=True)
@@ -310,7 +310,7 @@ class TestBackup:
         mock_pipeline.generate_all.return_value = mock_result
 
         mock_pipeline_cls = MagicMock(return_value=mock_pipeline)
-        args = _make_namespace(person="rin", style_from="miku", no_backup=True)
+        args = _make_namespace(anima="rin", style_from="miku", no_backup=True)
 
         with patch("core.tools.image_gen.ImageGenPipeline", mock_pipeline_cls):
             _run(args)
@@ -329,10 +329,10 @@ class TestBackup:
 class TestPipelineInvocation:
     """Verify ImageGenPipeline.generate_all is called with correct arguments."""
 
-    def test_pipeline_called_with_correct_args(self, data_dir, make_person, capsys):
+    def test_pipeline_called_with_correct_args(self, data_dir, make_anima, capsys):
         """Mock ImageGenPipeline and verify generate_all kwargs."""
-        target_dir = make_person("rin")
-        style_dir = make_person("miku")
+        target_dir = make_anima("rin")
+        style_dir = make_anima("miku")
 
         assets = target_dir / "assets"
         assets.mkdir(exist_ok=True)
@@ -357,7 +357,7 @@ class TestPipelineInvocation:
         mock_pipeline_cls = MagicMock(return_value=mock_pipeline)
 
         args = _make_namespace(
-            person="rin",
+            anima="rin",
             style_from="miku",
             vibe_strength=0.7,
             vibe_info_extracted=0.9,
@@ -368,7 +368,7 @@ class TestPipelineInvocation:
         with patch("core.tools.image_gen.ImageGenPipeline", mock_pipeline_cls):
             _run(args)
 
-        # Pipeline was instantiated with the target person directory
+        # Pipeline was instantiated with the target anima directory
         mock_pipeline_cls.assert_called_once()
         init_kwargs = mock_pipeline_cls.call_args
         assert init_kwargs[0][0] == target_dir

@@ -1,5 +1,5 @@
 from __future__ import annotations
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
@@ -45,7 +45,7 @@ class CronTask(BaseModel):
 
 
 class ModelConfig(BaseModel):
-    """Per-person API key, model, and endpoint configuration."""
+    """Per-anima API key, model, and endpoint configuration."""
 
     model: str = "claude-sonnet-4-20250514"
     fallback_model: str | None = None
@@ -58,12 +58,12 @@ class ModelConfig(BaseModel):
     max_chains: int = 2  # max auto-continuation sessions
     conversation_history_threshold: float = 0.30  # conversation compression trigger
     execution_mode: str | None = None  # "autonomous" or "assisted"; None = auto
-    supervisor: str | None = None  # supervisor Person name
+    supervisor: str | None = None  # supervisor Anima name
     speciality: str | None = None  # free-text specialisation
     resolved_mode: str | None = None  # "A1"/"A2"/"B" — resolved from config
 
 
-class PersonConfig(BaseModel):
+class AnimaConfig(BaseModel):
     name: str
     base_dir: Path
     identity: str = ""
@@ -100,7 +100,7 @@ class CycleResult(BaseModel):
     total_turns: int = 0
 
 
-class PersonStatus(BaseModel):
+class AnimaStatus(BaseModel):
     name: str
     status: str = "idle"
     current_task: str = ""

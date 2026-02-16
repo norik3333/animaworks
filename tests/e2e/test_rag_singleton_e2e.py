@@ -18,28 +18,28 @@ def _reset_singletons():
 
 
 @pytest.fixture
-def person_dir(tmp_path, monkeypatch):
-    """Create a minimal person directory structure."""
+def anima_dir(tmp_path, monkeypatch):
+    """Create a minimal anima directory structure."""
     monkeypatch.setenv("ANIMAWORKS_DATA_DIR", str(tmp_path))
 
     # Create required directories
-    persons_dir = tmp_path / "persons"
-    persons_dir.mkdir()
-    person = persons_dir / "test-person"
-    person.mkdir()
+    animas_dir = tmp_path / "animas"
+    animas_dir.mkdir()
+    anima_path = animas_dir / "test-anima"
+    anima_path.mkdir()
     for sub in ("episodes", "knowledge", "procedures", "skills", "state"):
-        (person / sub).mkdir()
+        (anima_dir / sub).mkdir()
     (tmp_path / "company").mkdir()
     (tmp_path / "company" / "vision.md").write_text("# Vision", encoding="utf-8")
     (tmp_path / "common_skills").mkdir()
     (tmp_path / "common_knowledge").mkdir()
     (tmp_path / "shared" / "users").mkdir(parents=True)
 
-    return person
+    return dp
 
 
 class TestMemoryManagerSingleton:
-    def test_init_indexer_uses_singleton(self, person_dir):
+    def test_init_indexer_uses_singleton(self, anima_dir):
         """MemoryManager._init_indexer() should use get_vector_store() singleton."""
         mock_store = MagicMock()
         mock_model = MagicMock()
@@ -56,7 +56,7 @@ class TestMemoryManagerSingleton:
         ):
             from core.memory.manager import MemoryManager
 
-            mgr = MemoryManager(person_dir)
+            mgr = MemoryManager(anima_dir)
             # Trigger lazy initialization
             indexer = mgr._get_indexer()
 
@@ -64,16 +64,16 @@ class TestMemoryManagerSingleton:
             assert indexer is not None
             assert indexer.vector_store is mock_store
 
-    def test_multiple_managers_share_vector_store(self, person_dir, tmp_path):
+    def test_multiple_managers_share_vector_store(self, anima_dir, tmp_path):
         """Multiple MemoryManager instances should share the same ChromaVectorStore."""
         mock_store = MagicMock()
         mock_model = MagicMock()
 
-        # Create a second person dir
-        person2 = tmp_path / "persons" / "test-person-2"
-        person2.mkdir()
+        # Create a second anima dir
+        anima2 = tmp_path / "animas" / "test-anima-2"
+        anima2.mkdir()
         for sub in ("episodes", "knowledge", "procedures", "skills", "state"):
-            (person2 / sub).mkdir()
+            (anima2 / sub).mkdir()
 
         with (
             patch(
@@ -87,8 +87,8 @@ class TestMemoryManagerSingleton:
         ):
             from core.memory.manager import MemoryManager
 
-            mgr1 = MemoryManager(person_dir)
-            mgr2 = MemoryManager(person2)
+            mgr1 = MemoryManager(anima_dir)
+            mgr2 = MemoryManager(anima2)
 
             indexer1 = mgr1._get_indexer()
             indexer2 = mgr2._get_indexer()
@@ -101,16 +101,16 @@ class TestMemoryManagerSingleton:
             # (called twice, one for each manager, but returns same object)
             assert mock_get_store.call_count == 2
 
-    def test_multiple_managers_share_embedding_model(self, person_dir, tmp_path):
+    def test_multiple_managers_share_embedding_model(self, anima_dir, tmp_path):
         """Multiple MemoryManager instances should share the same embedding model."""
         mock_store = MagicMock()
         mock_model = MagicMock()
 
-        # Create a second person dir
-        person2 = tmp_path / "persons" / "test-person-2"
-        person2.mkdir()
+        # Create a second anima dir
+        anima2 = tmp_path / "animas" / "test-anima-2"
+        anima2.mkdir()
         for sub in ("episodes", "knowledge", "procedures", "skills", "state"):
-            (person2 / sub).mkdir()
+            (anima2 / sub).mkdir()
 
         with (
             patch(
@@ -124,8 +124,8 @@ class TestMemoryManagerSingleton:
         ):
             from core.memory.manager import MemoryManager
 
-            mgr1 = MemoryManager(person_dir)
-            mgr2 = MemoryManager(person2)
+            mgr1 = MemoryManager(anima_dir)
+            mgr2 = MemoryManager(anima2)
 
             indexer1 = mgr1._get_indexer()
             indexer2 = mgr2._get_indexer()

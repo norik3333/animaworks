@@ -18,8 +18,8 @@ def _create_real_app(tmp_path: Path) -> "FastAPI":  # noqa: F821
     Returns an app whose setup_complete flag is True so the setup-guard
     middleware lets API requests through.
     """
-    persons_dir = tmp_path / "persons"
-    persons_dir.mkdir(parents=True)
+    animas_dir = tmp_path / "animas"
+    animas_dir.mkdir(parents=True)
     shared_dir = tmp_path / "shared"
     shared_dir.mkdir(parents=True)
 
@@ -47,7 +47,7 @@ def _create_real_app(tmp_path: Path) -> "FastAPI":  # noqa: F821
 
         from server.app import create_app
 
-        app = create_app(persons_dir, shared_dir)
+        app = create_app(animas_dir, shared_dir)
 
     return app
 
@@ -56,7 +56,7 @@ class TestSystemStatusE2E:
     """E2E tests for /api/system/status through the full app stack."""
 
     async def test_system_status_response_structure(self, tmp_path: Path) -> None:
-        """Response from real app must contain persons, processes, and scheduler_running."""
+        """Response from real app must contain animas, processes, and scheduler_running."""
         app = _create_real_app(tmp_path)
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -64,7 +64,7 @@ class TestSystemStatusE2E:
 
         assert resp.status_code == 200
         data = resp.json()
-        assert "persons" in data
+        assert "animas" in data
         assert "processes" in data
         assert "scheduler_running" in data
 
@@ -74,9 +74,9 @@ class TestSystemStatusE2E:
         """scheduler_running should be True when cron.md files define jobs."""
         app = _create_real_app(tmp_path)
 
-        # Create a person with cron.md
-        persons_dir = app.state.persons_dir
-        alice_dir = persons_dir / "alice"
+        # Create an anima with cron.md
+        animas_dir = app.state.animas_dir
+        alice_dir = animas_dir / "alice"
         alice_dir.mkdir(parents=True, exist_ok=True)
         (alice_dir / "cron.md").write_text(
             "# Cron: alice\n\n"
@@ -85,7 +85,7 @@ class TestSystemStatusE2E:
             "Plan daily tasks.\n",
             encoding="utf-8",
         )
-        app.state.person_names = ["alice"]
+        app.state.anima_names = ["alice"]
         app.state.supervisor.is_scheduler_running.return_value = True
 
         transport = ASGITransport(app=app)

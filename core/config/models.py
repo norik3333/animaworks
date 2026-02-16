@@ -1,4 +1,4 @@
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
@@ -62,8 +62,8 @@ class CredentialConfig(BaseModel):
     base_url: str | None = None
 
 
-class PersonModelConfig(BaseModel):
-    """Per-person overrides.  All fields are optional (None = use default)."""
+class AnimaModelConfig(BaseModel):
+    """Per-anima overrides.  All fields are optional (None = use default)."""
 
     model: str | None = None
     fallback_model: str | None = None
@@ -74,12 +74,12 @@ class PersonModelConfig(BaseModel):
     max_chains: int | None = None
     conversation_history_threshold: float | None = None
     execution_mode: str | None = None  # "autonomous" or "assisted"
-    supervisor: str | None = None  # name of supervisor Person
+    supervisor: str | None = None  # name of supervisor Anima
     speciality: str | None = None  # free-text specialisation
 
 
-class PersonDefaults(BaseModel):
-    """Concrete defaults applied when a per-person field is None."""
+class AnimaDefaults(BaseModel):
+    """Concrete defaults applied when a per-anima field is None."""
 
     model: str = "claude-sonnet-4-20250514"
     fallback_model: str | None = None
@@ -151,7 +151,7 @@ class NotificationChannelConfig(BaseModel):
 
 
 class HumanNotificationConfig(BaseModel):
-    """Global configuration for human notification from top-level Persons."""
+    """Global configuration for human notification from top-level Animas."""
 
     enabled: bool = False
     channels: list[NotificationChannelConfig] = []
@@ -207,8 +207,8 @@ class AnimaWorksConfig(BaseModel):
     system: SystemConfig = SystemConfig()
     credentials: dict[str, CredentialConfig] = {"anthropic": CredentialConfig()}
     model_modes: dict[str, str] = {}  # モデル名 → "A1"/"A2"/"B"
-    person_defaults: PersonDefaults = PersonDefaults()
-    persons: dict[str, PersonModelConfig] = {}
+    anima_defaults: AnimaDefaults = AnimaDefaults()
+    animas: dict[str, AnimaModelConfig] = {}
     consolidation: ConsolidationConfig = ConsolidationConfig()
     rag: RAGConfig = RAGConfig()
     priming: PrimingConfig = PrimingConfig()
@@ -323,13 +323,13 @@ def save_config(config: AnimaWorksConfig, path: Path | None = None) -> None:
 # ---------------------------------------------------------------------------
 
 
-def resolve_person_config(
+def resolve_anima_config(
     config: AnimaWorksConfig,
-    person_name: str,
-) -> tuple[PersonDefaults, CredentialConfig]:
-    """Merge per-person overrides with *person_defaults* and resolve the credential.
+    anima_name: str,
+) -> tuple[AnimaDefaults, CredentialConfig]:
+    """Merge per-anima overrides with *anima_defaults* and resolve the credential.
 
-    For each field in :class:`PersonModelConfig`, the person's value is used
+    For each field in :class:`AnimaModelConfig`, the anima's value is used
     when it is not ``None``; otherwise the corresponding default is used.
 
     Returns:
@@ -339,23 +339,23 @@ def resolve_person_config(
         KeyError: If the resolved credential name is not in
             ``config.credentials``.
     """
-    person = config.persons.get(person_name, PersonModelConfig())
-    defaults = config.person_defaults
+    anima_entry = config.animas.get(anima_name, AnimaModelConfig())
+    defaults = config.anima_defaults
 
-    # Build a dict with resolved values: person override wins when not None.
+    # Build a dict with resolved values: anima override wins when not None.
     resolved: dict[str, Any] = {}
-    for field_name in PersonModelConfig.model_fields:
-        person_value = getattr(person, field_name)
+    for field_name in AnimaModelConfig.model_fields:
+        anima_value = getattr(anima_entry, field_name)
         resolved[field_name] = (
-            person_value if person_value is not None else getattr(defaults, field_name)
+            anima_value if anima_value is not None else getattr(defaults, field_name)
         )
 
-    resolved_defaults = PersonDefaults.model_validate(resolved)
+    resolved_defaults = AnimaDefaults.model_validate(resolved)
 
     credential_name = resolved_defaults.credential
     if credential_name not in config.credentials:
         raise KeyError(
-            f"Credential '{credential_name}' (for person '{person_name}') "
+            f"Credential '{credential_name}' (for anima '{anima_name}') "
             f"not found in config.credentials"
         )
 
@@ -467,11 +467,11 @@ def _match_pattern_table(
     return None
 
 
-def load_model_config(person_dir: Path) -> "ModelConfig":
-    """Build a ModelConfig for *person_dir* from the unified config.json.
+def load_model_config(anima_dir: Path) -> "ModelConfig":
+    """Build a ModelConfig for *anima_dir* from the unified config.json.
 
     This is a standalone version of ``MemoryManager.read_model_config()``
-    for use in server routes that do not have a live DigitalPerson instance.
+    for use in server routes that do not have a live DigitalAnima instance.
     """
     from core.schemas import ModelConfig
 
@@ -480,8 +480,8 @@ def load_model_config(person_dir: Path) -> "ModelConfig":
         return ModelConfig()
 
     config = load_config(config_path)
-    person_name = person_dir.name
-    resolved, credential = resolve_person_config(config, person_name)
+    anima_name = anima_dir.name
+    resolved, credential = resolve_anima_config(config, anima_name)
 
     cred_name = resolved.credential
     api_key_env = f"{cred_name.upper()}_API_KEY"
@@ -514,7 +514,7 @@ def resolve_execution_mode(
     """Resolve execution mode from model name with wildcard pattern support.
 
     Priority:
-      1. Person's execution_mode explicit override (legacy)
+      1. Anima's execution_mode explicit override (legacy)
       2. config.json model_modes table (exact + wildcard)
       3. DEFAULT_MODEL_MODE_PATTERNS (exact + wildcard)
       4. Default "B" (safe side)
@@ -539,7 +539,7 @@ def resolve_execution_mode(
 
 
 # ---------------------------------------------------------------------------
-# Person registration helpers
+# Anima registration helpers
 # ---------------------------------------------------------------------------
 
 
@@ -549,7 +549,7 @@ _PAREN_EN_NAME_RE = re.compile(r"[（(]([A-Za-z_][A-Za-z0-9_]*)[）)]")
 
 
 def _resolve_supervisor_name(raw: str) -> str | None:
-    """Resolve a raw supervisor value to a person name.
+    """Resolve a raw supervisor value to an anima name.
 
     Handles formats like ``"琴葉（kotoha）"`` → ``"kotoha"``,
     ``"sakura"`` → ``"sakura"``, ``"(なし)"`` → ``None``.
@@ -567,7 +567,7 @@ def _resolve_supervisor_name(raw: str) -> str | None:
     if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", raw):
         return raw.lower()
 
-    # Non-ASCII without English equivalent — cannot resolve to a person name
+    # Non-ASCII without English equivalent — cannot resolve to an anima name
     logger.warning(
         "Supervisor value '%s' has no English name in parentheses; ignoring",
         raw,
@@ -575,25 +575,25 @@ def _resolve_supervisor_name(raw: str) -> str | None:
     return None
 
 
-def read_person_supervisor(person_dir: Path) -> str | None:
-    """Read the supervisor field for a person from status.json or identity.md.
+def read_anima_supervisor(anima_dir: Path) -> str | None:
+    """Read the supervisor field for an anima from status.json or identity.md.
 
     Tries two sources in order:
       1. ``status.json`` — looks for ``"supervisor"`` key.
       2. ``identity.md`` — parses the Japanese table format ``| 上司 | name |``.
 
-    The raw value is resolved to an English person name (e.g.
+    The raw value is resolved to an English anima name (e.g.
     ``"琴葉（kotoha）"`` → ``"kotoha"``).
 
     Args:
-        person_dir: Path to the person's runtime directory
-            (e.g. ``~/.animaworks/persons/hinata``).
+        anima_dir: Path to the anima's runtime directory
+            (e.g. ``~/.animaworks/animas/hinata``).
 
     Returns:
-        The supervisor person name if found, otherwise ``None``.
+        The supervisor anima name if found, otherwise ``None``.
     """
     # Source 1: status.json
-    status_path = person_dir / "status.json"
+    status_path = anima_dir / "status.json"
     if status_path.is_file():
         try:
             data = json.loads(status_path.read_text(encoding="utf-8"))
@@ -606,7 +606,7 @@ def read_person_supervisor(person_dir: Path) -> str | None:
             logger.warning("Failed to read %s: %s", status_path, exc)
 
     # Source 2: identity.md table row  | 上司 | name |
-    identity_path = person_dir / "identity.md"
+    identity_path = anima_dir / "identity.md"
     if identity_path.is_file():
         try:
             content = identity_path.read_text(encoding="utf-8")
@@ -621,32 +621,32 @@ def read_person_supervisor(person_dir: Path) -> str | None:
     return None
 
 
-def register_person_in_config(
+def register_anima_in_config(
     data_dir: Path,
-    person_name: str,
+    anima_name: str,
 ) -> None:
-    """Register a newly created person in config.json with supervisor synced.
+    """Register a newly created anima in config.json with supervisor synced.
 
-    Reads status.json / identity.md in the person directory to extract the
-    ``supervisor`` field and stores it in the :class:`PersonModelConfig` entry
-    inside config.json.  If the person already exists in the config the call
+    Reads status.json / identity.md in the anima directory to extract the
+    ``supervisor`` field and stores it in the :class:`AnimaModelConfig` entry
+    inside config.json.  If the anima already exists in the config the call
     is a no-op.
 
     Args:
         data_dir: The AnimaWorks data directory (e.g. ``~/.animaworks``).
-        person_name: Name of the person to register.
+        anima_name: Name of the anima to register.
     """
     config_path = data_dir / "config.json"
     if not config_path.exists():
         return
     config = load_config(config_path)
-    if person_name not in config.persons:
-        person_dir = data_dir / "persons" / person_name
-        supervisor = read_person_supervisor(person_dir) if person_dir.exists() else None
-        config.persons[person_name] = PersonModelConfig(supervisor=supervisor)
+    if anima_name not in config.animas:
+        anima_dir = data_dir / "animas" / anima_name
+        supervisor = read_anima_supervisor(anima_dir) if anima_dir.exists() else None
+        config.animas[anima_name] = AnimaModelConfig(supervisor=supervisor)
         save_config(config, config_path)
         logger.debug(
-            "Registered person '%s' in config (supervisor=%s)",
-            person_name,
+            "Registered anima '%s' in config (supervisor=%s)",
+            anima_name,
             supervisor,
         )

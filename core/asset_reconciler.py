@@ -1,11 +1,11 @@
 from __future__ import annotations
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-"""Asset reconciliation — detect and generate missing Person assets.
+"""Asset reconciliation — detect and generate missing Anima assets.
 
-Primary mechanism: Person bootstraps generate their own assets.
+Primary mechanism: Anima bootstraps generate their own assets.
 This module provides a fallback that runs at server startup and
 periodically via the reconciliation loop, generating any missing
 assets using the ImageGenPipeline with ``skip_existing=True``.
@@ -20,10 +20,10 @@ from typing import Any
 
 logger = logging.getLogger("animaworks.asset_reconciler")
 
-# Per-person locks to prevent concurrent generation (bootstrap vs fallback).
-_person_locks: dict[str, asyncio.Lock] = {}
+# Per-anima locks to prevent concurrent generation (bootstrap vs fallback).
+_anima_locks: dict[str, asyncio.Lock] = {}
 
-# Required base assets.  If *any* of these are missing the person
+# Required base assets.  If *any* of these are missing the anima
 # is considered to have incomplete assets.
 REQUIRED_ASSETS: dict[str, str] = {
     "avatar_fullbody": "avatar_fullbody.png",
@@ -34,18 +34,18 @@ REQUIRED_ASSETS: dict[str, str] = {
 }
 
 
-def _get_lock(person_name: str) -> asyncio.Lock:
-    """Return (or create) the per-person generation lock."""
-    if person_name not in _person_locks:
-        _person_locks[person_name] = asyncio.Lock()
-    return _person_locks[person_name]
+def _get_lock(anima_name: str) -> asyncio.Lock:
+    """Return (or create) the per-anima generation lock."""
+    if anima_name not in _anima_locks:
+        _anima_locks[anima_name] = asyncio.Lock()
+    return _anima_locks[anima_name]
 
 
 # ── Asset checking ────────────────────────────────────────────────
 
 
-def check_person_assets(person_dir: Path) -> dict[str, Any]:
-    """Check a person's asset completeness using metadata logic.
+def check_anima_assets(anima_dir: Path) -> dict[str, Any]:
+    """Check an anima's asset completeness using metadata logic.
 
     Returns a dict with:
       - ``complete`` (bool): True if all required assets exist.
@@ -53,7 +53,7 @@ def check_person_assets(person_dir: Path) -> dict[str, Any]:
       - ``present`` (list[str]): Keys of present required assets.
       - ``has_assets_dir`` (bool): Whether the assets/ directory exists.
     """
-    assets_dir = person_dir / "assets"
+    assets_dir = anima_dir / "assets"
     has_dir = assets_dir.exists()
 
     missing: list[str] = []
@@ -74,25 +74,25 @@ def check_person_assets(person_dir: Path) -> dict[str, Any]:
     }
 
 
-def find_persons_with_missing_assets(
-    persons_dir: Path,
+def find_animas_with_missing_assets(
+    animas_dir: Path,
 ) -> list[tuple[str, dict[str, Any]]]:
-    """Scan all person directories and return those with incomplete assets.
+    """Scan all anima directories and return those with incomplete assets.
 
-    Returns list of ``(person_name, check_result)`` tuples.
+    Returns list of ``(anima_name, check_result)`` tuples.
     """
     results: list[tuple[str, dict[str, Any]]] = []
-    if not persons_dir.exists():
+    if not animas_dir.exists():
         return results
 
-    for person_dir in sorted(persons_dir.iterdir()):
-        if not person_dir.is_dir():
+    for anima_dir in sorted(animas_dir.iterdir()):
+        if not anima_dir.is_dir():
             continue
-        if not (person_dir / "identity.md").exists():
+        if not (anima_dir / "identity.md").exists():
             continue
-        result = check_person_assets(person_dir)
+        result = check_anima_assets(anima_dir)
         if not result["complete"]:
-            results.append((person_dir.name, result))
+            results.append((anima_dir.name, result))
 
     return results
 
@@ -100,56 +100,56 @@ def find_persons_with_missing_assets(
 # ── Asset generation (fallback) ───────────────────────────────────
 
 
-async def reconcile_person_assets(
-    person_dir: Path,
+async def reconcile_anima_assets(
+    anima_dir: Path,
     *,
     prompt: str | None = None,
 ) -> dict[str, Any]:
-    """Generate missing assets for a single person (non-blocking).
+    """Generate missing assets for a single anima (non-blocking).
 
-    Acquires the per-person lock so bootstrap and fallback cannot run
+    Acquires the per-anima lock so bootstrap and fallback cannot run
     concurrently.  Uses ``skip_existing=True`` for differential
     generation.
 
     Args:
-        person_dir: Path to the person's runtime directory.
+        anima_dir: Path to the anima's runtime directory.
         prompt: Character prompt for image generation.  If ``None``,
             attempts to extract from identity.md.
 
     Returns:
         Dict with generation results or skip reason.
     """
-    person_name = person_dir.name
-    lock = _get_lock(person_name)
+    anima_name = anima_dir.name
+    lock = _get_lock(anima_name)
 
     if lock.locked():
         logger.info(
             "Asset generation already in progress for %s, skipping",
-            person_name,
+            anima_name,
         )
-        return {"person": person_name, "skipped": True, "reason": "locked"}
+        return {"anima": anima_name, "skipped": True, "reason": "locked"}
 
     async with lock:
         # Re-check after acquiring lock — another task may have generated
-        check = check_person_assets(person_dir)
+        check = check_anima_assets(anima_dir)
         if check["complete"]:
-            logger.debug("Assets complete for %s (post-lock check)", person_name)
-            return {"person": person_name, "skipped": True, "reason": "complete"}
+            logger.debug("Assets complete for %s (post-lock check)", anima_name)
+            return {"anima": anima_name, "skipped": True, "reason": "complete"}
 
         logger.info(
             "Generating missing assets for %s (missing: %s)",
-            person_name,
+            anima_name,
             check["missing"],
         )
 
-        resolved_prompt = prompt or await _extract_prompt(person_dir)
+        resolved_prompt = prompt or await _extract_prompt(anima_dir)
         if not resolved_prompt:
             logger.warning(
                 "No prompt available for %s — cannot generate assets",
-                person_name,
+                anima_name,
             )
             return {
-                "person": person_name,
+                "anima": anima_name,
                 "skipped": True,
                 "reason": "no_prompt",
             }
@@ -157,7 +157,7 @@ async def reconcile_person_assets(
         try:
             from core.tools.image_gen import ImageGenPipeline
 
-            pipeline = ImageGenPipeline(person_dir)
+            pipeline = ImageGenPipeline(anima_dir)
             loop = asyncio.get_running_loop()
             result = await loop.run_in_executor(
                 None,
@@ -169,65 +169,65 @@ async def reconcile_person_assets(
             generated = _summarise_result(result)
             logger.info(
                 "Asset generation complete for %s: %s",
-                person_name,
+                anima_name,
                 generated,
             )
             return {
-                "person": person_name,
+                "anima": anima_name,
                 "skipped": False,
                 "generated": generated,
                 "errors": result.errors,
             }
         except Exception as exc:
-            logger.exception("Asset generation failed for %s", person_name)
+            logger.exception("Asset generation failed for %s", anima_name)
             return {
-                "person": person_name,
+                "anima": anima_name,
                 "skipped": False,
                 "error": str(exc),
             }
 
 
 async def reconcile_all_assets(
-    persons_dir: Path,
+    animas_dir: Path,
     *,
     ws_manager: Any | None = None,
 ) -> list[dict[str, Any]]:
-    """Check all persons and generate missing assets sequentially.
+    """Check all animas and generate missing assets sequentially.
 
     Args:
-        persons_dir: Root persons directory.
+        animas_dir: Root animas directory.
         ws_manager: Optional WebSocketManager for broadcasting updates.
 
     Returns:
-        List of per-person result dicts.
+        List of per-anima result dicts.
     """
-    incomplete = find_persons_with_missing_assets(persons_dir)
+    incomplete = find_animas_with_missing_assets(animas_dir)
     if not incomplete:
-        logger.debug("All persons have complete assets")
+        logger.debug("All animas have complete assets")
         return []
 
     logger.info(
-        "Asset reconciliation: %d person(s) with missing assets: %s",
+        "Asset reconciliation: %d anima(s) with missing assets: %s",
         len(incomplete),
         [name for name, _ in incomplete],
     )
 
     results: list[dict[str, Any]] = []
-    for person_name, _check in incomplete:
-        person_dir = persons_dir / person_name
-        result = await reconcile_person_assets(person_dir)
+    for anima_name, _check in incomplete:
+        anima_dir = animas_dir / anima_name
+        result = await reconcile_anima_assets(anima_dir)
         results.append(result)
 
         # Broadcast asset update if something was generated
         if ws_manager and not result.get("skipped"):
             try:
                 await ws_manager.broadcast(
-                    "person.assets_updated",
-                    {"name": person_name, "source": "reconciliation"},
+                    "anima.assets_updated",
+                    {"name": anima_name, "source": "reconciliation"},
                 )
             except Exception:
                 logger.debug(
-                    "Failed to broadcast asset update for %s", person_name,
+                    "Failed to broadcast asset update for %s", anima_name,
                 )
 
     return results
@@ -236,15 +236,15 @@ async def reconcile_all_assets(
 # ── Helpers ───────────────────────────────────────────────────────
 
 
-async def _extract_prompt(person_dir: Path) -> str | None:
-    """Try to extract a generation prompt from the person's identity.md.
+async def _extract_prompt(anima_dir: Path) -> str | None:
+    """Try to extract a generation prompt from the anima's identity.md.
 
     Fallback chain:
       1. Regex match for explicit ``image_prompt:`` / ``外見:`` fields
       2. Cached ``assets/prompt.txt`` from a previous LLM synthesis
       3. LLM synthesis from the appearance table in identity.md
     """
-    identity_path = person_dir / "identity.md"
+    identity_path = anima_dir / "identity.md"
     if not identity_path.exists():
         return None
 
@@ -261,13 +261,13 @@ async def _extract_prompt(person_dir: Path) -> str | None:
             return match.group(1).strip()
 
     # Step 2: Check cached prompt from previous LLM synthesis
-    prompt_cache = person_dir / "assets" / "prompt.txt"
+    prompt_cache = anima_dir / "assets" / "prompt.txt"
     if prompt_cache.exists():
         cached = prompt_cache.read_text(encoding="utf-8").strip()
         if cached:
             logger.debug(
                 "Using cached prompt for %s from assets/prompt.txt",
-                person_dir.name,
+                anima_dir.name,
             )
             return cached
 
@@ -276,7 +276,7 @@ async def _extract_prompt(person_dir: Path) -> str | None:
     if not appearance:
         return None
 
-    return await _synthesize_prompt_via_llm(person_dir, appearance)
+    return await _synthesize_prompt_via_llm(anima_dir, appearance)
 
 
 # ── Appearance extraction ─────────────────────────────────────
@@ -342,24 +342,24 @@ full body, standing, white background, looking at viewer"""
 
 
 async def _synthesize_prompt_via_llm(
-    person_dir: Path,
+    anima_dir: Path,
     appearance: str,
 ) -> str | None:
-    """Call the Person's LLM to convert appearance text into NovelAI tags.
+    """Call the Anima's LLM to convert appearance text into NovelAI tags.
 
     On success the result is cached to ``assets/prompt.txt``.
     On failure returns ``None`` (logs the error, does not raise).
     """
-    person_name = person_dir.name
+    anima_name = anima_dir.name
 
     try:
         from core.config.models import load_model_config
 
-        model_config = load_model_config(person_dir)
+        model_config = load_model_config(anima_dir)
     except Exception:
         logger.warning(
             "Cannot load model config for %s — skipping LLM synthesis",
-            person_name,
+            anima_name,
         )
         return None
 
@@ -391,7 +391,7 @@ async def _synthesize_prompt_via_llm(
     except Exception as exc:
         logger.warning(
             "LLM prompt synthesis failed for %s: %s",
-            person_name,
+            anima_name,
             exc,
         )
         return None
@@ -401,16 +401,16 @@ async def _synthesize_prompt_via_llm(
 
     # Cache result to assets/prompt.txt
     try:
-        cache_dir = person_dir / "assets"
+        cache_dir = anima_dir / "assets"
         cache_dir.mkdir(parents=True, exist_ok=True)
         (cache_dir / "prompt.txt").write_text(result + "\n", encoding="utf-8")
         logger.info(
             "Synthesized and cached prompt for %s: %.200s",
-            person_name,
+            anima_name,
             result,
         )
     except OSError:
-        logger.debug("Failed to cache prompt.txt for %s", person_name)
+        logger.debug("Failed to cache prompt.txt for %s", anima_name)
 
     return result
 

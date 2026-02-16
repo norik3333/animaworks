@@ -1,6 +1,6 @@
 """Unit tests for IPC keep-alive functionality.
 
-Tests keep-alive chunk emission in PersonRunner._handle_process_message_stream()
+Tests keep-alive chunk emission in AnimaRunner._handle_process_message_stream()
 and per-chunk timeout behaviour in IPCClient.send_request_stream().
 """
 from __future__ import annotations
@@ -15,7 +15,7 @@ import pytest
 
 from core.supervisor.ipc import IPCClient, IPCRequest, IPCResponse
 from core.supervisor.runner import (
-    PersonRunner,
+    AnimaRunner,
     _DEFAULT_KEEPALIVE_INTERVAL,
     _SENTINEL,
     _Sentinel,
@@ -25,17 +25,17 @@ from core.supervisor.runner import (
 # ── Helpers ──────────────────────────────────────────────────
 
 
-def _make_runner() -> PersonRunner:
-    """Create a PersonRunner with minimal config for unit testing."""
-    runner = PersonRunner(
-        person_name="test",
+def _make_runner() -> AnimaRunner:
+    """Create a AnimaRunner with minimal config for unit testing."""
+    runner = AnimaRunner(
+        anima_name="test",
         socket_path=Path("/tmp/test.sock"),
-        persons_dir=Path("/tmp/persons"),
+        animas_dir=Path("/tmp/animas"),
         shared_dir=Path("/tmp/shared"),
     )
-    runner.person = MagicMock()
-    runner.person.needs_bootstrap = False
-    runner.person._lock = asyncio.Lock()
+    runner.anima = MagicMock()
+    runner.anima.needs_bootstrap = False
+    runner.anima._lock = asyncio.Lock()
     return runner
 
 
@@ -72,7 +72,7 @@ class TestRunnerKeepalive:
                 "cycle_result": {"summary": "done"},
             }
 
-        runner.person.process_message_stream = _slow_stream
+        runner.anima.process_message_stream = _slow_stream
 
         request = IPCRequest(
             id="ka_001",
@@ -126,7 +126,7 @@ class TestRunnerKeepalive:
                 "cycle_result": {"summary": "fast"},
             }
 
-        runner.person.process_message_stream = _fast_stream
+        runner.anima.process_message_stream = _fast_stream
 
         request = IPCRequest(
             id="ka_002",
@@ -171,7 +171,7 @@ class TestRunnerKeepalive:
                 "cycle_result": {"summary": "instant"},
             }
 
-        runner.person.process_message_stream = _instant_stream
+        runner.anima.process_message_stream = _instant_stream
 
         request = IPCRequest(
             id="ka_003",

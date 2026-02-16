@@ -1,5 +1,5 @@
 from __future__ import annotations
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
@@ -8,7 +8,7 @@ from __future__ import annotations
 
 """Periodic organizational structure synchronization.
 
-Scans person directories, extracts supervisor relationships from identity.md
+Scans anima directories, extracts supervisor relationships from identity.md
 tables and status.json, and reconciles them with config.json entries.
 Manual config overrides are never clobbered; mismatches are logged as warnings.
 """
@@ -19,9 +19,9 @@ import time
 from pathlib import Path
 
 from core.config.models import (
-    PersonModelConfig,
+    AnimaModelConfig,
     load_config,
-    read_person_supervisor,
+    read_anima_supervisor,
     save_config,
 )
 from core.messenger import Messenger
@@ -38,7 +38,7 @@ def _detect_circular_references(
     """Detect circular supervisor references.
 
     Args:
-        relationships: Mapping of person name to supervisor name.
+        relationships: Mapping of anima name to supervisor name.
 
     Returns:
         List of cycles found, each represented as a tuple of names.
@@ -74,59 +74,59 @@ def _detect_circular_references(
 
 
 def sync_org_structure(
-    persons_dir: Path,
+    animas_dir: Path,
     config_path: Path | None = None,
 ) -> dict[str, str | None]:
-    """Sync organizational structure from person files to config.json.
+    """Sync organizational structure from anima files to config.json.
 
-    For each person directory:
+    For each anima directory:
 
     1. Extract supervisor from identity.md / status.json via
-       :func:`~core.config.models.read_person_supervisor`.
-    2. If config.json has no entry for this person, create one.
+       :func:`~core.config.models.read_anima_supervisor`.
+    2. If config.json has no entry for this anima, create one.
     3. If config.json has ``supervisor=None`` but a value was found, update it.
     4. If config.json already has a supervisor set, don't overwrite
        (respect manual config).
     5. Log warnings for mismatches.
 
     Args:
-        persons_dir: Path to the persons directory
-            (e.g. ``~/.animaworks/persons``).
+        animas_dir: Path to the animas directory
+            (e.g. ``~/.animaworks/animas``).
         config_path: Optional explicit path to config.json.  When ``None``,
             the default location is resolved automatically.
 
     Returns:
-        Dict of ``{person_name: supervisor_value}`` for all discovered entries.
+        Dict of ``{anima_name: supervisor_value}`` for all discovered entries.
     """
-    if not persons_dir.is_dir():
-        logger.debug("Persons directory does not exist: %s", persons_dir)
+    if not animas_dir.is_dir():
+        logger.debug("Animas directory does not exist: %s", animas_dir)
         return {}
 
     # ── Phase 1: discover supervisor relationships from disk ──────
 
     discovered: dict[str, str | None] = {}
 
-    for person_dir in sorted(persons_dir.iterdir()):
-        if not person_dir.is_dir():
+    for anima_dir in sorted(animas_dir.iterdir()):
+        if not anima_dir.is_dir():
             continue
-        if not (person_dir / "identity.md").exists():
+        if not (anima_dir / "identity.md").exists():
             continue
 
-        name = person_dir.name
-        discovered[name] = read_person_supervisor(person_dir)
+        name = anima_dir.name
+        discovered[name] = read_anima_supervisor(anima_dir)
 
     if not discovered:
-        logger.debug("No persons discovered in %s", persons_dir)
+        logger.debug("No animas discovered in %s", animas_dir)
         return {}
 
-    logger.info("Org sync: discovered %d persons from disk", len(discovered))
+    logger.info("Org sync: discovered %d animas from disk", len(discovered))
 
     # ── Phase 2: detect circular references ──────────────────────
 
     cycles = _detect_circular_references(discovered)
-    circular_persons: set[str] = set()
+    circular_animas: set[str] = set()
     for cycle in cycles:
-        circular_persons.update(cycle)
+        circular_animas.update(cycle)
         logger.warning(
             "Org sync: circular supervisor reference detected: %s",
             " -> ".join(cycle) + " -> " + cycle[0],
@@ -138,25 +138,25 @@ def sync_org_structure(
     changed = False
 
     for name, disk_supervisor in discovered.items():
-        # Skip persons involved in circular references
-        if name in circular_persons:
+        # Skip animas involved in circular references
+        if name in circular_animas:
             logger.warning(
                 "Org sync: skipping %s due to circular reference", name,
             )
             continue
 
-        if name not in config.persons:
-            # Person not yet in config — add with discovered supervisor
-            config.persons[name] = PersonModelConfig(supervisor=disk_supervisor)
+        if name not in config.animas:
+            # Anima not yet in config — add with discovered supervisor
+            config.animas[name] = AnimaModelConfig(supervisor=disk_supervisor)
             changed = True
             logger.info(
-                "Org sync: added person '%s' with supervisor=%s",
+                "Org sync: added anima '%s' with supervisor=%s",
                 name,
                 disk_supervisor,
             )
             continue
 
-        existing = config.persons[name]
+        existing = config.animas[name]
 
         if existing.supervisor is None and disk_supervisor is not None:
             # Config has no supervisor but disk has one — fill it in
@@ -192,28 +192,28 @@ def sync_org_structure(
     return discovered
 
 
-# ── Orphan person detection ───────────────────────────────────────
+# ── Orphan anima detection ───────────────────────────────────────
 
 
 def _find_orphan_supervisor(
     orphan_dir: Path,
-    persons_dir: Path,
+    animas_dir: Path,
 ) -> str | None:
-    """Determine which supervisor should be notified about an orphan person.
+    """Determine which supervisor should be notified about an orphan anima.
 
     Resolution order:
         1. ``status.json`` in *orphan_dir* — ``supervisor`` field.
-        2. ``config.json`` (global) — ``persons.<name>.supervisor``.
-        3. Fallback: first person in *persons_dir* whose ``config.json``
+        2. ``config.json`` (global) — ``animas.<name>.supervisor``.
+        3. Fallback: first anima in *animas_dir* whose ``config.json``
            entry has ``supervisor=None`` and whose ``identity.md`` exists
-           (i.e. a top-level person).
+           (i.e. a top-level anima).
 
     Args:
-        orphan_dir: Directory of the orphan person.
-        persons_dir: Root persons directory.
+        orphan_dir: Directory of the orphan anima.
+        animas_dir: Root animas directory.
 
     Returns:
-        Supervisor person name, or ``None`` if no candidate found.
+        Supervisor anima name, or ``None`` if no candidate found.
     """
     name = orphan_dir.name
 
@@ -228,16 +228,16 @@ def _find_orphan_supervisor(
         except (json.JSONDecodeError, OSError):
             pass
 
-    # 2) config.json global entry / 3) fallback to top-level person
+    # 2) config.json global entry / 3) fallback to top-level anima
     try:
         config = load_config()
-        person_cfg = config.persons.get(name)
-        if person_cfg and person_cfg.supervisor:
-            return person_cfg.supervisor
-        # Fallback: first top-level person (supervisor=None, identity.md exists)
-        for pname, pcfg in config.persons.items():
+        anima_cfg = config.animas.get(name)
+        if anima_cfg and anima_cfg.supervisor:
+            return anima_cfg.supervisor
+        # Fallback: first top-level anima (supervisor=None, identity.md exists)
+        for pname, pcfg in config.animas.items():
             if pcfg.supervisor is None:
-                candidate_dir = persons_dir / pname
+                candidate_dir = animas_dir / pname
                 if candidate_dir.is_dir() and (candidate_dir / "identity.md").exists():
                     return pname
     except Exception:
@@ -246,12 +246,12 @@ def _find_orphan_supervisor(
     return None
 
 
-def detect_orphan_persons(
-    persons_dir: Path,
+def detect_orphan_animas(
+    animas_dir: Path,
     shared_dir: Path,
     age_threshold_s: float = 300,
 ) -> list[dict[str, str]]:
-    """Detect person directories missing a valid identity.md and notify supervisors.
+    """Detect anima directories missing a valid identity.md and notify supervisors.
 
     A directory is considered *orphan* when:
 
@@ -269,7 +269,7 @@ def detect_orphan_persons(
     3. Writes a ``.orphan_notified`` marker so repeated runs don't re-notify.
 
     Args:
-        persons_dir: Runtime persons directory (e.g. ``~/.animaworks/persons/``).
+        animas_dir: Runtime animas directory (e.g. ``~/.animaworks/animas/``).
         shared_dir: Shared directory used by Messenger.
         age_threshold_s: Minimum directory age in seconds before it is
             considered orphan.  Defaults to 300 (5 minutes).
@@ -278,13 +278,13 @@ def detect_orphan_persons(
         List of dicts with keys ``name``, ``supervisor``, and ``notified``
         (``"yes"`` or ``"no"``).
     """
-    if not persons_dir.is_dir():
+    if not animas_dir.is_dir():
         return []
 
     now = time.time()
     results: list[dict[str, str]] = []
 
-    for entry in sorted(persons_dir.iterdir()):
+    for entry in sorted(animas_dir.iterdir()):
         if not entry.is_dir():
             continue
 
@@ -322,7 +322,7 @@ def detect_orphan_persons(
             continue
 
         # Resolve supervisor and send notification
-        supervisor = _find_orphan_supervisor(entry, persons_dir)
+        supervisor = _find_orphan_supervisor(entry, animas_dir)
         notified = "no"
 
         if supervisor:
@@ -331,7 +331,7 @@ def detect_orphan_persons(
                 messenger.send(
                     to=supervisor,
                     content=(
-                        f"[Orphan Detection] Person directory '{entry.name}' "
+                        f"[Orphan Detection] Anima directory '{entry.name}' "
                         f"has no valid identity.md.  Please review and either "
                         f"complete setup or remove the directory."
                     ),

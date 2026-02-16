@@ -1,5 +1,5 @@
 from __future__ import annotations
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
@@ -13,11 +13,11 @@ from fastapi import APIRouter, Request
 logger = logging.getLogger("animaworks.routes.system")
 
 
-def _parse_cron_jobs(persons_dir: Path, person_names: list[str]) -> list[dict]:
-    """Parse cron.md files from all persons and return job definitions."""
+def _parse_cron_jobs(animas_dir: Path, anima_names: list[str]) -> list[dict]:
+    """Parse cron.md files from all animas and return job definitions."""
     jobs: list[dict] = []
-    for name in person_names:
-        cron_path = persons_dir / name / "cron.md"
+    for name in anima_names:
+        cron_path = animas_dir / name / "cron.md"
         if not cron_path.exists():
             continue
         try:
@@ -52,7 +52,7 @@ def _parse_cron_jobs(persons_dir: Path, person_names: list[str]) -> list[dict]:
                 jobs.append({
                     "id": f"cron-{name}-{len(jobs)}",
                     "name": current_title,
-                    "person": name,
+                    "anima": name,
                     "type": current_type,
                     "schedule": schedule,
                     "next_run": None,
@@ -76,72 +76,72 @@ def create_system_router() -> APIRouter:
     @router.get("/system/status")
     async def system_status(request: Request):
         supervisor = request.app.state.supervisor
-        person_names = request.app.state.person_names
+        anima_names = request.app.state.anima_names
 
         # Get all process statuses
         process_statuses = supervisor.get_all_status()
 
         return {
-            "persons": len(person_names),
+            "animas": len(anima_names),
             "processes": process_statuses,
             "scheduler_running": supervisor.is_scheduler_running(),
         }
 
     @router.post("/system/reload")
-    async def reload_persons(request: Request):
-        """Full sync: add new persons, refresh existing, remove deleted."""
+    async def reload_animas(request: Request):
+        """Full sync: add new animas, refresh existing, remove deleted."""
         supervisor = request.app.state.supervisor
-        persons_dir = request.app.state.persons_dir
-        current_names = set(request.app.state.person_names)
+        animas_dir = request.app.state.animas_dir
+        current_names = set(request.app.state.anima_names)
 
         added: list[str] = []
         refreshed: list[str] = []
         removed: list[str] = []
 
-        # Discover current persons on disk
+        # Discover current animas on disk
         from core.supervisor.manager import ProcessSupervisor
 
         on_disk: set[str] = set()
-        if persons_dir.exists():
-            for person_dir in sorted(persons_dir.iterdir()):
-                if not person_dir.is_dir():
+        if animas_dir.exists():
+            for anima_dir in sorted(animas_dir.iterdir()):
+                if not anima_dir.is_dir():
                     continue
-                if not (person_dir / "identity.md").exists():
+                if not (anima_dir / "identity.md").exists():
                     continue
-                name = person_dir.name
+                name = anima_dir.name
 
-                # Respect status.json: skip disabled persons
-                if not ProcessSupervisor.read_person_enabled(person_dir):
+                # Respect status.json: skip disabled animas
+                if not ProcessSupervisor.read_anima_enabled(anima_dir):
                     on_disk.add(name)
                     continue
 
                 on_disk.add(name)
 
                 if name not in current_names:
-                    # New person - start process
-                    await supervisor.start_person(name)
-                    request.app.state.person_names.append(name)
+                    # New anima - start process
+                    await supervisor.start_anima(name)
+                    request.app.state.anima_names.append(name)
                     added.append(name)
-                    logger.info("Hot-loaded person: %s", name)
+                    logger.info("Hot-loaded anima: %s", name)
                 else:
-                    # Existing person — restart to pick up file changes
-                    await supervisor.restart_person(name)
+                    # Existing anima — restart to pick up file changes
+                    await supervisor.restart_anima(name)
                     refreshed.append(name)
-                    logger.info("Refreshed person: %s", name)
+                    logger.info("Refreshed anima: %s", name)
 
-        # Remove persons whose directories no longer exist
+        # Remove animas whose directories no longer exist
         for name in list(current_names):
             if name not in on_disk:
-                await supervisor.stop_person(name)
-                request.app.state.person_names.remove(name)
+                await supervisor.stop_anima(name)
+                request.app.state.anima_names.remove(name)
                 removed.append(name)
-                logger.info("Unloaded person: %s", name)
+                logger.info("Unloaded anima: %s", name)
 
         return {
             "added": added,
             "refreshed": refreshed,
             "removed": removed,
-            "total": len(request.app.state.person_names),
+            "total": len(request.app.state.anima_names),
         }
 
     # ── Connections ─────────────────────────────────────────
@@ -162,7 +162,7 @@ def create_system_router() -> APIRouter:
             },
             "processes": {
                 name: supervisor.get_process_status(name)
-                for name in request.app.state.person_names
+                for name in request.app.state.anima_names
             },
         }
 
@@ -172,11 +172,11 @@ def create_system_router() -> APIRouter:
     async def system_scheduler(request: Request):
         """Return scheduler status and job information."""
         supervisor = request.app.state.supervisor
-        persons_dir = request.app.state.persons_dir
-        person_names = request.app.state.person_names
+        animas_dir = request.app.state.animas_dir
+        anima_names = request.app.state.anima_names
 
         # Get configured jobs from cron.md files (for display)
-        jobs = _parse_cron_jobs(persons_dir, person_names)
+        jobs = _parse_cron_jobs(animas_dir, anima_names)
 
         # Get system scheduler jobs
         system_jobs = []
@@ -185,7 +185,7 @@ def create_system_router() -> APIRouter:
                 system_jobs.append({
                     "id": job.id,
                     "name": job.name,
-                    "person": "system",
+                    "anima": "system",
                     "type": "consolidation",
                     "schedule": str(job.trigger),
                     "next_run": job.next_run_time.isoformat() if job.next_run_time else None,
@@ -194,7 +194,7 @@ def create_system_router() -> APIRouter:
         return {
             "running": supervisor.is_scheduler_running(),
             "system_jobs": system_jobs,
-            "person_jobs": jobs,
+            "anima_jobs": jobs,
         }
 
     # ── Activity ───────────────────────────────────────────
@@ -203,12 +203,12 @@ def create_system_router() -> APIRouter:
     async def get_recent_activity(
         request: Request,
         hours: int = 48,
-        person: str | None = None,
+        anima: str | None = None,
         offset: int = 0,
         limit: int = 100,
         event_type: str | None = None,
     ):
-        """Return recent activity events aggregated across persons."""
+        """Return recent activity events aggregated across animas."""
         from datetime import date as date_type
         from datetime import datetime, timedelta, timezone
 
@@ -216,9 +216,9 @@ def create_system_router() -> APIRouter:
         from core.memory.conversation import ConversationMemory
         from core.memory.shortterm import ShortTermMemory
 
-        persons_dir = request.app.state.persons_dir
+        animas_dir = request.app.state.animas_dir
         shared_dir = request.app.state.shared_dir
-        person_names = request.app.state.person_names
+        anima_names = request.app.state.anima_names
         cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
         events: list[dict] = []
 
@@ -232,16 +232,16 @@ def create_system_router() -> APIRouter:
             type_filter = {t.strip() for t in event_type.split(",") if t.strip()}
 
         target_names = (
-            [person] if person and person in person_names else person_names
+            [anima] if anima and anima in anima_names else anima_names
         )
 
         for name in target_names:
-            person_dir = persons_dir / name
-            if not person_dir.exists():
+            anima_dir = animas_dir / name
+            if not anima_dir.exists():
                 continue
 
             # Short-term memory archives (session history)
-            stm = ShortTermMemory(person_dir)
+            stm = ShortTermMemory(anima_dir)
             archive_dir = stm._archive_dir
             if archive_dir.exists():
                 for json_file in sorted(
@@ -259,7 +259,7 @@ def create_system_router() -> APIRouter:
                             break
                         events.append({
                             "type": "session",
-                            "persons": [name],
+                            "animas": [name],
                             "timestamp": ts_str,
                             "summary": (
                                 data.get("trigger", "")
@@ -279,15 +279,15 @@ def create_system_router() -> APIRouter:
 
             # Conversation transcripts (today)
             try:
-                model_config = load_model_config(person_dir)
-                conv = ConversationMemory(person_dir, model_config)
+                model_config = load_model_config(anima_dir)
+                conv = ConversationMemory(anima_dir, model_config)
                 today = date_type.today().isoformat()
                 messages = conv.load_transcript(today)
                 for msg in messages:
                     ts_str = msg.get("timestamp", "")
                     events.append({
                         "type": "chat",
-                        "persons": [name],
+                        "animas": [name],
                         "timestamp": ts_str,
                         "summary": (msg.get("content", ""))[:80],
                         "metadata": {"role": msg.get("role", "")},
@@ -296,8 +296,8 @@ def create_system_router() -> APIRouter:
                 logger.warning("Failed to load transcripts for %s", name, exc_info=True)
 
             # Heartbeat history (date-split directory or legacy single file)
-            hb_dir = person_dir / "shortterm" / "heartbeat_history"
-            hb_legacy = person_dir / "shortterm" / "heartbeat_history.jsonl"
+            hb_dir = anima_dir / "shortterm" / "heartbeat_history"
+            hb_legacy = anima_dir / "shortterm" / "heartbeat_history.jsonl"
             hb_files: list[Path] = []
             if hb_dir.exists():
                 hb_files = sorted(hb_dir.glob("*.jsonl"), reverse=True)
@@ -314,7 +314,7 @@ def create_system_router() -> APIRouter:
                                 continue
                             events.append({
                                 "type": "heartbeat",
-                                "persons": [name],
+                                "animas": [name],
                                 "timestamp": ts_str,
                                 "summary": entry.get("summary", "")[:80],
                                 "metadata": {
@@ -329,7 +329,7 @@ def create_system_router() -> APIRouter:
                     logger.warning("Failed to load heartbeat history for %s", name, exc_info=True)
 
             # Cron execution logs
-            cron_log_dir = person_dir / "state" / "cron_logs"
+            cron_log_dir = anima_dir / "state" / "cron_logs"
             if cron_log_dir.exists():
                 try:
                     for log_file in sorted(cron_log_dir.glob("*.jsonl"), reverse=True):
@@ -345,7 +345,7 @@ def create_system_router() -> APIRouter:
                                     summary = f"{entry.get('task', '')}: exit_code={entry['exit_code']}"
                                 events.append({
                                     "type": "cron",
-                                    "persons": [name],
+                                    "animas": [name],
                                     "timestamp": ts_str,
                                     "summary": summary[:80],
                                     "metadata": {
@@ -359,10 +359,10 @@ def create_system_router() -> APIRouter:
                 except Exception:
                     logger.warning("Failed to load cron logs for %s", name, exc_info=True)
 
-        # Inter-person message logs (shared across all persons)
+        # Inter-anima message logs (shared across all animas)
         msg_log_dir = shared_dir / "message_log"
         if msg_log_dir.exists():
-            person_filter = set(target_names)
+            anima_filter = set(target_names)
             try:
                 for log_file in sorted(msg_log_dir.glob("*.jsonl"), reverse=True):
                     for line in log_file.read_text(encoding="utf-8").strip().splitlines():
@@ -374,12 +374,12 @@ def create_system_router() -> APIRouter:
                                 continue
                             from_p = entry.get("from_person", "")
                             to_p = entry.get("to_person", "")
-                            # Include if either sender or receiver matches person filter
-                            if person and from_p not in person_filter and to_p not in person_filter:
+                            # Include if either sender or receiver matches anima filter
+                            if anima and from_p not in anima_filter and to_p not in anima_filter:
                                 continue
                             events.append({
                                 "type": "message",
-                                "persons": [from_p, to_p],
+                                "animas": [from_p, to_p],
                                 "timestamp": ts_str,
                                 "summary": f"{from_p} → {to_p}: {entry.get('summary', '')[:60]}",
                                 "metadata": {

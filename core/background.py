@@ -1,5 +1,5 @@
 from __future__ import annotations
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
@@ -43,7 +43,7 @@ class BackgroundTask:
     """Represents a single background task."""
 
     task_id: str
-    person_name: str
+    anima_name: str
     tool_name: str
     tool_args: dict[str, Any]
     status: TaskStatus = TaskStatus.PENDING
@@ -55,7 +55,7 @@ class BackgroundTask:
     def to_dict(self) -> dict[str, Any]:
         return {
             "task_id": self.task_id,
-            "person_name": self.person_name,
+            "anima_name": self.anima_name,
             "tool_name": self.tool_name,
             "tool_args": self.tool_args,
             "status": self.status.value,
@@ -102,7 +102,7 @@ class BackgroundTaskManager:
 
     Usage::
 
-        mgr = BackgroundTaskManager(person_dir, person_name="sakura")
+        mgr = BackgroundTaskManager(anima_dir, anima_name="sakura")
         mgr.on_complete = my_notify_callback
 
         if mgr.is_eligible("generate_character_assets"):
@@ -112,12 +112,12 @@ class BackgroundTaskManager:
 
     def __init__(
         self,
-        person_dir: Path,
-        person_name: str = "",
+        anima_dir: Path,
+        anima_name: str = "",
         eligible_tools: dict[str, int] | None = None,
     ) -> None:
-        self._person_dir = person_dir
-        self._person_name = person_name or person_dir.name
+        self._anima_dir = anima_dir
+        self._anima_name = anima_name or anima_dir.name
         self._eligible_tools = eligible_tools or dict(_DEFAULT_ELIGIBLE_TOOLS)
         self._tasks: dict[str, BackgroundTask] = {}
         self._async_tasks: dict[str, asyncio.Task[None]] = {}
@@ -128,7 +128,7 @@ class BackgroundTaskManager:
 
     @property
     def _storage_dir(self) -> Path:
-        return self._person_dir / "state" / "background_tasks"
+        return self._anima_dir / "state" / "background_tasks"
 
     # ── Public API ───────────────────────────────────────────
 
@@ -155,7 +155,7 @@ class BackgroundTaskManager:
         task_id = uuid.uuid4().hex[:12]
         task = BackgroundTask(
             task_id=task_id,
-            person_name=self._person_name,
+            anima_name=self._anima_name,
             tool_name=tool_name,
             tool_args=tool_args,
             status=TaskStatus.RUNNING,
@@ -164,8 +164,8 @@ class BackgroundTaskManager:
         self._save_task(task)
 
         logger.info(
-            "Background task submitted: id=%s tool=%s person=%s",
-            task_id, tool_name, self._person_name,
+            "Background task submitted: id=%s tool=%s anima=%s",
+            task_id, tool_name, self._anima_name,
         )
 
         # Schedule the async wrapper
@@ -189,7 +189,7 @@ class BackgroundTaskManager:
         task_id = uuid.uuid4().hex[:12]
         task = BackgroundTask(
             task_id=task_id,
-            person_name=self._person_name,
+            anima_name=self._anima_name,
             tool_name=tool_name,
             tool_args=tool_args,
             status=TaskStatus.RUNNING,
@@ -198,8 +198,8 @@ class BackgroundTaskManager:
         self._save_task(task)
 
         logger.info(
-            "Background task submitted (async): id=%s tool=%s person=%s",
-            task_id, tool_name, self._person_name,
+            "Background task submitted (async): id=%s tool=%s anima=%s",
+            task_id, tool_name, self._anima_name,
         )
 
         async_task = asyncio.create_task(
@@ -340,7 +340,7 @@ class BackgroundTaskManager:
             data = json.loads(path.read_text(encoding="utf-8"))
             return BackgroundTask(
                 task_id=data["task_id"],
-                person_name=data["person_name"],
+                anima_name=data["anima_name"],
                 tool_name=data["tool_name"],
                 tool_args=data.get("tool_args", {}),
                 status=TaskStatus(data["status"]),

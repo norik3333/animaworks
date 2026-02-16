@@ -2,14 +2,14 @@
 
 export const state = {
   currentUser: localStorage.getItem("animaworks_user") || null,
-  persons: [],            // PersonStatus[]
-  selectedPerson: null,   // string (name)
-  personDetail: null,     // full detail object
+  animas: [],            // AnimaStatus[]
+  selectedAnima: null,   // string (name)
+  animaDetail: null,     // full detail object
   chatHistories: {},      // { [name]: [{role, text}] }
   activeMemoryTab: "episodes",
   activeRightTab: "state",
   wsConnected: false,
-  sessionList: null,      // cached session list for selected person
+  sessionList: null,      // cached session list for selected anima
 };
 
 const $id = (id) => document.getElementById(id);

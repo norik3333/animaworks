@@ -18,7 +18,7 @@
 
 ### 原因
 
-1. 相手の名前（Person名）が間違っている
+1. 相手の名前（Anima名）が間違っている
 2. サーバーが停止している
 3. 相手がハートビート間隔の合間にいる（次の起動まで未読のまま）
 4. 送信処理自体がエラーで失敗していた
@@ -32,7 +32,7 @@
      ```
      search_memory(query="組織", scope="common_knowledge")
      ```
-     または `read_memory_file(path="common_knowledge/organization/structure.md")` で組織の全Person名を確認
+     または `read_memory_file(path="common_knowledge/organization/structure.md")` で組織の全Anima名を確認
 
 2. **サーバーの稼働状況を確認する**
    - 自分が動作している時点でサーバーは稼働中のはず
@@ -71,7 +71,7 @@ send_message(
 ### 症状
 
 - 作業を進めようとしたが、必要な情報や権限が不足している
-- 他のPersonの作業完了を待っている状態
+- 他のAnimaの作業完了を待っている状態
 - 外部サービスがエラーを返す
 
 ### 原因
@@ -192,7 +192,7 @@ send_message(
 | `knowledge` | 学んだ知識・ノウハウ | 対応方針、技術メモ |
 | `episodes` | 過去の行動ログ | 「いつ何をしたか」の事実確認 |
 | `procedures` | 手順書 | 「どうやるか」の手順確認 |
-| `common_knowledge` | 全Person共有の知識 | 組織ルール、システムガイド |
+| `common_knowledge` | 全Anima共有の知識 | 組織ルール、システムガイド |
 | `all` | 上記すべて | キーワードの存在確認、広範な検索 |
 
 ---
@@ -242,7 +242,7 @@ send_message(
 4. **絶対にやってはいけないこと**
    - 権限チェックを回避しようとすること
    - 許可されていないコマンドを別の方法で実行しようとすること
-   - 他のPersonの権限を利用しようとすること
+   - 他のAnimaの権限を利用しようとすること
 
 ---
 
@@ -356,7 +356,7 @@ send_message(
 
 - **原因**: パスの指定ミス、ファイルが存在しない
 - **対処**: `list_directory` でディレクトリ内容を確認してからパスを指定する
-- **注意**: 相対パスと絶対パスの使い分けに注意。`read_memory_file` は Person ディレクトリからの相対パス、`read_file` は絶対パスを使用する
+- **注意**: 相対パスと絶対パスの使い分けに注意。`read_memory_file` は Anima ディレクトリからの相対パス、`read_file` は絶対パスを使用する
 
 ### コマンドがタイムアウトする
 
@@ -364,7 +364,7 @@ send_message(
 - **対処**: `execute_command` の `timeout` パラメータを増やす（デフォルト: 30秒）
 - **注意**: 長時間実行するコマンドには適切なタイムアウト値を設定すること
 
-### 相手のPersonが存在しない
+### 相手のAnimaが存在しない
 
-- **原因**: Person名の間違い、またはそのPersonがまだ作成されていない
+- **原因**: Anima名の間違い、またはそのAnimaがまだ作成されていない
 - **対処**: 上司に確認する。組織構造は `common_knowledge/organization/structure.md` を参照

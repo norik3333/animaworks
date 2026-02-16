@@ -11,7 +11,7 @@ from core.tooling.handler import ToolHandler
 
 
 # Test flow:
-# 1. Create a person_dir with tools/ containing a custom Python tool
+# 1. Create a anima_dir with tools/ containing a custom Python tool
 # 2. Verify discover_personal_tools finds it
 # 3. Create ToolHandler, call refresh_tools, verify the tool is discovered
 # 4. Call the custom tool via handler.handle() and verify it works
@@ -23,18 +23,18 @@ from core.tooling.handler import ToolHandler
 class TestToolHotReload:
     """Verify the tool creation -> refresh -> use flow end-to-end."""
 
-    # Test 1: Person writes a tool file, refresh discovers it, handler can call it
+    # Test 1: Anima writes a tool file, refresh discovers it, handler can call it
     def test_create_tool_refresh_and_use(self, tmp_path: Path) -> None:
-        # Set up person directory with a custom tool
-        person_dir = tmp_path / "persons" / "alice"
-        person_dir.mkdir(parents=True)
-        (person_dir / "permissions.md").write_text(
+        # Set up anima directory with a custom tool
+        anima_dir = tmp_path / "animas" / "alice"
+        anima_dir.mkdir(parents=True)
+        (anima_dir / "permissions.md").write_text(
             "## ツール作成\n- 個人ツール: yes\n- 共有ツール: yes",
             encoding="utf-8",
         )
 
         # Create a simple tool module
-        tools_dir = person_dir / "tools"
+        tools_dir = anima_dir / "tools"
         tools_dir.mkdir()
         (tools_dir / "greet.py").write_text(
             '''def get_tool_schemas():
@@ -55,7 +55,7 @@ def dispatch(name, args):
         # Discover and verify
         from core.tools import discover_personal_tools
 
-        personal = discover_personal_tools(person_dir)
+        personal = discover_personal_tools(anima_dir)
         assert "greet" in personal
 
         # Create handler and test refresh + use
@@ -66,7 +66,7 @@ def dispatch(name, args):
         memory.search_memory_text.return_value = []
 
         handler = ToolHandler(
-            person_dir=person_dir,
+            anima_dir=anima_dir,
             memory=memory,
             messenger=None,
             tool_registry=[],
@@ -79,16 +79,16 @@ def dispatch(name, args):
 
     # Test 2: refresh_tools discovers newly added tool
     def test_refresh_discovers_new_tool(self, tmp_path: Path) -> None:
-        person_dir = tmp_path / "persons" / "alice"
-        person_dir.mkdir(parents=True)
-        (person_dir / "permissions.md").write_text("", encoding="utf-8")
+        anima_dir = tmp_path / "animas" / "alice"
+        anima_dir.mkdir(parents=True)
+        (anima_dir / "permissions.md").write_text("", encoding="utf-8")
 
         memory = MagicMock()
         memory.read_permissions.return_value = ""
         memory.search_memory_text.return_value = []
 
         handler = ToolHandler(
-            person_dir=person_dir,
+            anima_dir=anima_dir,
             memory=memory,
             messenger=None,
             tool_registry=[],
@@ -99,7 +99,7 @@ def dispatch(name, args):
         assert "No personal or common tools found" in result
 
         # Now create a tool file
-        tools_dir = person_dir / "tools"
+        tools_dir = anima_dir / "tools"
         tools_dir.mkdir()
         (tools_dir / "calc.py").write_text(
             '''def get_tool_schemas():
@@ -122,10 +122,10 @@ def dispatch(name, args):
 
     # Test 3: share_tool copies to common_tools
     def test_share_tool_copies_to_common(self, tmp_path: Path) -> None:
-        person_dir = tmp_path / "persons" / "alice"
-        person_dir.mkdir(parents=True)
-        (person_dir / "permissions.md").write_text("", encoding="utf-8")
-        tools_dir = person_dir / "tools"
+        anima_dir = tmp_path / "animas" / "alice"
+        anima_dir.mkdir(parents=True)
+        (anima_dir / "permissions.md").write_text("", encoding="utf-8")
+        tools_dir = anima_dir / "tools"
         tools_dir.mkdir()
         (tools_dir / "helper.py").write_text("# helper tool", encoding="utf-8")
 
@@ -138,7 +138,7 @@ def dispatch(name, args):
         memory.search_memory_text.return_value = []
 
         handler = ToolHandler(
-            person_dir=person_dir,
+            anima_dir=anima_dir,
             memory=memory,
             messenger=None,
             tool_registry=[],
@@ -160,16 +160,16 @@ def dispatch(name, args):
     def test_tool_creation_blocked_without_permission(
         self, tmp_path: Path
     ) -> None:
-        person_dir = tmp_path / "persons" / "alice"
-        person_dir.mkdir(parents=True)
-        (person_dir / "permissions.md").write_text("", encoding="utf-8")
+        anima_dir = tmp_path / "animas" / "alice"
+        anima_dir.mkdir(parents=True)
+        (anima_dir / "permissions.md").write_text("", encoding="utf-8")
 
         memory = MagicMock()
         memory.read_permissions.return_value = ""  # No tool creation section
         memory.search_memory_text.return_value = []
 
         handler = ToolHandler(
-            person_dir=person_dir,
+            anima_dir=anima_dir,
             memory=memory,
             messenger=None,
             tool_registry=[],
@@ -183,7 +183,7 @@ def dispatch(name, args):
         assert parsed["error_type"] == "PermissionDenied"
         assert "ツール作成" in parsed["message"]
         # File should NOT be created
-        assert not (person_dir / "tools" / "evil.py").exists()
+        assert not (anima_dir / "tools" / "evil.py").exists()
 
     # Test 5: discover_common_tools finds shared tools
     def test_discover_common_tools_finds_shared(self, tmp_path: Path) -> None:

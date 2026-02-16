@@ -1,5 +1,5 @@
 from __future__ import annotations
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
@@ -62,10 +62,10 @@ class BaseExecutor(ABC):
     def __init__(
         self,
         model_config: ModelConfig,
-        person_dir: Path,
+        anima_dir: Path,
     ) -> None:
         self._model_config = model_config
-        self._person_dir = person_dir
+        self._anima_dir = anima_dir
 
     # -- Properties ----------------------------------------
 

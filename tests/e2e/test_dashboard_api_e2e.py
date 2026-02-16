@@ -3,7 +3,7 @@
 Validates the following changes through the full FastAPI app stack:
 
 1. system.py — system_status and system_scheduler now parse cron.md files
-   from persons directories instead of relying on a scheduler attribute.
+   from animas directories instead of relying on a scheduler attribute.
 2. config_routes.py — init_status now returns a ``checks`` array alongside
    the existing backward-compatible fields.
 3. system.py — connections endpoint returns websocket and process info.
@@ -24,7 +24,7 @@ from httpx import ASGITransport, AsyncClient
 
 def _create_app(
     tmp_path: Path,
-    person_names: list[str] | None = None,
+    anima_names: list[str] | None = None,
     ws_connections: int = 0,
 ):
     """Build a real FastAPI app via create_app with mocked externals.
@@ -32,8 +32,8 @@ def _create_app(
     Returns an app whose setup_complete flag is True so the setup-guard
     middleware lets API requests through.
     """
-    persons_dir = tmp_path / "persons"
-    persons_dir.mkdir(parents=True, exist_ok=True)
+    animas_dir = tmp_path / "animas"
+    animas_dir.mkdir(parents=True, exist_ok=True)
     shared_dir = tmp_path / "shared"
     shared_dir.mkdir(parents=True, exist_ok=True)
 
@@ -62,21 +62,21 @@ def _create_app(
 
         from server.app import create_app
 
-        app = create_app(persons_dir, shared_dir)
+        app = create_app(animas_dir, shared_dir)
 
-    # Override person_names if specified
-    if person_names is not None:
-        app.state.person_names = person_names
+    # Override anima_names if specified
+    if anima_names is not None:
+        app.state.anima_names = anima_names
 
     return app
 
 
-def _write_cron_md(persons_dir: Path, name: str, content: str) -> None:
-    """Write a cron.md file for a person."""
-    person_dir = persons_dir / name
-    person_dir.mkdir(parents=True, exist_ok=True)
-    (person_dir / "identity.md").write_text(f"# {name}", encoding="utf-8")
-    (person_dir / "cron.md").write_text(content, encoding="utf-8")
+def _write_cron_md(animas_dir: Path, name: str, content: str) -> None:
+    """Write a cron.md file for an anima."""
+    anima_dir = animas_dir / name
+    anima_dir.mkdir(parents=True, exist_ok=True)
+    (anima_dir / "identity.md").write_text(f"# {name}", encoding="utf-8")
+    (anima_dir / "cron.md").write_text(content, encoding="utf-8")
 
 
 CRON_SAKURA = """\
@@ -115,11 +115,11 @@ class TestSchedulerWithCronMd:
     async def test_system_status_scheduler_running_true_with_cron(
         self, tmp_path: Path,
     ) -> None:
-        """scheduler_running should be True when persons have cron.md files."""
-        persons_dir = tmp_path / "persons"
-        _write_cron_md(persons_dir, "sakura", CRON_SAKURA)
+        """scheduler_running should be True when animas have cron.md files."""
+        animas_dir = tmp_path / "animas"
+        _write_cron_md(animas_dir, "sakura", CRON_SAKURA)
 
-        app = _create_app(tmp_path, person_names=["sakura"])
+        app = _create_app(tmp_path, anima_names=["sakura"])
         app.state.supervisor.is_scheduler_running.return_value = True
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -133,10 +133,10 @@ class TestSchedulerWithCronMd:
         self, tmp_path: Path,
     ) -> None:
         """Scheduler endpoint should return jobs parsed from cron.md."""
-        persons_dir = tmp_path / "persons"
-        _write_cron_md(persons_dir, "sakura", CRON_SAKURA)
+        animas_dir = tmp_path / "animas"
+        _write_cron_md(animas_dir, "sakura", CRON_SAKURA)
 
-        app = _create_app(tmp_path, person_names=["sakura"])
+        app = _create_app(tmp_path, anima_names=["sakura"])
         app.state.supervisor.is_scheduler_running.return_value = True
         app.state.supervisor.scheduler = MagicMock()
         app.state.supervisor.scheduler.get_jobs.return_value = []
@@ -147,20 +147,20 @@ class TestSchedulerWithCronMd:
         assert resp.status_code == 200
         data = resp.json()
         assert data["running"] is True
-        assert len(data["person_jobs"]) == 2
+        assert len(data["anima_jobs"]) == 2
 
         # Verify job fields
-        job_names = [j["name"] for j in data["person_jobs"]]
+        job_names = [j["name"] for j in data["anima_jobs"]]
         assert "Morning Planning (Daily 9:00 JST)" in job_names
         assert "Weekly Review (Friday 17:00 JST)" in job_names
 
-        for job in data["person_jobs"]:
+        for job in data["anima_jobs"]:
             assert "id" in job
             assert "name" in job
-            assert "person" in job
+            assert "anima" in job
             assert "type" in job
             assert "schedule" in job
-            assert job["person"] == "sakura"
+            assert job["anima"] == "sakura"
             assert job["type"] == "llm"
             assert job["id"].startswith("cron-sakura-")
 
@@ -168,10 +168,10 @@ class TestSchedulerWithCronMd:
         self, tmp_path: Path,
     ) -> None:
         """Schedule info should be extracted from parentheses in the title."""
-        persons_dir = tmp_path / "persons"
-        _write_cron_md(persons_dir, "sakura", CRON_SAKURA)
+        animas_dir = tmp_path / "animas"
+        _write_cron_md(animas_dir, "sakura", CRON_SAKURA)
 
-        app = _create_app(tmp_path, person_names=["sakura"])
+        app = _create_app(tmp_path, anima_names=["sakura"])
         app.state.supervisor.is_scheduler_running.return_value = True
         app.state.supervisor.scheduler = MagicMock()
         app.state.supervisor.scheduler.get_jobs.return_value = []
@@ -180,7 +180,7 @@ class TestSchedulerWithCronMd:
             resp = await client.get("/api/system/scheduler")
 
         data = resp.json()
-        schedules = {j["name"]: j["schedule"] for j in data["person_jobs"]}
+        schedules = {j["name"]: j["schedule"] for j in data["anima_jobs"]}
         assert schedules["Morning Planning (Daily 9:00 JST)"] == "Daily 9:00 JST"
         assert schedules["Weekly Review (Friday 17:00 JST)"] == "Friday 17:00 JST"
 
@@ -188,10 +188,10 @@ class TestSchedulerWithCronMd:
         self, tmp_path: Path,
     ) -> None:
         """Jobs inside HTML comment blocks should not appear."""
-        persons_dir = tmp_path / "persons"
-        _write_cron_md(persons_dir, "sakura", CRON_SAKURA)
+        animas_dir = tmp_path / "animas"
+        _write_cron_md(animas_dir, "sakura", CRON_SAKURA)
 
-        app = _create_app(tmp_path, person_names=["sakura"])
+        app = _create_app(tmp_path, anima_names=["sakura"])
         app.state.supervisor.is_scheduler_running.return_value = True
         app.state.supervisor.scheduler = MagicMock()
         app.state.supervisor.scheduler.get_jobs.return_value = []
@@ -200,19 +200,19 @@ class TestSchedulerWithCronMd:
             resp = await client.get("/api/system/scheduler")
 
         data = resp.json()
-        job_names = [j["name"] for j in data["person_jobs"]]
+        job_names = [j["name"] for j in data["anima_jobs"]]
         # "Commented Out" should NOT appear — it is inside <!-- -->
         assert all("Commented Out" not in name for name in job_names)
 
-    async def test_scheduler_multiple_persons(
+    async def test_scheduler_multiple_animas(
         self, tmp_path: Path,
     ) -> None:
-        """Jobs from multiple persons should all be returned."""
-        persons_dir = tmp_path / "persons"
-        _write_cron_md(persons_dir, "sakura", CRON_SAKURA)
-        _write_cron_md(persons_dir, "taro", CRON_TARO)
+        """Jobs from multiple animas should all be returned."""
+        animas_dir = tmp_path / "animas"
+        _write_cron_md(animas_dir, "sakura", CRON_SAKURA)
+        _write_cron_md(animas_dir, "taro", CRON_TARO)
 
-        app = _create_app(tmp_path, person_names=["sakura", "taro"])
+        app = _create_app(tmp_path, anima_names=["sakura", "taro"])
         app.state.supervisor.is_scheduler_running.return_value = True
         app.state.supervisor.scheduler = MagicMock()
         app.state.supervisor.scheduler.get_jobs.return_value = []
@@ -223,14 +223,14 @@ class TestSchedulerWithCronMd:
         data = resp.json()
         assert data["running"] is True
         # sakura has 2 jobs, taro has 1 = 3 total
-        assert len(data["person_jobs"]) == 3
+        assert len(data["anima_jobs"]) == 3
 
-        persons_in_jobs = {j["person"] for j in data["person_jobs"]}
-        assert "sakura" in persons_in_jobs
-        assert "taro" in persons_in_jobs
+        animas_in_jobs = {j["anima"] for j in data["anima_jobs"]}
+        assert "sakura" in animas_in_jobs
+        assert "taro" in animas_in_jobs
 
         # Taro's job should have type "command"
-        taro_jobs = [j for j in data["person_jobs"] if j["person"] == "taro"]
+        taro_jobs = [j for j in data["anima_jobs"] if j["anima"] == "taro"]
         assert len(taro_jobs) == 1
         assert taro_jobs[0]["type"] == "command"
         assert taro_jobs[0]["schedule"] == "Monday 10:00 JST"
@@ -246,13 +246,13 @@ class TestSchedulerWithoutCronMd:
         self, tmp_path: Path,
     ) -> None:
         """scheduler_running should be False when no cron.md files exist."""
-        persons_dir = tmp_path / "persons"
-        # Create a person without cron.md
-        alice_dir = persons_dir / "alice"
+        animas_dir = tmp_path / "animas"
+        # Create an anima without cron.md
+        alice_dir = animas_dir / "alice"
         alice_dir.mkdir(parents=True)
         (alice_dir / "identity.md").write_text("# Alice", encoding="utf-8")
 
-        app = _create_app(tmp_path, person_names=["alice"])
+        app = _create_app(tmp_path, anima_names=["alice"])
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.get("/api/system/status")
@@ -265,12 +265,12 @@ class TestSchedulerWithoutCronMd:
         self, tmp_path: Path,
     ) -> None:
         """Scheduler endpoint should return empty jobs when no cron.md."""
-        persons_dir = tmp_path / "persons"
-        alice_dir = persons_dir / "alice"
+        animas_dir = tmp_path / "animas"
+        alice_dir = animas_dir / "alice"
         alice_dir.mkdir(parents=True)
         (alice_dir / "identity.md").write_text("# Alice", encoding="utf-8")
 
-        app = _create_app(tmp_path, person_names=["alice"])
+        app = _create_app(tmp_path, anima_names=["alice"])
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.get("/api/system/scheduler")
@@ -278,13 +278,13 @@ class TestSchedulerWithoutCronMd:
         assert resp.status_code == 200
         data = resp.json()
         assert data["running"] is False
-        assert data["person_jobs"] == []
+        assert data["anima_jobs"] == []
 
-    async def test_system_scheduler_empty_when_no_persons(
+    async def test_system_scheduler_empty_when_no_animas(
         self, tmp_path: Path,
     ) -> None:
-        """Scheduler endpoint with zero persons should return empty."""
-        app = _create_app(tmp_path, person_names=[])
+        """Scheduler endpoint with zero animas should return empty."""
+        app = _create_app(tmp_path, anima_names=[])
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.get("/api/system/scheduler")
@@ -292,20 +292,20 @@ class TestSchedulerWithoutCronMd:
         assert resp.status_code == 200
         data = resp.json()
         assert data["running"] is False
-        assert data["person_jobs"] == []
+        assert data["anima_jobs"] == []
 
-    async def test_system_status_no_persons_scheduler_false(
+    async def test_system_status_no_animas_scheduler_false(
         self, tmp_path: Path,
     ) -> None:
-        """system_status with zero persons should show scheduler_running=False."""
-        app = _create_app(tmp_path, person_names=[])
+        """system_status with zero animas should show scheduler_running=False."""
+        app = _create_app(tmp_path, anima_names=[])
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.get("/api/system/status")
 
         assert resp.status_code == 200
         data = resp.json()
-        assert data["persons"] == 0
+        assert data["animas"] == 0
         assert data["scheduler_running"] is False
 
 
@@ -364,14 +364,14 @@ class TestInitStatusChecksArray:
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
         monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
 
-        # Set up config and one person
+        # Set up config and one anima
         base_dir = tmp_path / ".animaworks"
         base_dir.mkdir(parents=True, exist_ok=True)
         (base_dir / "config.json").write_text("{}", encoding="utf-8")
 
-        persons_dir = base_dir / "persons"
-        persons_dir.mkdir()
-        alice_dir = persons_dir / "alice"
+        animas_dir = base_dir / "animas"
+        animas_dir.mkdir()
+        alice_dir = animas_dir / "alice"
         alice_dir.mkdir()
         (alice_dir / "identity.md").write_text("# Alice", encoding="utf-8")
 
@@ -391,11 +391,11 @@ class TestInitStatusChecksArray:
         assert config_check is not None
         assert config_check["ok"] is True
 
-        # Person registered
-        person_check = checks_by_label.get("パーソン登録")
-        assert person_check is not None
-        assert person_check["ok"] is True
-        assert "detail" in person_check  # Should include count detail
+        # Anima registered
+        anima_check = checks_by_label.get("Anima登録")
+        assert anima_check is not None
+        assert anima_check["ok"] is True
+        assert "detail" in anima_check  # Should include count detail
 
         # Shared dir exists
         shared_check = checks_by_label.get("共有ディレクトリ")
@@ -414,7 +414,7 @@ class TestInitStatusChecksArray:
     async def test_backward_compatible_fields_present(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        """Existing fields (config_exists, persons_count, etc.) should still be present."""
+        """Existing fields (config_exists, animas_count, etc.) should still be present."""
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
         monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
@@ -428,7 +428,7 @@ class TestInitStatusChecksArray:
         data = resp.json()
         # All backward-compatible fields must still exist
         assert "config_exists" in data
-        assert "persons_count" in data
+        assert "animas_count" in data
         assert "api_keys" in data
         assert "shared_dir_exists" in data
         assert "initialized" in data
@@ -439,10 +439,10 @@ class TestInitStatusChecksArray:
         assert "openai" in data["api_keys"]
         assert "google" in data["api_keys"]
 
-    async def test_initialized_true_with_config_and_persons(
+    async def test_initialized_true_with_config_and_animas(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        """initialized should be True when config and at least one person exist."""
+        """initialized should be True when config and at least one anima exist."""
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
         monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
@@ -452,9 +452,9 @@ class TestInitStatusChecksArray:
         base_dir.mkdir(parents=True)
         (base_dir / "config.json").write_text("{}", encoding="utf-8")
 
-        persons_dir = base_dir / "persons"
-        persons_dir.mkdir()
-        alice_dir = persons_dir / "alice"
+        animas_dir = base_dir / "animas"
+        animas_dir.mkdir()
+        alice_dir = animas_dir / "alice"
         alice_dir.mkdir()
         (alice_dir / "identity.md").write_text("# Alice", encoding="utf-8")
 
@@ -466,7 +466,7 @@ class TestInitStatusChecksArray:
         data = resp.json()
         assert data["initialized"] is True
         assert data["config_exists"] is True
-        assert data["persons_count"] == 1
+        assert data["animas_count"] == 1
 
         # checks array should also have 初期化完了=True
         checks_by_label = {c["label"]: c for c in data["checks"]}
@@ -485,12 +485,12 @@ class TestConnectionsEndpoint:
         self, tmp_path: Path,
     ) -> None:
         """Connections should report correct websocket client count."""
-        persons_dir = tmp_path / "persons"
-        alice_dir = persons_dir / "alice"
+        animas_dir = tmp_path / "animas"
+        alice_dir = animas_dir / "alice"
         alice_dir.mkdir(parents=True)
         (alice_dir / "identity.md").write_text("# Alice", encoding="utf-8")
 
-        app = _create_app(tmp_path, person_names=["alice"], ws_connections=3)
+        app = _create_app(tmp_path, anima_names=["alice"], ws_connections=3)
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.get("/api/system/connections")
@@ -506,7 +506,7 @@ class TestConnectionsEndpoint:
         self, tmp_path: Path,
     ) -> None:
         """With no websocket connections, connected_clients should be 0."""
-        app = _create_app(tmp_path, person_names=["bob"], ws_connections=0)
+        app = _create_app(tmp_path, anima_names=["bob"], ws_connections=0)
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.get("/api/system/connections")
@@ -516,11 +516,11 @@ class TestConnectionsEndpoint:
         assert data["websocket"]["connected_clients"] == 0
         assert "bob" in data["processes"]
 
-    async def test_connections_no_persons(
+    async def test_connections_no_animas(
         self, tmp_path: Path,
     ) -> None:
-        """With no persons, processes should be empty."""
-        app = _create_app(tmp_path, person_names=[])
+        """With no animas, processes should be empty."""
+        app = _create_app(tmp_path, anima_names=[])
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.get("/api/system/connections")
@@ -534,7 +534,7 @@ class TestConnectionsEndpoint:
         self, tmp_path: Path,
     ) -> None:
         """When ws_manager lacks active_connections, connected_clients should be 0."""
-        app = _create_app(tmp_path, person_names=["alice"])
+        app = _create_app(tmp_path, anima_names=["alice"])
         # Remove active_connections attribute to test hasattr fallback
         del app.state.ws_manager.active_connections
 

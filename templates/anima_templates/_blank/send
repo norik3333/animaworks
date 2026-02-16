@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# send — Person間メッセージ送信ラッパー
+# send — Anima間メッセージ送信ラッパー
 # Usage: bash send <recipient> "message" [--reply-to ID] [--thread-id ID]
 set -euo pipefail
 SELF="$(basename "$(pwd)")"

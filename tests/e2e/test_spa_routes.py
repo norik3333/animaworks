@@ -25,8 +25,8 @@ def _create_test_app(tmp_path: Path):
     app = FastAPI()
 
     # Set up required state
-    persons_dir = tmp_path / "persons"
-    persons_dir.mkdir(exist_ok=True)
+    animas_dir = tmp_path / "animas"
+    animas_dir.mkdir(exist_ok=True)
     shared_dir = tmp_path / "shared"
     shared_dir.mkdir(exist_ok=True)
 
@@ -43,9 +43,9 @@ def _create_test_app(tmp_path: Path):
     ws_manager.active_connections = []
 
     app.state.supervisor = supervisor
-    app.state.person_names = []
+    app.state.anima_names = []
     app.state.ws_manager = ws_manager
-    app.state.persons_dir = persons_dir
+    app.state.animas_dir = animas_dir
     app.state.shared_dir = shared_dir
 
     app.include_router(create_router())
@@ -110,7 +110,7 @@ class TestInitStatus:
     """Test /api/system/init-status with varying filesystem state."""
 
     async def test_empty_directory(self, tmp_path, monkeypatch):
-        """No config.json, no persons => initialized=false."""
+        """No config.json, no animas => initialized=false."""
         monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
         app = _create_test_app(tmp_path)
         async with _client(app) as c:
@@ -118,19 +118,19 @@ class TestInitStatus:
         data = resp.json()
         assert data["initialized"] is False
         assert data["config_exists"] is False
-        assert data["persons_count"] == 0
+        assert data["animas_count"] == 0
 
-    async def test_with_config_and_persons(self, tmp_path, monkeypatch):
-        """config.json + 1 person => initialized=true."""
+    async def test_with_config_and_animas(self, tmp_path, monkeypatch):
+        """config.json + 1 anima => initialized=true."""
         monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
 
         aw_dir = tmp_path / ".animaworks"
         aw_dir.mkdir()
         (aw_dir / "config.json").write_text("{}", encoding="utf-8")
 
-        persons_dir = aw_dir / "persons"
-        persons_dir.mkdir()
-        alice = persons_dir / "alice"
+        animas_dir = aw_dir / "animas"
+        animas_dir.mkdir()
+        alice = animas_dir / "alice"
         alice.mkdir()
         (alice / "identity.md").write_text("# Alice", encoding="utf-8")
 
@@ -140,7 +140,7 @@ class TestInitStatus:
         data = resp.json()
         assert data["initialized"] is True
         assert data["config_exists"] is True
-        assert data["persons_count"] == 1
+        assert data["animas_count"] == 1
 
     async def test_api_key_detection(self, tmp_path, monkeypatch):
         """API key presence should be reflected."""
@@ -175,7 +175,7 @@ class TestSystemConnections:
 
     async def test_returns_processes_section(self, tmp_path):
         app = _create_test_app(tmp_path)
-        app.state.person_names = ["alice"]
+        app.state.anima_names = ["alice"]
         app.state.supervisor.get_process_status.return_value = {
             "status": "running",
             "pid": 12345,
@@ -202,15 +202,15 @@ class TestScheduler:
             resp = await c.get("/api/system/scheduler")
         data = resp.json()
         assert data["running"] is False
-        assert data["person_jobs"] == []
+        assert data["anima_jobs"] == []
 
     async def test_with_scheduler_and_jobs(self, tmp_path):
         """When cron.md files exist, report parsed jobs."""
         app = _create_test_app(tmp_path)
 
-        # Create a person with cron.md
-        persons_dir = app.state.persons_dir
-        alice_dir = persons_dir / "alice"
+        # Create an anima with cron.md
+        animas_dir = app.state.animas_dir
+        alice_dir = animas_dir / "alice"
         alice_dir.mkdir(parents=True)
         (alice_dir / "cron.md").write_text(
             "# Cron: alice\n\n"
@@ -219,7 +219,7 @@ class TestScheduler:
             "Plan daily tasks.\n",
             encoding="utf-8",
         )
-        app.state.person_names = ["alice"]
+        app.state.anima_names = ["alice"]
         app.state.supervisor.is_scheduler_running.return_value = True
         app.state.supervisor.scheduler = MagicMock()
         app.state.supervisor.scheduler.get_jobs.return_value = []
@@ -228,9 +228,9 @@ class TestScheduler:
             resp = await c.get("/api/system/scheduler")
         data = resp.json()
         assert data["running"] is True
-        assert len(data["person_jobs"]) == 1
-        assert data["person_jobs"][0]["person"] == "alice"
-        assert "Morning Planning" in data["person_jobs"][0]["name"]
+        assert len(data["anima_jobs"]) == 1
+        assert data["anima_jobs"][0]["anima"] == "alice"
+        assert "Morning Planning" in data["anima_jobs"][0]["name"]
 
 
 # ── 5. Logs Integration ─────────────────────────────────────────
@@ -326,14 +326,14 @@ class TestLogsIntegration:
 
 
 class TestMemoryStats:
-    """Test /api/persons/{name}/memory/stats."""
+    """Test /api/animas/{name}/memory/stats."""
 
-    async def test_stats_for_person_with_files(self, tmp_path):
+    async def test_stats_for_anima_with_files(self, tmp_path):
         app = _create_test_app(tmp_path)
-        persons_dir = app.state.persons_dir
+        animas_dir = app.state.animas_dir
 
-        # Create a person with memory files
-        alice_dir = persons_dir / "alice"
+        # Create an anima with memory files
+        alice_dir = animas_dir / "alice"
         alice_dir.mkdir()
         (alice_dir / "identity.md").write_text("# Alice", encoding="utf-8")
 
@@ -356,32 +356,32 @@ class TestMemoryStats:
         procedures.mkdir()
 
         async with _client(app) as c:
-            resp = await c.get("/api/persons/alice/memory/stats")
+            resp = await c.get("/api/animas/alice/memory/stats")
         data = resp.json()
-        assert data["person"] == "alice"
+        assert data["anima"] == "alice"
         assert data["episodes"]["count"] == 2
         assert data["episodes"]["total_bytes"] > 0
         assert data["knowledge"]["count"] == 1
         assert data["procedures"]["count"] == 0
 
-    async def test_stats_for_nonexistent_person_returns_404(self, tmp_path):
+    async def test_stats_for_nonexistent_anima_returns_404(self, tmp_path):
         app = _create_test_app(tmp_path)
         async with _client(app) as c:
-            resp = await c.get("/api/persons/nobody/memory/stats")
+            resp = await c.get("/api/animas/nobody/memory/stats")
         assert resp.status_code == 404
 
 
-# ── 7. Person Config ─────────────────────────────────────────────
+# ── 7. Anima Config ─────────────────────────────────────────────
 
 
-class TestPersonConfig:
-    """Test /api/persons/{name}/config."""
+class TestAnimaConfig:
+    """Test /api/animas/{name}/config."""
 
-    async def test_config_for_existing_person(self, tmp_path):
+    async def test_config_for_existing_anima(self, tmp_path):
         app = _create_test_app(tmp_path)
-        persons_dir = app.state.persons_dir
+        animas_dir = app.state.animas_dir
 
-        alice_dir = persons_dir / "alice"
+        alice_dir = animas_dir / "alice"
         alice_dir.mkdir()
         (alice_dir / "identity.md").write_text("# Alice", encoding="utf-8")
 
@@ -397,22 +397,22 @@ class TestPersonConfig:
         with patch(
             "core.config.models.load_config"
         ) as mock_load, patch(
-            "core.config.models.resolve_person_config"
+            "core.config.models.resolve_anima_config"
         ) as mock_resolve:
             mock_load.return_value = MagicMock()
             mock_resolve.return_value = (mock_defaults, mock_credential)
             async with _client(app) as c:
-                resp = await c.get("/api/persons/alice/config")
+                resp = await c.get("/api/animas/alice/config")
 
         data = resp.json()
-        assert data["person"] == "alice"
+        assert data["anima"] == "alice"
         assert data["model"] == "anthropic/claude-sonnet-4-20250514"
         assert data["execution_mode"] == "a1"
 
-    async def test_config_for_nonexistent_person_returns_404(self, tmp_path):
+    async def test_config_for_nonexistent_anima_returns_404(self, tmp_path):
         app = _create_test_app(tmp_path)
         async with _client(app) as c:
-            resp = await c.get("/api/persons/nobody/config")
+            resp = await c.get("/api/animas/nobody/config")
         assert resp.status_code == 404
 
 
@@ -439,10 +439,10 @@ class TestStaticFileServing:
         ws_manager.active_connections = []
 
         app.state.supervisor = supervisor
-        app.state.person_names = []
+        app.state.anima_names = []
         app.state.ws_manager = ws_manager
-        app.state.persons_dir = tmp_path / "persons"
-        app.state.persons_dir.mkdir()
+        app.state.animas_dir = tmp_path / "animas"
+        app.state.animas_dir.mkdir()
         app.state.shared_dir = tmp_path / "shared"
         app.state.shared_dir.mkdir()
 
@@ -478,10 +478,10 @@ class TestStaticFileServing:
         ws_manager.active_connections = []
 
         app.state.supervisor = supervisor
-        app.state.person_names = []
+        app.state.anima_names = []
         app.state.ws_manager = ws_manager
-        app.state.persons_dir = tmp_path / "persons"
-        app.state.persons_dir.mkdir()
+        app.state.animas_dir = tmp_path / "animas"
+        app.state.animas_dir.mkdir()
         app.state.shared_dir = tmp_path / "shared"
         app.state.shared_dir.mkdir()
 
@@ -520,10 +520,10 @@ class TestStaticFileServing:
         ws_manager.active_connections = []
 
         app.state.supervisor = supervisor
-        app.state.person_names = []
+        app.state.anima_names = []
         app.state.ws_manager = ws_manager
-        app.state.persons_dir = tmp_path / "persons"
-        app.state.persons_dir.mkdir()
+        app.state.animas_dir = tmp_path / "animas"
+        app.state.animas_dir.mkdir()
         app.state.shared_dir = tmp_path / "shared"
         app.state.shared_dir.mkdir()
 
@@ -557,27 +557,27 @@ class TestStaticFileServing:
 class TestCrossRouteIntegration:
     """Verify multiple route modules work together in a single app."""
 
-    async def test_system_and_person_routes_coexist(self, tmp_path, monkeypatch):
-        """System routes and person routes should both be reachable."""
+    async def test_system_and_anima_routes_coexist(self, tmp_path, monkeypatch):
+        """System routes and anima routes should both be reachable."""
         monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
         app = _create_test_app(tmp_path)
 
-        # Create a person on the filesystem
-        alice_dir = app.state.persons_dir / "alice"
+        # Create an anima on the filesystem
+        alice_dir = app.state.animas_dir / "alice"
         alice_dir.mkdir()
         (alice_dir / "identity.md").write_text("# Alice", encoding="utf-8")
-        # Register alice in person_names so the list endpoint includes her
-        app.state.person_names = ["alice"]
+        # Register alice in anima_names so the list endpoint includes her
+        app.state.anima_names = ["alice"]
 
         async with _client(app) as c:
             # System endpoint
             resp_init = await c.get("/api/system/init-status")
             assert resp_init.status_code == 200
 
-            # Person list endpoint
-            resp_persons = await c.get("/api/persons")
-            assert resp_persons.status_code == 200
-            names = [p["name"] for p in resp_persons.json()]
+            # Anima list endpoint
+            resp_animas = await c.get("/api/animas")
+            assert resp_animas.status_code == 200
+            names = [p["name"] for p in resp_animas.json()]
             assert "alice" in names
 
             # Connections
@@ -601,12 +601,12 @@ class TestCrossRouteIntegration:
             resp_logs = await c.get("/api/system/logs")
             assert resp_logs.status_code == 200
 
-    async def test_memory_stats_and_episodes_for_same_person(self, tmp_path):
-        """Both /memory/stats and /episodes should work for the same person."""
+    async def test_memory_stats_and_episodes_for_same_anima(self, tmp_path):
+        """Both /memory/stats and /episodes should work for the same anima."""
         app = _create_test_app(tmp_path)
-        persons_dir = app.state.persons_dir
+        animas_dir = app.state.animas_dir
 
-        bob_dir = persons_dir / "bob"
+        bob_dir = animas_dir / "bob"
         bob_dir.mkdir()
         (bob_dir / "identity.md").write_text("# Bob", encoding="utf-8")
 
@@ -619,11 +619,11 @@ class TestCrossRouteIntegration:
         (bob_dir / "procedures").mkdir()
 
         async with _client(app) as c:
-            resp_stats = await c.get("/api/persons/bob/memory/stats")
+            resp_stats = await c.get("/api/animas/bob/memory/stats")
             assert resp_stats.status_code == 200
             assert resp_stats.json()["episodes"]["count"] == 1
 
-            resp_eps = await c.get("/api/persons/bob/episodes")
+            resp_eps = await c.get("/api/animas/bob/episodes")
             assert resp_eps.status_code == 200
             files = resp_eps.json()["files"]
             assert any("2026-02-15" in f for f in files)

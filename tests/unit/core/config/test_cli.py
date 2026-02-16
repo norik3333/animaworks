@@ -204,15 +204,15 @@ class TestCmdConfigSet:
         config = load_config(data_dir / "config.json")
         assert config.system.log_level == "DEBUG"
 
-    def test_set_new_person(self, data_dir, capsys):
-        args = argparse.Namespace(key="persons.newperson.model", value="gpt-4o")
+    def test_set_new_anima(self, data_dir, capsys):
+        args = argparse.Namespace(key="animas.newanima.model", value="gpt-4o")
         cmd_config_set(args)
 
         invalidate_cache()
         from core.config.models import load_config
         config = load_config(data_dir / "config.json")
-        assert "newperson" in config.persons
-        assert config.persons["newperson"].model == "gpt-4o"
+        assert "newanima" in config.animas
+        assert config.animas["newanima"].model == "gpt-4o"
 
     def test_set_new_credential(self, data_dir, capsys):
         args = argparse.Namespace(key="credentials.openrouter.api_key", value="sk-test")

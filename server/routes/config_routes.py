@@ -1,5 +1,5 @@
 from __future__ import annotations
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
@@ -59,15 +59,15 @@ def create_config_router() -> APIRouter:
         """Check initialization status of AnimaWorks."""
         base_dir = Path.home() / ".animaworks"
         config_path = base_dir / "config.json"
-        persons_dir = base_dir / "persons"
+        animas_dir = base_dir / "animas"
         shared_dir = base_dir / "shared"
 
-        # Count persons
-        persons_count = 0
-        if persons_dir.exists():
-            for d in persons_dir.iterdir():
+        # Count animas
+        animas_count = 0
+        if animas_dir.exists():
+            for d in animas_dir.iterdir():
                 if d.is_dir() and (d / "identity.md").exists():
-                    persons_count += 1
+                    animas_count += 1
 
         # Check API keys from environment
         has_anthropic = bool(os.environ.get("ANTHROPIC_API_KEY"))
@@ -75,13 +75,13 @@ def create_config_router() -> APIRouter:
         has_google = bool(os.environ.get("GOOGLE_API_KEY"))
 
         config_exists = config_path.exists()
-        initialized = config_exists and persons_count > 0
+        initialized = config_exists and animas_count > 0
 
         return {
             "checks": [
                 {"label": "設定ファイル", "ok": config_exists},
-                {"label": "パーソン登録", "ok": persons_count > 0,
-                 "detail": f"{persons_count}名"},
+                {"label": "Anima登録", "ok": animas_count > 0,
+                 "detail": f"{animas_count}名"},
                 {"label": "共有ディレクトリ", "ok": shared_dir.exists()},
                 {"label": "Anthropic APIキー", "ok": has_anthropic},
                 {"label": "OpenAI APIキー", "ok": has_openai},
@@ -89,7 +89,7 @@ def create_config_router() -> APIRouter:
                 {"label": "初期化完了", "ok": initialized},
             ],
             "config_exists": config_exists,
-            "persons_count": persons_count,
+            "animas_count": animas_count,
             "api_keys": {
                 "anthropic": has_anthropic,
                 "openai": has_openai,

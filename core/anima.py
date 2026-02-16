@@ -1,5 +1,5 @@
 from __future__ import annotations
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
@@ -22,26 +22,26 @@ from core.memory.conversation import ConversationMemory
 from core.memory import MemoryManager
 from core.messenger import Messenger
 from core.paths import load_prompt
-from core.schemas import CycleResult, PersonStatus, VALID_EMOTIONS
+from core.schemas import CycleResult, AnimaStatus, VALID_EMOTIONS
 
-logger = logging.getLogger("animaworks.person")
+logger = logging.getLogger("animaworks.anima")
 
 
-class DigitalPerson:
-    """A Digital Person: encapsulates identity, memory, agent, and communication.
+class DigitalAnima:
+    """A Digital Anima: encapsulates identity, memory, agent, and communication.
 
-    1 person = 1 directory.
+    1 anima = 1 directory.
     """
 
-    def __init__(self, person_dir: Path, shared_dir: Path) -> None:
-        self.person_dir = person_dir
-        self.name = person_dir.name
+    def __init__(self, anima_dir: Path, shared_dir: Path) -> None:
+        self.anima_dir = anima_dir
+        self.name = anima_dir.name
 
-        self.memory = MemoryManager(person_dir)
+        self.memory = MemoryManager(anima_dir)
         self.model_config = self.memory.read_model_config()
         self.messenger = Messenger(shared_dir, self.name)
         self.agent = AgentCore(
-            person_dir, self.memory, self.model_config, self.messenger
+            anima_dir, self.memory, self.model_config, self.messenger
         )
 
         self._lock = asyncio.Lock()
@@ -64,12 +64,12 @@ class DigitalPerson:
         if self.agent.background_manager:
             self.agent.background_manager.on_complete = self._on_background_task_complete
 
-        logger.info("DigitalPerson '%s' initialized from %s", self.name, person_dir)
+        logger.info("DigitalAnima '%s' initialized from %s", self.name, anima_dir)
 
     def set_on_message_sent(
         self, fn: Callable[[str, str, str], None],
     ) -> None:
-        """Inject a callback fired after this person sends a message."""
+        """Inject a callback fired after this anima sends a message."""
         self.agent.set_on_message_sent(fn)
 
     def set_on_schedule_changed(
@@ -83,7 +83,7 @@ class DigitalPerson:
         return self.agent.drain_notifications()
 
     def set_on_lock_released(self, fn: Callable[[], None]) -> None:
-        """Inject a callback invoked when the person's lock is released."""
+        """Inject a callback invoked when the anima's lock is released."""
         self._on_lock_released = fn
 
     def set_ws_broadcast(self, fn: Callable[[dict], Any]) -> None:
@@ -104,7 +104,7 @@ class DigitalPerson:
                     "type": "background_task.done",
                     "data": {
                         "task_id": task.task_id,
-                        "person": self.name,
+                        "anima": self.name,
                         "tool_name": task.tool_name,
                         "status": task.status.value,
                         "result_summary": task.summary(),
@@ -125,7 +125,7 @@ class DigitalPerson:
                         subject=f"バックグラウンドタスク完了: {task.tool_name}",
                         body=task.summary(),
                         priority="normal",
-                        person_name=self.name,
+                        anima_name=self.name,
                     )
             except Exception:
                 logger.exception(
@@ -158,7 +158,7 @@ class DigitalPerson:
     def _save_heartbeat_history(self, result: CycleResult) -> None:
         """Append heartbeat result summary to daily JSONL history file."""
         from datetime import date
-        history_dir = self.person_dir / self._HEARTBEAT_HISTORY_DIR
+        history_dir = self.anima_dir / self._HEARTBEAT_HISTORY_DIR
         history_dir.mkdir(parents=True, exist_ok=True)
         path = history_dir / f"{date.today().isoformat()}.jsonl"
         entry = json.dumps({
@@ -182,10 +182,10 @@ class DigitalPerson:
 
     def _load_heartbeat_history(self) -> str:
         """Load last N heartbeat history entries as formatted text."""
-        history_dir = self.person_dir / self._HEARTBEAT_HISTORY_DIR
+        history_dir = self.anima_dir / self._HEARTBEAT_HISTORY_DIR
         if not history_dir.exists():
             # Fallback: check legacy single-file format
-            legacy = self.person_dir / "shortterm" / "heartbeat_history.jsonl"
+            legacy = self.anima_dir / "shortterm" / "heartbeat_history.jsonl"
             if not legacy.exists():
                 return ""
             lines = legacy.read_text(encoding="utf-8").strip().splitlines()
@@ -225,12 +225,12 @@ class DigitalPerson:
 
     @property
     def needs_bootstrap(self) -> bool:
-        """True if this person has not completed the first-run bootstrap."""
-        return (self.person_dir / "bootstrap.md").exists()
+        """True if this anima has not completed the first-run bootstrap."""
+        return (self.anima_dir / "bootstrap.md").exists()
 
     @property
-    def status(self) -> PersonStatus:
-        return PersonStatus(
+    def status(self) -> AnimaStatus:
+        return AnimaStatus(
             name=self.name,
             status=self._status,
             current_task=self._current_task,
@@ -242,9 +242,9 @@ class DigitalPerson:
     async def run_bootstrap(self) -> CycleResult:
         """Run the first-time bootstrap process in the background.
 
-        Acquires the person lock, sets status to ``"bootstrapping"``, and
+        Acquires the anima lock, sets status to ``"bootstrapping"``, and
         triggers an agent cycle with the bootstrap prompt.  The agent reads
-        ``bootstrap.md`` from the person directory and follows its
+        ``bootstrap.md`` from the anima directory and follows its
         instructions (identity setup, avatar generation, self-introduction,
         etc.).  Upon completion the agent deletes ``bootstrap.md``.
         """
@@ -262,7 +262,7 @@ class DigitalPerson:
                 self._status = "bootstrapping"
                 self._current_task = "Initial bootstrap"
 
-                conv_memory = ConversationMemory(self.person_dir, self.model_config)
+                conv_memory = ConversationMemory(self.anima_dir, self.model_config)
                 prompt = conv_memory.build_chat_prompt(
                     "あなたの bootstrap.md ファイルを読み、指示に従ってください。",
                     "system",
@@ -306,7 +306,7 @@ class DigitalPerson:
                 self._current_task = f"Responding to {from_person}"
 
                 # Build history-aware prompt via conversation memory
-                conv_memory = ConversationMemory(self.person_dir, self.model_config)
+                conv_memory = ConversationMemory(self.anima_dir, self.model_config)
                 await conv_memory.compress_if_needed()
                 prompt = conv_memory.build_chat_prompt(content, from_person)
 
@@ -383,7 +383,7 @@ class DigitalPerson:
                 self._current_task = f"Responding to {from_person}"
 
                 # Build history-aware prompt via conversation memory
-                conv_memory = ConversationMemory(self.person_dir, self.model_config)
+                conv_memory = ConversationMemory(self.anima_dir, self.model_config)
                 await conv_memory.compress_if_needed()
                 prompt = conv_memory.build_chat_prompt(content, from_person)
 
@@ -498,7 +498,7 @@ class DigitalPerson:
             self._status = "greeting"
             self._current_task = "Greeting user"
 
-            conv_memory = ConversationMemory(self.person_dir, self.model_config)
+            conv_memory = ConversationMemory(self.anima_dir, self.model_config)
 
             # Record visit marker (user turn) before greeting
             visit_text = "[デスクを訪問]"

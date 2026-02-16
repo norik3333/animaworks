@@ -1,11 +1,11 @@
 """
-Child process entry point for Person subprocess.
+Child process entry point for Anima subprocess.
 
 Usage:
     python -m core.supervisor.runner \\
-        --person-name sakura \\
+        --anima-name sakura \\
         --socket-path ~/.animaworks/run/sockets/sakura.sock \\
-        --persons-dir ~/.animaworks/persons \\
+        --animas-dir ~/.animaworks/animas \\
         --shared-dir ~/.animaworks/shared
 """
 
@@ -27,7 +27,7 @@ from typing import Any, Union
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
-from core.person import DigitalPerson
+from core.anima import DigitalAnima
 from core.schedule_parser import parse_cron_md, parse_schedule, parse_heartbeat_config
 from core.schemas import CronTask
 from core.supervisor.ipc import IPCServer, IPCRequest, IPCResponse
@@ -49,28 +49,28 @@ class _Sentinel:
 _SENTINEL = _Sentinel()
 
 
-# ── PersonRunner ──────────────────────────────────────────────────
+# ── AnimaRunner ──────────────────────────────────────────────────
 
-class PersonRunner:
+class AnimaRunner:
     """
-    Runner for a single Person in a child process.
+    Runner for a single Anima in a child process.
 
-    Starts a DigitalPerson instance and exposes it via Unix socket IPC.
+    Starts a DigitalAnima instance and exposes it via Unix socket IPC.
     """
 
     def __init__(
         self,
-        person_name: str,
+        anima_name: str,
         socket_path: Path,
-        persons_dir: Path,
+        animas_dir: Path,
         shared_dir: Path
     ):
-        self.person_name = person_name
+        self.anima_name = anima_name
         self.socket_path = socket_path
-        self.persons_dir = persons_dir
+        self.animas_dir = animas_dir
         self.shared_dir = shared_dir
 
-        self.person: DigitalPerson | None = None
+        self.anima: DigitalAnima | None = None
         self.ipc_server: IPCServer | None = None
         self.inbox_watcher_task: asyncio.Task | None = None
         self.scheduler: AsyncIOScheduler | None = None
@@ -90,33 +90,33 @@ class PersonRunner:
 
     async def run(self) -> None:
         """
-        Run the person process.
+        Run the anima process.
 
         Starts IPC server first (creates socket immediately), then
-        initializes DigitalPerson (heavy RAG/model loading).
+        initializes DigitalAnima (heavy RAG/model loading).
         The parent process can connect to the socket early and poll
         readiness via the ``ping`` method.
         """
         try:
             # Start IPC server first so the socket is created immediately.
             # This allows the parent process to detect the socket quickly
-            # while the heavy DigitalPerson initialization proceeds.
+            # while the heavy DigitalAnima initialization proceeds.
             self.ipc_server = IPCServer(
                 socket_path=self.socket_path,
                 request_handler=self._handle_request
             )
             await self.ipc_server.start()
 
-            logger.info("Initializing Person: %s", self.person_name)
+            logger.info("Initializing Anima: %s", self.anima_name)
 
-            # Initialize DigitalPerson (heavy: RAG indexer, model loading)
-            person_dir = self.persons_dir / self.person_name
-            self.person = DigitalPerson(
-                person_dir=person_dir,
+            # Initialize DigitalAnima (heavy: RAG indexer, model loading)
+            anima_dir = self.animas_dir / self.anima_name
+            self.anima = DigitalAnima(
+                anima_dir=anima_dir,
                 shared_dir=self.shared_dir
             )
-            self.person.set_on_lock_released(
-                lambda: asyncio.ensure_future(self._on_person_lock_released())
+            self.anima.set_on_lock_released(
+                lambda: asyncio.ensure_future(self._on_anima_lock_released())
             )
             self._ready_event.set()
 
@@ -128,15 +128,15 @@ class PersonRunner:
                 self._inbox_watcher_loop()
             )
 
-            logger.info("Person process ready: %s", self.person_name)
+            logger.info("Anima process ready: %s", self.anima_name)
 
             # Wait for shutdown signal
             await self.shutdown_event.wait()
 
-            logger.info("Shutting down: %s", self.person_name)
+            logger.info("Shutting down: %s", self.anima_name)
 
         except Exception as e:
-            logger.exception("Fatal error in PersonRunner: %s", e)
+            logger.exception("Fatal error in AnimaRunner: %s", e)
             sys.exit(1)
 
         finally:
@@ -147,7 +147,7 @@ class PersonRunner:
     def _emit_event(self, event_type: str, data: dict[str, Any]) -> None:
         """Write an event file for the parent process to pick up."""
         import time as _time
-        events_dir = self.shared_dir.parent / "run" / "events" / self.person_name
+        events_dir = self.shared_dir.parent / "run" / "events" / self.anima_name
         events_dir.mkdir(parents=True, exist_ok=True)
         # Use monotonic timestamp for uniqueness
         filename = f"{_time.time_ns()}.json"
@@ -160,7 +160,7 @@ class PersonRunner:
 
     def _setup_scheduler(self) -> None:
         """Set up and start the autonomous scheduler for heartbeat and cron."""
-        if not self.person:
+        if not self.anima:
             return
 
         try:
@@ -170,23 +170,23 @@ class PersonRunner:
             self.scheduler.start()
 
             # Wire up hot-reload callback
-            self.person.set_on_schedule_changed(self._reload_schedule)
+            self.anima.set_on_schedule_changed(self._reload_schedule)
 
             job_count = len(self.scheduler.get_jobs())
             logger.info(
                 "Scheduler started for %s: %d jobs registered",
-                self.person_name, job_count,
+                self.anima_name, job_count,
             )
         except Exception:
-            logger.exception("Failed to setup scheduler for %s", self.person_name)
+            logger.exception("Failed to setup scheduler for %s", self.anima_name)
             self.scheduler = None
 
     def _setup_heartbeat(self) -> None:
         """Register heartbeat job from heartbeat.md."""
-        if not self.person or not self.scheduler:
+        if not self.anima or not self.scheduler:
             return
 
-        config = self.person.memory.read_heartbeat_config()
+        config = self.anima.memory.read_heartbeat_config()
         if not config:
             return
 
@@ -198,44 +198,44 @@ class PersonRunner:
                 minute=f"*/{interval}",
                 hour=f"{active_start}-{active_end - 1}",
             ),
-            id=f"{self.person_name}_heartbeat",
-            name=f"{self.person_name} heartbeat",
+            id=f"{self.anima_name}_heartbeat",
+            name=f"{self.anima_name} heartbeat",
             replace_existing=True,
             misfire_grace_time=300,
             max_instances=1,
         )
         logger.info(
             "Heartbeat registered: %s every %dmin, active %d:00-%d:00",
-            self.person_name, interval, active_start, active_end,
+            self.anima_name, interval, active_start, active_end,
         )
 
     async def _heartbeat_tick(self) -> None:
         """Execute a scheduled heartbeat."""
-        if not self.person:
+        if not self.anima:
             return
         if self._heartbeat_running:
-            logger.info("Scheduled heartbeat SKIPPED (already running): %s", self.person_name)
+            logger.info("Scheduled heartbeat SKIPPED (already running): %s", self.anima_name)
             return
         self._heartbeat_running = True
         try:
-            logger.info("Scheduled heartbeat: %s", self.person_name)
-            result = await self.person.run_heartbeat()
+            logger.info("Scheduled heartbeat: %s", self.anima_name)
+            result = await self.anima.run_heartbeat()
             # Notify parent for WebSocket broadcast
-            self._emit_event("person.heartbeat", {
-                "name": self.person_name,
+            self._emit_event("anima.heartbeat", {
+                "name": self.anima_name,
                 "result": result.model_dump(),
             })
         except Exception:
-            logger.exception("Scheduled heartbeat failed: %s", self.person_name)
+            logger.exception("Scheduled heartbeat failed: %s", self.anima_name)
         finally:
             self._heartbeat_running = False
 
     def _setup_cron_tasks(self) -> None:
         """Register cron jobs from cron.md."""
-        if not self.person or not self.scheduler:
+        if not self.anima or not self.scheduler:
             return
 
-        config = self.person.memory.read_cron_config()
+        config = self.anima.memory.read_cron_config()
         if not config:
             return
 
@@ -252,8 +252,8 @@ class PersonRunner:
             self.scheduler.add_job(
                 self._cron_tick,
                 trigger,
-                id=f"{self.person_name}_cron_{i}",
-                name=f"{self.person_name}: {task.name}",
+                id=f"{self.anima_name}_cron_{i}",
+                name=f"{self.anima_name}: {task.name}",
                 args=[task],
                 replace_existing=True,
                 misfire_grace_time=300,
@@ -261,51 +261,51 @@ class PersonRunner:
             )
             logger.info(
                 "Cron registered: %s -> %s (%s) [%s]",
-                self.person_name, task.name, task.schedule, task.type,
+                self.anima_name, task.name, task.schedule, task.type,
             )
 
     async def _cron_tick(self, task: CronTask) -> None:
         """Execute a scheduled cron task."""
-        if not self.person:
+        if not self.anima:
             return
 
         if task.name in self._cron_running:
             logger.info(
                 "Scheduled cron SKIPPED (already running): %s -> %s",
-                self.person_name, task.name,
+                self.anima_name, task.name,
             )
             return
 
-        logger.info("Scheduled cron: %s -> %s [%s]", self.person_name, task.name, task.type)
+        logger.info("Scheduled cron: %s -> %s [%s]", self.anima_name, task.name, task.type)
         # Run in separate task to avoid blocking other scheduled jobs
         asyncio.create_task(
             self._run_cron_task(task),
-            name=f"cron-{self.person_name}-{task.name}",
+            name=f"cron-{self.anima_name}-{task.name}",
         )
 
     async def _run_cron_task(self, task: CronTask) -> None:
         """Run a single cron task (LLM or command type)."""
-        if not self.person:
+        if not self.anima:
             return
         self._cron_running.add(task.name)
         try:
             if task.type == "llm":
-                result = await self.person.run_cron_task(task.name, task.description)
-                self._emit_event("person.cron", {
-                    "name": self.person_name,
+                result = await self.anima.run_cron_task(task.name, task.description)
+                self._emit_event("anima.cron", {
+                    "name": self.anima_name,
                     "task": task.name,
                     "task_type": "llm",
                     "result": result.model_dump(),
                 })
             elif task.type == "command":
-                result = await self.person.run_cron_command(
+                result = await self.anima.run_cron_command(
                     task.name,
                     command=task.command,
                     tool=task.tool,
                     args=task.args,
                 )
-                self._emit_event("person.cron", {
-                    "name": self.person_name,
+                self._emit_event("anima.cron", {
+                    "name": self.anima_name,
                     "task": task.name,
                     "task_type": "command",
                     "result": result,
@@ -322,7 +322,7 @@ class PersonRunner:
                                 logger.info(
                                     "Cron command '%s' output matched skip_pattern, "
                                     "suppressing heartbeat for %s",
-                                    task.name, self.person_name,
+                                    task.name, self.anima_name,
                                 )
                                 return
                         except re.error as e:
@@ -340,19 +340,19 @@ class PersonRunner:
                         f"## cron結果: {task.name} ({ts})\n\n"
                         f"{stdout}\n"
                     )
-                    self.person.memory.update_pending(pending)
+                    self.anima.memory.update_pending(pending)
                     logger.info(
                         "Cron command '%s' produced output, triggering heartbeat for %s",
-                        task.name, self.person_name,
+                        task.name, self.anima_name,
                     )
                     asyncio.create_task(
                         self._heartbeat_tick(),
-                        name=f"cron-triggered-heartbeat-{self.person_name}",
+                        name=f"cron-triggered-heartbeat-{self.anima_name}",
                     )
             else:
                 logger.warning("Unknown cron type '%s' for task '%s'", task.type, task.name)
         except Exception:
-            logger.exception("Cron task failed: %s -> %s", self.person_name, task.name)
+            logger.exception("Cron task failed: %s -> %s", self.anima_name, task.name)
         finally:
             self._cron_running.discard(task.name)
 
@@ -374,7 +374,7 @@ class PersonRunner:
         new_jobs = [j.id for j in self.scheduler.get_jobs()]
         logger.info(
             "Schedule reloaded for %s: removed=%d, new_jobs=%s",
-            self.person_name, removed, new_jobs,
+            self.anima_name, removed, new_jobs,
         )
         return {"reloaded": name, "removed": removed, "new_jobs": new_jobs}
 
@@ -437,33 +437,33 @@ class PersonRunner:
 
     async def _handle_process_message(self, params: dict[str, Any]) -> dict[str, Any]:
         """Handle non-streaming process_message request."""
-        if not self.person:
-            raise RuntimeError("Person not initialized")
+        if not self.anima:
+            raise RuntimeError("Anima not initialized")
 
         message = params.get("message", "")
         from_person = params.get("from_person", "human")
 
-        result = await self.person.process_message(message, from_person=from_person)
+        result = await self.anima.process_message(message, from_person=from_person)
 
         return {
             "response": result,
             "replied_to": [],
-            "notifications": self.person.drain_notifications(),
+            "notifications": self.anima.drain_notifications(),
         }
 
     async def _handle_greet(self, params: dict[str, Any]) -> dict[str, Any]:
         """Handle greet request (character click greeting)."""
-        if not self.person:
-            raise RuntimeError("Person not initialized")
+        if not self.anima:
+            raise RuntimeError("Anima not initialized")
 
-        return await self.person.process_greet()
+        return await self.anima.process_greet()
 
     async def _handle_run_bootstrap(self, params: dict[str, Any]) -> dict[str, Any]:
         """Handle run_bootstrap request (background bootstrap execution)."""
-        if not self.person:
-            raise RuntimeError("Person not initialized")
+        if not self.anima:
+            raise RuntimeError("Anima not initialized")
 
-        result = await self.person.run_bootstrap()
+        result = await self.anima.run_bootstrap()
         return {
             "status": "completed",
             "summary": result.summary,
@@ -482,12 +482,12 @@ class PersonRunner:
         periodic keep-alive chunks so that the IPC layer's per-chunk
         timeout is reset even during long tool executions.
         """
-        if not self.person:
+        if not self.anima:
             yield IPCResponse(
                 id=request.id,
                 error={
                     "code": "NOT_INITIALIZED",
-                    "message": "Person not initialized"
+                    "message": "Anima not initialized"
                 }
             )
             return
@@ -504,7 +504,7 @@ class PersonRunner:
         full_response = ""
 
         # Track bootstrap state to detect completion
-        was_bootstrapping = self.person.needs_bootstrap
+        was_bootstrapping = self.anima.needs_bootstrap
 
         # ── Queue-based merge of SDK stream + keep-alive ─────────
         queue: asyncio.Queue[IPCResponse | _Sentinel] = asyncio.Queue()
@@ -521,7 +521,7 @@ class PersonRunner:
             """Read Agent SDK stream and enqueue IPCResponse chunks."""
             nonlocal full_response
             try:
-                # Emit bootstrap_start if person needs bootstrap
+                # Emit bootstrap_start if anima needs bootstrap
                 if was_bootstrapping:
                     await _enqueue(IPCResponse(
                         id=request.id,
@@ -531,7 +531,7 @@ class PersonRunner:
                         ),
                     ))
 
-                async for chunk in self.person.process_message_stream(
+                async for chunk in self.anima.process_message_stream(
                     message, from_person=from_person
                 ):
                     event_type = chunk.get("type", "unknown")
@@ -554,7 +554,7 @@ class PersonRunner:
                         # Emit bootstrap_complete if bootstrap just finished
                         if (
                             was_bootstrapping
-                            and not self.person.needs_bootstrap
+                            and not self.anima.needs_bootstrap
                         ):
                             await _enqueue(IPCResponse(
                                 id=request.id,
@@ -578,7 +578,7 @@ class PersonRunner:
                         return
 
                     elif event_type == "bootstrap_busy":
-                        # Person is already bootstrapping — forward as-is
+                        # Anima is already bootstrapping — forward as-is
                         await _enqueue(IPCResponse(
                             id=request.id,
                             stream=True,
@@ -647,7 +647,7 @@ class PersonRunner:
                         )
                         logger.debug(
                             "Keep-alive sent for %s (elapsed=%.1fs)",
-                            self.person_name, elapsed,
+                            self.anima_name, elapsed,
                         )
                         await _enqueue(IPCResponse(
                             id=request.id,
@@ -663,15 +663,15 @@ class PersonRunner:
         # Launch producer tasks
         logger.debug(
             "Starting queue-based stream merge for %s (keepalive=%ds)",
-            self.person_name, keepalive_interval,
+            self.anima_name, keepalive_interval,
         )
         producer_task = asyncio.create_task(
             _stream_producer(),
-            name=f"stream-producer-{self.person_name}",
+            name=f"stream-producer-{self.anima_name}",
         )
         keepalive_task = asyncio.create_task(
             _keepalive_producer(),
-            name=f"keepalive-{self.person_name}",
+            name=f"keepalive-{self.anima_name}",
         )
 
         try:
@@ -699,23 +699,23 @@ class PersonRunner:
                     pass
             logger.debug(
                 "Stream merge completed for %s (%.1fs)",
-                self.person_name,
+                self.anima_name,
                 time.monotonic() - stream_start_time,
             )
 
     async def _handle_run_heartbeat(self, params: dict[str, Any]) -> dict[str, Any]:
         """Handle run_heartbeat request."""
-        if not self.person:
-            raise RuntimeError("Person not initialized")
+        if not self.anima:
+            raise RuntimeError("Anima not initialized")
 
-        await self.person.run_heartbeat()
+        await self.anima.run_heartbeat()
 
         return {"status": "completed"}
 
     async def _handle_run_cron_task(self, params: dict[str, Any]) -> dict[str, Any]:
         """Handle run_cron_task request."""
-        if not self.person:
-            raise RuntimeError("Person not initialized")
+        if not self.anima:
+            raise RuntimeError("Anima not initialized")
 
         task_name = params.get("task_name")
         task_description = params.get("task_description")
@@ -723,19 +723,19 @@ class PersonRunner:
         if not task_name:
             raise ValueError("task_name is required")
 
-        await self.person.run_cron_task(task_name, task_description)
+        await self.anima.run_cron_task(task_name, task_description)
 
         return {"status": "completed"}
 
     async def _handle_get_status(self, params: dict[str, Any]) -> dict[str, Any]:
         """Handle get_status request."""
-        if not self.person:
-            raise RuntimeError("Person not initialized")
+        if not self.anima:
+            raise RuntimeError("Anima not initialized")
 
         return {
-            "status": self.person._status,
-            "current_task": self.person._current_task or None,
-            "needs_bootstrap": self.person.needs_bootstrap,
+            "status": self.anima._status,
+            "current_task": self.anima._current_task or None,
+            "needs_bootstrap": self.anima.needs_bootstrap,
             "scheduler_running": self.scheduler.running if self.scheduler else False,
             "scheduler_jobs": len(self.scheduler.get_jobs()) if self.scheduler else 0,
         }
@@ -743,7 +743,7 @@ class PersonRunner:
     async def _handle_ping(self, params: dict[str, Any]) -> dict[str, Any]:
         """Handle ping request.
 
-        Returns ``status: "initializing"`` while DigitalPerson is loading,
+        Returns ``status: "initializing"`` while DigitalAnima is loading,
         ``status: "ok"`` once ready.  The parent process polls this to
         confirm readiness.
         """
@@ -751,13 +751,13 @@ class PersonRunner:
         status = "ok" if self._ready_event.is_set() else "initializing"
         return {
             "status": status,
-            "person": self.person_name,
+            "anima": self.anima_name,
             "uptime_sec": round(uptime, 1),
         }
 
     async def _handle_shutdown(self, params: dict[str, Any]) -> dict[str, Any]:
         """Handle shutdown request."""
-        logger.info("Shutdown requested for %s", self.person_name)
+        logger.info("Shutdown requested for %s", self.anima_name)
         self.shutdown_event.set()
         return {"status": "shutting_down"}
 
@@ -768,10 +768,10 @@ class PersonRunner:
         return (time.monotonic() - self._last_msg_heartbeat_end) < _MSG_HEARTBEAT_COOLDOWN_S
 
     def _check_cascade(self, senders: set[str]) -> bool:
-        """Return True if any (person, sender) pair exceeds cascade threshold."""
+        """Return True if any (anima, sender) pair exceeds cascade threshold."""
         now = time.monotonic()
         for sender in senders:
-            keys = [(self.person_name, sender), (sender, self.person_name)]
+            keys = [(self.anima_name, sender), (sender, self.anima_name)]
             total = 0
             for k in keys:
                 times = self._pair_heartbeat_times.get(k, [])
@@ -785,7 +785,7 @@ class PersonRunner:
                 logger.warning(
                     "CASCADE DETECTED: %s <-> %s (%d round-trips in %ds window). "
                     "Suppressing message-triggered heartbeat.",
-                    self.person_name, sender, total, _CASCADE_WINDOW_S,
+                    self.anima_name, sender, total, _CASCADE_WINDOW_S,
                 )
                 return True
         return False
@@ -794,18 +794,18 @@ class PersonRunner:
         """Record a heartbeat exchange for cascade tracking."""
         now = time.monotonic()
         for sender in senders:
-            key = (self.person_name, sender)
+            key = (self.anima_name, sender)
             self._pair_heartbeat_times.setdefault(key, []).append(now)
 
-    async def _on_person_lock_released(self) -> None:
-        """Check deferred inbox after the person's lock is released."""
+    async def _on_anima_lock_released(self) -> None:
+        """Check deferred inbox after the anima's lock is released."""
         if not self._deferred_inbox:
             return
         self._deferred_inbox = False
 
-        if not self.person:
+        if not self.anima:
             return
-        if not self.person.messenger.has_unread():
+        if not self.anima.messenger.has_unread():
             return
         if self._pending_trigger:
             return
@@ -817,28 +817,28 @@ class PersonRunner:
 
     async def _message_triggered_heartbeat(self) -> None:
         """Execute a heartbeat triggered by incoming messages."""
-        if not self.person:
+        if not self.anima:
             self._pending_trigger = False
             return
 
         if self._heartbeat_running:
-            logger.info("Message-triggered heartbeat SKIPPED (already running): %s", self.person_name)
+            logger.info("Message-triggered heartbeat SKIPPED (already running): %s", self.anima_name)
             self._pending_trigger = False
             return
 
         # Peek at inbox senders for cascade detection
-        senders = {m.from_person for m in self.person.messenger.receive()}
+        senders = {m.from_person for m in self.anima.messenger.receive()}
         if senders and self._check_cascade(senders):
             self._pending_trigger = False
             return
 
         self._heartbeat_running = True
         try:
-            logger.info("Message-triggered heartbeat: %s", self.person_name)
-            await self.person.run_heartbeat()
+            logger.info("Message-triggered heartbeat: %s", self.anima_name)
+            await self.anima.run_heartbeat()
         except Exception:
             logger.exception(
-                "Message-triggered heartbeat failed: %s", self.person_name,
+                "Message-triggered heartbeat failed: %s", self.anima_name,
             )
         finally:
             self._heartbeat_running = False
@@ -852,26 +852,26 @@ class PersonRunner:
     async def _inbox_watcher_loop(self) -> None:
         """Poll inbox every 2s; trigger heartbeat on new messages.
 
-        Applies rate limiting to prevent cascade loops between persons
+        Applies rate limiting to prevent cascade loops between animas
         and cooldown to avoid excessive heartbeat triggers.
         """
-        if not self.person:
+        if not self.anima:
             return
 
-        logger.info("Inbox watcher started for %s", self.person_name)
+        logger.info("Inbox watcher started for %s", self.anima_name)
 
         while not self.shutdown_event.is_set():
             try:
                 if self._pending_trigger:
                     await asyncio.sleep(2.0)
                     continue
-                if not self.person.messenger.has_unread():
+                if not self.anima.messenger.has_unread():
                     await asyncio.sleep(2.0)
                     continue
                 if self._is_in_cooldown():
                     await asyncio.sleep(2.0)
                     continue
-                if self.person._lock.locked():
+                if self.anima._lock.locked():
                     self._deferred_inbox = True
                     await asyncio.sleep(2.0)
                     continue
@@ -884,11 +884,11 @@ class PersonRunner:
                 break
             except Exception as e:
                 logger.error(
-                    "Error in inbox watcher for %s: %s", self.person_name, e,
+                    "Error in inbox watcher for %s: %s", self.anima_name, e,
                 )
                 await asyncio.sleep(2.0)
 
-        logger.info("Inbox watcher stopped for %s", self.person_name)
+        logger.info("Inbox watcher stopped for %s", self.anima_name)
 
     async def _cleanup(self) -> None:
         """Clean up resources."""
@@ -906,23 +906,23 @@ class PersonRunner:
                 self.scheduler.shutdown(wait=False)
             except Exception:
                 pass  # Scheduler may not have been started
-            logger.info("Scheduler stopped for %s", self.person_name)
+            logger.info("Scheduler stopped for %s", self.anima_name)
 
         # Stop IPC server
         if self.ipc_server:
             await self.ipc_server.stop()
 
-        logger.info("Cleanup completed for %s", self.person_name)
+        logger.info("Cleanup completed for %s", self.anima_name)
 
 
 # ── CLI Entry Point ────────────────────────────────────────────────
 
-def setup_logging(person_name: str, log_dir: Path) -> None:
-    """Setup logging for child process with person-specific log files."""
-    from core.logging_config import setup_person_logging
+def setup_logging(anima_name: str, log_dir: Path) -> None:
+    """Setup logging for child process with anima-specific log files."""
+    from core.logging_config import setup_anima_logging
 
-    setup_person_logging(
-        person_name=person_name,
+    setup_anima_logging(
+        anima_name=anima_name,
         log_dir=log_dir,
         level="INFO",
         also_to_console=False  # Child processes log to file only
@@ -932,12 +932,12 @@ def setup_logging(person_name: str, log_dir: Path) -> None:
 def parse_args() -> argparse.Namespace:
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
-        description="Run a Person in a subprocess"
+        description="Run an Anima in a subprocess"
     )
     parser.add_argument(
-        "--person-name",
+        "--anima-name",
         required=True,
-        help="Name of the person to run"
+        help="Name of the anima to run"
     )
     parser.add_argument(
         "--socket-path",
@@ -946,10 +946,10 @@ def parse_args() -> argparse.Namespace:
         help="Path to Unix socket file"
     )
     parser.add_argument(
-        "--persons-dir",
+        "--animas-dir",
         required=True,
         type=Path,
-        help="Path to persons directory"
+        help="Path to animas directory"
     )
     parser.add_argument(
         "--shared-dir",
@@ -970,12 +970,12 @@ async def main() -> None:
     """Main entry point."""
     args = parse_args()
 
-    setup_logging(args.person_name, args.log_dir)
+    setup_logging(args.anima_name, args.log_dir)
 
-    runner = PersonRunner(
-        person_name=args.person_name,
+    runner = AnimaRunner(
+        anima_name=args.anima_name,
         socket_path=args.socket_path,
-        persons_dir=args.persons_dir,
+        animas_dir=args.animas_dir,
         shared_dir=args.shared_dir
     )
 

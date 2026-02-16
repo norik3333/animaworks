@@ -26,22 +26,22 @@ import pytest
 
 @pytest.mark.asyncio
 @pytest.mark.skip(reason="Full server E2E test requires complex async setup")
-async def test_server_startup_with_persons(data_dir: Path, make_person):
-    """Test server startup with multiple persons."""
+async def test_server_startup_with_animas(data_dir: Path, make_anima):
+    """Test server startup with multiple animas."""
     # This would start the actual FastAPI server
-    # and verify persons are loaded and running
+    # and verify animas are loaded and running
     pass
 
 
 @pytest.mark.asyncio
 @pytest.mark.skip(reason="Requires running server")
-async def test_api_chat_endpoint(data_dir: Path, make_person):
+async def test_api_chat_endpoint(data_dir: Path, make_anima):
     """Test /api/chat endpoint through full stack."""
     pass
 
 
 @pytest.mark.asyncio
 @pytest.mark.skip(reason="Requires running server")
-async def test_api_person_status_endpoint(data_dir: Path, make_person):
-    """Test /api/persons/{name}/status endpoint."""
+async def test_api_anima_status_endpoint(data_dir: Path, make_anima):
+    """Test /api/animas/{name}/status endpoint."""
     pass

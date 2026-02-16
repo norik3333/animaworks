@@ -13,11 +13,11 @@ def cmd_init(args: argparse.Namespace) -> None:
 
     from core.init import ensure_runtime_dir, merge_templates
     from core.paths import get_data_dir
-    from core.person_factory import (
+    from core.anima_factory import (
         create_blank,
         create_from_md,
         create_from_template,
-        validate_person_name,
+        validate_anima_name,
     )
 
     data_dir = get_data_dir()
@@ -25,9 +25,9 @@ def cmd_init(args: argparse.Namespace) -> None:
     # --force: safe merge (add missing files only)
     if getattr(args, "force", False):
         if not data_dir.exists():
-            ensure_runtime_dir(skip_persons=True)
+            ensure_runtime_dir(skip_animas=True)
             print(f"Runtime directory initialized: {data_dir}")
-            _interactive_person_setup(data_dir)
+            _interactive_anima_setup(data_dir)
             _interactive_user_setup(data_dir)
             return
         added = merge_templates(data_dir)
@@ -41,42 +41,42 @@ def cmd_init(args: argparse.Namespace) -> None:
 
     # Non-interactive shortcuts
     # Always call ensure_runtime_dir — it's idempotent (checks config.json).
-    persons_dir = data_dir / "persons"
+    animas_dir = data_dir / "animas"
 
     if getattr(args, "template", None):
-        ensure_runtime_dir(skip_persons=True)
-        persons_dir.mkdir(parents=True, exist_ok=True)
-        person_dir = create_from_template(persons_dir, args.template)
-        _register_person_in_config(data_dir, person_dir.name)
-        print(f"Created person '{person_dir.name}' from template '{args.template}'")
+        ensure_runtime_dir(skip_animas=True)
+        animas_dir.mkdir(parents=True, exist_ok=True)
+        anima_dir = create_from_template(animas_dir, args.template)
+        _register_anima_in_config(data_dir, anima_dir.name)
+        print(f"Created anima '{anima_dir.name}' from template '{args.template}'")
         return
 
     if getattr(args, "from_md", None):
-        ensure_runtime_dir(skip_persons=True)
-        persons_dir.mkdir(parents=True, exist_ok=True)
+        ensure_runtime_dir(skip_animas=True)
+        animas_dir.mkdir(parents=True, exist_ok=True)
         md_path = Path(args.from_md).resolve()
-        person_dir = create_from_md(
-            persons_dir, md_path, name=getattr(args, "name", None)
+        anima_dir = create_from_md(
+            animas_dir, md_path, name=getattr(args, "name", None)
         )
-        _register_person_in_config(data_dir, person_dir.name)
-        print(f"Created person '{person_dir.name}' from {md_path.name}")
+        _register_anima_in_config(data_dir, anima_dir.name)
+        print(f"Created anima '{anima_dir.name}' from {md_path.name}")
         return
 
     if getattr(args, "blank", None):
-        ensure_runtime_dir(skip_persons=True)
-        persons_dir.mkdir(parents=True, exist_ok=True)
-        err = validate_person_name(args.blank)
+        ensure_runtime_dir(skip_animas=True)
+        animas_dir.mkdir(parents=True, exist_ok=True)
+        err = validate_anima_name(args.blank)
         if err:
             print(f"Error: {err}")
             sys.exit(1)
-        person_dir = create_blank(persons_dir, args.blank)
-        _register_person_in_config(data_dir, person_dir.name)
-        print(f"Created blank person '{person_dir.name}'")
+        anima_dir = create_blank(animas_dir, args.blank)
+        _register_anima_in_config(data_dir, anima_dir.name)
+        print(f"Created blank anima '{anima_dir.name}'")
         return
 
-    if getattr(args, "skip_person", False):
-        ensure_runtime_dir(skip_persons=True)
-        print(f"Runtime directory initialized (no persons): {data_dir}")
+    if getattr(args, "skip_anima", False):
+        ensure_runtime_dir(skip_animas=True)
+        print(f"Runtime directory initialized (no animas): {data_dir}")
         return
 
     # Default: interactive first-time setup
@@ -87,52 +87,52 @@ def cmd_init(args: argparse.Namespace) -> None:
         print("Use --force to merge new template files, or 'animaworks reset' to re-initialize.")
         return
 
-    ensure_runtime_dir(skip_persons=True)
+    ensure_runtime_dir(skip_animas=True)
     print(f"Runtime directory initialized: {data_dir}")
-    _interactive_person_setup(data_dir)
+    _interactive_anima_setup(data_dir)
     _interactive_user_setup(data_dir)
 
 
-def _interactive_person_setup(data_dir) -> None:
-    """Interactive person creation during init."""
+def _interactive_anima_setup(data_dir) -> None:
+    """Interactive anima creation during init."""
     from pathlib import Path
 
-    from core.person_factory import (
+    from core.anima_factory import (
         create_blank,
         create_from_md,
         create_from_template,
-        list_person_templates,
-        validate_person_name,
+        list_anima_templates,
+        validate_anima_name,
     )
 
-    persons_dir = data_dir / "persons"
-    persons_dir.mkdir(parents=True, exist_ok=True)
+    animas_dir = data_dir / "animas"
+    animas_dir.mkdir(parents=True, exist_ok=True)
 
-    templates = list_person_templates()
+    templates = list_anima_templates()
 
     # テンプレートがない場合: 名前から直接作成
     if not templates:
         print()
         name = input(
-            "最初のDigital Personの名前（英小文字、空欄でスキップ）: "
+            "最初のDigital Animaの名前（英小文字、空欄でスキップ）: "
         ).strip()
         if not name:
             print("パーソンの作成をスキップしました。")
             return
-        err = validate_person_name(name)
+        err = validate_anima_name(name)
         if err:
             print(f"Error: {err}")
             return
-        person_dir = create_blank(persons_dir, name)
-        _register_person_in_config(data_dir, person_dir.name)
-        print(f"\n{person_dir.name} を作成しました。")
+        anima_dir = create_blank(animas_dir, name)
+        _register_anima_in_config(data_dir, anima_dir.name)
+        print(f"\n{anima_dir.name} を作成しました。")
         return
 
     # テンプレートがある場合: メニュー表示
     template_list = ", ".join(templates)
 
     print()
-    print("最初のDigital Personをどのように作成しますか？")
+    print("最初のDigital Animaをどのように作成しますか？")
     print(f"  1. テンプレートから作成 ({template_list})")
     print("  2. MDファイルから作成")
     print("  3. ブランクで作成（名前のみ指定）")
@@ -152,9 +152,9 @@ def _interactive_person_setup(data_dir) -> None:
                 tpl = templates[int(idx) - 1]
             except (ValueError, IndexError):
                 tpl = templates[0]
-        person_dir = create_from_template(persons_dir, tpl)
-        _register_person_in_config(data_dir, person_dir.name)
-        print(f"\n{person_dir.name} を作成しました。")
+        anima_dir = create_from_template(animas_dir, tpl)
+        _register_anima_in_config(data_dir, anima_dir.name)
+        print(f"\n{anima_dir.name} を作成しました。")
         return
 
     if choice == "2":
@@ -166,32 +166,32 @@ def _interactive_person_setup(data_dir) -> None:
         if not md_path.exists():
             print(f"ファイルが見つかりません: {md_path}")
             return
-        name = input("パーソン名（英小文字、空欄で自動検出）: ").strip() or None
+        name = input("Anima名（英小文字、空欄で自動検出）: ").strip() or None
         if name:
-            err = validate_person_name(name)
+            err = validate_anima_name(name)
             if err:
                 print(f"Error: {err}")
                 return
         try:
-            person_dir = create_from_md(persons_dir, md_path, name=name)
-            _register_person_in_config(data_dir, person_dir.name)
-            print(f"\n{person_dir.name} を作成しました。")
+            anima_dir = create_from_md(animas_dir, md_path, name=name)
+            _register_anima_in_config(data_dir, anima_dir.name)
+            print(f"\n{anima_dir.name} を作成しました。")
         except ValueError as e:
             print(f"Error: {e}")
         return
 
     if choice == "3":
-        name = input("パーソン名（英小文字）: ").strip()
+        name = input("Anima名（英小文字）: ").strip()
         if not name:
             print("スキップしました。")
             return
-        err = validate_person_name(name)
+        err = validate_anima_name(name)
         if err:
             print(f"Error: {err}")
             return
-        person_dir = create_blank(persons_dir, name)
-        _register_person_in_config(data_dir, person_dir.name)
-        print(f"\n{person_dir.name} を作成しました。")
+        anima_dir = create_blank(animas_dir, name)
+        _register_anima_in_config(data_dir, anima_dir.name)
+        print(f"\n{anima_dir.name} を作成しました。")
         return
 
     # choice == "4" or anything else
@@ -268,7 +268,7 @@ def cmd_reset(args: argparse.Namespace) -> None:
             print("Aborted.")
             return
 
-    reset_runtime_dir(data_dir, skip_persons=True)
+    reset_runtime_dir(data_dir, skip_animas=True)
     print(f"Runtime directory reset: {data_dir}")
 
     if getattr(args, "restart", False):
@@ -282,12 +282,12 @@ def cmd_reset(args: argparse.Namespace) -> None:
         print("Run 'animaworks start' to launch the server and configure via the web UI.")
 
 
-def _register_person_in_config(data_dir, person_name: str) -> None:
-    """Register a newly created person in config.json.
+def _register_anima_in_config(data_dir, anima_name: str) -> None:
+    """Register a newly created anima in config.json.
 
-    Delegates to :func:`core.config.register_person_in_config` which
+    Delegates to :func:`core.config.register_anima_in_config` which
     reads status.json / identity.md to sync the supervisor field.
     """
-    from core.config import register_person_in_config
+    from core.config import register_anima_in_config
 
-    register_person_in_config(data_dir, person_name)
+    register_anima_in_config(data_dir, anima_name)

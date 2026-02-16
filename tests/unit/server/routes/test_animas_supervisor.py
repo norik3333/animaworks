@@ -1,6 +1,6 @@
-"""Unit tests for supervisor field in GET /api/persons response.
+"""Unit tests for supervisor field in GET /api/animas response.
 
-Validates that the list_persons endpoint includes the ``supervisor`` field
+Validates that the list_animas endpoint includes the ``supervisor`` field
 read from config.json, which is required by the Workspace 3D office
 tree layout algorithm.
 """
@@ -18,19 +18,19 @@ import pytest
 
 def _create_app(
     tmp_path: Path,
-    person_names: list[str] | None = None,
-    config_persons: dict | None = None,
+    anima_names: list[str] | None = None,
+    config_animas: dict | None = None,
 ):
     """Build a real FastAPI app with mocked externals.
 
     Parameters
     ----------
-    config_persons:
-        Dict of person name → PersonModelConfig-like dict to inject
+    config_animas:
+        Dict of anima name → AnimaModelConfig-like dict to inject
         into the config.  Keys not listed default to empty config.
     """
-    persons_dir = tmp_path / "persons"
-    persons_dir.mkdir(parents=True, exist_ok=True)
+    animas_dir = tmp_path / "animas"
+    animas_dir.mkdir(parents=True, exist_ok=True)
     shared_dir = tmp_path / "shared"
     shared_dir.mkdir(parents=True, exist_ok=True)
 
@@ -61,60 +61,60 @@ def _create_app(
 
         from server.app import create_app
 
-        app = create_app(persons_dir, shared_dir)
+        app = create_app(animas_dir, shared_dir)
 
-    if person_names is not None:
-        app.state.person_names = person_names
+    if anima_names is not None:
+        app.state.anima_names = anima_names
 
-    # Patch load_config used inside the persons route
-    if config_persons is not None:
-        _patch_route_config(app, config_persons)
+    # Patch load_config used inside the animas route
+    if config_animas is not None:
+        _patch_route_config(app, config_animas)
 
     return app
 
 
-def _patch_route_config(app, config_persons: dict):
+def _patch_route_config(app, config_animas: dict):
     """Patch ``core.config.models.load_config`` to return a config with
-    the given person overrides.
+    the given anima overrides.
 
     This patches the module-level import used inside the route handler.
     """
-    from core.config.models import AnimaWorksConfig, PersonModelConfig
+    from core.config.models import AnimaWorksConfig, AnimaModelConfig
 
-    persons = {}
-    for name, overrides in config_persons.items():
-        persons[name] = PersonModelConfig(**overrides)
+    animas = {}
+    for name, overrides in config_animas.items():
+        animas[name] = AnimaModelConfig(**overrides)
 
-    config = AnimaWorksConfig(persons=persons)
+    config = AnimaWorksConfig(animas=animas)
 
-    # Patch load_config in the module where it was imported by persons.py
-    import server.routes.persons as persons_module
-    app._test_original_load_config = persons_module.load_config
-    persons_module.load_config = lambda *a, **kw: config
+    # Patch load_config in the module where it was imported by animas.py
+    import server.routes.animas as animas_module
+    app._test_original_load_config = animas_module.load_config
+    animas_module.load_config = lambda *a, **kw: config
 
 
 # ── Tests ──────────────────────────────────────────────
 
 
-class TestListPersonsSupervisorField:
-    """Verify that GET /api/persons includes the supervisor field."""
+class TestListAnimasSupervisorField:
+    """Verify that GET /api/animas includes the supervisor field."""
 
     @pytest.fixture(autouse=True)
     def _cleanup_patch(self):
         """Restore original load_config after each test."""
         yield
-        import server.routes.persons as persons_module
-        if hasattr(persons_module, "_test_original_load_config"):
-            persons_module.load_config = persons_module._test_original_load_config
+        import server.routes.animas as animas_module
+        if hasattr(animas_module, "_test_original_load_config"):
+            animas_module.load_config = animas_module._test_original_load_config
 
     async def test_supervisor_included_in_response(
         self, tmp_path: Path,
     ) -> None:
-        """Each person in the response should have a 'supervisor' key."""
+        """Each anima in the response should have a 'supervisor' key."""
         app = _create_app(
             tmp_path,
-            person_names=["sakura", "kotoha"],
-            config_persons={
+            anima_names=["sakura", "kotoha"],
+            config_animas={
                 "sakura": {},
                 "kotoha": {"supervisor": "sakura"},
             },
@@ -123,15 +123,15 @@ class TestListPersonsSupervisorField:
         from httpx import ASGITransport, AsyncClient
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            resp = await client.get("/api/persons")
+            resp = await client.get("/api/animas")
 
         assert resp.status_code == 200
         data = resp.json()
         assert len(data) == 2
 
-        for person in data:
-            assert "supervisor" in person, (
-                f"Person '{person['name']}' missing 'supervisor' field"
+        for anima_item in data:
+            assert "supervisor" in anima_item, (
+                f"Anima '{anima_item['name']}' missing 'supervisor' field"
             )
 
     async def test_supervisor_value_from_config(
@@ -140,8 +140,8 @@ class TestListPersonsSupervisorField:
         """supervisor field should reflect the config.json value."""
         app = _create_app(
             tmp_path,
-            person_names=["sakura", "kotoha"],
-            config_persons={
+            anima_names=["sakura", "kotoha"],
+            config_animas={
                 "sakura": {},
                 "kotoha": {"supervisor": "sakura"},
             },
@@ -150,7 +150,7 @@ class TestListPersonsSupervisorField:
         from httpx import ASGITransport, AsyncClient
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            resp = await client.get("/api/persons")
+            resp = await client.get("/api/animas")
 
         data = resp.json()
         by_name = {p["name"]: p for p in data}
@@ -161,21 +161,21 @@ class TestListPersonsSupervisorField:
     async def test_supervisor_none_when_not_in_config(
         self, tmp_path: Path,
     ) -> None:
-        """Persons not listed in config.json should have supervisor=null."""
+        """Animas not listed in config.json should have supervisor=null."""
         app = _create_app(
             tmp_path,
-            person_names=["unknown_person"],
-            config_persons={},  # empty config
+            anima_names=["unknown_anima"],
+            config_animas={},  # empty config
         )
 
         from httpx import ASGITransport, AsyncClient
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            resp = await client.get("/api/persons")
+            resp = await client.get("/api/animas")
 
         data = resp.json()
         assert len(data) == 1
-        assert data[0]["name"] == "unknown_person"
+        assert data[0]["name"] == "unknown_anima"
         assert data[0]["supervisor"] is None
 
     async def test_multiple_hierarchy_levels(
@@ -184,8 +184,8 @@ class TestListPersonsSupervisorField:
         """Three-level hierarchy should be correctly represented."""
         app = _create_app(
             tmp_path,
-            person_names=["boss", "manager", "worker"],
-            config_persons={
+            anima_names=["boss", "manager", "worker"],
+            config_animas={
                 "boss": {},
                 "manager": {"supervisor": "boss"},
                 "worker": {"supervisor": "manager"},
@@ -195,7 +195,7 @@ class TestListPersonsSupervisorField:
         from httpx import ASGITransport, AsyncClient
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            resp = await client.get("/api/persons")
+            resp = await client.get("/api/animas")
 
         data = resp.json()
         by_name = {p["name"]: p for p in data}
@@ -210,18 +210,18 @@ class TestListPersonsSupervisorField:
         """Adding supervisor should not break existing response fields."""
         app = _create_app(
             tmp_path,
-            person_names=["sakura"],
-            config_persons={"sakura": {}},
+            anima_names=["sakura"],
+            config_animas={"sakura": {}},
         )
 
         from httpx import ASGITransport, AsyncClient
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            resp = await client.get("/api/persons")
+            resp = await client.get("/api/animas")
 
         data = resp.json()
-        person = data[0]
+        anima_item = data[0]
 
         # All pre-existing fields must still be present
         expected_fields = {"name", "status", "bootstrapping", "pid", "uptime_sec", "appearance", "supervisor"}
-        assert set(person.keys()) == expected_fields
+        assert set(anima_item.keys()) == expected_fields

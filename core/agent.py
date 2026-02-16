@@ -1,5 +1,5 @@
 from __future__ import annotations
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
@@ -7,7 +7,7 @@ from __future__ import annotations
 # See LICENSES/AGPL-3.0.txt for the full license text.
 
 
-"""AgentCore -- orchestrator for Digital Person execution cycles.
+"""AgentCore -- orchestrator for Digital Anima execution cycles.
 
 This module is intentionally slim: it owns only the execution mode routing,
 session chaining orchestration, and lifecycle coordination.  Actual LLM
@@ -38,7 +38,7 @@ logger = logging.getLogger("animaworks.agent")
 
 
 class AgentCore:
-    """Orchestrates execution of a Digital Person's thinking/acting cycle.
+    """Orchestrates execution of a Digital Anima's thinking/acting cycle.
 
     Delegates actual LLM execution to an appropriate Executor:
       - A1 (autonomous, Claude):      ``AgentSDKExecutor``
@@ -49,12 +49,12 @@ class AgentCore:
 
     def __init__(
         self,
-        person_dir: Path,
+        anima_dir: Path,
         memory: MemoryManager,
         model_config: ModelConfig | None = None,
         messenger: Messenger | None = None,
     ) -> None:
-        self.person_dir = person_dir
+        self.anima_dir = anima_dir
         self.memory = memory
         self.model_config = model_config or ModelConfig()
         self.messenger = messenger
@@ -63,7 +63,7 @@ class AgentCore:
         self._sdk_available = self._check_sdk()
         self._agent_lock = asyncio.Lock()
 
-        # Build human notifier for top-level persons
+        # Build human notifier for top-level animas
         human_notifier = self._build_human_notifier()
 
         # Background task manager
@@ -71,7 +71,7 @@ class AgentCore:
 
         # Composable subsystems
         self._tool_handler = ToolHandler(
-            person_dir=person_dir,
+            anima_dir=anima_dir,
             memory=memory,
             messenger=messenger,
             tool_registry=self._tool_registry,
@@ -108,13 +108,13 @@ class AgentCore:
 
     @property
     def replied_to(self) -> set[str]:
-        """Person names this agent has sent messages to in the current cycle."""
+        """Anima names this agent has sent messages to in the current cycle."""
         return self._tool_handler.replied_to
 
     # ── Human notification ─────────────────────────────────
 
     def _build_human_notifier(self) -> "HumanNotifier | None":
-        """Build HumanNotifier if this person is top-level and notification is enabled."""
+        """Build HumanNotifier if this anima is top-level and notification is enabled."""
         try:
             from core.config import load_config
             from core.notification.notifier import HumanNotifier
@@ -123,9 +123,9 @@ class AgentCore:
             if not config.human_notification.enabled:
                 return None
 
-            # Only top-level persons (no supervisor) get the notifier
-            person_cfg = config.persons.get(self.person_dir.name)
-            if person_cfg is not None and person_cfg.supervisor is not None:
+            # Only top-level animas (no supervisor) get the notifier
+            anima_cfg = config.animas.get(self.anima_dir.name)
+            if anima_cfg is not None and anima_cfg.supervisor is not None:
                 return None
 
             notifier = HumanNotifier.from_config(config.human_notification)
@@ -134,7 +134,7 @@ class AgentCore:
 
             logger.info(
                 "HumanNotifier enabled for %s with %d channel(s)",
-                self.person_dir.name,
+                self.anima_dir.name,
                 notifier.channel_count,
             )
             return notifier
@@ -166,8 +166,8 @@ class AgentCore:
                 for name, tc in config.background_task.eligible_tools.items()
             }
             return BackgroundTaskManager(
-                person_dir=self.person_dir,
-                person_name=self.person_dir.name,
+                anima_dir=self.anima_dir,
+                anima_name=self.anima_dir.name,
                 eligible_tools=eligible,
             )
         except Exception:
@@ -247,7 +247,7 @@ class AgentCore:
         try:
             from core.tools import discover_personal_tools, discover_common_tools
             common = discover_common_tools()
-            personal = discover_personal_tools(self.person_dir)
+            personal = discover_personal_tools(self.anima_dir)
             # Personal overrides common (higher priority)
             return {**common, **personal}
         except Exception:
@@ -277,7 +277,7 @@ class AgentCore:
                 from core.execution.agent_sdk import AgentSDKExecutor
                 return AgentSDKExecutor(
                     model_config=self.model_config,
-                    person_dir=self.person_dir,
+                    anima_dir=self.anima_dir,
                     tool_registry=self._tool_registry,
                     personal_tools=self._personal_tools,
                 )
@@ -293,7 +293,7 @@ class AgentCore:
                 logger.info("Using AnthropicFallbackExecutor for Claude model")
                 return AnthropicFallbackExecutor(
                     model_config=self.model_config,
-                    person_dir=self.person_dir,
+                    anima_dir=self.anima_dir,
                     tool_handler=self._tool_handler,
                     tool_registry=self._tool_registry,
                     memory=self.memory,
@@ -308,7 +308,7 @@ class AgentCore:
             # ── Last resort: LiteLLM with anthropic provider ─
             return LiteLLMExecutor(
                 model_config=self.model_config,
-                person_dir=self.person_dir,
+                anima_dir=self.anima_dir,
                 tool_handler=self._tool_handler,
                 tool_registry=self._tool_registry,
                 memory=self.memory,
@@ -318,7 +318,7 @@ class AgentCore:
         if mode == "a2":
             return LiteLLMExecutor(
                 model_config=self.model_config,
-                person_dir=self.person_dir,
+                anima_dir=self.anima_dir,
                 tool_handler=self._tool_handler,
                 tool_registry=self._tool_registry,
                 memory=self.memory,
@@ -328,7 +328,7 @@ class AgentCore:
         # mode == "b"
         return AssistedExecutor(
             model_config=self.model_config,
-            person_dir=self.person_dir,
+            anima_dir=self.anima_dir,
             memory=self.memory,
             messenger=self.messenger,
         )
@@ -363,7 +363,7 @@ class AgentCore:
 
         try:
             if not hasattr(self, "_priming_engine"):
-                self._priming_engine = PrimingEngine(self.person_dir)
+                self._priming_engine = PrimingEngine(self.anima_dir)
             result = await self._priming_engine.prime_memories(message, sender_name)
 
             if result.is_empty():
@@ -478,7 +478,7 @@ class AgentCore:
         # ── Priming: Automatic memory retrieval ────────────────
         priming_section = await self._run_priming(prompt, trigger)
 
-        shortterm = ShortTermMemory(self.person_dir)
+        shortterm = ShortTermMemory(self.anima_dir)
         tracker = ContextTracker(
             model=self.model_config.model,
             threshold=self.model_config.context_threshold,
@@ -644,7 +644,7 @@ class AgentCore:
         # Priming: Automatic memory retrieval
         priming_section = await self._run_priming(prompt, trigger)
 
-        shortterm = ShortTermMemory(self.person_dir)
+        shortterm = ShortTermMemory(self.anima_dir)
         tracker = ContextTracker(
             model=self.model_config.model,
             threshold=self.model_config.context_threshold,

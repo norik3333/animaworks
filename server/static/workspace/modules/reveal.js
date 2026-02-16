@@ -1,5 +1,5 @@
-// ── Person Birth Reveal Animation ──────────────────────
-// Full-screen "gacha reveal" effect when a Person's avatar is generated.
+// ── Anima Birth Reveal Animation ──────────────────────
+// Full-screen "gacha reveal" effect when a Anima's avatar is generated.
 
 const FALLBACK_TIMEOUT = 5000;
 
@@ -19,7 +19,7 @@ export function preloadImage(url) {
 }
 
 /**
- * Play the reveal animation for a newly created Person.
+ * Play the reveal animation for a newly created Anima.
  * @param {{ name: string, avatarUrl?: string }} opts
  * @returns {Promise<void>} resolves when animation completes
  */

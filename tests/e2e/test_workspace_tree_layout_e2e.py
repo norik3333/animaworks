@@ -1,6 +1,6 @@
 """E2E tests for Workspace 3D office tree layout fix.
 
-Validates that the GET /api/persons endpoint returns the ``supervisor``
+Validates that the GET /api/animas endpoint returns the ``supervisor``
 field required by the office3d.js tree layout algorithm, and that the
 data structure correctly represents organizational hierarchy.
 
@@ -21,7 +21,7 @@ from httpx import ASGITransport, AsyncClient
 
 def _create_app_with_config(
     tmp_path: Path,
-    person_names: list[str],
+    anima_names: list[str],
     config_data: dict,
 ):
     """Build a real FastAPI app with a concrete config.json on disk.
@@ -29,8 +29,8 @@ def _create_app_with_config(
     This exercises the actual config loading path (load_config reads
     from the file) rather than mocking it, for true E2E coverage.
     """
-    persons_dir = tmp_path / "persons"
-    persons_dir.mkdir(parents=True, exist_ok=True)
+    animas_dir = tmp_path / "animas"
+    animas_dir.mkdir(parents=True, exist_ok=True)
     shared_dir = tmp_path / "shared"
     shared_dir.mkdir(parents=True, exist_ok=True)
 
@@ -68,18 +68,18 @@ def _create_app_with_config(
 
         from server.app import create_app
 
-        app = create_app(persons_dir, shared_dir)
+        app = create_app(animas_dir, shared_dir)
 
-    app.state.person_names = person_names
+    app.state.anima_names = anima_names
 
-    # Patch load_config in the persons route module to use our config file
+    # Patch load_config in the animas route module to use our config file
     from core.config.models import AnimaWorksConfig, load_config, invalidate_cache
 
     invalidate_cache()
     real_config = load_config(config_path)
 
-    import server.routes.persons as persons_module
-    persons_module.load_config = lambda *a, **kw: real_config
+    import server.routes.animas as animas_module
+    animas_module.load_config = lambda *a, **kw: real_config
 
     return app
 
@@ -88,7 +88,7 @@ def _create_app_with_config(
 
 
 class TestWorkspaceTreeLayoutE2E:
-    """E2E: Verify /api/persons provides correct data for 3D office tree layout."""
+    """E2E: Verify /api/animas provides correct data for 3D office tree layout."""
 
     @pytest.fixture(autouse=True)
     def _cleanup(self):
@@ -97,9 +97,9 @@ class TestWorkspaceTreeLayoutE2E:
         from core.config.models import invalidate_cache
         invalidate_cache()
         # Restore original load_config
-        import server.routes.persons as persons_module
+        import server.routes.animas as animas_module
         from core.config.models import load_config
-        persons_module.load_config = load_config
+        animas_module.load_config = load_config
 
     async def test_sakura_based_tree_structure(
         self, tmp_path: Path,
@@ -108,7 +108,7 @@ class TestWorkspaceTreeLayoutE2E:
         config_data = {
             "version": 1,
             "setup_complete": True,
-            "persons": {
+            "animas": {
                 "sakura": {},
                 "kotoha": {"supervisor": "sakura"},
                 "chatwork_checker": {},
@@ -117,13 +117,13 @@ class TestWorkspaceTreeLayoutE2E:
 
         app = _create_app_with_config(
             tmp_path,
-            person_names=["sakura", "kotoha", "chatwork_checker"],
+            anima_names=["sakura", "kotoha", "chatwork_checker"],
             config_data=config_data,
         )
 
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            resp = await client.get("/api/persons")
+            resp = await client.get("/api/animas")
 
         assert resp.status_code == 200
         data = resp.json()
@@ -147,7 +147,7 @@ class TestWorkspaceTreeLayoutE2E:
         config_data = {
             "version": 1,
             "setup_complete": True,
-            "persons": {
+            "animas": {
                 "sakura": {},
                 "kotoha": {"supervisor": "sakura"},
                 "aoi": {"supervisor": "sakura"},
@@ -156,19 +156,19 @@ class TestWorkspaceTreeLayoutE2E:
 
         app = _create_app_with_config(
             tmp_path,
-            person_names=["sakura", "kotoha", "aoi"],
+            anima_names=["sakura", "kotoha", "aoi"],
             config_data=config_data,
         )
 
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            resp = await client.get("/api/persons")
+            resp = await client.get("/api/animas")
 
-        persons = resp.json()
+        animas = resp.json()
 
         # Simulate buildOrgTree from office3d.js
         node_map = {}
-        for p in persons:
+        for p in animas:
             node_map[p["name"]] = {
                 "name": p["name"],
                 "supervisor": p.get("supervisor"),
@@ -191,43 +191,43 @@ class TestWorkspaceTreeLayoutE2E:
         children_names = sorted(c["name"] for c in roots[0]["children"])
         assert children_names == ["aoi", "kotoha"]
 
-    async def test_person_not_in_config_defaults_to_no_supervisor(
+    async def test_anima_not_in_config_defaults_to_no_supervisor(
         self, tmp_path: Path,
     ) -> None:
-        """Persons present in person_names but absent from config.json
+        """Animas present in anima_names but absent from config.json
         should have supervisor=null (treated as root in tree layout)."""
         config_data = {
             "version": 1,
             "setup_complete": True,
-            "persons": {
+            "animas": {
                 "sakura": {},
             },
         }
 
         app = _create_app_with_config(
             tmp_path,
-            person_names=["sakura", "new_person"],
+            anima_names=["sakura", "new_anima"],
             config_data=config_data,
         )
 
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            resp = await client.get("/api/persons")
+            resp = await client.get("/api/animas")
 
         data = resp.json()
         by_name = {p["name"]: p for p in data}
 
-        assert by_name["new_person"]["supervisor"] is None
+        assert by_name["new_anima"]["supervisor"] is None
 
     async def test_connector_data_available(
         self, tmp_path: Path,
     ) -> None:
-        """Verify that person data includes enough info for buildConnectors
-        (which iterates persons and checks p.supervisor to draw lines)."""
+        """Verify that anima data includes enough info for buildConnectors
+        (which iterates animas and checks p.supervisor to draw lines)."""
         config_data = {
             "version": 1,
             "setup_complete": True,
-            "persons": {
+            "animas": {
                 "sakura": {},
                 "kotoha": {"supervisor": "sakura"},
             },
@@ -235,41 +235,41 @@ class TestWorkspaceTreeLayoutE2E:
 
         app = _create_app_with_config(
             tmp_path,
-            person_names=["sakura", "kotoha"],
+            anima_names=["sakura", "kotoha"],
             config_data=config_data,
         )
 
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            resp = await client.get("/api/persons")
+            resp = await client.get("/api/animas")
 
-        persons = resp.json()
+        animas = resp.json()
 
-        # buildConnectors logic: for each person with supervisor, draw a line
+        # buildConnectors logic: for each anima with supervisor, draw a line
         connectors = []
-        person_names = {p["name"] for p in persons}
-        for p in persons:
-            if p.get("supervisor") and p["supervisor"] in person_names:
+        anima_names = {p["name"] for p in animas}
+        for p in animas:
+            if p.get("supervisor") and p["supervisor"] in anima_names:
                 connectors.append((p["supervisor"], p["name"]))
 
         assert len(connectors) == 1
         assert connectors[0] == ("sakura", "kotoha")
 
-    async def test_empty_persons_list(
+    async def test_empty_animas_list(
         self, tmp_path: Path,
     ) -> None:
-        """API should return empty list when no persons are registered."""
-        config_data = {"version": 1, "setup_complete": True, "persons": {}}
+        """API should return empty list when no animas are registered."""
+        config_data = {"version": 1, "setup_complete": True, "animas": {}}
 
         app = _create_app_with_config(
             tmp_path,
-            person_names=[],
+            anima_names=[],
             config_data=config_data,
         )
 
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            resp = await client.get("/api/persons")
+            resp = await client.get("/api/animas")
 
         assert resp.status_code == 200
         assert resp.json() == []

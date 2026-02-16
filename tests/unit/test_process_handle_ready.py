@@ -16,9 +16,9 @@ def handle(tmp_path: Path) -> ProcessHandle:
     """Create a ProcessHandle with mock paths."""
     socket_path = tmp_path / "test.sock"
     return ProcessHandle(
-        person_name="test-person",
+        anima_name="test-anima",
         socket_path=socket_path,
-        persons_dir=tmp_path / "persons",
+        animas_dir=tmp_path / "animas",
         shared_dir=tmp_path / "shared",
         log_dir=tmp_path / "logs",
     )
@@ -36,7 +36,7 @@ class TestWaitForReady:
         mock_client = AsyncMock()
         mock_client.send_request.return_value = IPCResponse(
             id="ready_check",
-            result={"status": "ok", "person": "test-person"},
+            result={"status": "ok", "anima": "test-anima"},
         )
         handle.ipc_client = mock_client
 
@@ -73,7 +73,7 @@ class TestWaitForReady:
 
     @pytest.mark.asyncio
     async def test_timeout_raises(self, handle: ProcessHandle):
-        """Should raise TimeoutError when person never becomes ready."""
+        """Should raise TimeoutError when anima never becomes ready."""
         handle.process = MagicMock()
         handle.process.poll.return_value = None
 

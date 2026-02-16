@@ -15,8 +15,8 @@ class TestArchiveAllCleansNonJsonFiles:
         shared = tmp_path / "shared"
         shared.mkdir()
 
-        alice = Messenger(shared_dir=shared, person_name="alice")
-        bob = Messenger(shared_dir=shared, person_name="bob")
+        alice = Messenger(shared_dir=shared, anima_name="alice")
+        bob = Messenger(shared_dir=shared, anima_name="bob")
 
         # bob sends a regular JSON message to alice
         msg = bob.send(to="alice", content="hello alice")
@@ -55,7 +55,7 @@ class TestNonJsonFileDoesNotAffectHasUnread:
         shared = tmp_path / "shared"
         shared.mkdir()
 
-        messenger = Messenger(shared_dir=shared, person_name="carol")
+        messenger = Messenger(shared_dir=shared, anima_name="carol")
 
         # Place only a .txt file in the inbox
         txt_file = shared / "inbox" / "carol" / "spurious.txt"

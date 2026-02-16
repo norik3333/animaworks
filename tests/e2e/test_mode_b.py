@@ -49,7 +49,7 @@ class TestModeBMock:
 
         # Check episode file was written
         today = date.today().isoformat()
-        episode_path = agent.person_dir / "episodes" / f"{today}.md"
+        episode_path = agent.anima_dir / "episodes" / f"{today}.md"
         assert episode_path.exists()
         content = episode_path.read_text(encoding="utf-8")
         assert "[assisted]" in content
@@ -75,7 +75,7 @@ class TestModeBMock:
 
         # Check knowledge file was created
         knowledge_files = list(
-            agent.person_dir.glob("knowledge/learned_*.md")
+            agent.anima_dir.glob("knowledge/learned_*.md")
         )
         assert len(knowledge_files) >= 1
         content = knowledge_files[0].read_text(encoding="utf-8")
@@ -93,12 +93,12 @@ class TestModeBMock:
         extract_resp = make_litellm_response(content="なし")
 
         # Snapshot existing knowledge files
-        existing = set(agent.person_dir.glob("knowledge/*.md"))
+        existing = set(agent.anima_dir.glob("knowledge/*.md"))
 
         with patch_litellm(main_resp, extract_resp):
             await agent.run_cycle("Hi there")
 
-        new_files = set(agent.person_dir.glob("knowledge/*.md")) - existing
+        new_files = set(agent.anima_dir.glob("knowledge/*.md")) - existing
         assert len(new_files) == 0
 
 
@@ -123,7 +123,7 @@ class TestModeBLive:
         assert result.action == "responded"
         # Episode should be recorded
         today = date.today().isoformat()
-        episode_path = agent.person_dir / "episodes" / f"{today}.md"
+        episode_path = agent.anima_dir / "episodes" / f"{today}.md"
         assert episode_path.exists()
 
 

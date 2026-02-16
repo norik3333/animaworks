@@ -6,10 +6,10 @@ import { parseConvSSE, getErrorMessage } from "../shared/sse-parser.js";
 // ── Local State ────────────────────────────
 
 let _container = null;
-let _persons = [];
-let _selectedPerson = null;
+let _animas = [];
+let _selectedAnima = null;
 let _chatHistories = {};
-let _personDetail = null;
+let _animaDetail = null;
 let _activeRightTab = "state";
 let _activeMemoryTab = "episodes";
 let _intervals = [];
@@ -23,10 +23,10 @@ function _$(id) { return document.getElementById(id); }
 
 export function render(container) {
   _container = container;
-  _persons = [];
-  _selectedPerson = null;
+  _animas = [];
+  _selectedAnima = null;
   _chatHistories = {};
-  _personDetail = null;
+  _animaDetail = null;
   _activeRightTab = "state";
   _activeMemoryTab = "episodes";
   _intervals = [];
@@ -36,17 +36,17 @@ export function render(container) {
     <div style="display:flex; gap:1rem; height:calc(100vh - 140px); min-height:400px;">
       <!-- Left: Chat Panel -->
       <div style="flex:1; display:flex; flex-direction:column; min-width:0;">
-        <!-- Person Selector -->
+        <!-- Anima Selector -->
         <div style="display:flex; align-items:center; gap:0.75rem; padding:0.75rem; border-bottom:1px solid var(--border-color, #eee);">
-          <div id="chatPageAvatar" class="person-avatar-container"></div>
-          <select id="chatPagePersonSelect" class="person-dropdown" style="flex:1;">
-            <option value="" disabled selected>パーソンを選択...</option>
+          <div id="chatPageAvatar" class="anima-avatar-container"></div>
+          <select id="chatPageAnimaSelect" class="anima-dropdown" style="flex:1;">
+            <option value="" disabled selected>Animaを選択...</option>
           </select>
         </div>
 
         <!-- Chat Messages -->
         <div id="chatPageMessages" class="chat-messages" style="flex:1; overflow-y:auto; padding:1rem;">
-          <div class="chat-empty">パーソンを選択してチャットを開始</div>
+          <div class="chat-empty">Animaを選択してチャットを開始</div>
         </div>
 
         <!-- Chat Input -->
@@ -75,7 +75,7 @@ export function render(container) {
         <div id="chatRightTabContent" style="flex:1; overflow-y:auto; padding:0.75rem;">
           <!-- State pane (default) -->
           <div id="chatPaneState">
-            <pre class="state-content" id="chatPersonState" style="white-space:pre-wrap; word-break:break-word; margin:0;">パーソンを選択してください</pre>
+            <pre class="state-content" id="chatAnimaState" style="white-space:pre-wrap; word-break:break-word; margin:0;">Animaを選択してください</pre>
           </div>
           <!-- Activity pane -->
           <div id="chatPaneActivity" style="display:none;">
@@ -86,7 +86,7 @@ export function render(container) {
           <!-- History pane -->
           <div id="chatPaneHistory" style="display:none;">
             <div id="chatHistorySessionList">
-              <div class="loading-placeholder">パーソンを選択してください</div>
+              <div class="loading-placeholder">Animaを選択してください</div>
             </div>
             <div id="chatHistoryDetail" style="display:none;">
               <button class="memory-back-btn" id="chatHistoryBackBtn">&larr; 一覧に戻る</button>
@@ -104,7 +104,7 @@ export function render(container) {
             <button class="memory-tab" data-tab="procedures">手順書</button>
           </nav>
           <div id="chatMemoryFileList" class="memory-file-list" style="flex:1; overflow-y:auto; padding:0.5rem;">
-            <div class="loading-placeholder">パーソンを選択してください</div>
+            <div class="loading-placeholder">Animaを選択してください</div>
           </div>
           <div id="chatMemoryContentArea" style="display:none; flex:1; overflow-y:auto; padding:0.5rem;">
             <button class="memory-back-btn" id="chatMemoryBackBtn">&larr; 一覧に戻る</button>
@@ -117,7 +117,7 @@ export function render(container) {
   `;
 
   _bindEvents();
-  _loadPersons();
+  _loadAnimas();
 
   // Auto-refresh activity
   const actInterval = setInterval(_loadActivity, 30000);
@@ -132,19 +132,19 @@ export function destroy() {
   }
   _boundListeners = [];
   _container = null;
-  _persons = [];
-  _selectedPerson = null;
+  _animas = [];
+  _selectedAnima = null;
   _chatHistories = {};
-  _personDetail = null;
+  _animaDetail = null;
 }
 
 // ── Event Binding ──────────────────────────
 
 function _bindEvents() {
-  // Person selector
-  _addListener("chatPagePersonSelect", "change", (e) => {
+  // Anima selector
+  _addListener("chatPageAnimaSelect", "change", (e) => {
     const name = e.target.value;
-    if (name) _selectPerson(name);
+    if (name) _selectAnima(name);
   });
 
   // Chat form submit
@@ -218,27 +218,27 @@ function _addListener(id, event, handler) {
   }
 }
 
-// ── Person Selection ───────────────────────
+// ── Anima Selection ───────────────────────
 
-async function _loadPersons() {
+async function _loadAnimas() {
   try {
-    _persons = await api("/api/persons");
-    _renderPersonDropdown();
-    if (_persons.length > 0 && !_selectedPerson) {
-      _selectPerson(_persons[0].name);
+    _animas = await api("/api/animas");
+    _renderAnimaDropdown();
+    if (_animas.length > 0 && !_selectedAnima) {
+      _selectAnima(_animas[0].name);
     }
   } catch (err) {
-    console.error("Failed to load persons:", err);
+    console.error("Failed to load animas:", err);
   }
 }
 
-function _renderPersonDropdown() {
-  const select = _$("chatPagePersonSelect");
+function _renderAnimaDropdown() {
+  const select = _$("chatPageAnimaSelect");
   if (!select) return;
 
-  let html = '<option value="" disabled>パーソンを選択...</option>';
-  for (const p of _persons) {
-    const selected = p.name === _selectedPerson ? " selected" : "";
+  let html = '<option value="" disabled>Animaを選択...</option>';
+  for (const p of _animas) {
+    const selected = p.name === _selectedAnima ? " selected" : "";
     if (p.status === "bootstrapping" || p.bootstrapping) {
       html += `<option value="${escapeHtml(p.name)}"${selected} disabled>\u23F3 ${escapeHtml(p.name)} (制作中...)</option>`;
     } else if (p.status === "not_found" || p.status === "stopped") {
@@ -251,10 +251,10 @@ function _renderPersonDropdown() {
   select.innerHTML = html;
 }
 
-async function _selectPerson(name) {
-  _selectedPerson = name;
+async function _selectAnima(name) {
+  _selectedAnima = name;
 
-  const select = _$("chatPagePersonSelect");
+  const select = _$("chatPageAnimaSelect");
   if (select) select.value = name;
 
   const input = _$("chatPageInput");
@@ -262,12 +262,12 @@ async function _selectPerson(name) {
   if (input) { input.disabled = false; input.placeholder = `${name} にメッセージ...`; }
   if (sendBtn) sendBtn.disabled = false;
 
-  // Load conversation history + person detail in parallel
+  // Load conversation history + anima detail in parallel
   const needConv = !_chatHistories[name] || _chatHistories[name].length === 0;
   const convPromise = needConv
-    ? api(`/api/persons/${encodeURIComponent(name)}/conversation/full?limit=20`).catch(() => null)
+    ? api(`/api/animas/${encodeURIComponent(name)}/conversation/full?limit=20`).catch(() => null)
     : Promise.resolve(null);
-  const detailPromise = api(`/api/persons/${encodeURIComponent(name)}`).catch(() => null);
+  const detailPromise = api(`/api/animas/${encodeURIComponent(name)}`).catch(() => null);
 
   const [conv, detail] = await Promise.all([convPromise, detailPromise]);
 
@@ -281,13 +281,13 @@ async function _selectPerson(name) {
 
   _renderChat();
 
-  // Apply person detail
+  // Apply anima detail
   if (detail) {
-    _personDetail = detail;
-    _renderPersonState();
+    _animaDetail = detail;
+    _renderAnimaState();
   } else {
-    _personDetail = null;
-    const stateEl = _$("chatPersonState");
+    _animaDetail = null;
+    const stateEl = _$("chatAnimaState");
     if (stateEl) stateEl.textContent = "詳細の読み込み失敗";
   }
 
@@ -301,24 +301,24 @@ async function _selectPerson(name) {
 
 async function _updateAvatar() {
   const container = _$("chatPageAvatar");
-  if (!container || !_selectedPerson) {
+  if (!container || !_selectedAnima) {
     if (container) container.innerHTML = "";
     return;
   }
 
-  const name = _selectedPerson;
+  const name = _selectedAnima;
   const candidates = ["avatar_bustup.png", "avatar_chibi.png"];
   for (const filename of candidates) {
-    const url = `/api/persons/${encodeURIComponent(name)}/assets/${encodeURIComponent(filename)}`;
+    const url = `/api/animas/${encodeURIComponent(name)}/assets/${encodeURIComponent(filename)}`;
     try {
       const resp = await fetch(url, { method: "HEAD" });
       if (resp.ok) {
-        container.innerHTML = `<img src="${escapeHtml(url)}" alt="${escapeHtml(name)}" class="person-avatar-img">`;
+        container.innerHTML = `<img src="${escapeHtml(url)}" alt="${escapeHtml(name)}" class="anima-avatar-img">`;
         return;
       }
     } catch { /* try next */ }
   }
-  container.innerHTML = `<div class="person-avatar-placeholder">${escapeHtml(name.charAt(0).toUpperCase())}</div>`;
+  container.innerHTML = `<div class="anima-avatar-placeholder">${escapeHtml(name.charAt(0).toUpperCase())}</div>`;
 }
 
 // ── Chat Rendering ─────────────────────────
@@ -327,7 +327,7 @@ function _renderChat() {
   const messagesEl = _$("chatPageMessages");
   if (!messagesEl) return;
 
-  const name = _selectedPerson;
+  const name = _selectedAnima;
   const history = _chatHistories[name] || [];
 
   if (history.length === 0) {
@@ -392,12 +392,12 @@ function _submitChat() {
 }
 
 async function _sendChat(message) {
-  const name = _selectedPerson;
+  const name = _selectedAnima;
   if (!name || !message.trim()) return;
 
-  // Guard: block sending to bootstrapping persons
-  const currentPerson = _persons.find((p) => p.name === name);
-  if (currentPerson?.status === "bootstrapping" || currentPerson?.bootstrapping) {
+  // Guard: block sending to bootstrapping animas
+  const currentAnima = _animas.find((p) => p.name === name);
+  if (currentAnima?.status === "bootstrapping" || currentAnima?.bootstrapping) {
     const msgs = _$("chatPageMessages");
     if (msgs) {
       const systemMsg = document.createElement("div");
@@ -427,7 +427,7 @@ async function _sendChat(message) {
   try {
     const currentUser = localStorage.getItem("animaworks_user") || "human";
     const response = await fetch(
-      `/api/persons/${encodeURIComponent(name)}/chat/stream`,
+      `/api/animas/${encodeURIComponent(name)}/chat/stream`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -513,7 +513,7 @@ function _switchRightTab(tab) {
     if (el) el.style.display = key === tab ? "" : "none";
   }
 
-  if (tab === "history" && _selectedPerson) {
+  if (tab === "history" && _selectedAnima) {
     const detail = _$("chatHistoryDetail");
     const list = _$("chatHistorySessionList");
     if (detail) detail.style.display = "none";
@@ -523,13 +523,13 @@ function _switchRightTab(tab) {
   if (tab === "activity") _loadActivity();
 }
 
-// ── Person State ───────────────────────────
+// ── Anima State ───────────────────────────
 
-function _renderPersonState() {
-  const el = _$("chatPersonState");
+function _renderAnimaState() {
+  const el = _$("chatAnimaState");
   if (!el) return;
 
-  const d = _personDetail;
+  const d = _animaDetail;
   if (!d || !d.state) {
     el.textContent = "状態情報なし";
     return;
@@ -546,7 +546,7 @@ const _TYPE_ICONS = {
   system: "\u2699\uFE0F",
 };
 
-function _addLocalActivity(type, personName, summary) {
+function _addLocalActivity(type, animaName, summary) {
   const feed = _$("chatActivityFeed");
   if (!feed) return;
 
@@ -563,7 +563,7 @@ function _addLocalActivity(type, personName, summary) {
     <span class="activity-icon">${icon}</span>
     <span class="activity-time">${ts}</span>
     <div class="activity-body">
-      <span class="activity-person">${escapeHtml(personName)}</span>
+      <span class="activity-anima">${escapeHtml(animaName)}</span>
       <span class="activity-summary"> ${escapeHtml(summary)}</span>
     </div>`;
   feed.appendChild(entry);
@@ -575,10 +575,10 @@ function _addLocalActivity(type, personName, summary) {
 }
 
 async function _loadActivity() {
-  if (!_selectedPerson) return;
+  if (!_selectedAnima) return;
 
   try {
-    const data = await api(`/api/activity/recent?hours=6&person=${encodeURIComponent(_selectedPerson)}`);
+    const data = await api(`/api/activity/recent?hours=6&anima=${encodeURIComponent(_selectedAnima)}`);
     const events = data.events || [];
     const feed = _$("chatActivityFeed");
     if (!feed) return;
@@ -597,7 +597,7 @@ async function _loadActivity() {
           <span class="activity-icon">${icon}</span>
           <span class="activity-time">${escapeHtml(ts)}</span>
           <div class="activity-body">
-            <span class="activity-person">${escapeHtml(evt.person || "")}</span>
+            <span class="activity-anima">${escapeHtml(evt.anima || "")}</span>
             <span class="activity-summary"> ${escapeHtml(summary)}</span>
           </div>
         </div>`;
@@ -611,15 +611,15 @@ async function _loadActivity() {
 
 async function _loadSessionList() {
   const list = _$("chatHistorySessionList");
-  if (!list || !_selectedPerson) {
-    if (list) list.innerHTML = '<div class="loading-placeholder">パーソンを選択してください</div>';
+  if (!list || !_selectedAnima) {
+    if (list) list.innerHTML = '<div class="loading-placeholder">Animaを選択してください</div>';
     return;
   }
 
   list.innerHTML = '<div class="loading-placeholder">読み込み中...</div>';
 
   try {
-    const data = await api(`/api/persons/${encodeURIComponent(_selectedPerson)}/sessions`);
+    const data = await api(`/api/animas/${encodeURIComponent(_selectedAnima)}/sessions`);
     let html = "";
 
     // Active Conversation
@@ -702,13 +702,13 @@ function _showHistoryDetail(title) {
 }
 
 async function _loadActiveConversation() {
-  if (!_selectedPerson) return;
+  if (!_selectedAnima) return;
   _showHistoryDetail("進行中の会話");
   const conv = _$("chatHistoryConversation");
   if (conv) conv.innerHTML = '<div class="loading-placeholder">読み込み中...</div>';
 
   try {
-    const data = await api(`/api/persons/${encodeURIComponent(_selectedPerson)}/conversation/full?limit=50`);
+    const data = await api(`/api/animas/${encodeURIComponent(_selectedAnima)}/conversation/full?limit=50`);
     _renderConversationDetail(data);
   } catch {
     if (conv) conv.innerHTML = '<div class="loading-placeholder">読み込み失敗</div>';
@@ -747,13 +747,13 @@ function _renderConversationDetail(data) {
 }
 
 async function _loadArchivedSession(sessionId) {
-  if (!_selectedPerson) return;
+  if (!_selectedAnima) return;
   _showHistoryDetail(`セッション: ${sessionId}`);
   const conv = _$("chatHistoryConversation");
   if (conv) conv.innerHTML = '<div class="loading-placeholder">読み込み中...</div>';
 
   try {
-    const data = await api(`/api/persons/${encodeURIComponent(_selectedPerson)}/sessions/${encodeURIComponent(sessionId)}`);
+    const data = await api(`/api/animas/${encodeURIComponent(_selectedAnima)}/sessions/${encodeURIComponent(sessionId)}`);
     if (data.markdown) {
       if (conv) conv.innerHTML = `<div class="history-markdown">${renderMarkdown(data.markdown)}</div>`;
     } else if (data.data) {
@@ -779,13 +779,13 @@ async function _loadArchivedSession(sessionId) {
 }
 
 async function _loadTranscript(date) {
-  if (!_selectedPerson) return;
+  if (!_selectedAnima) return;
   _showHistoryDetail(`会話ログ: ${date}`);
   const conv = _$("chatHistoryConversation");
   if (conv) conv.innerHTML = '<div class="loading-placeholder">読み込み中...</div>';
 
   try {
-    const data = await api(`/api/persons/${encodeURIComponent(_selectedPerson)}/transcripts/${encodeURIComponent(date)}`);
+    const data = await api(`/api/animas/${encodeURIComponent(_selectedAnima)}/transcripts/${encodeURIComponent(date)}`);
     _renderConversationDetail(data);
   } catch {
     if (conv) conv.innerHTML = '<div class="loading-placeholder">読み込み失敗</div>';
@@ -793,13 +793,13 @@ async function _loadTranscript(date) {
 }
 
 async function _loadEpisode(date) {
-  if (!_selectedPerson) return;
+  if (!_selectedAnima) return;
   _showHistoryDetail(`エピソード: ${date}`);
   const conv = _$("chatHistoryConversation");
   if (conv) conv.innerHTML = '<div class="loading-placeholder">読み込み中...</div>';
 
   try {
-    const data = await api(`/api/persons/${encodeURIComponent(_selectedPerson)}/episodes/${encodeURIComponent(date)}`);
+    const data = await api(`/api/animas/${encodeURIComponent(_selectedAnima)}/episodes/${encodeURIComponent(date)}`);
     if (conv) conv.innerHTML = `<div class="history-markdown">${renderMarkdown(data.content || "(内容なし)")}</div>`;
   } catch {
     if (conv) conv.innerHTML = '<div class="loading-placeholder">読み込み失敗</div>';
@@ -812,14 +812,14 @@ async function _loadMemoryTab() {
   const fileList = _$("chatMemoryFileList");
   if (!fileList) return;
 
-  if (!_selectedPerson) {
-    fileList.innerHTML = '<div class="loading-placeholder">パーソンを選択してください</div>';
+  if (!_selectedAnima) {
+    fileList.innerHTML = '<div class="loading-placeholder">Animaを選択してください</div>';
     return;
   }
 
   fileList.innerHTML = '<div class="loading-placeholder">読み込み中...</div>';
 
-  const endpoint = `/api/persons/${encodeURIComponent(_selectedPerson)}/${_activeMemoryTab}`;
+  const endpoint = `/api/animas/${encodeURIComponent(_selectedAnima)}/${_activeMemoryTab}`;
 
   try {
     const data = await api(endpoint);
@@ -844,7 +844,7 @@ async function _loadMemoryTab() {
 }
 
 async function _loadMemoryContent(tab, file) {
-  if (!_selectedPerson) return;
+  if (!_selectedAnima) return;
 
   const fileList = _$("chatMemoryFileList");
   const contentArea = _$("chatMemoryContentArea");
@@ -856,7 +856,7 @@ async function _loadMemoryContent(tab, file) {
   if (titleEl) titleEl.textContent = file;
   if (bodyEl) bodyEl.textContent = "読み込み中...";
 
-  const endpoint = `/api/persons/${encodeURIComponent(_selectedPerson)}/${tab}/${encodeURIComponent(file)}`;
+  const endpoint = `/api/animas/${encodeURIComponent(_selectedAnima)}/${tab}/${encodeURIComponent(file)}`;
 
   try {
     const data = await api(endpoint);

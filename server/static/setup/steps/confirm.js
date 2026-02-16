@@ -106,7 +106,7 @@ export async function completeSetup(data) {
   const payload = {
     locale: data.language?.locale || "ja",
     credentials: {},
-    person: { name: data.leader?.name },
+    anima: { name: data.leader?.name },
     user: data.userinfo ? {
       username: data.userinfo.username,
       display_name: data.userinfo.display_name || "",

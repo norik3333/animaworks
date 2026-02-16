@@ -1,5 +1,5 @@
 from __future__ import annotations
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
@@ -72,17 +72,17 @@ class KnowledgeGraph:
 
     # ── Graph construction ──────────────────────────────────────────
 
-    def build_graph(self, person_name: str, knowledge_dir: Path) -> nx.DiGraph:
+    def build_graph(self, anima_name: str, knowledge_dir: Path) -> nx.DiGraph:
         """Build knowledge graph from knowledge files.
 
         Args:
-            person_name: Person name (for collection selection)
+            anima_name: Anima name (for collection selection)
             knowledge_dir: Path to knowledge directory
 
         Returns:
             NetworkX directed graph
         """
-        logger.info("Building knowledge graph for person=%s", person_name)
+        logger.info("Building knowledge graph for anima=%s", anima_name)
 
         graph = nx.DiGraph()
 
@@ -131,7 +131,7 @@ class KnowledgeGraph:
         logger.debug("Added %d explicit edges", graph.number_of_edges())
 
         # Add implicit links (vector similarity)
-        implicit_count = self._add_implicit_links(graph, person_name)
+        implicit_count = self._add_implicit_links(graph, anima_name)
         logger.debug("Added %d implicit edges", implicit_count)
 
         logger.info(
@@ -157,17 +157,17 @@ class KnowledgeGraph:
         matches = re.findall(pattern, content)
         return [m.strip() for m in matches]
 
-    def _add_implicit_links(self, graph: nx.DiGraph, person_name: str) -> int:
+    def _add_implicit_links(self, graph: nx.DiGraph, anima_name: str) -> int:
         """Add implicit links based on vector similarity.
 
         Args:
             graph: NetworkX graph to modify
-            person_name: Person name for collection selection
+            anima_name: Anima name for collection selection
 
         Returns:
             Number of implicit edges added
         """
-        collection_name = f"{person_name}_knowledge"
+        collection_name = f"{anima_name}_knowledge"
         added_count = 0
 
         # For each node, find similar nodes via vector similarity
@@ -191,7 +191,7 @@ class KnowledgeGraph:
                 # Add edges to similar documents
                 for result in results:
                     # Extract target node ID from doc_id
-                    # Format: "{person}/{memory_type}/{filename}#{chunk_index}"
+                    # Format: "{anima}/{memory_type}/{filename}#{chunk_index}"
                     doc_id_parts = result.id.split("/")
                     if len(doc_id_parts) >= 3:
                         filename_with_chunk = doc_id_parts[2]
@@ -290,7 +290,7 @@ class KnowledgeGraph:
     def update_graph_incremental(
         self,
         changed_files: list[Path],
-        person_name: str,
+        anima_name: str,
     ) -> None:
         """Update graph incrementally for changed files.
 
@@ -302,7 +302,7 @@ class KnowledgeGraph:
 
         Args:
             changed_files: List of changed file paths
-            person_name: Person name for collection selection
+            anima_name: Anima name for collection selection
         """
         if self.graph is None:
             logger.warning("No graph to update incrementally")
@@ -376,7 +376,7 @@ class KnowledgeGraph:
                 logger.warning("Failed to re-scan links from %s: %s", node_path, e)
 
         # 4. Re-compute implicit links for changed files
-        collection_name = f"{person_name}_knowledge"
+        collection_name = f"{anima_name}_knowledge"
         for file_path in changed_files:
             if not file_path.exists():
                 continue
@@ -523,7 +523,7 @@ class KnowledgeGraph:
         query_nodes = []
         for result in initial_results:
             # Extract filename from doc_id
-            # Format: "{person}/{memory_type}/{filename}#{chunk_index}"
+            # Format: "{anima}/{memory_type}/{filename}#{chunk_index}"
             doc_id_parts = result.doc_id.split("/")
             if len(doc_id_parts) >= 3:
                 filename_with_chunk = doc_id_parts[2]
@@ -574,7 +574,7 @@ class KnowledgeGraph:
 
             expanded_results.append(
                 RetrievalResult(
-                    doc_id=f"{self.indexer.person_name}/knowledge/{node_id}.md#0",
+                    doc_id=f"{self.indexer.anima_name}/knowledge/{node_id}.md#0",
                     content=content,
                     score=score * 0.5,  # Reduce score for activated nodes
                     metadata={
@@ -617,10 +617,10 @@ class KnowledgeGraph:
 
         # Fallback: try fetching from vector store
         try:
-            collection_name = f"{self.indexer.person_name}_knowledge"
+            collection_name = f"{self.indexer.anima_name}_knowledge"
             # Use a dummy embedding to search by doc_id pattern
             # This is a best-effort fallback
-            doc_id_prefix = f"{self.indexer.person_name}/knowledge/{node_id}.md"
+            doc_id_prefix = f"{self.indexer.anima_name}/knowledge/{node_id}.md"
             embedding = self.indexer._generate_embeddings([node_id])[0]
             results = self.vector_store.query(
                 collection=collection_name,
@@ -639,15 +639,15 @@ class KnowledgeGraph:
 
 
 def create_knowledge_graph(
-    person_name: str,
+    anima_name: str,
     knowledge_dir: Path,
     vector_store,
     indexer,
 ) -> KnowledgeGraph:
-    """Create and build a knowledge graph for a person.
+    """Create and build a knowledge graph for an anima.
 
     Args:
-        person_name: Person name
+        anima_name: Anima name
         knowledge_dir: Path to knowledge directory
         vector_store: VectorStore instance
         indexer: MemoryIndexer instance
@@ -656,5 +656,5 @@ def create_knowledge_graph(
         Built KnowledgeGraph instance
     """
     graph = KnowledgeGraph(vector_store, indexer)
-    graph.build_graph(person_name, knowledge_dir)
+    graph.build_graph(anima_name, knowledge_dir)
     return graph

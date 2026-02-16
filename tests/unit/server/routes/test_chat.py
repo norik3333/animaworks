@@ -7,26 +7,28 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 
-def _make_test_app(persons: dict | None = None, supervisor: MagicMock | None = None):
+def _make_test_app(animas: dict | None = None, supervisor: MagicMock | None = None):
     from fastapi import FastAPI
     from server.routes.chat import create_chat_router
 
     app = FastAPI()
-    persons = persons or {}
-    app.state.persons = persons
+    animas = animas or {}
+    app.state.animas = animas
     app.state.ws_manager = MagicMock()
     app.state.ws_manager.broadcast = AsyncMock()
     if supervisor is not None:
+        supervisor.is_bootstrapping = MagicMock(return_value=False)
         app.state.supervisor = supervisor
     else:
-        # Build a supervisor mock that delegates to person mocks
+        # Build a supervisor mock that delegates to anima mocks
         sup = MagicMock()
-        sup.processes = set(persons.keys())
+        sup.processes = set(animas.keys())
+        sup.is_bootstrapping = MagicMock(return_value=False)
 
-        async def _send_request(person_name, method, params, timeout=60.0):
-            if person_name not in persons:
-                raise KeyError(person_name)
-            p = persons[person_name]
+        async def _send_request(anima_name, method, params, timeout=60.0):
+            if anima_name not in animas:
+                raise KeyError(anima_name)
+            p = animas[anima_name]
             if method == "process_message":
                 result = await p.process_message(
                     params.get("message", ""),
@@ -37,10 +39,10 @@ def _make_test_app(persons: dict | None = None, supervisor: MagicMock | None = N
                 return await p.process_greet()
             raise ValueError(f"Unknown method: {method}")
 
-        async def _send_request_stream(person_name, method, params, timeout=120.0):
-            if person_name not in persons:
-                raise KeyError(person_name)
-            p = persons[person_name]
+        async def _send_request_stream(anima_name, method, params, timeout=120.0):
+            if anima_name not in animas:
+                raise KeyError(anima_name)
+            p = animas[anima_name]
             from core.supervisor.ipc import IPCResponse
             import json as _json
             async for chunk in p.process_message_stream(
@@ -75,72 +77,72 @@ def _make_test_app(persons: dict | None = None, supervisor: MagicMock | None = N
     return app
 
 
-def _make_mock_person(name: str = "alice"):
-    person = MagicMock()
-    person.name = name
-    person.process_message = AsyncMock(return_value="Hello from Alice")
-    return person
+def _make_mock_anima(name: str = "alice"):
+    dp = MagicMock()
+    dp.name = name
+    dp.process_message = AsyncMock(return_value="Hello from Alice")
+    return dp
 
 
-# ── POST /persons/{name}/chat ────────────────────────────
+# ── POST /animas/{name}/chat ────────────────────────────
 
 
 class TestChat:
     async def test_chat_success(self):
-        alice = _make_mock_person("alice")
+        alice = _make_mock_anima("alice")
         app = _make_test_app({"alice": alice})
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.post(
-                "/api/persons/alice/chat",
+                "/api/animas/alice/chat",
                 json={"message": "Hi"},
             )
         assert resp.status_code == 200
         data = resp.json()
         assert data["response"] == "Hello from Alice"
-        assert data["person"] == "alice"
+        assert data["anima"] == "alice"
 
-    async def test_chat_with_from_person(self):
-        alice = _make_mock_person("alice")
+    async def test_chat_with_from_anima(self):
+        alice = _make_mock_anima("alice")
         app = _make_test_app({"alice": alice})
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.post(
-                "/api/persons/alice/chat",
+                "/api/animas/alice/chat",
                 json={"message": "Hi", "from_person": "bob"},
             )
         assert resp.status_code == 200
         alice.process_message.assert_awaited_once_with("Hi", from_person="bob")
 
-    async def test_chat_default_from_person(self):
-        alice = _make_mock_person("alice")
+    async def test_chat_default_from_anima(self):
+        alice = _make_mock_anima("alice")
         app = _make_test_app({"alice": alice})
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.post(
-                "/api/persons/alice/chat",
+                "/api/animas/alice/chat",
                 json={"message": "Hi"},
             )
         alice.process_message.assert_awaited_once_with("Hi", from_person="human")
 
-    async def test_chat_person_not_found(self):
+    async def test_chat_anima_not_found(self):
         app = _make_test_app({})
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.post(
-                "/api/persons/nobody/chat",
+                "/api/animas/nobody/chat",
                 json={"message": "Hi"},
             )
         assert resp.status_code == 404
-        assert resp.json()["detail"] == "Person not found: nobody"
+        assert resp.json()["detail"] == "Anima not found: nobody"
 
     async def test_chat_broadcasts_status(self):
-        alice = _make_mock_person("alice")
+        alice = _make_mock_anima("alice")
         app = _make_test_app({"alice": alice})
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             await client.post(
-                "/api/persons/alice/chat",
+                "/api/animas/alice/chat",
                 json={"message": "Hi"},
             )
 
@@ -150,38 +152,38 @@ class TestChat:
         broadcast_types = [
             call[0][0]["type"] for call in ws.broadcast.call_args_list
         ]
-        assert "person.status" in broadcast_types
+        assert "anima.status" in broadcast_types
         assert "chat.response" not in broadcast_types
 
     async def test_chat_missing_message_field(self):
-        app = _make_test_app({"alice": _make_mock_person()})
+        app = _make_test_app({"alice": _make_mock_anima()})
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.post(
-                "/api/persons/alice/chat",
+                "/api/animas/alice/chat",
                 json={},
             )
         # Pydantic validation error
         assert resp.status_code == 422
 
 
-# ── POST /persons/{name}/chat/stream ─────────────────────
+# ── POST /animas/{name}/chat/stream ─────────────────────
 
 
 class TestChatStream:
-    async def test_stream_person_not_found(self):
+    async def test_stream_anima_not_found(self):
         app = _make_test_app({})
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.post(
-                "/api/persons/nobody/chat/stream",
+                "/api/animas/nobody/chat/stream",
                 json={"message": "Hi"},
             )
         assert resp.status_code == 404
-        assert resp.json()["detail"] == "Person not found: nobody"
+        assert resp.json()["detail"] == "Anima not found: nobody"
 
     async def test_stream_success(self):
-        alice = _make_mock_person("alice")
+        alice = _make_mock_anima("alice")
 
         async def mock_stream(msg, from_person="human"):
             yield {"type": "text_delta", "text": "Hello"}
@@ -193,7 +195,7 @@ class TestChatStream:
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.post(
-                "/api/persons/alice/chat/stream",
+                "/api/animas/alice/chat/stream",
                 json={"message": "Hi"},
             )
         assert resp.status_code == 200
@@ -203,7 +205,7 @@ class TestChatStream:
         assert "event: done" in body
 
     async def test_stream_tool_events(self):
-        alice = _make_mock_person("alice")
+        alice = _make_mock_anima("alice")
 
         async def mock_stream(msg, from_person="human"):
             yield {"type": "tool_start", "tool_name": "web_search", "tool_id": "t1"}
@@ -217,7 +219,7 @@ class TestChatStream:
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.post(
-                "/api/persons/alice/chat/stream",
+                "/api/animas/alice/chat/stream",
                 json={"message": "Hi"},
             )
         body = resp.text
@@ -226,7 +228,7 @@ class TestChatStream:
         assert "event: chain_start" in body
 
     async def test_stream_error_event(self):
-        alice = _make_mock_person("alice")
+        alice = _make_mock_anima("alice")
 
         async def mock_stream(msg, from_person="human"):
             yield {"type": "error", "message": "Something went wrong"}
@@ -237,14 +239,14 @@ class TestChatStream:
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.post(
-                "/api/persons/alice/chat/stream",
+                "/api/animas/alice/chat/stream",
                 json={"message": "Hi"},
             )
         body = resp.text
         assert "event: error" in body
 
     async def test_stream_exception_handling(self):
-        alice = _make_mock_person("alice")
+        alice = _make_mock_anima("alice")
 
         async def mock_stream(msg, from_person="human"):
             raise RuntimeError("unexpected error")
@@ -255,7 +257,7 @@ class TestChatStream:
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.post(
-                "/api/persons/alice/chat/stream",
+                "/api/animas/alice/chat/stream",
                 json={"message": "Hi"},
             )
         body = resp.text
@@ -263,7 +265,7 @@ class TestChatStream:
         assert "Internal server error" in body
 
 
-# ── POST /persons/{name}/greet ──────────────────────────
+# ── POST /animas/{name}/greet ──────────────────────────
 
 
 class TestGreet:
@@ -277,14 +279,14 @@ class TestGreet:
         app = _make_test_app(supervisor=supervisor)
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            resp = await client.post("/api/persons/alice/greet")
+            resp = await client.post("/api/animas/alice/greet")
 
         assert resp.status_code == 200
         data = resp.json()
         assert data["response"] == "こんにちは！待機中です。"
         assert data["emotion"] == "smile"
         assert data["cached"] is False
-        assert data["person"] == "alice"
+        assert data["anima"] == "alice"
 
     async def test_greet_cached(self):
         supervisor = MagicMock()
@@ -296,19 +298,19 @@ class TestGreet:
         app = _make_test_app(supervisor=supervisor)
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            resp = await client.post("/api/persons/alice/greet")
+            resp = await client.post("/api/animas/alice/greet")
 
         assert resp.status_code == 200
         data = resp.json()
         assert data["cached"] is True
 
-    async def test_greet_person_not_found(self):
+    async def test_greet_anima_not_found(self):
         supervisor = MagicMock()
         supervisor.send_request = AsyncMock(side_effect=KeyError("bob"))
         app = _make_test_app(supervisor=supervisor)
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            resp = await client.post("/api/persons/bob/greet")
+            resp = await client.post("/api/animas/bob/greet")
 
         assert resp.status_code == 404
 
@@ -320,10 +322,10 @@ class TestGreet:
         app = _make_test_app(supervisor=supervisor)
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            await client.post("/api/persons/alice/greet")
+            await client.post("/api/animas/alice/greet")
 
         supervisor.send_request.assert_awaited_once_with(
-            person_name="alice",
+            anima_name="alice",
             method="greet",
             params={},
             timeout=60.0,

@@ -1,5 +1,5 @@
 from __future__ import annotations
-# AnimaWorks - Digital Person Framework
+# AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
@@ -33,8 +33,8 @@ sentence_transformers = pytest.importorskip(
 
 
 @pytest.fixture
-def person_dir(tmp_path, monkeypatch):
-    """Create an isolated person directory with ANIMAWORKS_DATA_DIR redirected.
+def anima_dir(tmp_path, monkeypatch):
+    """Create an isolated anima directory with ANIMAWORKS_DATA_DIR redirected.
 
     Ensures core.paths.get_data_dir() resolves to tmp_path so that
     MemoryIndexer can cache models and write index metadata without
@@ -52,56 +52,56 @@ def person_dir(tmp_path, monkeypatch):
     from core.paths import _prompt_cache
     _prompt_cache.clear()
 
-    person = data_dir / "persons" / "test_person"
-    person.mkdir(parents=True)
+    anima_dir = data_dir / "animas" / "test_anima"
+    anima_dir.mkdir(parents=True)
 
     # Create standard subdirectories
     for sub in ("knowledge", "episodes", "skills", "procedures", "state", "vectordb"):
-        (person / sub).mkdir()
+        (anima_dir / sub).mkdir()
 
-    yield person
+    yield anima_dir
 
 
 @pytest.fixture
-def vector_store(person_dir):
-    """Create a ChromaDB vector store persisted under the person's vectordb dir."""
+def vector_store(anima_dir):
+    """Create a ChromaDB vector store persisted under the anima's vectordb dir."""
     from core.memory.rag.store import ChromaVectorStore
 
-    store = ChromaVectorStore(persist_dir=person_dir / "vectordb")
+    store = ChromaVectorStore(persist_dir=anima_dir / "vectordb")
     return store
 
 
 @pytest.fixture
-def indexer(vector_store, person_dir):
-    """Create a MemoryIndexer bound to the test person directory."""
+def indexer(vector_store, anima_dir):
+    """Create a MemoryIndexer bound to the test anima directory."""
     from core.memory.rag.indexer import MemoryIndexer
 
-    return MemoryIndexer(vector_store, "test_person", person_dir)
+    return MemoryIndexer(vector_store, "test_anima", anima_dir)
 
 
 @pytest.fixture
-def retriever(vector_store, indexer, person_dir):
-    """Create a MemoryRetriever for the test person."""
+def retriever(vector_store, indexer, anima_dir):
+    """Create a MemoryRetriever for the test anima."""
     from core.memory.rag.retriever import MemoryRetriever
 
     return MemoryRetriever(
         vector_store,
         indexer,
-        person_dir / "knowledge",
+        anima_dir / "knowledge",
     )
 
 
 # ── Test 1: Index and Search ───────────────────────────────────────
 
 
-def test_e2e_index_and_search(person_dir, indexer, retriever):
+def test_e2e_index_and_search(anima_dir, indexer, retriever):
     """Index knowledge files and verify dense vector search returns correct results.
 
     Creates two knowledge files with distinct topics (Python開発 and 料理レシピ),
     indexes them, and verifies that a query about Python development retrieves the
     correct file with higher relevance.
     """
-    knowledge_dir = person_dir / "knowledge"
+    knowledge_dir = anima_dir / "knowledge"
 
     # Create knowledge files with distinct topics
     (knowledge_dir / "python-dev.md").write_text(
@@ -125,7 +125,7 @@ def test_e2e_index_and_search(person_dir, indexer, retriever):
     # Search for Python-related content
     results = retriever.search(
         query="Pythonでの開発について教えて",
-        person_name="test_person",
+        anima_name="test_anima",
         memory_type="knowledge",
         top_k=3,
     )
@@ -142,14 +142,14 @@ def test_e2e_index_and_search(person_dir, indexer, retriever):
 # ── Test 2: Temporal Decay Ordering ────────────────────────────────
 
 
-def test_e2e_temporal_decay_ordering(person_dir, indexer, retriever):
+def test_e2e_temporal_decay_ordering(anima_dir, indexer, retriever):
     """Verify that newer memories rank higher than older ones with identical content.
 
     Creates two knowledge files with near-identical content but different
     filesystem modification timestamps. After indexing, the file with the more
     recent mtime should receive a higher combined score due to temporal decay.
     """
-    knowledge_dir = person_dir / "knowledge"
+    knowledge_dir = anima_dir / "knowledge"
 
     # Create two files with similar content
     old_file = knowledge_dir / "report-old.md"
@@ -179,7 +179,7 @@ def test_e2e_temporal_decay_ordering(person_dir, indexer, retriever):
     # Search for the common topic
     results = retriever.search(
         query="月次売上レポート",
-        person_name="test_person",
+        anima_name="test_anima",
         memory_type="knowledge",
         top_k=5,
     )
@@ -210,7 +210,7 @@ def test_e2e_temporal_decay_ordering(person_dir, indexer, retriever):
 # ── Test 3: Spreading Activation ──────────────────────────────────
 
 
-def test_e2e_spreading_activation(person_dir, vector_store, indexer):
+def test_e2e_spreading_activation(anima_dir, vector_store, indexer):
     """Verify spreading activation expands search results via knowledge graph links.
 
     Creates three knowledge files where file-A links to file-B via ``[[link]]``
@@ -219,7 +219,7 @@ def test_e2e_spreading_activation(person_dir, vector_store, indexer):
     """
     from core.memory.rag.retriever import MemoryRetriever
 
-    knowledge_dir = person_dir / "knowledge"
+    knowledge_dir = anima_dir / "knowledge"
 
     # Create interconnected files with [[link]] references
     (knowledge_dir / "api-design.md").write_text(
@@ -254,7 +254,7 @@ def test_e2e_spreading_activation(person_dir, vector_store, indexer):
     # Search with spreading activation enabled
     results = retriever.search(
         query="API設計のエラー処理について",
-        person_name="test_person",
+        anima_name="test_anima",
         memory_type="knowledge",
         top_k=2,
         enable_spreading_activation=True,
@@ -293,7 +293,7 @@ def test_e2e_spreading_activation(person_dir, vector_store, indexer):
 # ── Test 4: Graph Cache Persistence ───────────────────────────────
 
 
-def test_e2e_graph_cache_persistence(person_dir, vector_store, indexer):
+def test_e2e_graph_cache_persistence(anima_dir, vector_store, indexer):
     """Verify knowledge graph can be saved and loaded from JSON cache.
 
     Builds a graph, saves it to a cache directory, creates a new
@@ -302,8 +302,8 @@ def test_e2e_graph_cache_persistence(person_dir, vector_store, indexer):
     """
     from core.memory.rag.graph import KnowledgeGraph
 
-    knowledge_dir = person_dir / "knowledge"
-    cache_dir = person_dir / "vectordb"
+    knowledge_dir = anima_dir / "knowledge"
+    cache_dir = anima_dir / "vectordb"
 
     # Create knowledge files with links
     (knowledge_dir / "infra.md").write_text(
@@ -324,7 +324,7 @@ def test_e2e_graph_cache_persistence(person_dir, vector_store, indexer):
 
     # Build and save graph
     graph1 = KnowledgeGraph(vector_store, indexer)
-    graph1.build_graph("test_person", knowledge_dir)
+    graph1.build_graph("test_anima", knowledge_dir)
     graph1.save_graph(cache_dir)
 
     # Verify cache file exists
@@ -364,7 +364,7 @@ def test_e2e_graph_cache_persistence(person_dir, vector_store, indexer):
 # ── Test 5: Incremental Index and Graph ───────────────────────────
 
 
-def test_e2e_incremental_index_and_graph(person_dir, vector_store, indexer, retriever):
+def test_e2e_incremental_index_and_graph(anima_dir, vector_store, indexer, retriever):
     """Verify incremental indexing and graph updates work correctly.
 
     Builds an initial index and graph, then adds a new file. After
@@ -373,7 +373,7 @@ def test_e2e_incremental_index_and_graph(person_dir, vector_store, indexer, retr
     """
     from core.memory.rag.graph import KnowledgeGraph
 
-    knowledge_dir = person_dir / "knowledge"
+    knowledge_dir = anima_dir / "knowledge"
 
     # Create initial files
     (knowledge_dir / "database.md").write_text(
@@ -394,7 +394,7 @@ def test_e2e_incremental_index_and_graph(person_dir, vector_store, indexer, retr
 
     # Build initial graph
     graph = KnowledgeGraph(vector_store, indexer)
-    graph.build_graph("test_person", knowledge_dir)
+    graph.build_graph("test_anima", knowledge_dir)
 
     initial_nodes = graph.graph.number_of_nodes()
     assert initial_nodes == 2
@@ -402,7 +402,7 @@ def test_e2e_incremental_index_and_graph(person_dir, vector_store, indexer, retr
     # Verify initial search works
     results_before = retriever.search(
         query="クエリ最適化",
-        person_name="test_person",
+        anima_name="test_anima",
         memory_type="knowledge",
         top_k=5,
     )
@@ -423,7 +423,7 @@ def test_e2e_incremental_index_and_graph(person_dir, vector_store, indexer, retr
 
     # Incremental graph update
     graph.graph.add_node("query-optimization", path=str(new_file))
-    graph.update_graph_incremental([new_file], "test_person")
+    graph.update_graph_incremental([new_file], "test_anima")
 
     assert graph.graph.number_of_nodes() == initial_nodes + 1
     assert "query-optimization" in graph.graph
@@ -431,7 +431,7 @@ def test_e2e_incremental_index_and_graph(person_dir, vector_store, indexer, retr
     # Search again - new file should appear in results
     results_after = retriever.search(
         query="クエリ最適化とEXPLAIN",
-        person_name="test_person",
+        anima_name="test_anima",
         memory_type="knowledge",
         top_k=5,
     )
@@ -449,19 +449,19 @@ def test_e2e_incremental_index_and_graph(person_dir, vector_store, indexer, retr
 # ── Test 6: Priming Integration ──────────────────────────────────
 
 
-def test_e2e_priming_integration(person_dir, vector_store, indexer):
+def test_e2e_priming_integration(anima_dir, vector_store, indexer):
     """Verify PrimingEngine retrieves memories and formats them for system prompt.
 
-    Creates a Person directory with knowledge, episodes, and skills,
+    Creates an Anima directory with knowledge, episodes, and skills,
     indexes the knowledge, and then uses PrimingEngine to prime memories.
     Validates that format_priming_section() produces a non-empty markdown
     section with the expected structure.
     """
     from core.memory.priming import PrimingEngine, format_priming_section
 
-    knowledge_dir = person_dir / "knowledge"
-    episodes_dir = person_dir / "episodes"
-    skills_dir = person_dir / "skills"
+    knowledge_dir = anima_dir / "knowledge"
+    episodes_dir = anima_dir / "episodes"
+    skills_dir = anima_dir / "skills"
 
     # Create knowledge file
     (knowledge_dir / "project-alpha.md").write_text(
@@ -494,7 +494,7 @@ def test_e2e_priming_integration(person_dir, vector_store, indexer):
     indexer.index_directory(knowledge_dir, "knowledge")
 
     # Create PrimingEngine and prime memories
-    engine = PrimingEngine(person_dir)
+    engine = PrimingEngine(anima_dir)
 
     result = asyncio.run(
         engine.prime_memories(
@@ -535,7 +535,7 @@ def test_e2e_priming_integration(person_dir, vector_store, indexer):
 # ── Test 7: Multi Memory Type ─────────────────────────────────────
 
 
-def test_e2e_multi_memory_type(person_dir, vector_store, indexer):
+def test_e2e_multi_memory_type(anima_dir, vector_store, indexer):
     """Index both knowledge and episodes, then search each type separately.
 
     Verifies that the collection isolation per memory_type works correctly:
@@ -543,8 +543,8 @@ def test_e2e_multi_memory_type(person_dir, vector_store, indexer):
     """
     from core.memory.rag.retriever import MemoryRetriever
 
-    knowledge_dir = person_dir / "knowledge"
-    episodes_dir = person_dir / "episodes"
+    knowledge_dir = anima_dir / "knowledge"
+    episodes_dir = anima_dir / "episodes"
 
     # Create knowledge file about security
     (knowledge_dir / "security-policy.md").write_text(
@@ -581,7 +581,7 @@ def test_e2e_multi_memory_type(person_dir, vector_store, indexer):
     # Search knowledge type
     knowledge_results = retriever.search(
         query="セキュリティ認証の仕組み",
-        person_name="test_person",
+        anima_name="test_anima",
         memory_type="knowledge",
         top_k=5,
     )
@@ -596,7 +596,7 @@ def test_e2e_multi_memory_type(person_dir, vector_store, indexer):
     # Search episodes type
     episodes_results = retriever.search(
         query="セキュリティインシデント対応",
-        person_name="test_person",
+        anima_name="test_anima",
         memory_type="episodes",
         top_k=5,
     )

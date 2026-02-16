@@ -9,13 +9,13 @@ from httpx import ASGITransport, AsyncClient
 
 
 def _make_test_app(
-    person_names: list[str] | None = None,
+    anima_names: list[str] | None = None,
     scheduler: MagicMock | None | object = ...,
 ) -> "FastAPI":  # noqa: F821
     """Create a minimal FastAPI app with the system router for testing.
 
     Args:
-        person_names: List of person names to register.
+        anima_names: List of anima names to register.
         scheduler: Mock scheduler to attach to supervisor.
             Use ``...`` (sentinel) to leave default MagicMock attribute,
             ``None`` to explicitly delete the attribute (no scheduler),
@@ -26,9 +26,9 @@ def _make_test_app(
     from server.routes.system import create_system_router
 
     app = FastAPI()
-    app.state.persons_dir = Path("/tmp/fake/persons")
+    app.state.animas_dir = Path("/tmp/fake/animas")
     app.state.shared_dir = Path("/tmp/fake/shared")
-    app.state.person_names = person_names if person_names is not None else []
+    app.state.anima_names = anima_names if anima_names is not None else []
 
     # Mock supervisor
     supervisor = MagicMock()
@@ -91,9 +91,9 @@ class TestSystemStatusSchedulerRunning:
         data = resp.json()
         assert data["scheduler_running"] is False
 
-    async def test_response_contains_persons_and_processes(self) -> None:
-        """The response should also include persons and processes fields."""
-        app = _make_test_app(person_names=["alice", "bob"])
+    async def test_response_contains_animas_and_processes(self) -> None:
+        """The response should also include animas and processes fields."""
+        app = _make_test_app(anima_names=["alice", "bob"])
         app.state.supervisor.get_all_status.return_value = {
             "alice": {"status": "running", "pid": 1234},
             "bob": {"status": "stopped", "pid": None},
@@ -102,7 +102,7 @@ class TestSystemStatusSchedulerRunning:
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.get("/api/system/status")
         data = resp.json()
-        assert data["persons"] == 2
+        assert data["animas"] == 2
         assert "processes" in data
         assert "alice" in data["processes"]
         assert "bob" in data["processes"]

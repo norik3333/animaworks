@@ -13,8 +13,8 @@ class TestSupervisorSchedulerInit:
     def _make_supervisor(self, tmp_path: Path):
         from core.supervisor.manager import ProcessSupervisor
 
-        persons_dir = tmp_path / "persons"
-        persons_dir.mkdir(exist_ok=True)
+        animas_dir = tmp_path / "animas"
+        animas_dir.mkdir(exist_ok=True)
         shared_dir = tmp_path / "shared"
         shared_dir.mkdir(exist_ok=True)
         run_dir = tmp_path / "run"
@@ -23,7 +23,7 @@ class TestSupervisorSchedulerInit:
         log_dir.mkdir(exist_ok=True)
 
         return ProcessSupervisor(
-            persons_dir=persons_dir,
+            animas_dir=animas_dir,
             shared_dir=shared_dir,
             run_dir=run_dir,
             log_dir=log_dir,
