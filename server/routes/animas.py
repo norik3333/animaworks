@@ -256,7 +256,7 @@ def create_animas_router() -> APIRouter:
         except (json.JSONDecodeError, OSError) as e:
             raise HTTPException(status_code=500, detail=str(e))
 
-    # ── Start (from UI) ──────────────────────────────────────
+    # ── Start / Stop / Restart ────────────────────────────────
 
     @router.post("/animas/{name}/start")
     async def start_anima(name: str, request: Request):
@@ -274,5 +274,37 @@ def create_animas_router() -> APIRouter:
 
         await supervisor.start_anima(name)
         return {"status": "started", "name": name}
+
+    @router.post("/animas/{name}/stop")
+    async def stop_anima(name: str, request: Request):
+        """Stop a specific anima process."""
+        supervisor = request.app.state.supervisor
+        anima_names = request.app.state.anima_names
+
+        if name not in anima_names:
+            raise HTTPException(status_code=404, detail=f"Anima not found: {name}")
+
+        if name not in supervisor.processes:
+            return {"status": "already_stopped", "name": name}
+
+        await supervisor.stop_anima(name)
+        return {"status": "stopped", "name": name}
+
+    @router.post("/animas/{name}/restart")
+    async def restart_anima(name: str, request: Request):
+        """Restart a specific anima process."""
+        supervisor = request.app.state.supervisor
+        anima_names = request.app.state.anima_names
+
+        if name not in anima_names:
+            raise HTTPException(status_code=404, detail=f"Anima not found: {name}")
+
+        await supervisor.restart_anima(name)
+        proc_status = supervisor.get_process_status(name)
+        return {
+            "status": "restarted",
+            "name": name,
+            "pid": proc_status.get("pid"),
+        }
 
     return router
