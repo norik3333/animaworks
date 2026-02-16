@@ -260,12 +260,34 @@ class MemoryIndexer:
         content: str,
         memory_type: str,
     ) -> list[MemoryChunk]:
-        """Split by Markdown ## headings."""
+        """Split by Markdown ## headings.
+
+        Chunks are numbered sequentially starting from 0.  The preamble
+        (content before the first ``##`` heading) is emitted first when
+        it exceeds 50 characters, followed by each heading section.
+        """
         chunks: list[MemoryChunk] = []
         sections = re.split(r"\n(##\s+.+)", content)
 
-        current_section = sections[0].strip()  # Before first heading
+        preamble = sections[0].strip()
+        chunk_idx = 0
 
+        # 1. Preamble (content before first ## heading)
+        if preamble and len(preamble) > 50:
+            chunk_id = self._make_chunk_id(file_path, memory_type, chunk_idx)
+            metadata = self._extract_metadata(
+                file_path, preamble, memory_type, chunk_idx, 1,
+            )
+            chunks.append(
+                MemoryChunk(
+                    id=chunk_id,
+                    content=preamble,
+                    metadata=metadata,
+                )
+            )
+            chunk_idx += 1
+
+        # 2. Heading sections (sequential)
         for i in range(1, len(sections), 2):
             if i + 1 < len(sections):
                 heading = sections[i].strip()
@@ -273,9 +295,9 @@ class MemoryIndexer:
                 section_content = f"{heading}\n\n{body}"
 
                 if section_content.strip():
-                    chunk_id = self._make_chunk_id(file_path, memory_type, i // 2)
+                    chunk_id = self._make_chunk_id(file_path, memory_type, chunk_idx)
                     metadata = self._extract_metadata(
-                        file_path, section_content, memory_type, i // 2, (i // 2) + 1
+                        file_path, section_content, memory_type, chunk_idx, 1,
                     )
                     chunks.append(
                         MemoryChunk(
@@ -284,21 +306,7 @@ class MemoryIndexer:
                             metadata=metadata,
                         )
                     )
-
-        # Add content before first heading as chunk 0 if substantial
-        if current_section and len(current_section) > 50:
-            chunk_id = self._make_chunk_id(file_path, memory_type, 0)
-            metadata = self._extract_metadata(
-                file_path, current_section, memory_type, 0, len(chunks) + 1
-            )
-            chunks.insert(
-                0,
-                MemoryChunk(
-                    id=chunk_id,
-                    content=current_section,
-                    metadata=metadata,
-                ),
-            )
+                    chunk_idx += 1
 
         return chunks
 
