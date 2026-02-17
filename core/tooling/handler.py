@@ -320,7 +320,7 @@ class ToolHandler:
             elif name == "read_dm_history":
                 activity.log("channel_read", channel=f"dm:{args.get('peer', '')}", summary="DM履歴を確認")
             elif name == "call_human":
-                activity.log("human_notify", content=args.get("message", "")[:200], via="configured_channels")
+                activity.log("human_notify", content=args.get("body", "")[:200], via="configured_channels")
             else:
                 activity.log("tool_use", tool=name, summary=str(args)[:200])
         except Exception:

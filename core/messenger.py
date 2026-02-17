@@ -143,28 +143,58 @@ class Messenger:
         return mentions[-limit:]
 
     def read_dm_history(self, peer: str, limit: int = 20) -> list[dict]:
-        """Read DM history with a specific peer."""
+        """Read DM history with a specific peer.
+
+        Reads from unified activity log first, falls back to legacy dm_logs/.
+        """
         _validate_name(peer, "peer name")
-        filepath = self._get_dm_log_path(peer)
-        if not filepath.exists():
-            return []
-        try:
-            lines = filepath.read_text(encoding="utf-8").strip().splitlines()
-        except OSError:
-            logger.warning("Failed to read DM history with: %s", peer)
-            return []
         entries: list[dict] = []
-        for line in reversed(lines):
-            if not line.strip():
-                continue
-            try:
-                entries.append(json.loads(line))
-            except json.JSONDecodeError:
-                continue
-            if len(entries) >= limit:
-                break
-        entries.reverse()
-        return entries
+
+        # New source: unified activity log
+        try:
+            from core.memory.activity import ActivityLogger
+            # Determine anima_dir from shared_dir (shared_dir is {data}/shared,
+            # anima_dir is {data}/animas/{name})
+            anima_dir = self.shared_dir.parent / "animas" / self.anima_name
+            if anima_dir.exists():
+                activity = ActivityLogger(anima_dir)
+                recent = activity.recent(
+                    days=7, limit=limit * 2,
+                    types=["dm_sent", "dm_received", "message_received", "response_sent"],
+                    involving=peer,
+                )
+                for e in recent:
+                    entries.append({
+                        "ts": e.ts,
+                        "from": e.from_person or self.anima_name,
+                        "text": e.content,
+                        "source": "activity_log",
+                    })
+        except Exception:
+            logger.debug("Failed to read DM history from activity log", exc_info=True)
+
+        # Fallback: legacy dm_logs/
+        if len(entries) < limit:
+            filepath = self._get_dm_log_path(peer)
+            if filepath.exists():
+                try:
+                    lines = filepath.read_text(encoding="utf-8").strip().splitlines()
+                except OSError:
+                    logger.warning("Failed to read DM history with: %s", peer)
+                    lines = []
+                for line in reversed(lines):
+                    if not line.strip():
+                        continue
+                    try:
+                        entries.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        continue
+                    if len(entries) >= limit * 2:
+                        break
+
+        # Sort by timestamp and return most recent
+        entries.sort(key=lambda e: e.get("ts", ""))
+        return entries[-limit:]
 
     def _get_dm_log_path(self, peer: str) -> Path:
         """Get DM log file path (pair names sorted alphabetically)."""
