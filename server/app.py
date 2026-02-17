@@ -7,6 +7,7 @@ from __future__ import annotations
 # See LICENSES/AGPL-3.0.txt for the full license text.
 
 
+import asyncio
 import logging
 import time
 import uuid
@@ -167,6 +168,8 @@ async def lifespan(app: FastAPI):
         async def _reconcile_assets_periodic() -> None:
             try:
                 await reconcile_all_assets(app.state.animas_dir)
+            except asyncio.CancelledError:
+                logger.debug("Asset reconciliation cancelled (shutdown)")
             except Exception:
                 logger.exception("Periodic asset reconciliation failed")
 
