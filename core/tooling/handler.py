@@ -580,7 +580,69 @@ class ToolHandler:
             return _error_result("InvalidArguments", "channel and text are required")
         self._messenger.post_channel(channel, text)
         logger.info("post_channel channel=%s anima=%s", channel, self._anima_name)
+
+        # ── Board mention fanout ──────────────────────────────
+        self._fanout_board_mentions(channel, text)
+
         return f"Posted to #{channel}"
+
+    def _fanout_board_mentions(self, channel: str, text: str) -> None:
+        """Send DM notifications to mentioned Animas when posting to a board channel.
+
+        Parses @all and @name mentions from the posted text and delivers
+        board_mention DMs to running Animas (detected via socket files).
+        The posting Anima is always excluded from fanout targets.
+        """
+        if not self._messenger:
+            return
+
+        mentions = re.findall(r"@(\w+)", text)
+        if not mentions:
+            return
+
+        is_all = "all" in mentions
+
+        # Determine running Animas via socket files
+        from core.paths import get_data_dir
+        sockets_dir = get_data_dir() / "run" / "sockets"
+        if sockets_dir.exists():
+            running = {p.stem for p in sockets_dir.glob("*.sock")}
+        else:
+            running = set()
+
+        # Determine fanout targets
+        if is_all:
+            targets = running - {self._anima_name}
+        else:
+            named = {m for m in mentions if m != "all"}
+            targets = (named & running) - {self._anima_name}
+
+        if not targets:
+            return
+
+        from_name = self._anima_name
+        fanout_content = (
+            f"[board_reply:channel={channel},from={from_name}]\n"
+            f"{from_name}さんがボード #{channel} であなたをメンションしました:\n\n"
+            f"{text}\n\n"
+            f'返信するには post_channel(channel="{channel}", text="返信内容") を使ってください。'
+        )
+
+        for target in sorted(targets):
+            try:
+                self._messenger.send(
+                    to=target,
+                    content=fanout_content,
+                    msg_type="board_mention",
+                )
+                logger.info(
+                    "board_mention fanout: %s -> %s (channel=%s)",
+                    from_name, target, channel,
+                )
+            except Exception:
+                logger.warning(
+                    "Failed to fanout board_mention to %s", target, exc_info=True,
+                )
 
     def _handle_read_channel(self, args: dict[str, Any]) -> str:
         if not self._messenger:

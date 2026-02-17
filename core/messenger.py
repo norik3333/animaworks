@@ -214,8 +214,8 @@ class Messenger:
     def receive_and_archive(self) -> list[Message]:
         messages = self.receive()
         if messages:
-            # E: Send read ACK to senders (skip ACK for ack messages to prevent loops)
-            non_ack_messages = [m for m in messages if m.type != "ack"]
+            # E: Send read ACK to senders (skip ACK for ack/board_mention to prevent loops)
+            non_ack_messages = [m for m in messages if m.type not in ("ack", "board_mention")]
             if non_ack_messages:
                 senders: dict[str, list[Message]] = {}
                 for m in non_ack_messages:
