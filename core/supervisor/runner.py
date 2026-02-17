@@ -28,6 +28,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
 from core.anima import DigitalAnima
+from core.memory.streaming_journal import StreamingJournal
 from core.schedule_parser import parse_cron_md, parse_schedule, parse_heartbeat_config
 from core.schemas import CronTask
 from core.supervisor.ipc import IPCServer, IPCRequest, IPCResponse
@@ -122,6 +123,10 @@ class AnimaRunner:
             self.anima.set_on_lock_released(
                 lambda: asyncio.ensure_future(self._on_anima_lock_released())
             )
+
+            # Crash recovery: check for orphaned streaming journal
+            self._recover_streaming_journal()
+
             self._ready_event.set()
 
             # Start autonomous scheduler (heartbeat + cron)
@@ -150,6 +155,76 @@ class AnimaRunner:
 
         finally:
             await self._cleanup()
+
+    def _recover_streaming_journal(self) -> None:
+        """Recover partial response from an orphaned streaming journal.
+
+        If the previous process crashed during streaming, the journal
+        file survives on disk.  Read it, record the partial response in
+        conversation memory, and log the crash event.
+        """
+        if not StreamingJournal.has_orphan(self._anima_dir):
+            return
+
+        recovery = StreamingJournal.recover(self._anima_dir)
+        if recovery is None:
+            return
+
+        logger.warning(
+            "Recovered streaming journal for %s: %d chars, %d tool calls, trigger=%s",
+            self.anima_name,
+            len(recovery.recovered_text),
+            len(recovery.tool_calls),
+            recovery.trigger,
+        )
+
+        # Record recovered text in conversation memory
+        if recovery.recovered_text and self.anima:
+            try:
+                from core.memory.conversation import ConversationMemory
+                conv_memory = ConversationMemory(
+                    self._anima_dir,
+                    self.anima.model_config,
+                )
+                saved_text = (
+                    recovery.recovered_text
+                    + "\n[プロセスクラッシュにより応答が中断されました]"
+                )
+                conv_memory.append_turn("assistant", saved_text)
+                conv_memory.save()
+                logger.info(
+                    "Recovered %d chars into conversation memory for %s",
+                    len(recovery.recovered_text),
+                    self.anima_name,
+                )
+            except Exception:
+                logger.exception(
+                    "Failed to save recovered journal to conversation memory: %s",
+                    self.anima_name,
+                )
+
+        # Record crash event in activity log
+        try:
+            from core.memory.activity import ActivityLogger
+            activity = ActivityLogger(self._anima_dir)
+            activity.log(
+                "error",
+                summary="プロセスクラッシュにより応答が中断されました",
+                meta={
+                    "recovered_chars": len(recovery.recovered_text),
+                    "trigger": recovery.trigger,
+                    "tool_calls": len(recovery.tool_calls),
+                    "from_person": recovery.from_person,
+                    "started_at": recovery.started_at,
+                    "last_event_at": recovery.last_event_at,
+                },
+            )
+        except Exception:
+            logger.debug(
+                "Failed to log crash recovery to activity log: %s",
+                self.anima_name,
+                exc_info=True,
+            )
 
     # ── Event Emission ─────────────────────────────────────────────
 

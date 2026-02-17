@@ -19,6 +19,7 @@ from typing import Any
 from core.agent import AgentCore
 from core.background import BackgroundTask
 from core.memory.activity import ActivityLogger
+from core.memory.streaming_journal import StreamingJournal
 from core.memory.conversation import ConversationMemory
 from core.memory import MemoryManager
 from core.messenger import Messenger
@@ -481,6 +482,13 @@ class DigitalAnima:
                 except Exception:
                     pass
 
+                # Streaming journal: write-ahead log for crash recovery
+                journal = StreamingJournal(self.anima_dir)
+                journal.open(
+                    trigger=f"message:{from_person}",
+                    from_person=from_person,
+                )
+
                 partial_response = ""
                 cycle_done = False
 
@@ -490,7 +498,20 @@ class DigitalAnima:
                         images=images,
                     ):
                         if chunk.get("type") == "text_delta":
-                            partial_response += chunk.get("text", "")
+                            delta_text = chunk.get("text", "")
+                            partial_response += delta_text
+                            journal.write_text(delta_text)
+
+                        if chunk.get("type") == "tool_start":
+                            journal.write_tool_start(
+                                tool=chunk.get("tool_name", ""),
+                                args_summary="",
+                            )
+                        if chunk.get("type") == "tool_end":
+                            journal.write_tool_end(
+                                tool=chunk.get("tool_name", ""),
+                                result_summary="",
+                            )
 
                         if chunk.get("type") == "cycle_done":
                             cycle_done = True
@@ -507,6 +528,9 @@ class DigitalAnima:
                                 activity.log("response_sent", content=summary, to_person=from_person, channel="chat")
                             except Exception:
                                 pass
+
+                            # Finalize streaming journal (deletes the file)
+                            journal.finalize(summary=summary[:500])
 
                             # Fire-and-forget: episode recording
                             asyncio.create_task(
@@ -550,6 +574,8 @@ class DigitalAnima:
                             saved_text = "[応答が中断されました]"
                         conv_memory.append_turn("assistant", saved_text)
                         conv_memory.save()
+                    # Close journal (no-op if already finalized)
+                    journal.close()
                     self._status = "idle"
                     self._current_task = ""
         finally:
@@ -783,11 +809,16 @@ class DigitalAnima:
                     accumulated_text = ""
                     result: CycleResult | None = None
 
+                    # Streaming journal for heartbeat crash recovery
+                    journal = StreamingJournal(self.anima_dir)
+                    journal.open(trigger="heartbeat")
+
                     async for chunk in self.agent.run_cycle_streaming(
                         prompt, trigger="heartbeat"
                     ):
                         # Relay text_delta chunks to waiting user stream
                         if chunk.get("type") == "text_delta":
+                            journal.write_text(chunk.get("text", ""))
                             queue = self._heartbeat_stream_queue
                             if queue is not None:
                                 await queue.put(chunk)
@@ -807,6 +838,7 @@ class DigitalAnima:
                                 ),
                                 total_turns=cycle_result.get("total_turns", 0),
                             )
+                            journal.finalize(summary=result.summary[:500])
 
                     # Send sentinel to close the relay queue
                     queue = self._heartbeat_stream_queue
@@ -885,6 +917,7 @@ class DigitalAnima:
                         await queue.put(None)
                     raise
                 finally:
+                    journal.close()
                     self._status = "idle"
                     self._current_task = ""
                     self._heartbeat_context = ""
