@@ -120,7 +120,7 @@ CHANNEL_TOOLS: list[dict[str, Any]] = [
                 },
                 "text": {
                     "type": "string",
-                    "description": "投稿するメッセージ本文。@名前 でメンション可能",
+                    "description": "投稿するメッセージ本文。@名前 でメンション可能（メンション先にDM通知される）。@all で起動中の全員にDM通知",
                 },
             },
             "required": ["channel", "text"],
