@@ -158,9 +158,10 @@ class HumanNotificationConfig(BaseModel):
 
 
 class ExternalMessagingChannelConfig(BaseModel):
-    """Configuration for a single external messaging platform webhook."""
+    """Configuration for a single external messaging platform."""
 
     enabled: bool = False
+    mode: str = "socket"  # "socket" | "webhook"
     anima_mapping: dict[str, str] = {}  # channel_id → anima_name
 
 

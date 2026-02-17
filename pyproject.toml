@@ -24,7 +24,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-communication = ["requests>=2.31", "slack-sdk>=3.27"]
+communication = ["requests>=2.31", "slack-sdk>=3.27", "slack-bolt>=1.21", "aiohttp>=3.9"]
 notification = ["line-bot-sdk>=3.0"]
 gmail = ["google-api-python-client>=2.0", "google-auth-oauthlib>=1.0", "google-auth-httplib2>=0.2"]
 transcribe = ["faster-whisper>=1.0"]

@@ -167,6 +167,17 @@ async def lifespan(app: FastAPI):
         # ── WebSocket heartbeat ────────────────────────────────
         await app.state.ws_manager.start_heartbeat()
 
+        # ── Slack Socket Mode ─────────────────────────────────
+        try:
+            from server.slack_socket import SlackSocketModeManager
+
+            socket_manager = SlackSocketModeManager()
+            await socket_manager.start()
+            app.state.slack_socket_manager = socket_manager
+        except Exception:
+            logger.exception("Slack Socket Mode startup failed")
+            app.state.slack_socket_manager = None
+
         logger.info("Server started with process isolation")
     else:
         logger.info("Server started in setup mode (setup not yet complete)")
@@ -174,6 +185,8 @@ async def lifespan(app: FastAPI):
     # Shutdown all processes
     if app.state.setup_complete:
         await app.state.ws_manager.stop_heartbeat()
+        if getattr(app.state, "slack_socket_manager", None):
+            await app.state.slack_socket_manager.stop()
         await app.state.supervisor.shutdown_all()
         if hasattr(app.state, "msg_log_scheduler"):
             app.state.msg_log_scheduler.shutdown(wait=False)
