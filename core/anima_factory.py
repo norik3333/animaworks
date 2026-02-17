@@ -369,12 +369,17 @@ def _create_status_json(
         supervisor_raw = info.get("上司", "")
         supervisor = "" if supervisor_raw in ("(なし)", "なし", "-", "") else supervisor_raw
 
-    status = {
+    status: dict[str, object] = {
         "supervisor": supervisor,
         "role": role,
-        "execution_mode": info.get("実行モード", "autonomous"),
         "enabled": True,
     }
+    # Only write execution_mode when explicitly specified in the character sheet.
+    # When omitted, resolve_execution_mode() falls through to
+    # DEFAULT_MODEL_MODE_PATTERNS (e.g. "claude-*" → "A1").
+    explicit_mode = info.get("実行モード")
+    if explicit_mode:
+        status["execution_mode"] = explicit_mode
 
     # Merge role defaults (model config fields)
     for key in ("model", "context_threshold", "max_turns", "max_chains",

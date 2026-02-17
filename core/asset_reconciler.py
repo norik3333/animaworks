@@ -237,28 +237,36 @@ async def reconcile_all_assets(
 
 
 async def _extract_prompt(anima_dir: Path) -> str | None:
-    """Try to extract a generation prompt from the anima's identity.md.
+    """Try to extract a generation prompt from the anima's files.
 
     Fallback chain:
       1. Regex match for explicit ``image_prompt:`` / ``外見:`` fields
+         (searches identity.md, then character_sheet.md)
       2. Cached ``assets/prompt.txt`` from a previous LLM synthesis
-      3. LLM synthesis from the appearance table in identity.md
+      3. LLM synthesis — pass the full character document to LLM which
+         extracts visual appearance and converts to NovelAI tags.
+         Tries character_sheet.md first, then identity.md.
     """
-    identity_path = anima_dir / "identity.md"
-    if not identity_path.exists():
-        return None
+    # Collect candidate texts: identity.md first, then character_sheet.md
+    candidates: list[str] = []
+    for filename in ("identity.md", "character_sheet.md"):
+        path = anima_dir / filename
+        if path.exists():
+            candidates.append(path.read_text(encoding="utf-8"))
 
-    text = identity_path.read_text(encoding="utf-8")
+    if not candidates:
+        return None
 
     # Step 1: Look for a dedicated image_prompt / appearance field
     patterns = [
         r"(?:image[_ ]?prompt|画像プロンプト|外見|appearance)\s*[:\uff1a]\s*(.+)",
         r"(?:キャラクターデザイン|character[_ ]?design)\s*[:\uff1a]\s*(.+)",
     ]
-    for pattern in patterns:
-        match = re.search(pattern, text, re.IGNORECASE)
-        if match:
-            return match.group(1).strip()
+    for text in candidates:
+        for pattern in patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                return match.group(1).strip()
 
     # Step 2: Check cached prompt from previous LLM synthesis
     prompt_cache = anima_dir / "assets" / "prompt.txt"
@@ -271,81 +279,107 @@ async def _extract_prompt(anima_dir: Path) -> str | None:
             )
             return cached
 
-    # Step 3: Extract appearance table and synthesize via LLM
-    appearance = _extract_appearance_table(text)
-    if not appearance:
-        return None
+    # Step 3: Pass the richest available document to LLM for synthesis.
+    # Prefer character_sheet.md (has appearance info), fall back to identity.md.
+    for text in reversed(candidates):
+        result = await _synthesize_prompt_via_llm(anima_dir, text)
+        if result:
+            return result
 
-    return await _synthesize_prompt_via_llm(anima_dir, appearance)
-
-
-# ── Appearance extraction ─────────────────────────────────────
-
-# Fields in the identity.md profile table that describe visual appearance.
-_APPEARANCE_FIELDS: frozenset[str] = frozenset({
-    "髪型", "髪色", "瞳の色", "顔タイプ", "身長", "体重",
-    "スリーサイズ", "イメージカラー",
-})
-
-
-def _extract_appearance_table(text: str) -> str | None:
-    """Extract appearance-related rows from the profile table in identity.md.
-
-    Looks for Markdown table rows (``| key | value |``) where the key
-    matches a known appearance field.  Returns the matching rows as a
-    single string, or ``None`` if no appearance data is found.
-    """
-    rows: list[str] = []
-    for line in text.splitlines():
-        m = re.match(r"\|\s*(.+?)\s*\|\s*(.+?)\s*\|", line)
-        if not m:
-            continue
-        key = m.group(1).strip()
-        if key in _APPEARANCE_FIELDS:
-            rows.append(f"{key}: {m.group(2).strip()}")
-    return "\n".join(rows) if rows else None
+    return None
 
 
 # ── LLM prompt synthesis ──────────────────────────────────────
 
 _SYNTHESIS_SYSTEM_PROMPT = """\
-You are an expert at converting Japanese character appearance descriptions \
-into NovelAI-compatible anime image generation tags.
+You are an expert at reading Japanese character sheets and converting \
+visual appearance into high-quality NovelAI V4.5 image generation prompts.
 
-Rules:
-- Output ONLY a comma-separated tag string, nothing else.
-- Always begin with quality/style tags: \
+## Image Generation Pipeline Reference
+
+Target: NovelAI V4.5 (nai-diffusion-4-5-full), Danbooru tag system.
+The generated prompt will be used as the base_caption in v4_prompt.
+NovelAI's qualityToggle is enabled server-side, which auto-prepends \
+additional quality boosters — but you MUST still include quality tags \
+in your output for maximum effect (they stack, not conflict).
+After full-body generation, the image is passed to Flux Kontext for \
+bust-up and chibi variants, so the full-body pose/composition matters.
+
+## Task
+
+The input is a full character sheet in Markdown. It contains personality, \
+hobbies, skills, backstory, and visual appearance mixed together. \
+Extract ONLY the visual appearance and convert to Danbooru-style tags.
+
+## Quality Tags (MANDATORY — always include first)
+
 masterpiece, best quality, very aesthetic, absurdres, \
 anime coloring, clean lineart, soft shading
-- Then 1girl or 1boy.
-- Use plain English color names, NOT gemstone metaphors \
-  (サファイアブルー → blue, エメラルドグリーン → green).
-- Decompose compound descriptions into atomic tags \
-  (ショートボブ、前髪ぱっつん → short hair, bob cut, blunt bangs).
-- Translate hair accessories (ピン → hair clip, リボン → hair ribbon).
-- Omit non-visual traits (personality, hobbies).
+
+These quality tags are critical for high-quality output. Never omit them.
+
+## Tag Rules
+
+- Output ONLY a comma-separated tag string, nothing else.
+- Start with the quality tags above, then 1girl or 1boy.
+- Use Danbooru tag conventions (lowercase, underscores optional).
+- Use plain English color names, NOT gemstone/poetic metaphors \
+  (サファイアブルー → blue eyes, エメラルドグリーン → green eyes, \
+   ハニーブラウン → light brown, プラチナブロンド → platinum blonde).
+- Decompose compound descriptions into atomic Danbooru tags \
+  (ショートボブ、前髪ぱっつん → short hair, bob cut, blunt bangs; \
+   ロングヘア、ツインテール → long hair, twintails).
+- Translate accessories to Danbooru tags \
+  (ピン → hair clip, リボン → hair ribbon, サイド留め → hair clip).
+- Include body type cues when available \
+  (petite, slender, medium breasts, etc.).
+- Include eye shape/expression when described \
+  (narrow eyes, round eyes, tareme, tsurime).
+- Ignore all non-visual traits (personality, hobbies, skills, backstory).
 - Height/weight: omit unless notably tall/short (use tall or petite).
 - Always end with: full body, standing, white background, looking at viewer
 - All tags lowercase, separated by comma + space.
+- If the document contains no visual appearance information at all, \
+output exactly: NO_APPEARANCE_DATA
 
-Example input:
-髪型: ロングヘア、ツインテール
-髪色: 黒
-瞳の色: 赤
-顔タイプ: クール系
+## Examples
 
-Example output:
+Input (excerpt):
+- 髪型: 明るいボブカット。元気な印象のサイド留め
+- 髪色: ハニーブラウン
+- 瞳の色: ウォームブラウン
+- 顔タイプ: 明るく親しみやすい可愛い系。くりっとした目、よく笑う
+- 身長: 155cm
+
+Output:
 masterpiece, best quality, very aesthetic, absurdres, \
 anime coloring, clean lineart, soft shading, \
-1girl, black hair, long hair, twintails, red eyes, cool expression, \
+1girl, light brown hair, short hair, bob cut, hair clip, \
+brown eyes, round eyes, cute face, friendly expression, smile, petite, \
+full body, standing, white background, looking at viewer
+
+Input (excerpt):
+- 髪型: ロングストレート、ローポニーテール
+- 髪色: 黒
+- 瞳の色: 赤
+- 顔タイプ: クール系、切れ長の目、端正な顔立ち
+
+Output:
+masterpiece, best quality, very aesthetic, absurdres, \
+anime coloring, clean lineart, soft shading, \
+1girl, black hair, very long hair, straight hair, low ponytail, \
+red eyes, narrow eyes, beautiful, elegant, refined features, \
 full body, standing, white background, looking at viewer"""
 
 
 async def _synthesize_prompt_via_llm(
     anima_dir: Path,
-    appearance: str,
+    character_text: str,
 ) -> str | None:
-    """Call the Anima's LLM to convert appearance text into NovelAI tags.
+    """Call LLM to extract appearance from a character sheet into NovelAI tags.
+
+    The LLM reads the full character document, picks out visual traits,
+    and returns a comma-separated tag string.
 
     On success the result is cached to ``assets/prompt.txt``.
     On failure returns ``None`` (logs the error, does not raise).
@@ -371,8 +405,9 @@ async def _synthesize_prompt_via_llm(
             {
                 "role": "user",
                 "content": (
-                    "以下の外見情報を NovelAI 互換タグに変換してください:\n\n"
-                    + appearance
+                    "以下のキャラクターシートから外見情報を読み取り、"
+                    "NovelAI 互換の画像生成タグに変換してください:\n\n"
+                    + character_text
                 ),
             },
         ],
@@ -396,7 +431,7 @@ async def _synthesize_prompt_via_llm(
         )
         return None
 
-    if not result:
+    if not result or result == "NO_APPEARANCE_DATA":
         return None
 
     # Cache result to assets/prompt.txt
