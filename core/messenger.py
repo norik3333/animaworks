@@ -104,6 +104,26 @@ class Messenger:
     def receive_and_archive(self) -> list[Message]:
         messages = self.receive()
         if messages:
+            # E: Send read ACK to senders (skip ACK for ack messages to prevent loops)
+            non_ack_messages = [m for m in messages if m.type != "ack"]
+            if non_ack_messages:
+                senders: dict[str, list[Message]] = {}
+                for m in non_ack_messages:
+                    senders.setdefault(m.from_person, []).append(m)
+                for sender, sender_msgs in senders.items():
+                    summary = ", ".join(m.content[:50] for m in sender_msgs[:3])
+                    if len(sender_msgs) > 3:
+                        summary += f" (+{len(sender_msgs) - 3}件)"
+                    try:
+                        self.send(
+                            to=sender,
+                            content=f"[既読通知] {len(sender_msgs)}件のメッセージを受信しました: {summary}",
+                            msg_type="ack",
+                        )
+                    except Exception:
+                        logger.debug(
+                            "Failed to send read ACK to %s", sender, exc_info=True,
+                        )
             self.archive_all()
         return messages
 

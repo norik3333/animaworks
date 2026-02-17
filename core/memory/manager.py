@@ -148,6 +148,38 @@ class MemoryManager:
     def read_heartbeat_config(self) -> str:
         return self._read(self.anima_dir / "heartbeat.md")
 
+    def load_recent_heartbeat_summary(self, limit: int = 5) -> str:
+        """Load recent heartbeat summaries for dialogue context injection."""
+        import json as _json
+
+        history_dir = self.anima_dir / "shortterm" / "heartbeat_history"
+        if not history_dir.exists():
+            return ""
+
+        lines: list[str] = []
+        for f in sorted(history_dir.glob("*.jsonl"), reverse=True)[:3]:
+            file_lines = f.read_text(encoding="utf-8").strip().splitlines()
+            lines = file_lines + lines
+            if len(lines) >= limit:
+                break
+
+        if not lines:
+            return ""
+
+        entries: list[str] = []
+        for line in lines[-limit:]:
+            try:
+                e = _json.loads(line)
+                ts = e.get("timestamp", "?")
+                action = e.get("action", "?")
+                summary = e.get("summary", "")[:300]
+                if "HEARTBEAT_OK" not in summary:
+                    entries.append(f"- {ts}: [{action}] {summary}")
+            except (_json.JSONDecodeError, KeyError):
+                continue
+
+        return "\n".join(entries)
+
     def read_cron_config(self) -> str:
         return self._read(self.anima_dir / "cron.md")
 

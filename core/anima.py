@@ -705,6 +705,26 @@ class DigitalAnima:
                         "heartbeat_history", history=history_text,
                     ))
 
+                # A-1: Inject recent dialogue context for cross-session continuity
+                try:
+                    conv_mem = ConversationMemory(self.anima_dir, self.model_config)
+                    state = conv_mem.load()
+                    recent_turns = state.turns[-5:] if state.turns else []
+                    if recent_turns:
+                        conv_lines = []
+                        for t in recent_turns:
+                            snippet = t.content[:200]
+                            conv_lines.append(f"- [{t.role}] {snippet}")
+                        conv_summary = "\n".join(conv_lines)
+                        parts.append(
+                            f"## 直近の対話履歴\n\n"
+                            f"以下はユーザーとの直近の対話です。"
+                            f"進行中のタスクや指示がある場合、この内容を考慮してください。\n\n"
+                            f"{conv_summary}"
+                        )
+                except Exception:
+                    logger.debug("[%s] Failed to load dialogue context for heartbeat", self.name, exc_info=True)
+
                 # Read unread messages but do NOT archive yet.
                 # Messages stay in inbox until the agent replies to each sender.
                 unread_count = 0
@@ -777,6 +797,18 @@ class DigitalAnima:
 
                     self._last_activity = datetime.now()
                     self._save_heartbeat_history(result)
+
+                    # A-3: Record important heartbeat actions to episodes
+                    if result.summary and "HEARTBEAT_OK" not in result.summary:
+                        ts = datetime.now().strftime("%H:%M")
+                        episode_entry = (
+                            f"## {ts} ハートビート活動\n\n"
+                            f"{result.summary[:500]}"
+                        )
+                        try:
+                            self.memory.append_episode(episode_entry)
+                        except Exception:
+                            logger.debug("[%s] Failed to record heartbeat episode", self.name, exc_info=True)
 
                     # Archive all messages that were injected into the prompt.
                     # In A1 mode agents send replies via Bash (not the

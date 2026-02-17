@@ -307,12 +307,29 @@ def build_system_prompt(
         parts.append(permissions)
 
     state = memory.read_current_state()
-    if state:
+    if state and state.strip() != "status: idle":
+        parts.append(
+            "## ⚠️ 進行中タスク（MUST: 最優先で確認すること）\n\n"
+            "以下のタスクが進行中です。状態を確認し、このタスクの続きから開始してください。\n"
+            "「idle」「待機中」と判定する前に、必ずこの内容を確認すること。\n\n"
+            f"{state}"
+        )
+    elif state:
         parts.append(f"## 現在の状態\n\n{state}")
 
     pending = memory.read_pending()
     if pending:
         parts.append(f"## 未完了タスク\n\n{pending}")
+
+    # A-2: Inject recent heartbeat activity summary for cross-session continuity
+    hb_summary = memory.load_recent_heartbeat_summary(limit=5)
+    if hb_summary:
+        parts.append(
+            "## 直近のハートビート活動\n\n"
+            "以下は最近のハートビートで行った活動です。"
+            "対話の文脈として考慮してください。\n\n"
+            f"{hb_summary}"
+        )
 
     # Priming section (automatic memory recall)
     if priming_section:
