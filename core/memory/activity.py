@@ -51,7 +51,13 @@ class ActivityEntry:
     def to_dict(self) -> dict[str, Any]:
         """Serialise to a JSON-safe dict, omitting empty fields."""
         d = asdict(self)
-        return {k: v for k, v in d.items() if v}
+        d = {k: v for k, v in d.items() if v}
+        # Rename Python field names to JSONL keys (avoid Python reserved word 'from')
+        if "from_person" in d:
+            d["from"] = d.pop("from_person")
+        if "to_person" in d:
+            d["to"] = d.pop("to_person")
+        return d
 
 
 # ── ActivityLogger ────────────────────────────────────────────
@@ -170,6 +176,11 @@ class ActivityLogger:
                         continue
                     if involving and not self._involves(raw, involving):
                         continue
+                    # Map JSONL keys to Python field names
+                    if "from" in raw:
+                        raw["from_person"] = raw.pop("from")
+                    if "to" in raw:
+                        raw["to_person"] = raw.pop("to")
                     entries.append(ActivityEntry(**{
                         k: v for k, v in raw.items()
                         if k in ActivityEntry.__dataclass_fields__
@@ -190,8 +201,8 @@ class ActivityLogger:
     def _involves(raw: dict[str, Any], name: str) -> bool:
         """Return True if *name* appears in from/to/channel fields."""
         return (
-            raw.get("from_person") == name
-            or raw.get("to_person") == name
+            raw.get("from", raw.get("from_person")) == name
+            or raw.get("to", raw.get("to_person")) == name
             or raw.get("channel") == name
         )
 

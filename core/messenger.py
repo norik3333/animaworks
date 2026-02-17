@@ -201,23 +201,6 @@ class Messenger:
         pair = sorted([self.anima_name, peer])
         return self.shared_dir / "dm_logs" / f"{pair[0]}-{pair[1]}.jsonl"
 
-    def _append_dm_log(self, peer: str, text: str, source: str = "anima") -> None:
-        """Append a message to the DM log for this peer."""
-        dm_logs_dir = self.shared_dir / "dm_logs"
-        dm_logs_dir.mkdir(parents=True, exist_ok=True)
-        filepath = self._get_dm_log_path(peer)
-        entry = json.dumps({
-            "ts": datetime.now().isoformat(),
-            "from": self.anima_name,
-            "text": text,
-            "source": source,
-        }, ensure_ascii=False)
-        try:
-            with filepath.open("a", encoding="utf-8") as f:
-                f.write(entry + "\n")
-        except OSError:
-            logger.warning("Failed to append DM log: %s", filepath)
-
     def receive(self) -> list[Message]:
         messages: list[Message] = []
         for f in sorted(self.inbox_dir.glob("*.json")):

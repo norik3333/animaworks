@@ -139,16 +139,6 @@ class TestLoadSave:
 
 
 class TestTranscript:
-    def test_append_transcript(self, conv, anima_dir):
-        conv._append_transcript("human", "hello", "2026-01-15T10:00:00")
-        path = anima_dir / "transcripts" / "2026-01-15.jsonl"
-        assert path.exists()
-        lines = path.read_text(encoding="utf-8").strip().split("\n")
-        assert len(lines) == 1
-        data = json.loads(lines[0])
-        assert data["role"] == "human"
-        assert data["content"] == "hello"
-
     def test_list_transcript_dates(self, conv, anima_dir):
         (anima_dir / "transcripts" / "2026-01-15.jsonl").write_text(
             '{"role":"human","content":"a","timestamp":"ts"}\n', encoding="utf-8"

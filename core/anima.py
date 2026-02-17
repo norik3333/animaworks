@@ -206,38 +206,28 @@ class DigitalAnima:
 
     # ── Heartbeat history ────────────────────────────────────
 
-    _HEARTBEAT_HISTORY_DIR = "shortterm/heartbeat_history"
     _HEARTBEAT_HISTORY_N = 3
 
     def _load_heartbeat_history(self) -> str:
-        """Load last N heartbeat history entries as formatted text."""
-        history_dir = self.anima_dir / self._HEARTBEAT_HISTORY_DIR
-        if not history_dir.exists():
-            # Fallback: check legacy single-file format
-            legacy = self.anima_dir / "shortterm" / "heartbeat_history.jsonl"
-            if not legacy.exists():
+        """Load last N heartbeat history entries from unified activity log."""
+        try:
+            activity = ActivityLogger(self.anima_dir)
+            entries = activity.recent(
+                days=2,
+                types=["heartbeat_end"],
+                limit=self._HEARTBEAT_HISTORY_N,
+            )
+            if not entries:
                 return ""
-            lines = legacy.read_text(encoding="utf-8").strip().splitlines()
-        else:
-            # Read from most recent log files
-            log_files = sorted(history_dir.glob("*.jsonl"), reverse=True)
-            lines = []
-            for f in log_files[:3]:  # Check last 3 days max
-                file_lines = f.read_text(encoding="utf-8").strip().splitlines()
-                lines = file_lines + lines
-                if len(lines) >= self._HEARTBEAT_HISTORY_N:
-                    break
-
-        entries: list[str] = []
-        for line in lines[-self._HEARTBEAT_HISTORY_N:]:
-            try:
-                e = json.loads(line)
-                entries.append(
-                    f"- {e['timestamp']}: [{e['action']}] {e['summary'][:200]}"
-                )
-            except (json.JSONDecodeError, KeyError):
-                continue
-        return "\n".join(entries)
+            lines: list[str] = []
+            for e in entries:
+                ts_short = e.ts[11:19] if len(e.ts) >= 19 else e.ts
+                summary = (e.summary or e.content)[:200]
+                lines.append(f"- {ts_short}: {summary}")
+            return "\n".join(lines)
+        except Exception:
+            logger.exception("[%s] Failed to load heartbeat history", self.name)
+            return ""
 
     @property
     def needs_bootstrap(self) -> bool:
@@ -369,8 +359,18 @@ class DigitalAnima:
                         self.name, result.duration_ms,
                     )
                     return result.summary
-                except Exception:
+                except Exception as exc:
                     logger.exception("[%s] process_message FAILED", self.name)
+                    # Activity log: error
+                    try:
+                        activity = ActivityLogger(self.anima_dir)
+                        activity.log(
+                            "error",
+                            summary=f"process_messageエラー: {type(exc).__name__}",
+                            meta={"phase": "process_message", "error": str(exc)[:200]},
+                        )
+                    except Exception:
+                        pass
                     # Save error marker so the failed exchange is visible
                     conv_memory.append_turn(
                         "assistant", "[ERROR: エージェント実行中にエラーが発生しました]"
@@ -560,6 +560,16 @@ class DigitalAnima:
                         error_code = "LLM_ERROR"
                     else:
                         error_code = "STREAM_ERROR"
+                    # Activity log: error
+                    try:
+                        activity = ActivityLogger(self.anima_dir)
+                        activity.log(
+                            "error",
+                            summary=f"process_message_streamエラー: {type(exc).__name__}",
+                            meta={"phase": "process_message_stream", "error_code": error_code, "error": str(exc)[:200]},
+                        )
+                    except Exception:
+                        pass
                     yield {
                         "type": "error",
                         "code": error_code,
@@ -909,8 +919,18 @@ class DigitalAnima:
                         self.name, result.duration_ms, unread_count,
                     )
                     return result
-                except Exception:
+                except Exception as exc:
                     logger.exception("[%s] run_heartbeat FAILED", self.name)
+                    # Activity log: error
+                    try:
+                        activity = ActivityLogger(self.anima_dir)
+                        activity.log(
+                            "error",
+                            summary=f"run_heartbeatエラー: {type(exc).__name__}",
+                            meta={"phase": "run_heartbeat", "error": str(exc)[:200]},
+                        )
+                    except Exception:
+                        pass
                     # Send sentinel to close the relay queue on error
                     queue = self._heartbeat_stream_queue
                     if queue is not None:
@@ -962,10 +982,20 @@ class DigitalAnima:
                         self.name, task_name, result.duration_ms,
                     )
                     return result
-                except Exception:
+                except Exception as exc:
                     logger.exception(
                         "[%s] run_cron_task FAILED task=%s", self.name, task_name,
                     )
+                    # Activity log: error
+                    try:
+                        activity = ActivityLogger(self.anima_dir)
+                        activity.log(
+                            "error",
+                            summary=f"run_cron_taskエラー: {type(exc).__name__}",
+                            meta={"phase": "run_cron_task", "error": str(exc)[:200]},
+                        )
+                    except Exception:
+                        pass
                     raise
                 finally:
                     self._status = "idle"
@@ -1032,12 +1062,22 @@ class DigitalAnima:
 
                     self._last_activity = datetime.now()
 
-                except Exception as e:
-                    stderr = f"{type(e).__name__}: {e}"
+                except Exception as exc:
+                    stderr = f"{type(exc).__name__}: {exc}"
                     exit_code = 1
                     logger.exception(
                         "[%s] run_cron_command FAILED task=%s", self.name, task_name
                     )
+                    # Activity log: error
+                    try:
+                        activity = ActivityLogger(self.anima_dir)
+                        activity.log(
+                            "error",
+                            summary=f"run_cron_commandエラー: {type(exc).__name__}",
+                            meta={"phase": "run_cron_command", "error": str(exc)[:200]},
+                        )
+                    except Exception:
+                        pass
                 finally:
                     self._status = "idle"
                     self._current_task = ""
@@ -1052,6 +1092,19 @@ class DigitalAnima:
                 stderr=stderr,
                 duration_ms=duration_ms,
             )
+
+            # Activity log: cron command executed (intentionally logs even on
+            # failure — exit_code captures the error state, unlike run_cron_task
+            # which re-raises and never reaches this point on error)
+            try:
+                activity = ActivityLogger(self.anima_dir)
+                activity.log(
+                    "cron_executed",
+                    summary=f"コマンド: {task_name}",
+                    meta={"task_name": task_name, "exit_code": exit_code, "command": command or "", "tool": tool or ""},
+                )
+            except Exception:
+                pass
 
             logger.info(
                 "[%s] run_cron_command END task=%s exit_code=%d duration_ms=%d",

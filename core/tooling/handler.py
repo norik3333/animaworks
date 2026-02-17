@@ -450,6 +450,17 @@ class ToolHandler:
             args["path"], args.get("mode", "overwrite"),
         )
 
+        # Activity log: memory write
+        try:
+            activity = ActivityLogger(self._anima_dir)
+            activity.log(
+                "memory_write",
+                summary=f"{rel} ({args.get('mode', 'overwrite')})",
+                meta={"path": rel, "mode": args.get("mode", "overwrite")},
+            )
+        except Exception:
+            pass
+
         # Trigger schedule reload if heartbeat or cron config changed
         if args["path"] in ("heartbeat.md", "cron.md") and self._on_schedule_changed:
             try:

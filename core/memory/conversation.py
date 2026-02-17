@@ -150,31 +150,6 @@ class ConversationMemory:
         """Return True if *date* looks like YYYY-MM-DD."""
         return bool(re.fullmatch(r"\d{4}-\d{2}-\d{2}", date))
 
-    def _append_transcript(
-        self,
-        role: str,
-        content: str,
-        timestamp: str,
-        attachments: list[str] | None = None,
-    ) -> None:
-        """Append a message to the permanent daily transcript (JSONL)."""
-        try:
-            self._transcript_dir.mkdir(parents=True, exist_ok=True)
-            date_str = timestamp[:10] if len(timestamp) >= 10 else datetime.now().strftime("%Y-%m-%d")
-            if not self._valid_date(date_str):
-                date_str = datetime.now().strftime("%Y-%m-%d")
-            path = self._transcript_dir / f"{date_str}.jsonl"
-            entry_data: dict[str, Any] = {
-                "role": role, "content": content, "timestamp": timestamp,
-            }
-            if attachments:
-                entry_data["attachments"] = attachments
-            entry = json.dumps(entry_data, ensure_ascii=False)
-            with open(path, "a", encoding="utf-8") as f:
-                f.write(entry + "\n")
-        except Exception:
-            logger.exception("Failed to append transcript for %s", self.anima_name)
-
     def list_transcript_dates(self) -> list[str]:
         """Return sorted list of dates that have transcript files (newest first)."""
         if not self._transcript_dir.exists():

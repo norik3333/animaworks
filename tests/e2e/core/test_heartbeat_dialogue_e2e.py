@@ -137,17 +137,17 @@ class TestCrossContextFlow:
         """_load_heartbeat_history reads back persisted entries."""
         # Write entries directly to heartbeat_history/ (legacy format)
         history_dir = anima_dir / "shortterm" / "heartbeat_history"
-        history_dir.mkdir(parents=True, exist_ok=True)
+        # Write heartbeat_end entries to unified activity log
+        activity_dir = anima_dir / "activity_log"
+        activity_dir.mkdir(parents=True, exist_ok=True)
         entries = []
         for i in range(5):
             entries.append(json.dumps({
-                "timestamp": f"2026-02-17T{10 + i:02d}:00:00",
-                "trigger": "heartbeat",
-                "action": "checked",
+                "ts": f"2026-02-17T{10 + i:02d}:00:00",
+                "type": "heartbeat_end",
                 "summary": f"HB action {i}",
-                "duration_ms": 100,
             }, ensure_ascii=False))
-        (history_dir / f"{date.today().isoformat()}.jsonl").write_text(
+        (activity_dir / f"{date.today().isoformat()}.jsonl").write_text(
             "\n".join(entries) + "\n", encoding="utf-8",
         )
 
