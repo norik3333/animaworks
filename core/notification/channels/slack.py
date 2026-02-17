@@ -11,6 +11,7 @@ from typing import Any
 import httpx
 
 from core.notification.notifier import NotificationChannel, register_channel
+from core.tools.slack import md_to_slack_mrkdwn
 
 logger = logging.getLogger("animaworks.notification.slack")
 
@@ -64,6 +65,7 @@ class SlackChannel(NotificationChannel):
     def _build_text(subject: str, body: str, priority: str, anima_name: str) -> str:
         prefix = f"[{priority.upper()}] " if priority in ("high", "urgent") else ""
         sender = f" (from {anima_name})" if anima_name else ""
+        body = md_to_slack_mrkdwn(body)
         return f"{prefix}*{subject}*{sender}\n{body}"[:40000]
 
     async def _send_via_bot(

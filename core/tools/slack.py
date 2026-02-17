@@ -73,6 +73,86 @@ def format_slack_ts(ts: str) -> str:
         return ts
 
 
+def md_to_slack_mrkdwn(text: str) -> str:
+    """Convert standard Markdown to Slack mrkdwn format.
+
+    Handles:
+    - **bold** → *bold*
+    - *italic* → _italic_
+    - ***bold italic*** → *_bold italic_*
+    - ~~strikethrough~~ → ~strikethrough~
+    - [text](url) → <url|text>
+    - ![alt](url) → <url>
+    - # Heading → *Heading*
+    - Bullet lists (- / *) → • item
+    - Horizontal rules (---) → ───────────────
+    - Code blocks and inline code are preserved as-is.
+    """
+    if not text:
+        return ""
+
+    # ── Protect code blocks / inline code from conversion ──
+    _placeholders: list[str] = []
+
+    def _save(matched_text: str) -> str:
+        _placeholders.append(matched_text)
+        return f"\x00PH{len(_placeholders) - 1}\x00"
+
+    # Fenced code blocks (``` ... ```)
+    text = re.sub(r"```[\s\S]*?```", lambda m: _save(m.group(0)), text)
+    # Inline code (` ... `)
+    text = re.sub(r"`[^`]+`", lambda m: _save(m.group(0)), text)
+
+    # ── Images: ![alt](url) → <url> ──
+    text = re.sub(r"!\[([^\]]*)\]\(([^)]+)\)", r"<\2>", text)
+
+    # ── Links: [text](url) → <url|text> ──
+    text = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", r"<\2|\1>", text)
+
+    # ── Headers: # Heading → *Heading* (protect from italic pass) ──
+    text = re.sub(
+        r"^#{1,6}\s+(.+)$",
+        lambda m: _save(f"*{m.group(1)}*"),
+        text,
+        flags=re.MULTILINE,
+    )
+
+    # ── Bold+Italic: ***text*** → *_text_* ──
+    text = re.sub(
+        r"\*{3}(.+?)\*{3}",
+        lambda m: _save(f"*_{m.group(1)}_*"),
+        text,
+    )
+
+    # ── Bold: **text** → *text* (protect from italic pass) ──
+    text = re.sub(
+        r"\*{2}(.+?)\*{2}",
+        lambda m: _save(f"*{m.group(1)}*"),
+        text,
+    )
+
+    # ── Italic: *text* → _text_ ──
+    # Avoid matching ** (already handled) and "* " (bullet list).
+    text = re.sub(r"(?<![*])\*(?![* ])(.+?)(?<![* ])\*(?![*])", r"_\1_", text)
+
+    # ── Strikethrough: ~~text~~ → ~text~ ──
+    text = re.sub(r"~~(.+?)~~", r"~\1~", text)
+
+    # ── Bullet lists: - item / * item → • item ──
+    text = re.sub(r"^(\s*)[-*]\s+", r"\1• ", text, flags=re.MULTILINE)
+
+    # ── Horizontal rules: --- / *** / ___ → ─────────────── ──
+    text = re.sub(
+        r"^[-*_]{3,}\s*$", "───────────────", text, flags=re.MULTILINE
+    )
+
+    # ── Restore placeholders ──
+    for i, ph in enumerate(_placeholders):
+        text = text.replace(f"\x00PH{i}\x00", ph)
+
+    return text
+
+
 def clean_slack_markup(text: str, cache: dict | None = None) -> str:
     """Convert Slack markup to readable plain text.
 
@@ -979,7 +1059,7 @@ def _run_cli_command(client: SlackClient, args) -> None:
     """Dispatch CLI subcommands."""
     if args.command == "send":
         channel_id = client.resolve_channel(args.channel)
-        message = " ".join(args.message)
+        message = md_to_slack_mrkdwn(" ".join(args.message))
         thread_ts = getattr(args, "thread", None)
         response = client.post_message(channel_id, message, thread_ts=thread_ts)
         ts = response.get("ts", "")
@@ -1173,7 +1253,7 @@ def dispatch(name: str, args: dict[str, Any]) -> Any:
         channel_id = client.resolve_channel(args["channel"])
         return client.post_message(
             channel_id,
-            args["message"],
+            md_to_slack_mrkdwn(args["message"]),
             thread_ts=args.get("thread_ts"),
         )
     if name == "slack_messages":
