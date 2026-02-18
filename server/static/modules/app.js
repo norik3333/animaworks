@@ -34,8 +34,8 @@ function showAuthBannerIfNeeded() {
   `;
   banner.querySelector(".auth-banner-close").addEventListener("click", () => banner.remove());
 
-  const main = document.getElementById("pageContent");
-  if (main) main.parentElement.insertBefore(banner, main);
+  const shell = document.querySelector(".app-shell");
+  if (shell) shell.parentElement.insertBefore(banner, shell);
 }
 
 setStartDashboard(startDashboard);

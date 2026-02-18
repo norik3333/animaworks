@@ -140,12 +140,14 @@ async function _loadConfig() {
     flattenConfig(config);
 
     configEl.innerHTML = `
-      <table class="data-table">
-        <thead><tr><th>設定項目</th><th>値</th></tr></thead>
-        <tbody>
-          ${rows.map(r => `<tr><td>${escapeHtml(r.key)}</td><td><code>${escapeHtml(r.val)}</code></td></tr>`).join("")}
-        </tbody>
-      </table>
+      <div class="data-table-wrapper">
+        <table class="data-table">
+          <thead><tr><th>設定項目</th><th>値</th></tr></thead>
+          <tbody>
+            ${rows.map(r => `<tr><td>${escapeHtml(r.key)}</td><td><code>${escapeHtml(r.val)}</code></td></tr>`).join("")}
+          </tbody>
+        </table>
+      </div>
     `;
 
     // Extract API key info
