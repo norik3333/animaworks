@@ -351,9 +351,6 @@ class DigitalAnima:
                     except Exception:
                         pass
 
-                    # Fire-and-forget: episode recording
-                    asyncio.create_task(conv_memory.finalize_session(min_turns=3))
-
                     logger.info(
                         "[%s] process_message END duration_ms=%d",
                         self.name, result.duration_ms,
@@ -531,11 +528,6 @@ class DigitalAnima:
 
                             # Finalize streaming journal (deletes the file)
                             journal.finalize(summary=summary[:500])
-
-                            # Fire-and-forget: episode recording
-                            asyncio.create_task(
-                                conv_memory.finalize_session(min_turns=3)
-                            )
 
                             # Yield pending notification events before cycle_done
                             for notif in self.agent.drain_notifications():
@@ -871,6 +863,13 @@ class DigitalAnima:
                         activity.log("heartbeat_end", summary=result.summary[:200])
                     except Exception:
                         pass
+
+                    # Session boundary: finalize pending conversation turns
+                    try:
+                        conv_mem = ConversationMemory(self.anima_dir, self.model_config)
+                        await conv_mem.finalize_if_session_ended()
+                    except Exception:
+                        logger.debug("[%s] finalize_if_session_ended failed", self.name, exc_info=True)
 
                     # A-3: Record important heartbeat actions to episodes
                     if result.summary and "HEARTBEAT_OK" not in result.summary:

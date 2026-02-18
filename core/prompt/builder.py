@@ -371,6 +371,25 @@ def build_system_prompt(
     if pending:
         parts.append(f"## 未完了タスク\n\n{pending}")
 
+    # Resolution registry injection (cross-org resolved issues)
+    try:
+        resolutions = memory.read_resolutions(days=7)
+        if resolutions:
+            res_lines = []
+            for r in resolutions[-10:]:  # Latest 10 entries
+                ts_short = r.get("ts", "")[:16]  # YYYY-MM-DDTHH:MM
+                resolver = r.get("resolver", "unknown")
+                issue = r.get("issue", "")
+                res_lines.append(f"- [{ts_short}] {resolver}: {issue}")
+            parts.append(
+                "## 解決済み案件（組織横断）\n\n"
+                "以下は直近7日間に解決された案件です。"
+                "これらの問題については再調査・再報告は不要です。\n\n"
+                + "\n".join(res_lines)
+            )
+    except Exception:
+        logger.debug("Failed to inject resolution registry", exc_info=True)
+
     # Priming section (automatic memory recall)
     if priming_section:
         parts.append(priming_section)

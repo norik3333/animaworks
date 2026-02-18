@@ -346,6 +346,7 @@ class ActivityLogger:
             "cron_executed": "CRON",
             "memory_write": "MEM",
             "error": "ERR",
+            "issue_resolved": "RSLV",
         }
         icon = type_map.get(entry.type, "•")
 

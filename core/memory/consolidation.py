@@ -76,6 +76,9 @@ class ConsolidationEngine:
         # Collect recent episodes
         episode_entries = self._collect_recent_episodes(hours=24)
 
+        # Collect resolved events for consolidation prompt injection
+        resolved_events = self._collect_resolved_events(hours=24)
+
         if len(episode_entries) < min_episodes:
             logger.info(
                 "Skipping daily consolidation for anima=%s: "
@@ -102,6 +105,7 @@ class ConsolidationEngine:
             episode_entries=episode_entries,
             existing_knowledge_files=existing_knowledge,
             model=model,
+            resolved_events=resolved_events,
         )
 
         # Parse and write results to knowledge/
@@ -224,6 +228,17 @@ class ConsolidationEngine:
 
         return entries
 
+    def _collect_resolved_events(self, hours: int = 24) -> list[dict]:
+        """Collect issue_resolved events from activity log."""
+        try:
+            from core.memory.activity import ActivityLogger
+            activity = ActivityLogger(self.anima_dir)
+            entries = activity.recent(days=1, limit=50, types=["issue_resolved"])
+            return [{"ts": e.ts, "content": e.content, "summary": e.summary} for e in entries]
+        except Exception:
+            logger.debug("Failed to collect resolved events", exc_info=True)
+            return []
+
     def _list_knowledge_files(self) -> list[str]:
         """List all existing knowledge files.
 
@@ -245,6 +260,7 @@ class ConsolidationEngine:
         episode_entries: list[dict[str, str]],
         existing_knowledge_files: list[str],
         model: str,
+        resolved_events: list[dict] | None = None,
     ) -> str:
         """Use LLM to extract lessons from episodes.
 
@@ -252,6 +268,7 @@ class ConsolidationEngine:
             episode_entries: List of episode entries with date, time, content
             existing_knowledge_files: List of existing knowledge file names
             model: LLM model to use
+            resolved_events: Optional list of resolved issue events
 
         Returns:
             LLM response with structured consolidation results
@@ -303,6 +320,20 @@ class ConsolidationEngine:
 - 挨拶のみの会話や実質的な情報を含まないやり取りは知識化不要です
 - 既存ファイルがない場合は、すべて新規ファイルとして提案してください
 - ファイル名はトピックを表すわかりやすい名前にしてください（英数字とハイフン推奨）
+"""
+
+        # Inject resolved events into prompt
+        if resolved_events:
+            resolved_text = "\n".join(
+                f"- {r.get('ts', '')[:16]}: {r.get('content', '')}" for r in resolved_events
+            )
+            prompt += f"""
+
+【解決済み案件】
+以下の案件は解決済みです。既存の知識ファイルに「未解決」「対応中」「調査中」等の
+記載がある場合は、「解決済み」に更新してください。
+
+{resolved_text}
 """
 
         # Call LLM

@@ -21,7 +21,7 @@ import json
 import logging
 import re
 from dataclasses import asdict, dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -66,6 +66,7 @@ class ConversationState:
     turns: list[ConversationTurn] = field(default_factory=list)
     compressed_summary: str = ""
     compressed_turn_count: int = 0
+    last_finalized_turn_index: int = 0
 
     @property
     def total_token_estimate(self) -> int:
@@ -76,6 +77,21 @@ class ConversationState:
     @property
     def total_turn_count(self) -> int:
         return len(self.turns) + self.compressed_turn_count
+
+
+SESSION_GAP_MINUTES = 10
+
+
+@dataclass
+class ParsedSessionSummary:
+    """Parsed result of LLM session summary with state changes."""
+
+    title: str
+    episode_body: str
+    resolved_items: list[str]
+    new_tasks: list[str]
+    current_status: str
+    has_state_changes: bool
 
 
 # ---------------------------------------------------------------------------
@@ -119,6 +135,7 @@ class ConversationMemory:
                     turns=turns,
                     compressed_summary=data.get("compressed_summary", ""),
                     compressed_turn_count=data.get("compressed_turn_count", 0),
+                    last_finalized_turn_index=data.get("last_finalized_turn_index", 0),
                 )
             except (json.JSONDecodeError, TypeError):
                 logger.warning("Failed to parse conversation state; starting fresh")
@@ -137,6 +154,7 @@ class ConversationMemory:
             "turns": [asdict(t) for t in state.turns],
             "compressed_summary": state.compressed_summary,
             "compressed_turn_count": state.compressed_turn_count,
+            "last_finalized_turn_index": state.last_finalized_turn_index,
         }
         self._state_path.write_text(
             json.dumps(data, ensure_ascii=False, indent=2),
@@ -382,61 +400,104 @@ class ConversationMemory:
         self,
         min_turns: int = 3,
     ) -> bool:
-        """Finalize the current conversation session.
+        """Finalize the current conversation session (differential).
 
-        Summarizes the conversation using LLM and appends to episodes/{date}.md.
-        This implements immediate encoding (即時符号化) from the design.
+        Only summarizes turns since last_finalized_turn_index, preventing
+        duplicate episode entries. Also extracts state changes and resolution
+        information from the conversation.
 
         Args:
-            min_turns: Minimum number of turns to trigger summarization.
-                       Short conversations (greetings) are skipped.
+            min_turns: Minimum number of *new* turns to trigger summarization.
 
         Returns:
             True if session was finalized and written to episodes/, False if skipped.
         """
         state = self.load()
 
-        # Skip if conversation is too short
-        if len(state.turns) < min_turns:
+        # Only process turns since last finalization
+        new_turns = state.turns[state.last_finalized_turn_index:]
+        if len(new_turns) < min_turns:
             logger.debug(
-                "Session finalization skipped: only %d turns (min %d)",
-                len(state.turns),
+                "Session finalization skipped: only %d new turns (min %d)",
+                len(new_turns),
                 min_turns,
             )
             return False
 
         # Gather activity context for richer episode generation
-        activity_context = self._gather_activity_context(state.turns)
+        activity_context = self._gather_activity_context(new_turns)
 
-        # Generate summary
+        # Generate summary with state extraction
         try:
-            summary = await self._summarize_session(state.turns, activity_context)
+            raw_summary = await self._summarize_session_with_state(
+                new_turns, activity_context,
+            )
         except Exception:
             logger.exception("Failed to summarize session; skipping episode write")
             return False
 
-        # Write to episodes/{date}.md
+        parsed = self._parse_session_summary(raw_summary)
+
+        # 1. Episode recording (differential only)
         from core.memory.manager import MemoryManager
 
         memory_mgr = MemoryManager(self.anima_dir)
         timestamp = datetime.now()
         time_str = timestamp.strftime("%H:%M")
-
-        # Extract title (first line) and body (rest) from summary
-        lines = summary.strip().splitlines()
-        title = lines[0][:50] if lines else "会話"
-        body = "\n".join(lines[1:]).strip() if len(lines) > 1 else summary
-
-        episode_entry = f"## {time_str} — {title}\n\n{body}\n"
+        episode_entry = f"## {time_str} — {parsed.title}\n\n{parsed.episode_body}\n"
         memory_mgr.append_episode(episode_entry)
 
+        # 2. State auto-update (only when parse succeeded)
+        if parsed.has_state_changes:
+            self._update_state_from_summary(memory_mgr, parsed)
+
+        # 3. Resolution event recording (only when resolved items found)
+        if parsed.resolved_items:
+            self._record_resolutions(memory_mgr, parsed.resolved_items)
+
+        # 4. Integrate recorded turns into compressed_summary
+        turn_text = self._format_turns_for_compression(new_turns)
+        old_summary = state.compressed_summary
+        try:
+            compressed = await self._call_compression_llm(old_summary, turn_text)
+            state.compressed_summary = compressed
+        except Exception:
+            logger.warning("Compression failed during finalization; keeping raw turns")
+
+        # 5. Update tracking index
+        state.last_finalized_turn_index = len(state.turns)
+        state.compressed_turn_count += len(new_turns)
+        self.save()
+
         logger.info(
-            "Session finalized: %d turns summarized and written to episodes/%s.md",
-            len(state.turns),
+            "Session finalized: %d new turns summarized and written to episodes/%s.md",
+            len(new_turns),
             date.today().isoformat(),
         )
 
         return True
+
+    async def finalize_if_session_ended(self) -> bool:
+        """Finalize if session has ended (10-minute idle gap).
+
+        Called from heartbeat to detect session boundaries and trigger
+        episode recording for pending conversation turns.
+
+        Returns:
+            True if finalization was performed.
+        """
+        state = self.load()
+        if not state.turns:
+            return False
+        # No unrecorded turns → skip
+        new_turns = state.turns[state.last_finalized_turn_index:]
+        if not new_turns:
+            return False
+        last_ts = datetime.fromisoformat(new_turns[-1].timestamp)
+        elapsed = (datetime.now() - last_ts).total_seconds()
+        if elapsed < SESSION_GAP_MINUTES * 60:
+            return False
+        return await self.finalize_session()
 
     def _gather_activity_context(self, turns: list[ConversationTurn]) -> str:
         """Gather non-conversation activities from activity log for episode enrichment.
@@ -485,34 +546,35 @@ class ConversationMemory:
             logger.debug("Failed to gather activity context", exc_info=True)
             return ""
 
-    async def _summarize_session(
+    async def _summarize_session_with_state(
         self, turns: list[ConversationTurn], activity_context: str = "",
     ) -> str:
-        """Summarize a conversation session for episode recording.
+        """Summarize a conversation session with state change extraction.
 
-        Uses a cheap model (fallback_model or main model) to generate
-        a structured summary of the conversation.
-
-        Args:
-            turns: Conversation turns to summarize.
-            activity_context: Optional activity log context to include.
+        Produces a structured Markdown output with episode summary and
+        state change sections for parsing by _parse_session_summary().
         """
-        # Format turns for summarization
         conversation_text = self._format_turns_for_compression(turns)
 
         system = (
-            "あなたは会話記録の要約者です。以下の会話とセッション中の活動をエピソード記憶として記録するための要約を作成してください。\n\n"
-            "出力形式（最初の行はタイトルとして使います）:\n"
+            "あなたは会話記録の要約者です。以下の会話をエピソード記憶として記録し、"
+            "同時にステート変更を抽出してください。\n\n"
+            "出力形式:\n"
+            "## エピソード要約\n"
             "{会話の要約タイトル（20文字以内）}\n\n"
             "**相手**: {相手の名前}\n"
             "**トピック**: {主なトピック、カンマ区切り}\n"
             "**要点**:\n"
             "- {要点1}\n"
-            "- {要点2}\n"
-            "**実行したアクション**: {DM送信、チャネル投稿、ツール使用等があれば}\n"
-            "**決定事項**: {決定事項があれば}\n"
-            "**未解決**: {未解決事項があれば}\n\n"
-            "日本語で、簡潔に、事実を中心に記述してください。"
+            "- {要点2}\n\n"
+            "**決定事項**: {あれば記載}\n\n"
+            "## ステート変更\n"
+            "### 解決済み\n"
+            "- {解決した課題があればリスト。なければ「なし」}\n"
+            "### 新規タスク\n"
+            "- {新たに発生したタスク。なければ「なし」}\n"
+            "### 現在の状態\n"
+            "{「idle」または現在取り組み中の内容}\n"
         )
 
         user_content = conversation_text
@@ -520,3 +582,128 @@ class ConversationMemory:
             user_content += f"\n\n{activity_context}"
 
         return await self._call_llm(system, user_content)
+
+    @staticmethod
+    def _parse_session_summary(raw: str) -> ParsedSessionSummary:
+        """Parse Markdown-formatted LLM output into structured data.
+
+        Falls back to treating the entire raw text as episode body
+        when the expected sections are not found.
+        """
+        # Extract ## エピソード要約 section
+        episode_match = re.search(
+            r"##\s*エピソード要約\s*\n(.+?)(?=##\s*ステート変更|\Z)",
+            raw, re.DOTALL,
+        )
+        episode_body = episode_match.group(1).strip() if episode_match else raw.strip()
+
+        lines = episode_body.splitlines()
+        title = lines[0][:50] if lines else "会話"
+        body = "\n".join(lines[1:]).strip() if len(lines) > 1 else episode_body
+
+        # Extract ## ステート変更 section
+        state_match = re.search(
+            r"##\s*ステート変更\s*\n(.+)",
+            raw, re.DOTALL,
+        )
+
+        resolved_items: list[str] = []
+        new_tasks: list[str] = []
+        current_status = ""
+
+        if state_match:
+            state_text = state_match.group(1)
+
+            # ### 解決済み
+            resolved_match = re.search(
+                r"###\s*解決済み\s*\n(.+?)(?=###|\Z)",
+                state_text, re.DOTALL,
+            )
+            if resolved_match:
+                for line in resolved_match.group(1).strip().splitlines():
+                    item = line.strip().lstrip("- ").strip()
+                    if item and item != "なし":
+                        resolved_items.append(item)
+
+            # ### 新規タスク
+            tasks_match = re.search(
+                r"###\s*新規タスク\s*\n(.+?)(?=###|\Z)",
+                state_text, re.DOTALL,
+            )
+            if tasks_match:
+                for line in tasks_match.group(1).strip().splitlines():
+                    item = line.strip().lstrip("- ").strip()
+                    if item and item != "なし":
+                        new_tasks.append(item)
+
+            # ### 現在の状態
+            status_match = re.search(
+                r"###\s*現在の状態\s*\n(.+?)(?=###|\Z)",
+                state_text, re.DOTALL,
+            )
+            if status_match:
+                current_status = status_match.group(1).strip()
+
+        return ParsedSessionSummary(
+            title=title,
+            episode_body=body,
+            resolved_items=resolved_items,
+            new_tasks=new_tasks,
+            current_status=current_status,
+            has_state_changes=bool(resolved_items or new_tasks or current_status),
+        )
+
+    def _update_state_from_summary(
+        self, memory_mgr: "MemoryManager", parsed: ParsedSessionSummary,
+    ) -> None:
+        """Auto-update state/current_task.md based on conversation conclusions."""
+        from core.memory.manager import MemoryManager as _MM
+
+        current = memory_mgr.read_current_state()
+        updated = False
+
+        # Append resolved items with checkmark
+        for item in parsed.resolved_items:
+            if item not in current:
+                marker = f"   - ✅ {item}（自動検出: {datetime.now().strftime('%m/%d %H:%M')}）"
+                if "未解決" in current or "継続監視" in current:
+                    current += f"\n{marker}"
+                updated = True
+
+        # Append new tasks
+        for task in parsed.new_tasks:
+            if task not in current:
+                current += f"\n- [ ] {task}（自動検出: {datetime.now().strftime('%m/%d %H:%M')}）"
+                updated = True
+
+        if updated:
+            memory_mgr.update_state(current)
+            logger.info("State auto-updated from session summary")
+
+    def _record_resolutions(
+        self, memory_mgr: "MemoryManager", resolved_items: list[str],
+    ) -> None:
+        """Record resolution events to ActivityLogger and shared registry."""
+        from core.memory.activity import ActivityLogger
+
+        activity = ActivityLogger(self.anima_dir)
+
+        for item in resolved_items:
+            # Layer 1: ActivityLogger issue_resolved event
+            try:
+                activity.log(
+                    "issue_resolved",
+                    content=item,
+                    summary=f"解決済み: {item[:100]}",
+                )
+            except Exception:
+                logger.debug("Failed to log issue_resolved event", exc_info=True)
+
+            # Layer 3: shared/resolutions.jsonl cross-org record
+            try:
+                memory_mgr.append_resolution(
+                    issue=item,
+                    resolver=self.anima_dir.name,
+                )
+            except Exception:
+                logger.debug("Failed to write resolution registry", exc_info=True)

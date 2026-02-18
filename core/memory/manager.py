@@ -750,6 +750,42 @@ class MemoryManager:
     def update_pending(self, content: str) -> None:
         (self.state_dir / "pending.md").write_text(content, encoding="utf-8")
 
+    def append_resolution(self, issue: str, resolver: str) -> None:
+        """Append resolution info to shared/resolutions.jsonl."""
+        import json as _json
+
+        shared_dir = get_shared_dir()
+        path = shared_dir / "resolutions.jsonl"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        entry = {
+            "ts": datetime.now().isoformat(),
+            "issue": issue,
+            "resolver": resolver,
+        }
+        with path.open("a", encoding="utf-8") as f:
+            f.write(_json.dumps(entry, ensure_ascii=False) + "\n")
+
+    def read_resolutions(self, days: int = 7) -> list[dict[str, str]]:
+        """Read recent resolutions from shared/resolutions.jsonl."""
+        import json as _json
+
+        shared_dir = get_shared_dir()
+        path = shared_dir / "resolutions.jsonl"
+        if not path.exists():
+            return []
+        cutoff = (datetime.now() - timedelta(days=days)).isoformat()
+        entries: list[dict[str, str]] = []
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            try:
+                entry = _json.loads(line)
+                if entry.get("ts", "") >= cutoff:
+                    entries.append(entry)
+            except _json.JSONDecodeError:
+                continue
+        return entries
+
     def write_knowledge(self, topic: str, content: str) -> None:
         safe = re.sub(r"[^\w\-_]", "_", topic)
         path = self.knowledge_dir / f"{safe}.md"
