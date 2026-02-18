@@ -51,7 +51,7 @@ class OllamaServer:
 
 
 DEFAULT_SERVERS = {
-    "localserver-a": OllamaServer("localserver-a", "http://192.168.1.10:11435"),
+    "localserver-a": OllamaServer("localserver-a", "http://192.168.1.10:11434"),
     "localserver-b": OllamaServer("localserver-b", "http://192.168.1.100:11434"),
     "localserver-c": OllamaServer("localserver-c", "http://192.168.1.50:11434"),
 }

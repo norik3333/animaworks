@@ -141,7 +141,7 @@ class TestModeBOllamaLive:
 
         agent = make_agent_core(
             name="b-ollama-live",
-            model="ollama/glm-flash-q8:16k",
+            model="ollama/glm-flash-q8:32k",
             credential="ollama",
             execution_mode="assisted",
             api_base_url=os.environ.get("OLLAMA_API_BASE", ""),

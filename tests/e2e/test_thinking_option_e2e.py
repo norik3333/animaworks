@@ -22,7 +22,7 @@ class TestThinkingOptionModeB:
         """Ollama model should receive think=False when thinking is not configured."""
         agent = make_agent_core(
             name="think-ollama-default",
-            model="ollama/glm-flash-q8:16k",
+            model="ollama/glm-flash-q8:32k",
             execution_mode="assisted",
         )
 
@@ -67,7 +67,7 @@ class TestThinkingOptionModeB:
         """Ollama model with explicit thinking=True should receive think=True."""
         agent = make_agent_core(
             name="think-ollama-explicit",
-            model="ollama/glm-flash-q8:16k",
+            model="ollama/glm-flash-q8:32k",
             execution_mode="assisted",
         )
 
