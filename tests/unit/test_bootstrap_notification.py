@@ -107,7 +107,7 @@ class TestProcessMessageStreamBootstrapGuard:
         assert dp.needs_bootstrap is False
 
         # Mock run_cycle_streaming to yield a quick done
-        async def _mock_stream(prompt, trigger=""):
+        async def _mock_stream(prompt, trigger="", **kwargs):
             yield {"type": "text_delta", "text": "hi"}
             yield {
                 "type": "cycle_done",
@@ -291,7 +291,7 @@ class TestAnimaRunnerBootstrapNotification:
         mock_anima = MagicMock()
         mock_anima.needs_bootstrap = True
 
-        async def mock_stream(msg, from_person="human"):
+        async def mock_stream(msg, from_person="human", **kwargs):
             yield {"type": "text_delta", "text": "hello"}
             yield {"type": "cycle_done", "cycle_result": {"summary": "hello"}}
 
@@ -333,7 +333,7 @@ class TestAnimaRunnerBootstrapNotification:
             lambda self: bootstrap_values[0] if bootstrap_values else False,
         )
 
-        async def mock_stream(msg, from_person="human"):
+        async def mock_stream(msg, from_person="human", **kwargs):
             yield {"type": "text_delta", "text": "hello"}
             # Simulate bootstrap completion (file deleted during agent run)
             bootstrap_values[0] = False
@@ -376,7 +376,7 @@ class TestAnimaRunnerBootstrapNotification:
         mock_anima = MagicMock()
         mock_anima.needs_bootstrap = False
 
-        async def mock_stream(msg, from_person="human"):
+        async def mock_stream(msg, from_person="human", **kwargs):
             yield {"type": "text_delta", "text": "hello"}
             yield {"type": "cycle_done", "cycle_result": {"summary": "hello"}}
 

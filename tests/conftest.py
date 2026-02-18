@@ -62,6 +62,21 @@ def pytest_addoption(parser: pytest.Parser) -> None:
 # ── Fixtures ──────────────────────────────────────────────
 
 
+@pytest.fixture(autouse=True)
+def _restore_load_auth():
+    """Restore server.app.load_auth after tests that monkey-patch it.
+
+    Several E2E test helpers persist ``_sa.load_auth = lambda: _auth`` beyond
+    their ``with patch(...)`` blocks so that the auth-guard middleware returns
+    ``local_trust`` at request time.  Without this teardown the monkey-patch
+    leaks into subsequent tests that expect the real ``load_auth``.
+    """
+    import server.app as sa
+    original = sa.load_auth
+    yield
+    sa.load_auth = original
+
+
 @pytest.fixture
 def use_mock(request: pytest.FixtureRequest) -> bool:
     """Determine whether to use mocks or real API calls.

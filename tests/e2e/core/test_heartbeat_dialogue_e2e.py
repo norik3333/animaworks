@@ -654,10 +654,19 @@ class TestCurrentTaskEmphasis:
         mm._indexer_initialized = True
 
         from core.prompt.builder import build_system_prompt
-        prompt = build_system_prompt(mm)
+        from core.memory.priming import PrimingResult, format_priming_section
 
-        # A-2: activity summary section should be present (renamed from ハートビート活動)
-        assert "直近の活動" in prompt
+        # Generate the priming section with activity data
+        recent_entries = activity.recent(days=1)
+        activity_text = activity.format_for_priming(recent_entries)
+        priming_result = PrimingResult(recent_activity=activity_text)
+        priming_section = format_priming_section(priming_result)
+
+        result = build_system_prompt(mm, priming_section=priming_section)
+        prompt = result.system_prompt
+
+        # A-2: activity summary section should be present via priming
+        assert "アクティビティ" in prompt
         assert "Found 3 errors in production logs" in prompt
 
         invalidate_cache()

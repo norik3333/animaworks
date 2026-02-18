@@ -67,7 +67,7 @@ class TestRunnerKeepalive:
         """
         runner = _make_runner()
 
-        async def _slow_stream(message, from_person="human"):
+        async def _slow_stream(message, from_person="human", **kwargs):
             """Async generator that is silent for ~1.5s then emits cycle_done."""
             await asyncio.sleep(1.5)
             yield {
@@ -119,7 +119,7 @@ class TestRunnerKeepalive:
         """
         runner = _make_runner()
 
-        async def _fast_stream(message, from_person="human"):
+        async def _fast_stream(message, from_person="human", **kwargs):
             """Async generator that produces chunks rapidly."""
             for i in range(5):
                 await asyncio.sleep(0.1)
@@ -167,7 +167,7 @@ class TestRunnerKeepalive:
         """
         runner = _make_runner()
 
-        async def _instant_stream(message, from_person="human"):
+        async def _instant_stream(message, from_person="human", **kwargs):
             """Async generator that completes immediately."""
             yield {
                 "type": "cycle_done",

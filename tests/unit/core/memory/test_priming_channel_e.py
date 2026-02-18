@@ -5,7 +5,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import json
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -69,49 +68,41 @@ class TestPrimingResultRecentActivity:
 
 
 class TestFallbackChannels:
-    def test_empty_when_no_shared_dir(self, anima_dir):
+    async def test_empty_when_no_shared_dir(self, anima_dir):
         engine = PrimingEngine(anima_dir, shared_dir=None)
-        result = asyncio.get_event_loop().run_until_complete(
-            engine._read_old_channels()
-        )
+        result = await engine._read_old_channels()
         assert result == ""
 
-    def test_empty_when_no_channels_dir(self, anima_dir, tmp_path):
+    async def test_empty_when_no_channels_dir(self, anima_dir, tmp_path):
         # shared_dir exists but no channels subdir
         empty_shared = tmp_path / "empty_shared"
         empty_shared.mkdir()
         engine = PrimingEngine(anima_dir, shared_dir=empty_shared)
-        result = asyncio.get_event_loop().run_until_complete(
-            engine._read_old_channels()
-        )
+        result = await engine._read_old_channels()
         assert result == ""
 
-    def test_reads_general_channel(self, anima_dir, shared_dir):
+    async def test_reads_general_channel(self, anima_dir, shared_dir):
         now = datetime.now()
         _write_channel(shared_dir, "general", [
             {"ts": now.isoformat(), "from": "kotoha", "text": "Hello!", "source": "anima"},
         ])
         engine = PrimingEngine(anima_dir, shared_dir=shared_dir)
-        result = asyncio.get_event_loop().run_until_complete(
-            engine._read_old_channels()
-        )
+        result = await engine._read_old_channels()
         assert "kotoha" in result
         assert "Hello!" in result
         assert "#general" in result
 
-    def test_reads_ops_channel(self, anima_dir, shared_dir):
+    async def test_reads_ops_channel(self, anima_dir, shared_dir):
         now = datetime.now()
         _write_channel(shared_dir, "ops", [
             {"ts": now.isoformat(), "from": "yuki", "text": "Server down", "source": "anima"},
         ])
         engine = PrimingEngine(anima_dir, shared_dir=shared_dir)
-        result = asyncio.get_event_loop().run_until_complete(
-            engine._read_old_channels()
-        )
+        result = await engine._read_old_channels()
         assert "#ops" in result
         assert "Server down" in result
 
-    def test_last_5_entries(self, anima_dir, shared_dir):
+    async def test_last_5_entries(self, anima_dir, shared_dir):
         now = datetime.now()
         entries = [
             {"ts": (now - timedelta(minutes=10 - i)).isoformat(), "from": f"anima{i}", "text": f"msg{i}", "source": "anima"}
@@ -119,14 +110,12 @@ class TestFallbackChannels:
         ]
         _write_channel(shared_dir, "general", entries)
         engine = PrimingEngine(anima_dir, shared_dir=shared_dir)
-        result = asyncio.get_event_loop().run_until_complete(
-            engine._read_old_channels()
-        )
+        result = await engine._read_old_channels()
         # Should include at least the last 5
         assert "msg5" in result
         assert "msg9" in result
 
-    def test_human_messages_within_24h(self, anima_dir, shared_dir):
+    async def test_human_messages_within_24h(self, anima_dir, shared_dir):
         now = datetime.now()
         entries = [
             {"ts": (now - timedelta(hours=2)).isoformat(), "from": "taka", "text": "Error resolved", "source": "human"},
@@ -134,13 +123,11 @@ class TestFallbackChannels:
         ]
         _write_channel(shared_dir, "general", entries)
         engine = PrimingEngine(anima_dir, shared_dir=shared_dir)
-        result = asyncio.get_event_loop().run_until_complete(
-            engine._read_old_channels()
-        )
+        result = await engine._read_old_channels()
         assert "Error resolved" in result
         assert "[human]" in result
 
-    def test_mentions_included(self, anima_dir, shared_dir):
+    async def test_mentions_included(self, anima_dir, shared_dir):
         now = datetime.now()
         entries = [
             {"ts": (now - timedelta(hours=48)).isoformat(), "from": "mio", "text": "@sakura please check", "source": "anima"},
@@ -151,17 +138,13 @@ class TestFallbackChannels:
         ]
         _write_channel(shared_dir, "general", entries)
         engine = PrimingEngine(anima_dir, shared_dir=shared_dir)
-        result = asyncio.get_event_loop().run_until_complete(
-            engine._read_old_channels()
-        )
+        result = await engine._read_old_channels()
         assert "@sakura please check" in result
 
-    def test_empty_channel_files(self, anima_dir, shared_dir):
+    async def test_empty_channel_files(self, anima_dir, shared_dir):
         (shared_dir / "channels" / "general.jsonl").touch()
         engine = PrimingEngine(anima_dir, shared_dir=shared_dir)
-        result = asyncio.get_event_loop().run_until_complete(
-            engine._read_old_channels()
-        )
+        result = await engine._read_old_channels()
         assert result == ""
 
 
@@ -169,7 +152,7 @@ class TestFallbackChannels:
 
 
 class TestPrimeMemoriesWithActivity:
-    def test_includes_recent_activity(self, anima_dir, shared_dir, monkeypatch):
+    async def test_includes_recent_activity(self, anima_dir, shared_dir, monkeypatch):
         now = datetime.now()
         _write_channel(shared_dir, "general", [
             {"ts": now.isoformat(), "from": "kotoha", "text": "Test msg", "source": "anima"},
@@ -194,12 +177,10 @@ class TestPrimeMemoriesWithActivity:
         monkeypatch.setattr("core.memory.priming.PrimingEngine._channel_d_skill_match", _stub_d)
 
         engine = PrimingEngine(anima_dir, shared_dir=shared_dir)
-        result = asyncio.get_event_loop().run_until_complete(
-            engine.prime_memories("hello", sender_name="taka")
-        )
+        result = await engine.prime_memories("hello", sender_name="taka")
         assert result.recent_activity != ""
 
-    def test_fallback_populates_recent_activity(self, anima_dir, shared_dir, monkeypatch):
+    async def test_fallback_populates_recent_activity(self, anima_dir, shared_dir, monkeypatch):
         """When _channel_b_recent_activity falls back to old channels, result goes into recent_activity."""
         now = datetime.now()
         _write_channel(shared_dir, "general", [
@@ -226,9 +207,7 @@ class TestPrimeMemoriesWithActivity:
         monkeypatch.setattr("core.memory.priming.PrimingEngine._channel_d_skill_match", _stub_d)
 
         engine = PrimingEngine(anima_dir, shared_dir=shared_dir)
-        result = asyncio.get_event_loop().run_until_complete(
-            engine.prime_memories("hello", sender_name="taka")
-        )
+        result = await engine.prime_memories("hello", sender_name="taka")
         assert result.recent_activity != ""
         assert "Fallback msg" in result.recent_activity
 

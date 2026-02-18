@@ -175,17 +175,20 @@ class TestExtractSkillSummary:
     def test_extracts_summary(self, tmp_path):
         skill = tmp_path / "skill.md"
         skill.write_text("# Skill\n## 概要\nFirst line summary\nSecond line", encoding="utf-8")
-        assert MemoryManager._extract_skill_summary(skill) == "First line summary"
+        meta = MemoryManager._extract_skill_meta(skill)
+        assert meta.description == "First line summary"
 
     def test_empty_overview(self, tmp_path):
         skill = tmp_path / "skill.md"
         skill.write_text("# Skill\n## 概要\n## 手順", encoding="utf-8")
-        assert MemoryManager._extract_skill_summary(skill) == ""
+        meta = MemoryManager._extract_skill_meta(skill)
+        assert meta.description == ""
 
     def test_no_overview_section(self, tmp_path):
         skill = tmp_path / "skill.md"
         skill.write_text("# Skill\nJust content", encoding="utf-8")
-        assert MemoryManager._extract_skill_summary(skill) == ""
+        meta = MemoryManager._extract_skill_meta(skill)
+        assert meta.description == ""
 
 
 class TestListSkillSummaries:

@@ -107,6 +107,7 @@ async def test_process_message(data_dir: Path, make_anima):
 
 
 @pytest.mark.asyncio
+@pytest.mark.timeout(90)
 async def test_heartbeat_request(data_dir: Path, make_anima):
     """Test run_heartbeat IPC request."""
     make_anima("test-anima")

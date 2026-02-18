@@ -15,6 +15,8 @@ from unittest.mock import MagicMock, patch, call
 
 import pytest
 
+pytest.importorskip("sentence_transformers")
+
 
 class TestSharedKnowledgeInit:
     """Verify _ensure_shared_knowledge_indexed behavior."""

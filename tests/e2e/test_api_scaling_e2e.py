@@ -33,10 +33,15 @@ def _create_app(tmp_path: Path, anima_names: list[str] | None = None):
         patch("server.app.ProcessSupervisor") as mock_sup_cls,
         patch("server.app.load_config") as mock_cfg,
         patch("server.app.WebSocketManager") as mock_ws_cls,
+        patch("server.app.load_auth") as mock_auth,
     ):
         cfg = MagicMock()
         cfg.setup_complete = True
         mock_cfg.return_value = cfg
+
+        auth_cfg = MagicMock()
+        auth_cfg.auth_mode = "local_trust"
+        mock_auth.return_value = auth_cfg
 
         supervisor = MagicMock()
         supervisor.get_all_status.return_value = {}
@@ -50,6 +55,12 @@ def _create_app(tmp_path: Path, anima_names: list[str] | None = None):
         from server.app import create_app
 
         app = create_app(animas_dir, shared_dir)
+
+    # Persist auth mock beyond the with-block for request-time middleware
+    import server.app as _sa
+    _auth = MagicMock()
+    _auth.auth_mode = "local_trust"
+    _sa.load_auth = lambda: _auth
 
     # Override anima_names if specified (simulates reload after adding animas)
     if anima_names is not None:
@@ -254,13 +265,13 @@ class TestActivityEndpointE2E:
 
     async def test_activity_with_anima_returns_200(self, tmp_path):
         """Activity endpoint with an anima should return 200 with activity_log data."""
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         animas_dir = tmp_path / "animas"
         anima_dir = _create_anima_on_disk(animas_dir, "alice")
 
-        # Write activity_log data
-        now = datetime.now(timezone.utc)
+        # Write activity_log data (use local time to match ActivityLogger's date.today())
+        now = datetime.now()
         log_dir = anima_dir / "activity_log"
         log_dir.mkdir(parents=True, exist_ok=True)
         entry = json.dumps({
@@ -286,12 +297,12 @@ class TestActivityEndpointE2E:
 
     async def test_activity_from_activity_log(self, tmp_path):
         """Activity reads from activity_log JSONL files and returns new format."""
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         animas_dir = tmp_path / "animas"
         anima_dir = _create_anima_on_disk(animas_dir, "alice")
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now()
         log_dir = anima_dir / "activity_log"
         log_dir.mkdir(parents=True, exist_ok=True)
         entries = [

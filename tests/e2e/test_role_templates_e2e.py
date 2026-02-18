@@ -402,7 +402,8 @@ class TestSpecialtyPromptInjection:
         memory = MemoryManager(anima_dir)
         invalidate_cache()
 
-        prompt = build_system_prompt(memory)
+        result = build_system_prompt(memory)
+        prompt = result.system_prompt
 
         # Read files to find their unique content markers
         injection_content = memory.read_injection()

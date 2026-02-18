@@ -157,7 +157,8 @@ class TestMemoryIndexerCollectionPrefix:
             encoding="utf-8",
         )
 
-        indexer.index_file(test_file, "common_knowledge", force=True)
+        with patch("core.memory.rag.singleton.get_embedding_dimension", return_value=384):
+            indexer.index_file(test_file, "common_knowledge", force=True)
 
         # Verify create_collection was called with shared prefix
         vector_store.create_collection.assert_called_with(

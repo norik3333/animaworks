@@ -59,6 +59,7 @@ def _make_streaming_executor(
         system_prompt: str,
         prompt: str,
         tracker: Any,
+        **kwargs: Any,
     ) -> AsyncGenerator[dict[str, Any], None]:
         nonlocal call_count
         call_count += 1
@@ -102,6 +103,7 @@ def _make_always_failing_executor():
         system_prompt: str,
         prompt: str,
         tracker: Any,
+        **kwargs: Any,
     ) -> AsyncGenerator[dict[str, Any], None]:
         raise StreamDisconnectedError(
             "Persistent disconnect",
@@ -344,6 +346,7 @@ class TestCheckpointClearedOnSuccess:
             system_prompt: str,
             prompt: str,
             tracker: Any,
+            **kwargs: Any,
         ) -> AsyncGenerator[dict[str, Any], None]:
             """Executor that emits a tool_start/tool_end pair, then completes."""
             yield {

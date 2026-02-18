@@ -30,11 +30,17 @@ def _create_real_app(tmp_path: Path) -> "FastAPI":  # noqa: F821
         patch("server.app.ProcessSupervisor") as mock_sup_cls,
         patch("server.app.load_config") as mock_cfg,
         patch("server.app.WebSocketManager") as mock_ws_cls,
+        patch("server.app.load_auth") as mock_auth,
     ):
         # Configure mock config
         cfg = MagicMock()
         cfg.setup_complete = True
         mock_cfg.return_value = cfg
+
+        # Configure mock auth
+        auth_cfg = MagicMock()
+        auth_cfg.auth_mode = "local_trust"
+        mock_auth.return_value = auth_cfg
 
         # Configure mock supervisor
         supervisor = MagicMock()
@@ -51,6 +57,12 @@ def _create_real_app(tmp_path: Path) -> "FastAPI":  # noqa: F821
         from server.app import create_app
 
         app = create_app(animas_dir, shared_dir)
+
+    # Persist auth mock beyond the with-block for request-time middleware
+    import server.app as _sa
+    _auth = MagicMock()
+    _auth.auth_mode = "local_trust"
+    _sa.load_auth = lambda: _auth
 
     return app
 

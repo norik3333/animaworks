@@ -44,10 +44,15 @@ def _create_app(
         patch("server.app.ProcessSupervisor") as mock_sup_cls,
         patch("server.app.load_config") as mock_cfg,
         patch("server.app.WebSocketManager") as mock_ws_cls,
+        patch("server.app.load_auth") as mock_auth,
     ):
         cfg = MagicMock()
         cfg.setup_complete = True
         mock_cfg.return_value = cfg
+
+        auth_cfg = MagicMock()
+        auth_cfg.auth_mode = "local_trust"
+        mock_auth.return_value = auth_cfg
 
         supervisor = MagicMock()
         supervisor.get_all_status.return_value = {}
@@ -66,6 +71,14 @@ def _create_app(
         from server.app import create_app
 
         app = create_app(animas_dir, shared_dir)
+
+    # Persist auth mock beyond the with-block so auth_guard middleware
+    # returns local_trust on every request (the with-block patch is
+    # restored on exit, but the middleware calls load_auth at request time).
+    import server.app as _sa
+    _auth = MagicMock()
+    _auth.auth_mode = "local_trust"
+    _sa.load_auth = lambda: _auth
 
     # Override anima_names if specified
     if anima_names is not None:

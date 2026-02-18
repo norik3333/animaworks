@@ -68,7 +68,7 @@ class TestNotificationSentEventInStream:
                 side_effect=[pending_notifications, []]
             )
 
-            async def mock_stream(prompt, trigger="manual"):
+            async def mock_stream(prompt, trigger="manual", **kwargs):
                 yield {"type": "text_delta", "text": "Processing your request..."}
                 yield {
                     "type": "cycle_done",
@@ -129,7 +129,7 @@ class TestNotificationSentEventInStream:
             # No notifications queued
             dp.agent.drain_notifications = MagicMock(return_value=[])
 
-            async def mock_stream(prompt, trigger="manual"):
+            async def mock_stream(prompt, trigger="manual", **kwargs):
                 yield {"type": "text_delta", "text": "Hello"}
                 yield {
                     "type": "cycle_done",
@@ -305,7 +305,7 @@ class TestWebSocketNotificationQueueLifecycle:
                 }]
             )
 
-            async def mock_stream(prompt, trigger="manual"):
+            async def mock_stream(prompt, trigger="manual", **kwargs):
                 yield {"type": "text_delta", "text": "Done"}
                 yield {
                     "type": "cycle_done",

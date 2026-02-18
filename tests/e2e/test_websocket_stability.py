@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import json
 import time
+from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi import FastAPI
@@ -31,6 +32,23 @@ from server.websocket import WebSocketManager
 
 
 # ── Fixtures ────────────────────────────────────────────────────
+
+
+def _mock_local_trust_auth():
+    """Return a mock auth config with auth_mode='local_trust'."""
+    auth = MagicMock()
+    auth.auth_mode = "local_trust"
+    return auth
+
+
+@pytest.fixture(autouse=True)
+def _bypass_ws_auth():
+    """Bypass WebSocket auth for all tests by mocking load_auth to return local_trust."""
+    with patch(
+        "server.routes.websocket_route.load_auth",
+        side_effect=_mock_local_trust_auth,
+    ):
+        yield
 
 
 @pytest.fixture

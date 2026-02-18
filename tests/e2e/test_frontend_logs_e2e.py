@@ -33,10 +33,15 @@ def _create_app(tmp_path: Path):
         patch("server.app.ProcessSupervisor") as mock_sup_cls,
         patch("server.app.load_config") as mock_cfg,
         patch("server.app.WebSocketManager") as mock_ws_cls,
+        patch("server.app.load_auth") as mock_auth,
     ):
         cfg = MagicMock()
         cfg.setup_complete = True
         mock_cfg.return_value = cfg
+
+        auth_cfg = MagicMock()
+        auth_cfg.auth_mode = "local_trust"
+        mock_auth.return_value = auth_cfg
 
         supervisor = MagicMock()
         supervisor.get_all_status.return_value = {}
@@ -51,6 +56,12 @@ def _create_app(tmp_path: Path):
         from server.app import create_app
 
         app = create_app(animas_dir, shared_dir)
+
+    # Persist auth mock beyond the with-block for request-time middleware
+    import server.app as _sa
+    _auth = MagicMock()
+    _auth.auth_mode = "local_trust"
+    _sa.load_auth = lambda: _auth
 
     return app
 
@@ -237,10 +248,15 @@ class TestSetupGuardFrontendLogs:
             patch("server.app.ProcessSupervisor") as mock_sup_cls,
             patch("server.app.load_config") as mock_cfg,
             patch("server.app.WebSocketManager") as mock_ws_cls,
+            patch("server.app.load_auth") as mock_auth,
         ):
             cfg = MagicMock()
             cfg.setup_complete = False  # Setup NOT complete
             mock_cfg.return_value = cfg
+
+            auth_cfg = MagicMock()
+            auth_cfg.auth_mode = "local_trust"
+            mock_auth.return_value = auth_cfg
 
             mock_sup_cls.return_value = MagicMock()
             mock_ws_cls.return_value = MagicMock()
@@ -248,6 +264,12 @@ class TestSetupGuardFrontendLogs:
             from server.app import create_app
 
             app = create_app(animas_dir, shared_dir)
+
+        # Persist auth mock beyond the with-block for request-time middleware
+        import server.app as _sa
+        _auth = MagicMock()
+        _auth.auth_mode = "local_trust"
+        _sa.load_auth = lambda: _auth
 
         transport = ASGITransport(app=app)
         entries = [{"ts": "2026-02-17T12:00:00Z", "level": "INFO", "module": "api", "msg": "test"}]

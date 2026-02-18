@@ -62,10 +62,15 @@ def mock_supervisor() -> MagicMock:
 
 
 @pytest.fixture
-def app(e2e_data_dir: Path, e2e_anima_dir: Path, mock_supervisor: MagicMock):
+def app(e2e_data_dir: Path, e2e_anima_dir: Path, mock_supervisor: MagicMock, monkeypatch: pytest.MonkeyPatch):
     """Create the FastAPI app with mocked supervisor."""
     animas_dir = e2e_data_dir / "animas"
     shared_dir = e2e_data_dir / "shared"
+
+    # Mock load_auth to return local_trust mode so auth_guard middleware passes
+    auth_cfg = MagicMock()
+    auth_cfg.auth_mode = "local_trust"
+    monkeypatch.setattr("server.app.load_auth", lambda: auth_cfg)
 
     application = create_app(animas_dir, shared_dir)
 
@@ -189,6 +194,7 @@ async def test_memory_episode_io_error_returns_500(
 
 async def test_global_exception_handler(
     e2e_data_dir: Path, e2e_anima_dir: Path, mock_supervisor: MagicMock,
+    monkeypatch: pytest.MonkeyPatch,
 ):
     """Unhandled exceptions in routes should be caught by the global
     exception handler and return a 500 JSON response."""
@@ -196,6 +202,11 @@ async def test_global_exception_handler(
 
     animas_dir = e2e_data_dir / "animas"
     shared_dir = e2e_data_dir / "shared"
+
+    # Mock load_auth to return local_trust mode so auth_guard middleware passes
+    auth_cfg = MagicMock()
+    auth_cfg.auth_mode = "local_trust"
+    monkeypatch.setattr("server.app.load_auth", lambda: auth_cfg)
 
     application = create_app(animas_dir, shared_dir)
     application.state.supervisor = mock_supervisor

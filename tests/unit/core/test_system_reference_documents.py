@@ -820,10 +820,10 @@ class TestTemplateFilesExist:
         assert full_path.exists(), f"Missing template: {rel_path}"
 
     def test_total_file_count(self):
-        """Exactly 12 .md files should exist in common_knowledge."""
+        """Exactly 14 .md files should exist in common_knowledge."""
         md_files = list(_TEMPLATES_CK_DIR.rglob("*.md"))
-        assert len(md_files) == 12, (
-            f"Expected 12 .md files, found {len(md_files)}: "
+        assert len(md_files) == 14, (
+            f"Expected 14 .md files, found {len(md_files)}: "
             f"{[str(f.relative_to(_TEMPLATES_CK_DIR)) for f in md_files]}"
         )
 

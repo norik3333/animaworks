@@ -56,27 +56,32 @@ def dp(anima_dir: Path, shared_dir: Path):
 
 
 class TestHeartbeatHistoryLoad:
-    """Tests for _load_heartbeat_history (read-only, backward compat)."""
+    """Tests for _load_heartbeat_history (reads from unified activity log)."""
 
-    def test_load_from_date_split(self, dp, anima_dir):
-        """Loading reads from date-split directory."""
-        history_dir = anima_dir / "shortterm" / "heartbeat_history"
-        history_dir.mkdir(parents=True)
+    def _write_activity_entries(self, anima_dir, entries_by_date):
+        """Write activity log entries in the unified format.
 
-        # Write entries for today
+        entries_by_date: dict mapping date string to list of entry dicts.
+        """
+        log_dir = anima_dir / "activity_log"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        for date_str, entries in entries_by_date.items():
+            lines = [json.dumps(e, ensure_ascii=False) for e in entries]
+            (log_dir / f"{date_str}.jsonl").write_text(
+                "\n".join(lines) + "\n", encoding="utf-8",
+            )
+
+    def test_load_from_activity_log(self, dp, anima_dir):
+        """Loading reads heartbeat_end entries from unified activity log."""
+        today = date.today().isoformat()
         entries = []
         for i in range(5):
-            entry = json.dumps({
-                "timestamp": f"2026-02-16T{10 + i:02d}:00:00",
-                "trigger": "heartbeat",
-                "action": "checked",
+            entries.append({
+                "ts": f"{today}T{10 + i:02d}:00:00",
+                "type": "heartbeat_end",
                 "summary": f"Entry {i}",
-                "duration_ms": 100,
-            }, ensure_ascii=False)
-            entries.append(entry)
-        (history_dir / f"{date.today().isoformat()}.jsonl").write_text(
-            "\n".join(entries) + "\n", encoding="utf-8",
-        )
+            })
+        self._write_activity_entries(anima_dir, {today: entries})
 
         text = dp._load_heartbeat_history()
         assert text != ""
@@ -88,54 +93,39 @@ class TestHeartbeatHistoryLoad:
         assert "Entry 3" in lines[-2]
         assert "Entry 2" in lines[-3]
 
-    def test_load_fallback_legacy(self, dp, anima_dir):
-        """Loading falls back to legacy single file if no directory."""
-        shortterm_dir = anima_dir / "shortterm"
-        shortterm_dir.mkdir(parents=True, exist_ok=True)
-        # No heartbeat_history/ directory
-
-        entry = json.dumps({
-            "timestamp": "2026-02-16T08:00:00",
-            "trigger": "heartbeat",
-            "action": "scanned",
-            "summary": "Legacy heartbeat",
-            "duration_ms": 120,
-        }, ensure_ascii=False)
-        (shortterm_dir / "heartbeat_history.jsonl").write_text(
-            entry + "\n", encoding="utf-8",
-        )
+    def test_load_ignores_non_heartbeat_entries(self, dp, anima_dir):
+        """Loading only picks up heartbeat_end type entries."""
+        today = date.today().isoformat()
+        entries = [
+            {"ts": f"{today}T08:00:00", "type": "message_received", "summary": "A message"},
+            {"ts": f"{today}T09:00:00", "type": "heartbeat_end", "summary": "Heartbeat result"},
+        ]
+        self._write_activity_entries(anima_dir, {today: entries})
 
         text = dp._load_heartbeat_history()
         assert text != ""
-        assert "Legacy heartbeat" in text
-        assert "[scanned]" in text
+        assert "Heartbeat result" in text
+        assert "A message" not in text
 
     def test_load_returns_empty_when_no_files(self, dp, anima_dir):
-        """Loading returns empty string when neither directory nor legacy file exists."""
+        """Loading returns empty string when no activity log exists."""
         text = dp._load_heartbeat_history()
         assert text == ""
 
     def test_load_across_multiple_days(self, dp, anima_dir):
         """Loading reads entries from multiple recent day files."""
-        history_dir = anima_dir / "shortterm" / "heartbeat_history"
-        history_dir.mkdir(parents=True)
-
-        # Write one entry per day for 3 days
-        for days_ago in range(3):
+        entries_by_date = {}
+        for days_ago in range(2):
             file_date = date.today() - timedelta(days=days_ago)
-            entry = json.dumps({
-                "timestamp": f"2026-02-{16 - days_ago}T10:00:00",
-                "trigger": "heartbeat",
-                "action": "checked",
+            date_str = file_date.isoformat()
+            entries_by_date[date_str] = [{
+                "ts": f"{date_str}T10:00:00",
+                "type": "heartbeat_end",
                 "summary": f"Day {days_ago} ago",
-                "duration_ms": 100,
-            }, ensure_ascii=False)
-            (history_dir / f"{file_date.isoformat()}.jsonl").write_text(
-                entry + "\n", encoding="utf-8",
-            )
+            }]
+        self._write_activity_entries(anima_dir, entries_by_date)
 
         text = dp._load_heartbeat_history()
         assert text != ""
         lines = text.strip().splitlines()
-        # _HEARTBEAT_HISTORY_N is 3, and we have 3 entries total
-        assert len(lines) == 3
+        assert len(lines) == 2

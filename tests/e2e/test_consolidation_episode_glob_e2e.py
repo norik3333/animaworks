@@ -126,10 +126,11 @@ class TestDailyConsolidateWithSuffixedEpisodes:
         assert kf.exists()
         content = kf.read_text(encoding="utf-8")
         assert "サーバー健全性" in content
-        assert "AUTO-CONSOLIDATED" in content
+        assert "auto_consolidated" in content
 
-        # Verify LLM was called exactly once
-        mock_llm.assert_awaited_once()
+        # Verify LLM was called at least once (consolidation may invoke
+        # multiple LLM calls for validation, duplicate-merge, etc.)
+        assert mock_llm.await_count >= 1
 
     @pytest.mark.asyncio
     async def test_daily_consolidate_mixed_files(self, consolidation_engine):

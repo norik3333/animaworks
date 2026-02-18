@@ -87,6 +87,7 @@ def patch_litellm(*responses: MagicMock):
 
     mock_module = MagicMock()
     mock_module.acompletion = mock_fn
+    mock_module.token_counter = MagicMock(return_value=100)
 
     saved = sys.modules.get("litellm")
     try:

@@ -33,6 +33,9 @@ def _install_litellm_mock(acompletion_mock: AsyncMock) -> MagicMock:
     """Install a mock litellm module into sys.modules."""
     mock_mod = MagicMock()
     mock_mod.acompletion = acompletion_mock
+    # token_counter must return a real int so that the pre-flight
+    # max_tokens clamping logic can compare with `<`.
+    mock_mod.token_counter = MagicMock(return_value=500)
     sys.modules.setdefault("litellm", mock_mod)
     return mock_mod
 

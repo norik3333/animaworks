@@ -222,7 +222,7 @@ class TestProcessMessage:
 
             observed_statuses = []
 
-            async def mock_run_cycle(prompt, trigger="manual"):
+            async def mock_run_cycle(prompt, trigger="manual", **kwargs):
                 observed_statuses.append(dp._status)
                 return _make_cycle_result()
 
@@ -386,8 +386,8 @@ class TestProcessGreet:
             # First call
             await dp.process_greet()
 
-            # Simulate cache expiry
-            dp._last_greet_at = time.time() - 301
+            # Simulate cache expiry (must exceed _GREET_COOLDOWN of 3600s)
+            dp._last_greet_at = time.time() - 3601
 
             # Second call after expiry
             result = await dp.process_greet()
@@ -446,7 +446,7 @@ class TestProcessGreet:
 
             observed_statuses = []
 
-            async def mock_run_cycle(prompt, trigger="manual"):
+            async def mock_run_cycle(prompt, trigger="manual", **kwargs):
                 observed_statuses.append(dp._status)
                 return _make_cycle_result(summary="Hello!")
 
@@ -537,13 +537,13 @@ class TestProcessMessageConversationSave:
             # Track call order via a shared list
             call_order: list[str] = []
             MockConv.return_value.append_turn.side_effect = (
-                lambda role, text: call_order.append(f"append_turn:{role}")
+                lambda role, text, **kwargs: call_order.append(f"append_turn:{role}")
             )
             MockConv.return_value.save.side_effect = (
                 lambda: call_order.append("save")
             )
 
-            async def mock_run_cycle(prompt, trigger="manual"):
+            async def mock_run_cycle(prompt, trigger="manual", **kwargs):
                 call_order.append("run_cycle")
                 return _make_cycle_result(summary="OK")
 
@@ -659,13 +659,13 @@ class TestProcessMessageStreamConversationSave:
 
             call_order: list[str] = []
             MockConv.return_value.append_turn.side_effect = (
-                lambda role, text: call_order.append(f"append_turn:{role}")
+                lambda role, text, **kwargs: call_order.append(f"append_turn:{role}")
             )
             MockConv.return_value.save.side_effect = (
                 lambda: call_order.append("save")
             )
 
-            async def mock_stream(prompt, trigger="manual"):
+            async def mock_stream(prompt, trigger="manual", **kwargs):
                 call_order.append("stream_start")
                 yield {"type": "text_delta", "text": "Hello"}
                 yield {
@@ -704,7 +704,7 @@ class TestProcessMessageStreamConversationSave:
             from core.anima import DigitalAnima
             dp = DigitalAnima(anima_dir, shared_dir)
 
-            async def mock_stream(prompt, trigger="manual"):
+            async def mock_stream(prompt, trigger="manual", **kwargs):
                 yield {"type": "text_delta", "text": "partial "}
                 yield {"type": "text_delta", "text": "response"}
                 raise RuntimeError("stream failed")
@@ -750,7 +750,7 @@ class TestProcessMessageStreamConversationSave:
             from core.anima import DigitalAnima
             dp = DigitalAnima(anima_dir, shared_dir)
 
-            async def mock_stream(prompt, trigger="manual"):
+            async def mock_stream(prompt, trigger="manual", **kwargs):
                 raise RuntimeError("immediate failure")
                 yield  # noqa: unreachable — makes this an async generator
 
@@ -789,7 +789,7 @@ class TestProcessMessageStreamConversationSave:
             from core.anima import DigitalAnima
             dp = DigitalAnima(anima_dir, shared_dir)
 
-            async def mock_stream(prompt, trigger="manual"):
+            async def mock_stream(prompt, trigger="manual", **kwargs):
                 yield {"type": "text_delta", "text": "Full "}
                 yield {"type": "text_delta", "text": "response"}
                 yield {

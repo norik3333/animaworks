@@ -11,11 +11,21 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from botocore.exceptions import ClientError as BotoClientError
+
 from core.tools.aws_collector import (
     AWSCollector,
     DEFAULT_ERROR_PATTERNS,
     get_tool_schemas,
 )
+
+
+def _make_client_error(message: str = "Access Denied") -> BotoClientError:
+    """Create a botocore ClientError for testing."""
+    return BotoClientError(
+        error_response={"Error": {"Code": "AccessDeniedException", "Message": message}},
+        operation_name="TestOperation",
+    )
 
 
 # ── Fixtures ──────────────────────────────────────────────────────
@@ -97,7 +107,7 @@ class TestGetEcsStatus:
         assert "error" in result
 
     def test_client_error(self, mock_boto3):
-        mock_boto3["ecs"].describe_services.side_effect = Exception("Access Denied")
+        mock_boto3["ecs"].describe_services.side_effect = _make_client_error("Access Denied")
         collector = AWSCollector()
         result = collector.get_ecs_status("cluster", "service")
         assert "error" in result
@@ -136,7 +146,7 @@ class TestGetEcsEvents:
         assert events == []
 
     def test_error(self, mock_boto3):
-        mock_boto3["ecs"].describe_services.side_effect = Exception("err")
+        mock_boto3["ecs"].describe_services.side_effect = _make_client_error("err")
         collector = AWSCollector()
         events = collector.get_ecs_events("cluster", "service")
         assert events == []
@@ -176,7 +186,7 @@ class TestGetErrorLogs:
             assert f"?{p}" in call_kwargs["filterPattern"]
 
     def test_error(self, mock_boto3):
-        mock_boto3["logs"].filter_log_events.side_effect = Exception("err")
+        mock_boto3["logs"].filter_log_events.side_effect = _make_client_error("err")
         collector = AWSCollector()
         logs = collector.get_error_logs("/ecs/svc")
         assert logs == []
@@ -226,7 +236,7 @@ class TestGetMetrics:
         assert result["summary"]["datapointCount"] == 0
 
     def test_error(self, mock_boto3):
-        mock_boto3["cloudwatch"].get_metric_statistics.side_effect = Exception("err")
+        mock_boto3["cloudwatch"].get_metric_statistics.side_effect = _make_client_error("err")
         collector = AWSCollector()
         result = collector.get_metrics("cluster", "service")
         assert result["datapoints"] == []

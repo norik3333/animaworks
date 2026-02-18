@@ -28,10 +28,14 @@ def _create_app(tmp_path: Path, anima_names: list[str] | None = None):
         patch("server.app.ProcessSupervisor") as mock_sup_cls,
         patch("server.app.load_config") as mock_cfg,
         patch("server.app.WebSocketManager") as mock_ws_cls,
+        patch("server.app.load_auth") as mock_auth,
     ):
         cfg = MagicMock()
         cfg.setup_complete = True
         mock_cfg.return_value = cfg
+        auth_cfg = MagicMock()
+        auth_cfg.auth_mode = "local_trust"
+        mock_auth.return_value = auth_cfg
         supervisor = MagicMock()
         supervisor.get_all_status.return_value = {}
         supervisor.get_process_status.return_value = {"status": "stopped", "pid": None}
@@ -43,6 +47,11 @@ def _create_app(tmp_path: Path, anima_names: list[str] | None = None):
         mock_ws_cls.return_value = ws_manager
         from server.app import create_app
         app = create_app(animas_dir, shared_dir)
+    # Persist auth mock beyond the with-block for request-time middleware
+    import server.app as _sa
+    _auth = MagicMock()
+    _auth.auth_mode = "local_trust"
+    _sa.load_auth = lambda: _auth
     if anima_names is not None:
         app.state.anima_names = anima_names
     return app

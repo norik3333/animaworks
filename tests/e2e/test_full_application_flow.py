@@ -455,7 +455,7 @@ async def test_consolidation_lifecycle(full_anima_environment, mock_llm):
             filepath = anima_dir / "knowledge" / filename
             assert filepath.exists()
             content = filepath.read_text(encoding="utf-8")
-            assert "[AUTO-CONSOLIDATED" in content
+            assert "auto_consolidated" in content
 
     # Days 3-6: Create more episodes
     for day_offset in range(1, 5):

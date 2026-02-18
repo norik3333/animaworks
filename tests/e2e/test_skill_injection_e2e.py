@@ -55,6 +55,7 @@ def _make_mock_memory(anima_dir: Path, tmp_path: Path) -> MagicMock:
     memory.list_procedure_files.return_value = []
     memory.list_shared_users.return_value = []
     memory.load_recent_heartbeat_summary.return_value = ""
+    memory.list_procedure_metas.return_value = []
     return memory
 
 

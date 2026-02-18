@@ -37,6 +37,7 @@ except ImportError:
 
 try:
     from core.memory.rag import MemoryIndexer, MemoryRetriever
+    import chromadb as _chromadb  # noqa: F401 — verify native dep is available
     RAG_AVAILABLE = True
 except ImportError:
     RAG_AVAILABLE = False
@@ -410,7 +411,7 @@ async def test_concurrent_priming(tmp_path):
     for i, result in enumerate(results):
         # Each result should be valid (not necessarily non-empty)
         assert isinstance(result.sender_profile, str)
-        assert isinstance(result.recent_episodes, str)
+        assert isinstance(result.recent_activity, str)
         assert isinstance(result.related_knowledge, str)
         assert isinstance(result.matched_skills, list)
 

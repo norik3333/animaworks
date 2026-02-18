@@ -89,6 +89,7 @@ def executor(model_config, anima_dir, memory):
 def _install_litellm_mock(mock: AsyncMock) -> MagicMock:
     mock_mod = MagicMock()
     mock_mod.acompletion = mock
+    mock_mod.token_counter = MagicMock(return_value=100)
     sys.modules.setdefault("litellm", mock_mod)
     return mock_mod
 
@@ -264,9 +265,9 @@ class TestBaseToolCount:
     """Verify the base tool set matches the design spec."""
 
     def test_base_tool_count(self, executor):
-        """Base tools should be 13 (4 memory + 4 file + 2 search + 1 discovery + 2 tool_management)."""
+        """Base tools should be 17 (4 memory + 4 messaging + 1 procedure + 4 file + 2 search + 1 discovery + 1 tool_management)."""
         tools = executor._build_base_tools()
-        assert len(tools) == 13
+        assert len(tools) == 17
         names = {t["function"]["name"] for t in tools}
         assert "search_code" in names
         assert "list_directory" in names
@@ -275,3 +276,7 @@ class TestBaseToolCount:
         assert "search_memory" in names
         assert "refresh_tools" in names
         assert "share_tool" in names
+        assert "post_channel" in names
+        assert "read_channel" in names
+        assert "read_dm_history" in names
+        assert "report_procedure_outcome" in names

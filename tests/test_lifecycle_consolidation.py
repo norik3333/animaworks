@@ -146,7 +146,7 @@ Test content from consolidation
         assert knowledge_file.exists()
         content = knowledge_file.read_text(encoding="utf-8")
         assert "Test Knowledge" in content
-        assert "AUTO-CONSOLIDATED" in content
+        assert "auto_consolidated: true" in content
 
 
 if __name__ == "__main__":

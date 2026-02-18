@@ -299,8 +299,10 @@ class TestNeedsCompression:
     def test_many_turns_large_content(self, conv):
         # Add many large turns to exceed threshold.
         # 200k window * 0.30 threshold = 60k tokens needed.
-        # Each turn: 8000 chars / 4 = 2000 tokens. 40 turns * 2000 = 80k > 60k
-        for i in range(20):
+        # Content is truncated at _MAX_STORED_CONTENT_CHARS (3000 chars),
+        # so each stored turn is ~3050 chars / 4 = ~762 tokens.
+        # Need at least 79 turns to exceed 60k tokens. Use 90 turns.
+        for i in range(45):
             conv.append_turn("human", "x" * 8000)
             conv.append_turn("assistant", "y" * 8000)
         assert conv.needs_compression() is True
@@ -313,8 +315,10 @@ class TestCompressIfNeeded:
         assert result is False
 
     async def test_compression_performed(self, conv):
-        # Add enough turns to trigger compression
-        for i in range(20):
+        # Add enough turns to trigger compression.
+        # Content is truncated at _MAX_STORED_CONTENT_CHARS (3000 chars),
+        # so each stored turn is ~762 tokens. Need 90 turns to exceed 60k threshold.
+        for i in range(45):
             conv.append_turn("human", "x" * 8000)
             conv.append_turn("assistant", "y" * 8000)
 
@@ -327,7 +331,8 @@ class TestCompressIfNeeded:
             assert state.compressed_turn_count > 0
 
     async def test_compression_failure_keeps_turns(self, conv):
-        for i in range(20):
+        # Add enough turns to trigger compression (same reasoning as above).
+        for i in range(45):
             conv.append_turn("human", "x" * 8000)
             conv.append_turn("assistant", "y" * 8000)
 

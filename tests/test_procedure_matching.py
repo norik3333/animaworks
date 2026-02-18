@@ -8,7 +8,6 @@ from __future__ import annotations
 
 """Unit tests for Phase 2: 3-tier matching + auto-injection for procedures."""
 
-import asyncio
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -200,7 +199,7 @@ class TestBuilderProcedureInjection:
 class TestPrimingChannelDProcedures:
     """Test that Channel D searches procedures/ in addition to skills/."""
 
-    def test_channel_d_matches_procedure_filename(self, anima_dir: Path) -> None:
+    async def test_channel_d_matches_procedure_filename(self, anima_dir: Path) -> None:
         """Procedure filenames should be matched in Channel D."""
         # Create a procedure file
         proc_dir = anima_dir / "procedures"
@@ -214,12 +213,10 @@ class TestPrimingChannelDProcedures:
 
         engine = PrimingEngine(anima_dir)
 
-        result = asyncio.get_event_loop().run_until_complete(
-            engine._channel_d_skill_match(["deploy"]),
-        )
+        result = await engine._channel_d_skill_match(["deploy"])
         assert "deploy-pipeline" in result
 
-    def test_channel_d_matches_procedure_content(self, anima_dir: Path) -> None:
+    async def test_channel_d_matches_procedure_content(self, anima_dir: Path) -> None:
         """Procedure file content should be matched in Channel D."""
         proc_dir = anima_dir / "procedures"
         proc_dir.mkdir(parents=True, exist_ok=True)
@@ -232,12 +229,10 @@ class TestPrimingChannelDProcedures:
 
         engine = PrimingEngine(anima_dir)
 
-        result = asyncio.get_event_loop().run_until_complete(
-            engine._channel_d_skill_match(["incident"]),
-        )
+        result = await engine._channel_d_skill_match(["incident"])
         assert "ops-runbook" in result
 
-    def test_channel_d_no_double_count(self, anima_dir: Path) -> None:
+    async def test_channel_d_no_double_count(self, anima_dir: Path) -> None:
         """Same-named skill and procedure should not produce duplicates."""
         skills_dir = anima_dir / "skills"
         proc_dir = anima_dir / "procedures"
@@ -251,8 +246,6 @@ class TestPrimingChannelDProcedures:
 
         engine = PrimingEngine(anima_dir)
 
-        result = asyncio.get_event_loop().run_until_complete(
-            engine._channel_d_skill_match(["deploy"]),
-        )
+        result = await engine._channel_d_skill_match(["deploy"])
         # "deploy" should appear only once due to dedup
         assert result.count("deploy") == 1

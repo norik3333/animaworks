@@ -321,51 +321,6 @@ class TestExtractPrompt:
         assert result is None
 
 
-# ── _extract_appearance_table ────────────────────────────────────
-
-
-class TestExtractAppearanceTable:
-    """Tests for _extract_appearance_table() helper."""
-
-    def test_extracts_known_fields(self) -> None:
-        """Extracts rows matching known appearance fields."""
-        from core.asset_reconciler import _extract_appearance_table
-
-        text = (
-            "# Identity\n"
-            "| 項目 | 設定 |\n"
-            "|------|------|\n"
-            "| 誕生日 | 7月20日 |\n"
-            "| 髪型 | ショートボブ |\n"
-            "| 髪色 | ネイビーブルー |\n"
-            "| 瞳の色 | サファイアブルー |\n"
-            "| 上司 | rin |\n"
-        )
-        result = _extract_appearance_table(text)
-        assert result is not None
-        assert "髪型: ショートボブ" in result
-        assert "髪色: ネイビーブルー" in result
-        assert "瞳の色: サファイアブルー" in result
-        # Non-appearance fields should be excluded
-        assert "誕生日" not in result
-        assert "上司" not in result
-
-    def test_returns_none_no_table(self) -> None:
-        """Returns None when no table rows are found."""
-        from core.asset_reconciler import _extract_appearance_table
-
-        result = _extract_appearance_table("# Test\nJust text.\n")
-        assert result is None
-
-    def test_returns_none_no_appearance_fields(self) -> None:
-        """Returns None when table has no appearance-related fields."""
-        from core.asset_reconciler import _extract_appearance_table
-
-        text = "| 誕生日 | 7月20日 |\n| 星座 | 蟹座 |\n"
-        result = _extract_appearance_table(text)
-        assert result is None
-
-
 # ── reconcile_anima_assets ──────────────────────────────────────
 
 

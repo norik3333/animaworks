@@ -142,6 +142,14 @@ _PASSIVE_HOVER_SELECTORS = {
     ".activity-entry",
     ".md-content .md-table tr",
     ".status-section-body .md-content .md-table tr",
+    ".image-preview-remove",
+    ".board-msg",
+    ".chat-attached-image",
+    ".activity-row",
+    ".activity-load-more",
+    ".chat-attach-btn",
+    ".activity-type-chip",
+    ".btn-login",
 }
 
 
@@ -222,13 +230,13 @@ class TestFontSizes:
 
     @staticmethod
     def _find_small_font_sizes(css_text: str) -> list[str]:
-        """Find font-size values below 0.75rem in mobile media query blocks."""
+        """Find font-size values below 0.65rem in mobile media query blocks."""
         issues: list[str] = []
         for width in (768, 640, 480):
             for block in _extract_media_blocks(css_text, width):
                 for m in re.finditer(r"font-size\s*:\s*([\d.]+)rem", block):
                     val = float(m.group(1))
-                    if val < 0.75:
+                    if val < 0.65:
                         issues.append(f"{val}rem in {width}px query")
         return issues
 

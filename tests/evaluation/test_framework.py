@@ -20,6 +20,8 @@ from tempfile import TemporaryDirectory
 
 import pytest
 
+pytest.importorskip("numpy")
+
 from framework import (
     ConversationLength,
     Domain,

@@ -8,9 +8,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import numpy as np
-import pandas as pd
 import pytest
+
+np = pytest.importorskip("numpy")
+pd = pytest.importorskip("pandas")
 
 from tests.evaluation.framework.visualization import ExperimentVisualizer
 

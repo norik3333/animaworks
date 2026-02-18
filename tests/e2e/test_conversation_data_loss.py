@@ -159,7 +159,7 @@ class TestConversationDataLossProtection:
         dp = _make_anima_with_mocks(anima_dir, shared_dir)
 
         # Streaming yields some text_delta chunks, then raises
-        async def _failing_stream(prompt, trigger=""):
+        async def _failing_stream(prompt, trigger="", **kwargs):
             yield {"type": "text_delta", "text": "Partial "}
             yield {"type": "text_delta", "text": "response"}
             raise RuntimeError("Stream interrupted")

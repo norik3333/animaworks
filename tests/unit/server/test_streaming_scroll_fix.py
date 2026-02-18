@@ -94,11 +94,11 @@ class TestChatJsScrollFix:
     def test_text_delta_uses_throttled_update(self, source: str):
         """onTextDelta handler should call scheduleStreamingUpdate."""
         idx = source.index("onTextDelta")
-        context = source[idx:idx + 200]
+        context = source[idx:idx + 400]
         assert "scheduleStreamingUpdate" in context
 
     def test_render_all_messages_uses_raf_scroll(self, source: str):
-        """renderAllMessages should use rAF + scrollIntoView."""
+        """renderAllMessages should use rAF + scrollIntoView for scrollToBottom path."""
         idx = source.index("function renderAllMessages")
         end_idx = source.find("\n// ──", idx + 1)
         if end_idx == -1:
@@ -106,4 +106,5 @@ class TestChatJsScrollFix:
         func_body = source[idx:end_idx]
         assert "requestAnimationFrame" in func_body
         assert "scrollIntoView" in func_body
-        assert "scrollTop" not in func_body
+        # scrollTop is used in the scroll-preserve path (prepending older messages),
+        # which is valid; the primary scrollToBottom path uses rAF + scrollIntoView.

@@ -87,7 +87,9 @@ class TestSupervisorSchedulerInit:
 
         assert sup.scheduler.running
         jobs = sup.scheduler.get_jobs()
-        assert len(jobs) == 0
+        # Monthly forgetting job is always present (not governed by consolidation config)
+        assert len(jobs) == 1
+        assert jobs[0].id == "system_monthly_forgetting"
 
         sup.scheduler.shutdown(wait=False)
 

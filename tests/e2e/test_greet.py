@@ -74,8 +74,8 @@ class TestGreetE2E:
         ) as mock_cycle:
             await dp.process_greet()
 
-            # Simulate cache expiry (set last greet to 6 minutes ago)
-            dp._last_greet_at = time.time() - 360
+            # Simulate cache expiry (set last greet to beyond the 1-hour cooldown)
+            dp._last_greet_at = time.time() - 3601
 
             result = await dp.process_greet()
             assert result["cached"] is False

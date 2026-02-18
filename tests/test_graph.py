@@ -10,6 +10,8 @@ from pathlib import Path
 
 import pytest
 
+pytest.importorskip("scipy")
+
 from core.memory.rag.graph import KnowledgeGraph
 
 
@@ -18,11 +20,11 @@ class MockVectorStore:
 
     def query(self, collection, embedding, top_k):
         """Mock query method."""
-        from core.memory.rag.store import Document, QueryResult
+        from core.memory.rag.store import Document, SearchResult
 
         # Return mock results
         return [
-            QueryResult(
+            SearchResult(
                 document=Document(
                     id=f"anima/knowledge/related{i}.md#0",
                     content=f"Related content {i}",
