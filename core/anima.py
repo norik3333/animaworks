@@ -22,7 +22,7 @@ from core.memory.activity import ActivityLogger
 from core.memory.streaming_journal import StreamingJournal
 from core.memory.conversation import ConversationMemory
 from core.memory import MemoryManager
-from core.messenger import Messenger
+from core.messenger import InboxItem, Messenger
 from core.paths import load_prompt
 from core.schemas import CycleResult, AnimaStatus, VALID_EMOTIONS
 
@@ -752,9 +752,11 @@ class DigitalAnima:
                 # Read unread messages but do NOT archive yet.
                 # Messages stay in inbox until the agent replies to each sender.
                 unread_count = 0
+                inbox_items: list[InboxItem] = []
                 senders: set[str] = set()
                 if self.messenger.has_unread():
-                    messages = self.messenger.receive()
+                    inbox_items = self.messenger.receive_with_paths()
+                    messages = [item.msg for item in inbox_items]
                     unread_count = len(messages)
                     senders = {m.from_person for m in messages}
                     logger.info(
@@ -907,7 +909,7 @@ class DigitalAnima:
                                 "(may have replied via Bash)",
                                 self.name, ", ".join(unreplied),
                             )
-                        total_archived = self.messenger.archive_all()
+                        total_archived = self.messenger.archive_paths(inbox_items)
                         logger.info(
                             "[%s] Archived %d messages from heartbeat",
                             self.name, total_archived,
