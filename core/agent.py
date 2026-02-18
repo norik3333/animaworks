@@ -953,7 +953,7 @@ class AgentCore:
                         yield chunk
 
             except Exception as e:
-                from core.execution.agent_sdk import StreamDisconnectedError
+                from core.execution.base import StreamDisconnectedError
 
                 is_stream_error = isinstance(e, StreamDisconnectedError)
                 if not is_stream_error:

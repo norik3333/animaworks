@@ -18,14 +18,21 @@ context threshold is crossed mid-conversation.
 import asyncio
 import json as _json
 import logging
+from collections.abc import AsyncGenerator
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
 from typing import Any
 
-from core.prompt.context import CHARS_PER_TOKEN, ContextTracker, _resolve_context_window
+from core.prompt.context import ContextTracker, _resolve_context_window
 from core.execution._session import build_continuation_prompt, handle_session_chaining
-from core.execution.base import BaseExecutor, ExecutionResult
+from core.execution._streaming import (
+    accumulate_tool_call_chunks,
+    parse_accumulated_tool_calls,
+    stream_error_boundary,
+)
+from core.execution.base import BaseExecutor, ExecutionResult, StreamDisconnectedError
 from core.memory import MemoryManager
 from core.prompt.builder import build_system_prompt
 from core.schemas import ModelConfig
@@ -47,6 +54,27 @@ _tool_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="tool-quic
 
 # Dedicated thread-pool for long-running background tools (image gen, local LLM, etc.)
 _bg_tool_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="tool-bg")
+
+
+# ── M1: Module-level dataclass replacing dynamic _FakeTC ─────
+
+
+@dataclass
+class _ToolCallShim:
+    """Lightweight shim to satisfy ``_partition_tool_calls`` / ``_execute_tool_call``.
+
+    Adapts parsed tool-call dicts (from ``parse_accumulated_tool_calls`` or
+    iteration-level LiteLLM responses) into the ``.id`` / ``.function.name``
+    / ``.function.arguments`` interface expected by partitioning and execution.
+    """
+
+    @dataclass
+    class _Function:
+        name: str
+        arguments: str
+
+    id: str
+    function: _Function
 
 
 def _partition_tool_calls(
@@ -104,6 +132,12 @@ class LiteLLMExecutor(BaseExecutor):
         self._tool_registry = tool_registry
         self._memory = memory
         self._personal_tools = personal_tools or {}
+
+    @property
+    def _is_ollama_model(self) -> bool:
+        """Return True if the configured model is served via Ollama."""
+        model = self._model_config.model
+        return model.startswith("ollama/") or model.startswith("ollama_chat/")
 
     def _build_base_tools(self) -> list[dict[str, Any]]:
         """Build the base LiteLLM-format tool list (no external tools)."""
@@ -218,6 +252,8 @@ class LiteLLMExecutor(BaseExecutor):
         )
         return {"role": "tool", "tool_call_id": tc.id, "content": result}
 
+    # ── C3b: execute() uses _build_initial_messages / _preflight_clamp ──
+
     async def execute(
         self,
         prompt: str,
@@ -236,26 +272,7 @@ class LiteLLMExecutor(BaseExecutor):
         tools = self._build_base_tools()
         active_categories: set[str] = set()
 
-        # Build initial messages with optional image content (OpenAI vision format)
-        if images:
-            content_parts: list[dict[str, Any]] = []
-            for img in images:
-                content_parts.append({
-                    "type": "image_url",
-                    "image_url": {
-                        "url": f"data:{img['media_type']};base64,{img['data']}",
-                    },
-                })
-            content_parts.append({"type": "text", "text": prompt})
-            messages: list[dict[str, Any]] = [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": content_parts},
-            ]
-        else:
-            messages: list[dict[str, Any]] = [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": prompt},
-            ]
+        messages = self._build_initial_messages(system_prompt, prompt, images)
         all_response_text: list[str] = []
         llm_kwargs = self._build_llm_kwargs()
         max_iterations = self._model_config.max_turns
@@ -268,49 +285,14 @@ class LiteLLMExecutor(BaseExecutor):
             )
 
             # ── Pre-flight: clamp max_tokens to fit context window ──
-            try:
-                from core.config import load_config
-                _cw_overrides = load_config().model_context_windows
-            except Exception:
-                _cw_overrides = None
-            ctx_window = _resolve_context_window(
-                self._model_config.model, _cw_overrides,
+            iter_kwargs = self._preflight_clamp(
+                llm_kwargs, messages, tools, litellm,
             )
-            try:
-                est_input = litellm.token_counter(
-                    model=self._model_config.model,
-                    messages=messages,
-                    tools=tools,
+            if iter_kwargs is None:
+                return ExecutionResult(
+                    text=f"[Error: prompt too large for "
+                    f"{self._model_config.model}]",
                 )
-            except Exception:
-                # Fallback to conservative char-based estimate (2 chars/token
-                # handles CJK better than the default 4)
-                msg_chars = sum(len(str(m.get("content", ""))) for m in messages)
-                tool_chars = len(_json.dumps(tools)) if tools else 0
-                est_input = (msg_chars + tool_chars) // 2
-            available = ctx_window - est_input
-            configured_max = llm_kwargs.get("max_tokens", 4096)
-            iter_kwargs = llm_kwargs
-
-            if available < configured_max:
-                if available - 128 < 256:
-                    logger.error(
-                        "Prompt too large for context window: "
-                        "~%d tokens input, %d window",
-                        est_input, ctx_window,
-                    )
-                    return ExecutionResult(
-                        text=f"[Error: prompt too large for "
-                        f"{self._model_config.model} "
-                        f"(~{est_input} tokens, window {ctx_window})]",
-                    )
-                clamped = available - 128
-                logger.info(
-                    "Clamping max_tokens %d -> %d "
-                    "(est_input ~%d, window %d)",
-                    configured_max, clamped, est_input, ctx_window,
-                )
-                iter_kwargs = {**llm_kwargs, "max_tokens": clamped}
 
             try:
                 response = await litellm.acompletion(
@@ -380,111 +362,606 @@ class LiteLLMExecutor(BaseExecutor):
             )
             messages.append(message.model_dump())
 
-            # Phase 1: Parse arguments and handle discover_tools / JSON errors
-            pending_calls: list[tuple] = []  # (tc, fn_args)
-            for tc in tool_calls:
-                fn_name = tc.function.name
-
-                # JSON parse with structured error on failure
-                try:
-                    fn_args = _json.loads(tc.function.arguments)
-                except _json.JSONDecodeError as e:
-                    messages.append({
-                        "role": "tool",
-                        "tool_call_id": tc.id,
-                        "content": _json.dumps({
-                            "status": "error",
-                            "error_type": "InvalidArguments",
-                            "message": f"Failed to parse tool arguments: {e}",
-                            "context": {"raw_arguments": tc.function.arguments[:500]},
-                            "suggestion": "Ensure arguments are valid JSON",
-                        }, ensure_ascii=False),
-                    })
-                    continue
-
-                # Handle discover_tools inline
-                if fn_name == "discover_tools":
-                    category = fn_args.get("category")
-                    if category is None:
-                        result = self._list_tool_categories()
-                    elif category not in active_categories:
-                        new_schemas = self._activate_category(category)
-                        if new_schemas:
-                            tools.extend(to_litellm_format(new_schemas))
-                            active_categories.add(category)
-                            result = f"Activated {len(new_schemas)} tools for '{category}'"
-                        else:
-                            result = f"No tools found for category '{category}'"
-                    else:
-                        result = f"Category '{category}' is already active"
-                    messages.append({
-                        "role": "tool",
-                        "tool_call_id": tc.id,
-                        "content": result,
-                    })
-                    continue
-
-                # Handle refresh_tools inline — hot-reload personal/common tools
-                if fn_name == "refresh_tools":
-                    result = self._refresh_tools_inline(tools)
-                    messages.append({
-                        "role": "tool",
-                        "tool_call_id": tc.id,
-                        "content": result,
-                    })
-                    continue
-
-                pending_calls.append((tc, fn_args))
-
-            # Phase 2: Execute remaining tool calls with parallelism
-            if pending_calls:
-                parallel, serial_batches = _partition_tool_calls(
-                    [tc for tc, _ in pending_calls],
-                )
-                # Build args lookup by tool_call_id
-                args_map = {tc.id: fn_args for tc, fn_args in pending_calls}
-
-                # Parallel batch
-                if parallel:
-                    coros = [
-                        self._execute_tool_call(tc, args_map[tc.id])
-                        for tc in parallel
-                    ]
-                    results = await asyncio.gather(*coros, return_exceptions=True)
-                    for i, r in enumerate(results):
-                        if isinstance(r, Exception):
-                            logger.warning("Parallel tool execution error: %s", r)
-                            messages.append({
-                                "role": "tool",
-                                "tool_call_id": parallel[i].id,
-                                "content": _json.dumps({
-                                    "status": "error",
-                                    "error_type": "ExecutionError",
-                                    "message": str(r),
-                                }, ensure_ascii=False),
-                            })
-                        else:
-                            messages.append(r)
-
-                # Serial batches (same-path writes)
-                for batch in serial_batches:
-                    for tc in batch:
-                        try:
-                            r = await self._execute_tool_call(tc, args_map[tc.id])
-                            messages.append(r)
-                        except Exception as e:
-                            logger.warning("Serial tool execution error: %s", e)
-                            messages.append({
-                                "role": "tool",
-                                "tool_call_id": tc.id,
-                                "content": _json.dumps({
-                                    "status": "error",
-                                    "error_type": "ExecutionError",
-                                    "message": str(e),
-                                }, ensure_ascii=False),
-                            })
+            # Convert and delegate to shared tool-call processor
+            parsed_calls = _convert_litellm_tool_calls(tool_calls)
+            async for _event in self._process_streaming_tool_calls(
+                parsed_calls, messages, tools, active_categories,
+            ):
+                pass  # tool_end events not needed in non-streaming execute()
 
         logger.warning("A2 max iterations (%d) reached", max_iterations)
         return ExecutionResult(
             text="\n".join(all_response_text) or "(max iterations reached)",
         )
+
+    # ── Streaming execution ──────────────────────────────────
+
+    async def execute_streaming(
+        self,
+        system_prompt: str,
+        prompt: str,
+        tracker: ContextTracker,
+        images: list[dict[str, Any]] | None = None,
+    ) -> AsyncGenerator[dict[str, Any], None]:
+        """Stream execution events from the LiteLLM tool-use loop.
+
+        Dispatches to token-level streaming (non-Ollama) or iteration-level
+        streaming (Ollama) based on the model type.
+
+        Yields:
+            Event dicts: ``text_delta``, ``tool_start``, ``tool_end``, ``done``.
+        """
+        if self._is_ollama_model:
+            async for event in self._stream_iteration_level(
+                system_prompt, prompt, tracker, images,
+            ):
+                yield event
+        else:
+            async for event in self._stream_token_level(
+                system_prompt, prompt, tracker, images,
+            ):
+                yield event
+
+    # ── Token-level streaming (GPT-4o, Gemini, etc.) ─────────
+
+    async def _stream_token_level(
+        self,
+        system_prompt: str,
+        prompt: str,
+        tracker: ContextTracker,
+        images: list[dict[str, Any]] | None = None,
+    ) -> AsyncGenerator[dict[str, Any], None]:
+        """Token-level streaming via ``litellm.acompletion(stream=True)``.
+
+        Note: Session chaining is NOT handled in streaming -- AgentCore
+        manages that externally.
+        """
+        import litellm
+
+        tools = self._build_base_tools()
+        active_categories: set[str] = set()
+
+        messages = self._build_initial_messages(system_prompt, prompt, images)
+        all_response_text: list[str] = []
+        llm_kwargs = self._build_llm_kwargs()
+        max_iterations = self._model_config.max_turns
+
+        async with stream_error_boundary(
+            all_response_text, executor_name="A2-stream",
+        ):
+            for iteration in range(max_iterations):
+                logger.debug(
+                    "A2 stream iteration=%d messages=%d",
+                    iteration, len(messages),
+                )
+
+                # ── Pre-flight: clamp max_tokens to fit context window ──
+                iter_kwargs = self._preflight_clamp(
+                    llm_kwargs, messages, tools, litellm,
+                )
+                if iter_kwargs is None:
+                    # Prompt too large -- emit error and stop
+                    error_msg = (
+                        f"[Error: prompt too large for "
+                        f"{self._model_config.model}]"
+                    )
+                    yield {"type": "text_delta", "text": error_msg}
+                    yield {
+                        "type": "done",
+                        "full_text": error_msg,
+                        "result_message": None,
+                    }
+                    return
+
+                # Stream the LLM response
+                response = await litellm.acompletion(
+                    messages=messages,
+                    tools=tools,
+                    stream=True,
+                    stream_options={"include_usage": True},
+                    **iter_kwargs,
+                )
+
+                # Accumulate streamed chunks
+                iter_text_parts: list[str] = []
+                tool_calls_acc: dict[int, dict[str, Any]] = {}
+                finish_reason: str | None = None
+                usage_data: dict[str, int] | None = None
+
+                async for chunk in response:
+                    choice = chunk.choices[0] if chunk.choices else None
+                    if choice is None:
+                        # Usage-only chunk (last chunk with stream_options)
+                        if hasattr(chunk, "usage") and chunk.usage:
+                            usage_data = {
+                                "input_tokens": chunk.usage.prompt_tokens or 0,
+                                "output_tokens": chunk.usage.completion_tokens or 0,
+                            }
+                        continue
+
+                    # H4: null check for choice.delta
+                    delta = choice.delta
+                    if not delta:
+                        continue
+
+                    # Text content
+                    if delta.content:
+                        iter_text_parts.append(delta.content)
+                        yield {"type": "text_delta", "text": delta.content}
+
+                    # H1: Use accumulate_tool_call_chunks return value
+                    if delta.tool_calls:
+                        new_tool_names = accumulate_tool_call_chunks(
+                            tool_calls_acc, delta.tool_calls,
+                        )
+                        for tool_name in new_tool_names:
+                            for idx, entry in tool_calls_acc.items():
+                                if entry["name"] == tool_name:
+                                    yield {
+                                        "type": "tool_start",
+                                        "tool_name": tool_name,
+                                        "tool_id": entry["id"],
+                                    }
+                                    break
+
+                    # Check finish reason
+                    if choice.finish_reason:
+                        finish_reason = choice.finish_reason
+
+                    # Usage from choice-bearing chunk
+                    if hasattr(chunk, "usage") and chunk.usage:
+                        usage_data = {
+                            "input_tokens": chunk.usage.prompt_tokens or 0,
+                            "output_tokens": chunk.usage.completion_tokens or 0,
+                        }
+
+                # Update context tracker
+                if tracker and usage_data:
+                    tracker.update_from_usage(usage_data)
+
+                iter_text = "".join(iter_text_parts)
+                if iter_text:
+                    all_response_text.append(iter_text)
+
+                # ── No tool calls: final response ──
+                if not tool_calls_acc:
+                    full_text = "\n".join(all_response_text)
+                    logger.debug(
+                        "A2 stream final response at iteration=%d", iteration,
+                    )
+                    yield {
+                        "type": "done",
+                        "full_text": full_text,
+                        "result_message": None,
+                    }
+                    return
+
+                # ── Process tool calls ──
+                parsed_calls = parse_accumulated_tool_calls(tool_calls_acc)
+                logger.info(
+                    "A2 stream tool calls at iteration=%d: %s",
+                    iteration,
+                    ", ".join(tc["name"] for tc in parsed_calls),
+                )
+
+                # Reconstruct assistant message for conversation history
+                assistant_tool_calls = []
+                for tc in parsed_calls:
+                    assistant_tool_calls.append({
+                        "id": tc["id"],
+                        "type": "function",
+                        "function": {
+                            "name": tc["name"],
+                            "arguments": (
+                                _json.dumps(tc["arguments"], ensure_ascii=False)
+                                if tc["arguments"] is not None
+                                else tc.get("raw_arguments", "")
+                            ),
+                        },
+                    })
+                assistant_msg: dict[str, Any] = {
+                    "role": "assistant",
+                    "content": iter_text or None,
+                    "tool_calls": assistant_tool_calls,
+                }
+                messages.append(assistant_msg)
+
+                # H2: Execute tool calls and yield tool_end per-tool
+                async for event in self._process_streaming_tool_calls(
+                    parsed_calls, messages, tools, active_categories,
+                ):
+                    yield event
+
+        # If we exit the loop without returning, max iterations reached
+        full_text = "\n".join(all_response_text) or "(max iterations reached)"
+        logger.warning("A2 stream max iterations (%d) reached", max_iterations)
+        yield {
+            "type": "done",
+            "full_text": full_text,
+            "result_message": None,
+        }
+
+    # ── Iteration-level streaming (Ollama) ───────────────────
+
+    async def _stream_iteration_level(
+        self,
+        system_prompt: str,
+        prompt: str,
+        tracker: ContextTracker,
+        images: list[dict[str, Any]] | None = None,
+    ) -> AsyncGenerator[dict[str, Any], None]:
+        """Iteration-level streaming for Ollama models.
+
+        Each LLM call is blocking (no token streaming). After each
+        iteration, the full text and tool events are yielded.
+
+        Note: Session chaining is NOT handled in streaming -- AgentCore
+        manages that externally.
+        """
+        import litellm
+
+        tools = self._build_base_tools()
+        active_categories: set[str] = set()
+
+        messages = self._build_initial_messages(system_prompt, prompt, images)
+        all_response_text: list[str] = []
+        llm_kwargs = self._build_llm_kwargs()
+        max_iterations = self._model_config.max_turns
+
+        async with stream_error_boundary(
+            all_response_text, executor_name="A2-ollama-stream",
+        ):
+            for iteration in range(max_iterations):
+                logger.debug(
+                    "A2 ollama stream iteration=%d messages=%d",
+                    iteration, len(messages),
+                )
+
+                # ── Pre-flight: clamp max_tokens to fit context window ──
+                iter_kwargs = self._preflight_clamp(
+                    llm_kwargs, messages, tools, litellm,
+                )
+                if iter_kwargs is None:
+                    error_msg = (
+                        f"[Error: prompt too large for "
+                        f"{self._model_config.model}]"
+                    )
+                    yield {"type": "text_delta", "text": error_msg}
+                    yield {
+                        "type": "done",
+                        "full_text": error_msg,
+                        "result_message": None,
+                    }
+                    return
+
+                response = await litellm.acompletion(
+                    messages=messages,
+                    tools=tools,
+                    **iter_kwargs,
+                )
+
+                choice = response.choices[0]
+                message = choice.message
+
+                # ── Context tracking ──
+                if tracker and hasattr(response, "usage") and response.usage:
+                    usage_dict = {
+                        "input_tokens": response.usage.prompt_tokens or 0,
+                        "output_tokens": response.usage.completion_tokens or 0,
+                    }
+                    tracker.update_from_usage(usage_dict)
+
+                # ── Yield iteration text ──
+                iter_text = message.content or ""
+                if iter_text:
+                    all_response_text.append(iter_text)
+                    yield {"type": "text_delta", "text": iter_text}
+
+                # ── Check for tool calls ──
+                tool_calls = message.tool_calls
+                if not tool_calls:
+                    full_text = "\n".join(all_response_text)
+                    logger.debug(
+                        "A2 ollama stream final response at iteration=%d",
+                        iteration,
+                    )
+                    yield {
+                        "type": "done",
+                        "full_text": full_text,
+                        "result_message": None,
+                    }
+                    return
+
+                # ── C1: Patch Ollama tool_call IDs BEFORE model_dump ──
+                for i, tc in enumerate(tool_calls):
+                    if not tc.id:
+                        tc.id = f"ollama_{iteration}_{i}"
+
+                logger.info(
+                    "A2 ollama stream tool calls at iteration=%d: %s",
+                    iteration,
+                    ", ".join(tc.function.name for tc in tool_calls),
+                )
+                messages.append(message.model_dump())
+
+                # Yield tool_start events
+                for tc in tool_calls:
+                    yield {
+                        "type": "tool_start",
+                        "tool_name": tc.function.name,
+                        "tool_id": tc.id,
+                    }
+
+                # C3a: Convert iteration-level tool_calls to parsed dict
+                # format and delegate to _process_streaming_tool_calls
+                parsed_calls = _convert_litellm_tool_calls(tool_calls)
+
+                # H2: Execute and yield tool_end per-tool in real-time
+                async for event in self._process_streaming_tool_calls(
+                    parsed_calls, messages, tools, active_categories,
+                ):
+                    yield event
+
+        # Max iterations reached
+        full_text = "\n".join(all_response_text) or "(max iterations reached)"
+        logger.warning(
+            "A2 ollama stream max iterations (%d) reached", max_iterations,
+        )
+        yield {
+            "type": "done",
+            "full_text": full_text,
+            "result_message": None,
+        }
+
+    # ── Shared helpers for streaming ─────────────────────────
+
+    def _build_initial_messages(
+        self,
+        system_prompt: str,
+        prompt: str,
+        images: list[dict[str, Any]] | None,
+    ) -> list[dict[str, Any]]:
+        """Build the initial messages list for an LLM call."""
+        if images:
+            content_parts: list[dict[str, Any]] = []
+            for img in images:
+                content_parts.append({
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:{img['media_type']};base64,{img['data']}",
+                    },
+                })
+            content_parts.append({"type": "text", "text": prompt})
+            return [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": content_parts},
+            ]
+        return [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": prompt},
+        ]
+
+    def _preflight_clamp(
+        self,
+        llm_kwargs: dict[str, Any],
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]],
+        litellm: Any,
+    ) -> dict[str, Any] | None:
+        """Pre-flight context window check, clamping max_tokens if needed.
+
+        Returns the (possibly adjusted) kwargs dict, or ``None`` if the
+        prompt is too large to fit in the context window at all.
+        """
+        try:
+            from core.config import load_config
+            _cw_overrides = load_config().model_context_windows
+        except Exception:
+            _cw_overrides = None
+        ctx_window = _resolve_context_window(
+            self._model_config.model, _cw_overrides,
+        )
+        try:
+            est_input = litellm.token_counter(
+                model=self._model_config.model,
+                messages=messages,
+                tools=tools,
+            )
+        except Exception:
+            msg_chars = sum(len(str(m.get("content", ""))) for m in messages)
+            tool_chars = len(_json.dumps(tools)) if tools else 0
+            est_input = (msg_chars + tool_chars) // 2
+        available = ctx_window - est_input
+        configured_max = llm_kwargs.get("max_tokens", 4096)
+
+        if available < configured_max:
+            if available - 128 < 256:
+                logger.error(
+                    "Prompt too large for context window: "
+                    "~%d tokens input, %d window",
+                    est_input, ctx_window,
+                )
+                return None
+            clamped = available - 128
+            logger.info(
+                "Clamping max_tokens %d -> %d "
+                "(est_input ~%d, window %d)",
+                configured_max, clamped, est_input, ctx_window,
+            )
+            return {**llm_kwargs, "max_tokens": clamped}
+
+        return llm_kwargs
+
+    # H2: _process_streaming_tool_calls is now an async generator
+    # that yields tool_end events after each individual tool completes.
+
+    async def _process_streaming_tool_calls(
+        self,
+        parsed_calls: list[dict[str, Any]],
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]],
+        active_categories: set[str],
+    ) -> AsyncGenerator[dict[str, Any], None]:
+        """Process parsed tool calls: discover_tools, refresh_tools, and execute.
+
+        Appends tool result messages to ``messages`` in place.  Yields
+        ``tool_end`` events after each individual tool completes so the
+        caller can forward them to the client in real-time.
+        """
+        pending_calls: list[tuple[dict[str, Any], dict[str, Any]]] = []
+
+        for tc in parsed_calls:
+            fn_name = tc["name"]
+            fn_args = tc["arguments"]
+            tc_id = tc["id"]
+
+            # Handle unparseable arguments
+            if fn_args is None:
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": tc_id,
+                    "content": _json.dumps({
+                        "status": "error",
+                        "error_type": "InvalidArguments",
+                        "message": "Failed to parse tool arguments",
+                        "context": {"raw_arguments": (tc.get("raw_arguments") or "")[:500]},
+                        "suggestion": "Ensure arguments are valid JSON",
+                    }, ensure_ascii=False),
+                })
+                yield {"type": "tool_end", "tool_id": tc_id, "tool_name": fn_name}
+                continue
+
+            # Handle discover_tools inline
+            if fn_name == "discover_tools":
+                category = fn_args.get("category")
+                if category is None:
+                    result = self._list_tool_categories()
+                elif category not in active_categories:
+                    new_schemas = self._activate_category(category)
+                    if new_schemas:
+                        tools.extend(to_litellm_format(new_schemas))
+                        active_categories.add(category)
+                        result = f"Activated {len(new_schemas)} tools for '{category}'"
+                    else:
+                        result = f"No tools found for category '{category}'"
+                else:
+                    result = f"Category '{category}' is already active"
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": tc_id,
+                    "content": result,
+                })
+                yield {"type": "tool_end", "tool_id": tc_id, "tool_name": fn_name}
+                continue
+
+            # Handle refresh_tools inline
+            if fn_name == "refresh_tools":
+                result = self._refresh_tools_inline(tools)
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": tc_id,
+                    "content": result,
+                })
+                yield {"type": "tool_end", "tool_id": tc_id, "tool_name": fn_name}
+                continue
+
+            pending_calls.append((tc, fn_args))
+
+        # Execute remaining tool calls with parallelism
+        if not pending_calls:
+            return
+
+        # M1: Use _ToolCallShim dataclass instead of dynamic type()
+        shims = [
+            _ToolCallShim(
+                id=tc["id"],
+                function=_ToolCallShim._Function(
+                    name=tc["name"],
+                    arguments=(
+                        _json.dumps(tc["arguments"], ensure_ascii=False)
+                        if tc["arguments"] is not None
+                        else ""
+                    ),
+                ),
+            )
+            for tc, _ in pending_calls
+        ]
+        args_map = {tc["id"]: fn_args for tc, fn_args in pending_calls}
+
+        parallel, serial_batches = _partition_tool_calls(shims)
+
+        if parallel:
+            coros = [
+                self._execute_tool_call(shim, args_map[shim.id])
+                for shim in parallel
+            ]
+            results = await asyncio.gather(*coros, return_exceptions=True)
+            for i, r in enumerate(results):
+                if isinstance(r, Exception):
+                    logger.warning("Parallel tool execution error: %s", r)
+                    messages.append({
+                        "role": "tool",
+                        "tool_call_id": parallel[i].id,
+                        "content": _json.dumps({
+                            "status": "error",
+                            "error_type": "ExecutionError",
+                            "message": str(r),
+                        }, ensure_ascii=False),
+                    })
+                else:
+                    messages.append(r)
+                yield {
+                    "type": "tool_end",
+                    "tool_id": parallel[i].id,
+                    "tool_name": parallel[i].function.name,
+                }
+
+        for batch in serial_batches:
+            for shim in batch:
+                try:
+                    r = await self._execute_tool_call(shim, args_map[shim.id])
+                    messages.append(r)
+                except Exception as e:
+                    logger.warning("Serial tool execution error: %s", e)
+                    messages.append({
+                        "role": "tool",
+                        "tool_call_id": shim.id,
+                        "content": _json.dumps({
+                            "status": "error",
+                            "error_type": "ExecutionError",
+                            "message": str(e),
+                        }, ensure_ascii=False),
+                    })
+                yield {
+                    "type": "tool_end",
+                    "tool_id": shim.id,
+                    "tool_name": shim.function.name,
+                }
+
+
+# ── Module-level helper ──────────────────────────────────────
+
+
+def _convert_litellm_tool_calls(
+    tool_calls: list,
+) -> list[dict[str, Any]]:
+    """Convert LiteLLM iteration-level tool_call objects to parsed dict format.
+
+    Transforms objects with ``.function.name``, ``.function.arguments``,
+    ``.id`` attributes into the same dict format produced by
+    ``parse_accumulated_tool_calls()`` so that both token-level and
+    iteration-level paths can share ``_process_streaming_tool_calls()``.
+    """
+    result: list[dict[str, Any]] = []
+    for tc in tool_calls:
+        try:
+            args = _json.loads(tc.function.arguments)
+        except (_json.JSONDecodeError, TypeError):
+            args = None
+        result.append({
+            "id": tc.id,
+            "name": tc.function.name,
+            "arguments": args,
+            "raw_arguments": tc.function.arguments if args is None else None,
+        })
+    return result

@@ -27,10 +27,12 @@ import asyncio
 import json
 import logging
 import re
+from collections.abc import AsyncGenerator
 from pathlib import Path
 from typing import Any
 
-from core.execution.base import BaseExecutor, ExecutionResult
+from core.execution.base import BaseExecutor, ExecutionResult, StreamDisconnectedError
+from core.execution._streaming import stream_error_boundary
 from core.memory import MemoryManager
 from core.messenger import Messenger
 from core.prompt.context import ContextTracker
@@ -329,3 +331,153 @@ class AssistedExecutor(BaseExecutor):
         final_text = "\n".join(filter(None, all_response_text))
         logger.info("Mode B text-loop END total_len=%d", len(final_text))
         return ExecutionResult(text=final_text or "(max iterations reached)")
+
+    async def execute_streaming(
+        self,
+        system_prompt: str,
+        prompt: str,
+        tracker: ContextTracker,
+        images: list[dict[str, Any]] | None = None,
+    ) -> AsyncGenerator[dict[str, Any], None]:
+        """Stream execution events from the text-based tool-call loop.
+
+        Mode B is iteration-level streaming: each loop iteration calls
+        ``_call_llm()`` (blocking), then yields the full response as
+        events.  This is not token-level streaming but gives the UI
+        incremental progress as each tool call completes.
+
+        Yields:
+            ``{"type": "text_delta", "text": "..."}`` — narrative text
+            ``{"type": "tool_start", "tool_name": "...", "tool_id": "..."}``
+            ``{"type": "tool_end", "tool_id": "...", "tool_name": "..."}``
+            ``{"type": "done", "full_text": "...", "result_message": None}``
+        """
+        if images:
+            logger.warning(
+                "Mode B (text-loop) streaming does not support image input; "
+                "images will be ignored"
+            )
+        logger.info(
+            "Mode B streaming START prompt_len=%d", len(prompt),
+        )
+
+        # ── 1. Build tool spec and augment system prompt ─────
+        tool_spec = self._build_tool_spec_text()
+        full_system = system_prompt + "\n\n" + tool_spec if system_prompt else tool_spec
+
+        messages: list[dict[str, Any]] = [
+            {"role": "system", "content": full_system},
+            {"role": "user", "content": prompt},
+        ]
+        all_response_text: list[str] = []
+        max_iterations = self._model_config.max_turns
+
+        # ── 2. Tool-call loop ────────────────────────────────
+        async with stream_error_boundary(
+            all_response_text, executor_name="Mode B",
+        ):
+            for iteration in range(max_iterations):
+                logger.debug(
+                    "Mode B streaming iteration=%d messages=%d",
+                    iteration, len(messages),
+                )
+
+                response = await self._call_llm(messages)
+                content = response.choices[0].message.content or ""
+
+                # ── 3. Extract tool call ─────────────────────
+                tool_call = extract_tool_call(content)
+
+                if tool_call is None:
+                    # No tool call → final response
+                    all_response_text.append(content)
+                    if content:
+                        yield {"type": "text_delta", "text": content}
+                    logger.info(
+                        "Mode B streaming final response at iteration=%d len=%d",
+                        iteration, len(content),
+                    )
+                    break
+
+                # ── 4. Validate tool name ────────────────────
+                tool_name = tool_call.get("tool", "")
+                tool_args = tool_call.get("arguments", {})
+                if not isinstance(tool_args, dict):
+                    tool_args = {}
+
+                if tool_name not in self._known_tools:
+                    logger.warning(
+                        "Mode B streaming unknown tool: %s (known: %s)",
+                        tool_name, sorted(self._known_tools)[:10],
+                    )
+                    messages.append({"role": "assistant", "content": content})
+                    messages.append({
+                        "role": "user",
+                        "content": (
+                            f"エラー: 不明なツール '{tool_name}' です。"
+                            f"利用可能なツール: {sorted(self._known_tools)}"
+                        ),
+                    })
+                    continue
+
+                # ── 5. Yield narrative text (tool JSON stripped) ──
+                narrative = _strip_tool_call_block(content)
+                if narrative:
+                    all_response_text.append(narrative)
+                    yield {"type": "text_delta", "text": narrative}
+
+                # ── 6. Yield tool_start ──────────────────────
+                tool_id = f"assisted_{iteration}_{tool_name}"
+                yield {
+                    "type": "tool_start",
+                    "tool_name": tool_name,
+                    "tool_id": tool_id,
+                }
+
+                # ── 7. Execute tool ──────────────────────────
+                logger.info(
+                    "Mode B streaming tool call: %s args=%s",
+                    tool_name, list(tool_args.keys()),
+                )
+
+                try:
+                    loop = asyncio.get_running_loop()
+                    result = await loop.run_in_executor(
+                        None,
+                        self._tool_handler.handle,
+                        tool_name,
+                        tool_args,
+                    )
+                except Exception as e:
+                    logger.exception(
+                        "Mode B streaming tool execution error: %s", tool_name,
+                    )
+                    result = f"ツール実行エラー: {e}"
+
+                # ── 8. Yield tool_end ────────────────────────
+                yield {
+                    "type": "tool_end",
+                    "tool_id": tool_id,
+                    "tool_name": tool_name,
+                }
+
+                # ── 9. Inject result and continue ────────────
+                messages.append({"role": "assistant", "content": content})
+                messages.append({
+                    "role": "user",
+                    "content": f"ツール実行結果:\n{result}",
+                })
+            else:
+                # max_turns reached
+                logger.warning(
+                    "Mode B streaming max iterations (%d) reached",
+                    max_iterations,
+                )
+
+        final_text = "\n".join(filter(None, all_response_text))
+        logger.info("Mode B streaming END total_len=%d", len(final_text))
+        yield {
+            "type": "done",
+            "full_text": final_text or "(max iterations reached)",
+            "result_message": None,
+        }

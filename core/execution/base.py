@@ -21,6 +21,29 @@ from core.schemas import ModelConfig
 from core.memory.shortterm import ShortTermMemory
 
 
+# ── Streaming error ──────────────────────────────────────────
+
+
+class StreamDisconnectedError(Exception):
+    """Raised when a streaming session disconnects unexpectedly.
+
+    Carries partial response text accumulated before the disconnect
+    so AgentCore can build a checkpoint-based retry prompt.
+    """
+
+    def __init__(
+        self,
+        message: str = "Stream disconnected",
+        *,
+        partial_text: str = "",
+    ) -> None:
+        super().__init__(message)
+        self.partial_text = partial_text
+
+
+# ── Result ───────────────────────────────────────────────────
+
+
 @dataclass
 class ExecutionResult:
     """Result of a single execution session.
@@ -73,10 +96,11 @@ class BaseExecutor(ABC):
     def supports_streaming(self) -> bool:
         """Whether this executor supports streaming execution.
 
-        Returns False by default. Override in subclasses that implement
-        execute_streaming() (currently only AgentSDKExecutor).
+        Returns True by default.  All executors now implement
+        ``execute_streaming()`` — either token-level (A1, A1 Fallback,
+        A2 non-Ollama) or iteration-level (A2 Ollama, B).
         """
-        return False
+        return True
 
     # -- Credential helpers --------------------------------
 

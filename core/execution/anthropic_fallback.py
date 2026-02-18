@@ -14,14 +14,17 @@ Calls the Anthropic messages API directly with tool_use for memory operations.
 Handles mid-conversation context monitoring and session chaining.
 """
 
+import asyncio
 import logging
+from collections.abc import AsyncGenerator
 from functools import partial
 from pathlib import Path
 from typing import Any
 
 from core.prompt.context import ContextTracker
 from core.execution._session import build_continuation_prompt, handle_session_chaining
-from core.execution.base import BaseExecutor, ExecutionResult
+from core.execution._streaming import stream_error_boundary
+from core.execution.base import BaseExecutor, ExecutionResult, StreamDisconnectedError
 from core.memory import MemoryManager
 from core.prompt.builder import build_system_prompt
 from core.schemas import ModelConfig
@@ -71,16 +74,8 @@ class AnthropicFallbackExecutor(BaseExecutor):
         )
         return to_anthropic_format(canonical)
 
-    async def execute(
-        self,
-        prompt: str,
-        system_prompt: str = "",
-        tracker: ContextTracker | None = None,
-        shortterm: ShortTermMemory | None = None,
-        trigger: str = "",
-        images: list[dict[str, Any]] | None = None,
-    ) -> ExecutionResult:
-        """Run Anthropic SDK with tool_use loop."""
+    def _build_client(self):
+        """Create an AsyncAnthropic client with resolved credentials."""
         import anthropic
 
         client_kwargs: dict[str, str] = {}
@@ -89,11 +84,14 @@ class AnthropicFallbackExecutor(BaseExecutor):
             client_kwargs["api_key"] = api_key
         if self._model_config.api_base_url:
             client_kwargs["base_url"] = self._model_config.api_base_url
-        client = anthropic.AsyncAnthropic(**client_kwargs)
+        return anthropic.AsyncAnthropic(**client_kwargs)
 
-        tools = self._build_tools()
-
-        # Build initial user message with optional image content blocks
+    def _build_initial_messages(
+        self,
+        prompt: str,
+        images: list[dict[str, Any]] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Build the initial user message with optional image content blocks."""
         if images:
             content_blocks: list[dict[str, Any]] = []
             for img in images:
@@ -106,9 +104,22 @@ class AnthropicFallbackExecutor(BaseExecutor):
                     },
                 })
             content_blocks.append({"type": "text", "text": prompt})
-            messages: list[dict[str, Any]] = [{"role": "user", "content": content_blocks}]
-        else:
-            messages: list[dict[str, Any]] = [{"role": "user", "content": prompt}]
+            return [{"role": "user", "content": content_blocks}]
+        return [{"role": "user", "content": prompt}]
+
+    async def execute(
+        self,
+        prompt: str,
+        system_prompt: str = "",
+        tracker: ContextTracker | None = None,
+        shortterm: ShortTermMemory | None = None,
+        trigger: str = "",
+        images: list[dict[str, Any]] | None = None,
+    ) -> ExecutionResult:
+        """Run Anthropic SDK with tool_use loop."""
+        client = self._build_client()
+        tools = self._build_tools()
+        messages = self._build_initial_messages(prompt, images)
         all_response_text: list[str] = []
         chain_count = 0
 
@@ -199,3 +210,142 @@ class AnthropicFallbackExecutor(BaseExecutor):
         return ExecutionResult(
             text="\n".join(all_response_text) or "(max iterations reached)",
         )
+
+    # ── Streaming execution ───────────────────────────────────
+
+    async def execute_streaming(
+        self,
+        system_prompt: str,
+        prompt: str,
+        tracker: ContextTracker,
+        images: list[dict[str, Any]] | None = None,
+    ) -> AsyncGenerator[dict[str, Any], None]:
+        """Stream execution events using the Anthropic SDK messages.stream().
+
+        Yields event dicts matching the A1 streaming protocol:
+            - ``{"type": "text_delta", "text": "..."}``
+            - ``{"type": "tool_start", "tool_name": "...", "tool_id": "..."}``
+            - ``{"type": "tool_end", "tool_id": "...", "tool_name": "..."}``
+            - ``{"type": "done", "full_text": "...", "result_message": None}``
+
+        Session chaining is NOT handled here — AgentCore manages that
+        externally for streaming paths.
+        """
+        client = self._build_client()
+        tools = self._build_tools()
+        messages = self._build_initial_messages(prompt, images)
+
+        all_response_text: list[str] = []
+        _MAX_ITERATIONS = 10
+
+        async with stream_error_boundary(
+            all_response_text, executor_name="AnthropicFallback",
+        ):
+            for iteration in range(_MAX_ITERATIONS):
+                logger.debug(
+                    "Streaming API call iteration=%d messages_count=%d",
+                    iteration, len(messages),
+                )
+
+                # ── Stream one API round ──────────────────────
+                iteration_text_parts: list[str] = []
+                final_message = None
+
+                async with client.messages.stream(
+                    model=self._model_config.model,
+                    max_tokens=self._model_config.max_tokens,
+                    system=system_prompt,
+                    messages=messages,
+                    tools=tools,
+                ) as stream:
+                    async for event in stream:
+                        # Text deltas — forward immediately
+                        if event.type == "text":
+                            iteration_text_parts.append(event.text)
+                            yield {"type": "text_delta", "text": event.text}
+
+                        # Content block start — detect tool_use blocks
+                        elif event.type == "content_block_start":
+                            block = event.content_block
+                            if block.type == "tool_use":
+                                yield {
+                                    "type": "tool_start",
+                                    "tool_name": block.name,
+                                    "tool_id": block.id,
+                                }
+
+                    # After consuming the full stream, get the final message
+                    final_message = await stream.get_final_message()
+
+                # ── Context tracking ──────────────────────────
+                if tracker and final_message:
+                    usage_dict = {
+                        "input_tokens": final_message.usage.input_tokens,
+                        "output_tokens": final_message.usage.output_tokens,
+                    }
+                    tracker.update_from_usage(usage_dict)
+
+                # ── Check for tool use ────────────────────────
+                tool_uses = [
+                    b for b in final_message.content if b.type == "tool_use"
+                ]
+                if not tool_uses:
+                    # No tools — this is the final response
+                    iteration_text = "".join(iteration_text_parts)
+                    if iteration_text:
+                        all_response_text.append(iteration_text)
+                    logger.debug(
+                        "Streaming final response at iteration=%d", iteration,
+                    )
+                    break
+
+                # ── Execute tool calls ────────────────────────
+                iteration_text = "".join(iteration_text_parts)
+                if iteration_text:
+                    all_response_text.append(iteration_text)
+
+                logger.info(
+                    "Streaming tool calls at iteration=%d: %s",
+                    iteration, ", ".join(tu.name for tu in tool_uses),
+                )
+                messages.append({
+                    "role": "assistant",
+                    "content": final_message.content,
+                })
+
+                loop = asyncio.get_running_loop()
+                tool_results = []
+                for tu in tool_uses:
+                    try:
+                        result = await loop.run_in_executor(
+                            None,
+                            self._tool_handler.handle,
+                            tu.name,
+                            tu.input,
+                        )
+                    except Exception as tool_err:
+                        logger.exception("Tool execution error: %s", tu.name)
+                        result = f"ツール実行エラー: {tool_err}"
+                    tool_results.append({
+                        "type": "tool_result",
+                        "tool_use_id": tu.id,
+                        "content": result,
+                    })
+                    yield {
+                        "type": "tool_end",
+                        "tool_id": tu.id,
+                        "tool_name": tu.name,
+                    }
+                messages.append({"role": "user", "content": tool_results})
+            else:
+                # for-else: max iterations reached without break
+                logger.warning(
+                    "Streaming max iterations (%d) reached", _MAX_ITERATIONS,
+                )
+
+        full_text = "\n".join(all_response_text) or "(no response)"
+        yield {
+            "type": "done",
+            "full_text": full_text,
+            "result_message": None,
+        }

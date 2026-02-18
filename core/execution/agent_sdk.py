@@ -22,7 +22,7 @@ from collections.abc import AsyncGenerator
 from typing import Any
 
 from core.prompt.context import ContextTracker
-from core.execution.base import BaseExecutor, ExecutionResult
+from core.execution.base import BaseExecutor, ExecutionResult, StreamDisconnectedError
 from core.schemas import ModelConfig
 from core.memory.shortterm import ShortTermMemory
 from pathlib import Path
@@ -30,21 +30,8 @@ from pathlib import Path
 logger = logging.getLogger("animaworks.execution.agent_sdk")
 
 
-class StreamDisconnectedError(Exception):
-    """Raised when the Agent SDK stream is unexpectedly closed.
-
-    Carries partial response text and tool results accumulated before
-    the disconnect so callers can build a retry prompt.
-    """
-
-    def __init__(
-        self,
-        message: str = "Stream disconnected",
-        *,
-        partial_text: str = "",
-    ) -> None:
-        super().__init__(message)
-        self.partial_text = partial_text
+# Re-export for backward compatibility (agent.py imports from here)
+__all__ = ["AgentSDKExecutor", "StreamDisconnectedError"]
 
 
 _SEND_PATTERNS = [
