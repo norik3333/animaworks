@@ -7,7 +7,7 @@ Covers:
 - Inter-Anima messages received during heartbeat are recorded to episodic memory
 - ACK messages are excluded from recording
 - Message content is truncated at 1000 chars
-- Maximum 10 messages are recorded per heartbeat
+- Maximum 50 messages are recorded per heartbeat
 - Heartbeat summary includes message count
 - Episode recording failures do not block heartbeat completion
 """
@@ -263,8 +263,8 @@ class TestHeartbeatMessageEpisodeRecording:
             # The content should be exactly 1000 A's (plus potential newline)
             assert content_part.strip() == "A" * 1000
 
-    async def test_max_10_messages_recorded(self, data_dir, make_anima):
-        """When 15 messages arrive, only the first 10 should be recorded to episodes."""
+    async def test_max_50_messages_recorded(self, data_dir, make_anima):
+        """When 60 messages arrive, only the first 50 should be recorded to episodes."""
         anima_dir = make_anima("alice")
         shared_dir = data_dir / "shared"
 
@@ -278,16 +278,16 @@ class TestHeartbeatMessageEpisodeRecording:
             MockMM.return_value.append_episode = MagicMock()
             MockConv.return_value.load.return_value = MagicMock(turns=[])
 
-            # Create 15 messages
+            # Create 60 messages
             messages = [
                 Message(from_person=f"sender{i}", to_person="alice", content=f"Message {i}")
-                for i in range(15)
+                for i in range(60)
             ]
             MockMsg.return_value.has_unread.return_value = True
             MockMsg.return_value.receive_with_paths.return_value = [
                 InboxItem(msg=m, path=Path(f"/fake/{m.id}.json")) for m in messages
             ]
-            MockMsg.return_value.archive_paths.return_value = 15
+            MockMsg.return_value.archive_paths.return_value = 60
 
             from core.anima import DigitalAnima
             dp = DigitalAnima(anima_dir, shared_dir)
@@ -313,16 +313,16 @@ class TestHeartbeatMessageEpisodeRecording:
             all_calls = [call[0][0] for call in MockMM.return_value.append_episode.call_args_list]
             message_episodes = [ep for ep in all_calls if "からのメッセージ受信" in ep]
 
-            # Should only record 10 message episodes (not all 15)
-            assert len(message_episodes) == 10
+            # Should only record 50 message episodes (not all 60)
+            assert len(message_episodes) == 50
 
-            # Verify messages 0-9 are recorded
-            for i in range(10):
+            # Verify messages 0-49 are recorded
+            for i in range(50):
                 assert any(f"Message {i}" in ep for ep in message_episodes)
 
-            # Verify messages 10-14 are NOT recorded
+            # Verify messages 50-59 are NOT recorded
             all_episodes_text = "\n".join(all_calls)
-            for i in range(10, 15):
+            for i in range(50, 60):
                 assert f"Message {i}" not in all_episodes_text
 
     async def test_no_messages_no_episode_recording(self, data_dir, make_anima):

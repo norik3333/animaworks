@@ -209,7 +209,11 @@ class DigitalAnima:
     _HEARTBEAT_HISTORY_N = 3
 
     def _load_heartbeat_history(self) -> str:
-        """Load last N heartbeat history entries from unified activity log."""
+        """Load last N heartbeat history entries from unified activity log.
+
+        Falls back to legacy ``shortterm/heartbeat_history/`` when the
+        activity log is empty (migration period).
+        """
         try:
             activity = ActivityLogger(self.anima_dir)
             entries = activity.recent(
@@ -217,14 +221,21 @@ class DigitalAnima:
                 types=["heartbeat_end"],
                 limit=self._HEARTBEAT_HISTORY_N,
             )
-            if not entries:
-                return ""
-            lines: list[str] = []
-            for e in entries:
-                ts_short = e.ts[11:19] if len(e.ts) >= 19 else e.ts
-                summary = (e.summary or e.content)[:200]
-                lines.append(f"- {ts_short}: {summary}")
-            return "\n".join(lines)
+            if entries:
+                lines: list[str] = []
+                for e in entries:
+                    ts_short = e.ts[11:19] if len(e.ts) >= 19 else e.ts
+                    summary = e.summary or e.content
+                    lines.append(f"- {ts_short}: {summary}")
+                return "\n".join(lines)
+
+            # Legacy fallback: read from shortterm/heartbeat_history/
+            legacy = self.memory.load_recent_heartbeat_summary(
+                limit=self._HEARTBEAT_HISTORY_N,
+            )
+            if legacy:
+                return legacy
+            return ""
         except Exception:
             logger.exception("[%s] Failed to load heartbeat history", self.name)
             return ""
@@ -775,7 +786,12 @@ class DigitalAnima:
                     # content would be lost after archiving.
                     _msg_ts = datetime.now().strftime("%H:%M")
                     _recordable = [m for m in messages if m.type != "ack"]
-                    for _m in _recordable[:10]:
+                    if len(_recordable) > 50:
+                        logger.warning(
+                            "[%s] DM burst: %d messages, recording first 50",
+                            self.name, len(_recordable),
+                        )
+                    for _m in _recordable[:50]:
                         _episode = (
                             f"## {_msg_ts} {_m.from_person}からのメッセージ受信\n\n"
                             f"**送信者**: {_m.from_person}\n"
@@ -789,11 +805,11 @@ class DigitalAnima:
                                 self.name, _m.from_person, exc_info=True,
                             )
 
-                    # Activity log: DM received
+                    # Activity log: DM received (full content, summary truncated)
                     try:
                         activity = ActivityLogger(self.anima_dir)
-                        for _m in _recordable[:10]:
-                            activity.log("dm_received", content=_m.content[:200], summary=_m.content[:100], from_person=_m.from_person)
+                        for _m in _recordable[:50]:
+                            activity.log("dm_received", content=_m.content, summary=_m.content[:200], from_person=_m.from_person)
                     except Exception:
                         pass
 
@@ -862,7 +878,7 @@ class DigitalAnima:
                     # Activity log: heartbeat end
                     try:
                         activity = ActivityLogger(self.anima_dir)
-                        activity.log("heartbeat_end", summary=result.summary[:200])
+                        activity.log("heartbeat_end", summary=result.summary)
                     except Exception:
                         pass
 
@@ -974,7 +990,15 @@ class DigitalAnima:
                     # Activity log: cron executed
                     try:
                         activity = ActivityLogger(self.anima_dir)
-                        activity.log("cron_executed", summary=f"タスク: {task_name}", meta={"task_name": task_name})
+                        activity.log(
+                            "cron_executed",
+                            summary=f"タスク: {task_name}",
+                            content=result.summary[:500] if result else "",
+                            meta={
+                                "task_name": task_name,
+                                "duration_ms": result.duration_ms if result else 0,
+                            },
+                        )
                     except Exception:
                         pass
 

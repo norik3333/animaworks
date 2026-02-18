@@ -315,6 +315,30 @@ def _load_a2_reflection() -> str:
         return ""
 
 
+def _load_recent_activity_summary(anima_dir: Path) -> str:
+    """Load recent activity summary for Section 9.
+
+    Returns a short section summarising the Anima's most recent
+    notable activities (heartbeat, cron, DMs, channel posts, human
+    notifications).  Injected into the system prompt so the Anima has
+    organisational situational awareness even outside heartbeat cycles.
+    """
+    try:
+        from core.memory.activity import ActivityLogger
+        activity = ActivityLogger(anima_dir)
+        entries = activity.recent(
+            days=1, limit=5,
+            types=["heartbeat_end", "cron_executed", "dm_sent",
+                   "dm_received", "channel_post", "human_notify"],
+        )
+        if not entries:
+            return ""
+        lines = [activity._format_entry(e) for e in entries]
+        return "## 直近の活動\n\n" + "\n".join(lines)
+    except Exception:
+        return ""
+
+
 def _build_human_notification_guidance() -> str:
     """Build the human notification instruction for top-level Animas."""
     return """\
@@ -414,6 +438,11 @@ def build_system_prompt(
     pending = memory.read_pending()
     if pending:
         parts.append(f"## 未完了タスク\n\n{pending}")
+
+    # Section 9: Recent activity summary (organisational awareness)
+    recent_activity_summary = _load_recent_activity_summary(pd)
+    if recent_activity_summary:
+        parts.append(recent_activity_summary)
 
     # Resolution registry injection (cross-org resolved issues)
     try:

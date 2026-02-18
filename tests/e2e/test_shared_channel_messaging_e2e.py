@@ -24,11 +24,10 @@ def shared_dir(tmp_path: Path) -> Path:
 
 
 class TestE2EDMFlow:
-    """Full DM flow: send → inbox (dm_logs no longer written by send)."""
+    """Full DM flow: send → inbox + dm_logs parallel write."""
 
-    def test_send_creates_inbox_only(self, shared_dir):
-        """send() creates inbox file but no longer writes dm_log
-        (replaced by unified activity log)."""
+    def test_send_creates_inbox_and_dm_log(self, shared_dir):
+        """send() creates inbox file and writes dm_log (parallel fallback)."""
         alice = Messenger(shared_dir, "alice")
         alice.send("bob", "Hello Bob!")
 
@@ -36,9 +35,9 @@ class TestE2EDMFlow:
         bob_inbox = shared_dir / "inbox" / "bob"
         assert len(list(bob_inbox.glob("*.json"))) == 1
 
-        # DM log should NOT be created (replaced by activity log)
+        # DM log should be created (restored as parallel fallback)
         dm_log = shared_dir / "dm_logs" / "alice-bob.jsonl"
-        assert not dm_log.exists()
+        assert dm_log.exists()
 
     def test_bidirectional_inbox_conversation(self, shared_dir):
         """Bidirectional messages are delivered via inbox.

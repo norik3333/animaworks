@@ -108,7 +108,10 @@ class TestHeartbeatHistoryLoad:
         assert "A message" not in text
 
     def test_load_returns_empty_when_no_files(self, dp, anima_dir):
-        """Loading returns empty string when no activity log exists."""
+        """Loading returns empty string when no activity log or legacy files exist."""
+        # With legacy fallback, load_recent_heartbeat_summary is called when
+        # activity log is empty. Ensure it returns "" for the empty case.
+        dp.memory.load_recent_heartbeat_summary.return_value = ""
         text = dp._load_heartbeat_history()
         assert text == ""
 

@@ -218,21 +218,124 @@ class PrimingEngine:
         """Channel B: Recent activity from unified activity log.
 
         Replaces old Channel B (episodes) and Channel E (shared channels).
-        Reads from activity_log/{date}.jsonl for a unified timeline.
+        Reads from activity_log/{date}.jsonl for a unified timeline,
+        plus shared/channels/*.jsonl for cross-Anima visibility.
         Falls back to episodes/ if activity_log is empty (migration period).
         """
         from core.memory.activity import ActivityLogger
 
         activity = ActivityLogger(self.anima_dir)
-        entries = activity.recent(days=2, limit=50)
+        entries = activity.recent(days=2)  # No limit — fetch all entries
+
+        # Always read shared channels for cross-Anima visibility
+        channel_entries = self._read_shared_channels(limit_per_channel=5)
+        entries.extend(channel_entries)
 
         if entries:
             # Prioritize: sender-related entries first, then by recency
             prioritized = self._prioritize_entries(entries, sender_name, keywords)
+            # Apply limit after scoring
+            prioritized = prioritized[:50]
             return activity.format_for_priming(prioritized, budget_tokens=1300)
 
         # Fallback: read old episodes if no activity log exists yet
         return await self._fallback_episodes_and_channels()
+
+    def _read_shared_channels(self, limit_per_channel: int = 5) -> list:
+        """Read recent entries from shared channels for cross-Anima visibility.
+
+        Reads shared/channels/*.jsonl and converts entries to ActivityEntry
+        format for unified priming display.  Prioritises 24h human posts
+        and @mentions.
+
+        Args:
+            limit_per_channel: Max entries per channel (latest N).
+
+        Returns:
+            List of ActivityEntry from shared channels.
+        """
+        from core.memory.activity import ActivityEntry
+        from datetime import datetime
+
+        if not self.shared_dir:
+            return []
+
+        channels_dir = self.shared_dir / "channels"
+        if not channels_dir.is_dir():
+            return []
+
+        anima_name = self.anima_dir.name
+        mention_tag = f"@{anima_name}"
+        now = datetime.now()
+        cutoff_24h = now - timedelta(hours=24)
+
+        result: list[ActivityEntry] = []
+
+        try:
+            for channel_file in sorted(channels_dir.glob("*.jsonl")):
+                channel_name = channel_file.stem
+                try:
+                    content = channel_file.read_text(encoding="utf-8")
+                except OSError:
+                    continue
+
+                lines = content.strip().splitlines()
+                if not lines:
+                    continue
+
+                # Parse all entries
+                all_entries: list[dict] = []
+                for line in lines:
+                    if not line.strip():
+                        continue
+                    try:
+                        all_entries.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        continue
+
+                if not all_entries:
+                    continue
+
+                # Select: latest N + 24h human posts + mentions
+                selected: list[dict] = []
+                seen_indices: set[int] = set()
+
+                # Latest N entries
+                for i in range(max(0, len(all_entries) - limit_per_channel), len(all_entries)):
+                    if i not in seen_indices:
+                        selected.append(all_entries[i])
+                        seen_indices.add(i)
+
+                # 24h human posts and mentions
+                for i, entry in enumerate(all_entries):
+                    if i in seen_indices:
+                        continue
+                    ts_str = entry.get("ts", "")
+                    try:
+                        ts = datetime.fromisoformat(ts_str)
+                    except (ValueError, TypeError):
+                        continue
+                    is_human = entry.get("source") == "human"
+                    is_mention = mention_tag in entry.get("text", "")
+                    if (is_human and ts >= cutoff_24h) or is_mention:
+                        selected.append(entry)
+                        seen_indices.add(i)
+
+                # Convert to ActivityEntry
+                for entry in selected:
+                    result.append(ActivityEntry(
+                        ts=entry.get("ts", ""),
+                        type="channel_post",
+                        content=entry.get("text", ""),
+                        summary=entry.get("text", "")[:100],
+                        from_person=entry.get("from", ""),
+                        channel=channel_name,
+                    ))
+
+        except Exception:
+            logger.warning("Failed to read shared channels", exc_info=True)
+
+        return result
 
     def _prioritize_entries(
         self,

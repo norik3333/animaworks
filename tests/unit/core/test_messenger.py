@@ -295,30 +295,30 @@ class TestSendAsync:
         assert len(list(bob_inbox.glob("*.json"))) == 1
 
 
-# ── send() does NOT write DM log ────────────────────────
+# ── send() writes DM log (restored) ────────────────────
 
 
-class TestSendNoDmLog:
-    """After migration to unified activity log, send() no longer creates dm_logs."""
+class TestSendCreatesDmLog:
+    """send() writes to dm_logs/ again for legacy fallback support."""
 
-    def test_send_does_not_create_dm_log(self, shared_dir, messenger):
+    def test_send_creates_dm_log(self, shared_dir, messenger):
         messenger.send("bob", "Hello Bob!")
         log_dir = shared_dir / "dm_logs"
-        assert not log_dir.exists()
+        assert log_dir.exists()
 
-    def test_reply_does_not_create_dm_log(self, shared_dir, messenger):
+    def test_reply_creates_dm_log(self, shared_dir, messenger):
         original = Message(
             from_person="bob", to_person="alice",
             content="original", thread_id="thread-abc",
         )
         messenger.reply(original, "Got it!")
         log_dir = shared_dir / "dm_logs"
-        assert not log_dir.exists()
+        assert log_dir.exists()
 
-    async def test_send_async_does_not_create_dm_log(self, shared_dir, messenger):
+    async def test_send_async_creates_dm_log(self, shared_dir, messenger):
         await messenger.send_async("bob", "async msg")
         log_dir = shared_dir / "dm_logs"
-        assert not log_dir.exists()
+        assert log_dir.exists()
 
 
 # ── receive_with_paths ───────────────────────────────────

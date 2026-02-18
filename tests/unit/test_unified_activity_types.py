@@ -212,9 +212,9 @@ class TestBackendActivityLogSummary:
 
     def test_dm_received_has_summary(self) -> None:
         content = self._ANIMA_PY.read_text(encoding="utf-8")
-        pattern = r'activity\.log\("dm_received",\s*content=_m\.content\[:200\],\s*summary=_m\.content\[:100\]'
+        pattern = r'activity\.log\("dm_received",\s*content=_m\.content,\s*summary=_m\.content\[:200\]'
         assert re.search(pattern, content), (
-            "dm_received activity.log() should include summary=_m.content[:100]"
+            "dm_received activity.log() should use full content and summary=_m.content[:200]"
         )
 
 

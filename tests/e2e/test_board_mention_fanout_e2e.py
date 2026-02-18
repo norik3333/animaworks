@@ -211,10 +211,10 @@ class TestBoardMentionFanout:
             f"found {len(alice_acks)} ack(s) in alice's inbox"
         )
 
-    def test_e2e_fanout_only_to_running_animas(
+    def test_e2e_fanout_includes_stopped_animas(
         self, tmp_path: Path, shared_dir: Path, sockets_dir: Path,
     ) -> None:
-        """@all fanout only reaches Animas with active socket files (running)."""
+        """@all fanout reaches both running and stopped Animas (inbox saved for pickup)."""
         alice_dir = _make_anima_dir(tmp_path, "alice")
         _make_anima_dir(tmp_path, "bob")
         _make_anima_dir(tmp_path, "charlie")
@@ -222,7 +222,7 @@ class TestBoardMentionFanout:
         # Only bob has a socket file (running); charlie does not
         _create_socket(sockets_dir, "alice")
         _create_socket(sockets_dir, "bob")
-        # charlie: no socket -> not running
+        # charlie: no socket -> not running, but has anima dir
 
         handler = _make_tool_handler(alice_dir, shared_dir)
 
@@ -239,9 +239,9 @@ class TestBoardMentionFanout:
         bob_board = [m for m in bob_msgs if m.get("type") == "board_mention"]
         assert len(bob_board) == 1, f"Expected 1 board_mention for bob, got {len(bob_board)}"
 
-        # Charlie (not running) should NOT receive anything
+        # Charlie (stopped) should also receive a board_mention in inbox
         charlie_msgs = _read_inbox(shared_dir, "charlie")
         charlie_board = [m for m in charlie_msgs if m.get("type") == "board_mention"]
-        assert len(charlie_board) == 0, (
-            "Charlie is not running (no socket); should not receive board_mention"
+        assert len(charlie_board) == 1, (
+            "Charlie (stopped) should receive board_mention in inbox for next HB pickup"
         )

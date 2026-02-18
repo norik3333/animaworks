@@ -74,7 +74,23 @@ class Messenger:
         filepath = target_dir / f"{msg.id}.json"
         filepath.write_text(msg.model_dump_json(indent=2), encoding="utf-8")
         logger.info("Message sent: %s -> %s (%s)", self.anima_name, to, msg.id)
-        # DM log replaced by unified activity log (core.memory.activity)
+
+        # Activity Log: record dm_sent for all send paths (A1/A2/B/CLI)
+        try:
+            from core.memory.activity import ActivityLogger
+            anima_dir = self.shared_dir.parent / "animas" / self.anima_name
+            if anima_dir.exists():
+                activity = ActivityLogger(anima_dir)
+                activity.log("dm_sent", content=content, to_person=to)
+        except Exception:
+            pass  # Never fail the send itself
+
+        # Parallel write to legacy dm_logs/ (fallback data source)
+        try:
+            self._append_dm_log(to, content)
+        except Exception:
+            pass  # Never fail the send itself
+
         return msg
 
     def reply(self, original: Message, content: str) -> Message:
@@ -167,8 +183,8 @@ class Messenger:
             if anima_dir.exists():
                 activity = ActivityLogger(anima_dir)
                 recent = activity.recent(
-                    days=7, limit=limit * 2,
-                    types=["dm_sent", "dm_received", "message_received", "response_sent"],
+                    days=30, limit=limit * 2,
+                    types=["dm_sent", "dm_received"],
                     involving=peer,
                 )
                 for e in recent:
@@ -208,6 +224,19 @@ class Messenger:
         """Get DM log file path (pair names sorted alphabetically)."""
         pair = sorted([self.anima_name, peer])
         return self.shared_dir / "dm_logs" / f"{pair[0]}-{pair[1]}.jsonl"
+
+    def _append_dm_log(self, peer: str, content: str) -> None:
+        """Append a DM entry to the legacy dm_logs/ file."""
+        filepath = self._get_dm_log_path(peer)
+        filepath.parent.mkdir(parents=True, exist_ok=True)
+        entry = json.dumps({
+            "ts": datetime.now().isoformat(),
+            "from": self.anima_name,
+            "to": peer,
+            "text": content,
+        }, ensure_ascii=False)
+        with filepath.open("a", encoding="utf-8") as f:
+            f.write(entry + "\n")
 
     def receive(self) -> list[Message]:
         messages: list[Message] = []

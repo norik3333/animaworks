@@ -417,6 +417,7 @@ class ActivityLogger:
         self,
         entries: list[ActivityEntry],
         budget_tokens: int = 1300,
+        content_trim: int = 200,
     ) -> str:
         """Format activity entries for system prompt injection.
 
@@ -426,6 +427,8 @@ class ActivityLogger:
         Args:
             entries: Entries to format (should be chronological).
             budget_tokens: Target token budget.
+            content_trim: Maximum characters for content display in
+                each entry.  Set to ``0`` for no trim.
 
         Returns:
             Formatted string.
@@ -440,7 +443,7 @@ class ActivityLogger:
 
         # Process groups newest-first (budget cuts oldest groups)
         for group in reversed(groups):
-            formatted = self._format_group(group)
+            formatted = self._format_group(group, content_trim=content_trim)
             if total_chars + len(formatted) + 1 > max_chars:
                 break
             lines.append(formatted)
@@ -453,15 +456,16 @@ class ActivityLogger:
         return "\n".join(lines)
 
     @staticmethod
-    def _format_entry(entry: ActivityEntry) -> str:
+    def _format_entry(entry: ActivityEntry, content_trim: int = 200) -> str:
         """Format a single entry as a concise timeline line."""
         ts = entry.ts[11:16] if len(entry.ts) >= 16 else entry.ts
         text = entry.summary or entry.content
 
-        # Truncate long content with pointer
-        if len(text) > 200:
+        # Truncate long content with pointer (0 = no trim)
+        if content_trim > 0 and len(text) > content_trim:
+            trim_at = max(1, content_trim - 20)
             date_str = entry.ts[:10] if len(entry.ts) >= 10 else "unknown"
-            text = text[:180] + f"...(-> activity_log/{date_str}.jsonl)"
+            text = text[:trim_at] + f"...(-> activity_log/{date_str}.jsonl)"
 
         type_map: dict[str, str] = {
             "message_received": "MSG<",
@@ -608,7 +612,7 @@ class ActivityLogger:
         return groups
 
     @staticmethod
-    def _format_group(group: EntryGroup) -> str:
+    def _format_group(group: EntryGroup, content_trim: int = 200) -> str:
         """Format a group of entries for priming display."""
         start_time = group.start_ts[11:16] if len(group.start_ts) >= 16 else group.start_ts
         end_time = group.end_ts[11:16] if len(group.end_ts) >= 16 else group.end_ts
@@ -658,4 +662,4 @@ class ActivityLogger:
             return "\n".join(lines)
 
         # Single entry: use _format_entry
-        return ActivityLogger._format_entry(group.entries[0])
+        return ActivityLogger._format_entry(group.entries[0], content_trim=content_trim)

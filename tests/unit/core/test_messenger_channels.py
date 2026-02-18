@@ -147,9 +147,8 @@ class TestReadChannelMentions:
 class TestReadDmHistory:
     """read_dm_history() reads existing dm_logs files.
 
-    After migration to unified activity log, send() no longer writes to
-    dm_logs/.  These tests manually create log files to verify that
-    read_dm_history() can still parse legacy logs.
+    send() writes to dm_logs/ again for legacy fallback support.
+    These tests verify that read_dm_history() can parse dm_logs.
     """
 
     def _write_dm_log(self, shared_dir: Path, pair: str, entries: list[dict]) -> None:
@@ -211,10 +210,10 @@ class TestReadDmHistory:
         result = messenger.read_dm_history("bob", limit=3)
         assert len(result) == 3
 
-    def test_send_does_not_write_dm_log(self, shared_dir, messenger):
-        """send() should NOT create dm_logs anymore (unified activity log migration)."""
+    def test_send_creates_dm_log(self, shared_dir, messenger):
+        """send() writes to dm_logs/ again for legacy fallback support."""
         messenger.send("bob", "Hello!")
-        assert not (shared_dir / "dm_logs").exists()
+        assert (shared_dir / "dm_logs").exists()
 
     def test_send_no_message_log(self, shared_dir, messenger):
         """send() should NOT create message_log anymore."""
