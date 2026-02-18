@@ -1,3 +1,6 @@
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
 """Tests for Mode A2 (LiteLLM + tool_use loop) execution.
 
 Mode A2 iteratively calls litellm.acompletion, processes tool_calls,

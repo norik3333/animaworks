@@ -1,4 +1,8 @@
 """Unit tests for file I/O error handling in server/routes/memory_routes.py."""
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
+
 from __future__ import annotations
 
 from pathlib import Path

@@ -1,4 +1,8 @@
 """Tests for core.execution.anthropic_fallback — Anthropic SDK fallback executor."""
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
+
 from __future__ import annotations
 
 from pathlib import Path

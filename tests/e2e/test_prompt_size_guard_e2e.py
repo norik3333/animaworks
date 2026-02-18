@@ -1,3 +1,6 @@
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
 """E2E test: prompt size guard prevents Agent SDK buffer overflow.
 
 Verifies that large messages and accumulated conversation history

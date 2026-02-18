@@ -1,3 +1,6 @@
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
 """Global test fixtures for AnimaWorks E2E tests.
 
 Provides filesystem isolation, config cache management, and

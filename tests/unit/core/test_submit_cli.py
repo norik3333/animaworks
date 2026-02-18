@@ -1,3 +1,6 @@
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
 """Tests for animaworks-tool submit CLI command.
 
 Validates ``_handle_submit()`` in ``core/tools/__init__.py``:

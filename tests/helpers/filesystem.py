@@ -1,3 +1,6 @@
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
 """Filesystem scaffolding helpers for tests.
 
 Creates isolated AnimaWorks runtime data directories so that each test

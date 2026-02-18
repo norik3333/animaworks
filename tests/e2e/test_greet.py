@@ -1,3 +1,6 @@
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
 """E2E tests for the character greeting feature.
 
 Tests the full greet flow: DigitalAnima.process_greet() with mocked LLM,

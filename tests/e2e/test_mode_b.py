@@ -1,3 +1,6 @@
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
 """Tests for Mode B (assisted) execution.
 
 Mode B is a 1-shot LLM call where the framework handles memory I/O.

@@ -1,4 +1,8 @@
 """Tests for core/tools/_base.py — ToolResult, get_env_or_fail, auto_cli_guide."""
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
+
 from __future__ import annotations
 
 import os

@@ -1,3 +1,6 @@
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
 """Tests for pending task watcher in core/supervisor/runner.py.
 
 Validates ``_pending_task_watcher_loop()`` and ``_execute_pending_task()``:

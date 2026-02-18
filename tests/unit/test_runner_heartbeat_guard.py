@@ -1,3 +1,6 @@
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
 """Unit tests for heartbeat collision prevention in AnimaRunner.
 
 Verifies that the _heartbeat_running flag and _cron_running set properly

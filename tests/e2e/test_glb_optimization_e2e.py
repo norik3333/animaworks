@@ -1,3 +1,6 @@
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
 """E2E tests for GLB optimization: strip_mesh_from_glb, simplify_glb, compress_textures, fbx2gltf.
 
 These tests call the actual gltf-transform CLI via npx to verify real-world behavior.

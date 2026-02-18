@@ -1,3 +1,6 @@
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
 """E2E tests for Ollama thinking option (think=False default).
 
 Verifies that the full AgentCore.run_cycle() path passes the correct

@@ -1,3 +1,6 @@
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
 """E2E tests for the notification broadcast pipeline.
 
 Tests the full flow from process_message_stream yielding notification_sent

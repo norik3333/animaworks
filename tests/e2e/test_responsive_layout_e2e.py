@@ -1,3 +1,6 @@
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
 """E2E tests for responsive layout using Playwright.
 
 Validates the responsive design across mobile, tablet, and desktop viewports

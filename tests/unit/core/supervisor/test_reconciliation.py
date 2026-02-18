@@ -1,3 +1,6 @@
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
 """Unit tests for ProcessSupervisor._reconcile() — on_disk_incomplete protection.
 
 Verifies that the reconciliation loop correctly handles anima directories

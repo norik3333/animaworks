@@ -1,3 +1,6 @@
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
 """E2E tests for anima lifecycle CLI commands.
 
 Tests the full delete/disable/enable/list workflow with real filesystem

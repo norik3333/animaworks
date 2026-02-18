@@ -1,3 +1,6 @@
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
 """Unit tests for MemoryIndexer chunk ID generation and memory_type propagation.
 
 Verifies:

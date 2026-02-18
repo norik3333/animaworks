@@ -1,3 +1,6 @@
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
 """Unit tests for Anima birth reveal animation integration.
 
 Validates that the workspace frontend files contain the required

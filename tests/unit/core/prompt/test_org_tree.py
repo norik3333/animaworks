@@ -1,3 +1,6 @@
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
 """Unit tests for _build_full_org_tree and top-level org context.
 
 Verifies the indented tree formatting, marker placement, and

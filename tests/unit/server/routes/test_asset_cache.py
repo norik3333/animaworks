@@ -1,4 +1,8 @@
 """Tests for asset route HTTP caching (ETag, Cache-Control, 304)."""
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
+
 from __future__ import annotations
 
 from pathlib import Path

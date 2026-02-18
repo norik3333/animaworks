@@ -1,3 +1,6 @@
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
 """Unit tests for shared_common_knowledge auto-initialization in MemoryManager.
 
 Verifies that MemoryManager._init_indexer() triggers indexing of

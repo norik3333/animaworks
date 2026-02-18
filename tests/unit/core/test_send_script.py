@@ -1,4 +1,8 @@
 """Unit tests for the send wrapper script in anima templates."""
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
+
 from __future__ import annotations
 
 from core.anima_factory import BLANK_TEMPLATE_DIR

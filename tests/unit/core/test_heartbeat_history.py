@@ -1,3 +1,6 @@
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
 """Unit tests for heartbeat history loading in core/anima.py.
 
 Note: _save_heartbeat_history and _purge_old_heartbeat_logs were removed

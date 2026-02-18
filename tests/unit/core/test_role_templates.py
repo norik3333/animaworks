@@ -1,3 +1,6 @@
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
 """Unit tests for Role Templates + Ability Scores feature.
 
 Tests _apply_role_defaults(), _create_status_json() with role parameter,

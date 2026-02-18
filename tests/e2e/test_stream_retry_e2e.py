@@ -1,3 +1,6 @@
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
 """E2E tests for stream checkpoint retry feature.
 
 Verifies the full flow of stream disconnection detection, checkpoint

@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
 """Demo script for Phase 3-4: Statistical Analysis and Visualization.
 
 This script demonstrates the statistical analysis and visualization capabilities

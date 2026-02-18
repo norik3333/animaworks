@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
 """
 Generate a small sample dataset for testing.
 

@@ -1,3 +1,6 @@
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
 """E2E tests: activity log spec compliance fixes.
 
 Validates Fix 1 (cron_command logging), Fix 2 (memory_write/error events),

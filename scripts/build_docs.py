@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
 """docs/ ディレクトリを走査して mkdocs.yml の nav を自動生成し、mkdocs build を実行する。
 
 Usage:

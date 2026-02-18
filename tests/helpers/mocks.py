@@ -1,3 +1,6 @@
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
 """Mock factories for LLM API calls.
 
 Provides helpers to mock litellm.acompletion, claude_agent_sdk.query,

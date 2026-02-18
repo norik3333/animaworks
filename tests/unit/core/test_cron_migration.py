@@ -1,4 +1,8 @@
 """Unit tests for cron.md migration from Japanese text schedules to cron expressions."""
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
+
 from __future__ import annotations
 
 import pytest

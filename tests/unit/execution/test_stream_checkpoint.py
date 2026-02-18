@@ -1,3 +1,6 @@
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
 """Tests for stream checkpoint and retry feature.
 
 Covers StreamCheckpoint dataclass, ShortTermMemory checkpoint methods,

@@ -1,3 +1,6 @@
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
 """E2E tests for multimodal image input across execution modes.
 
 Verifies that process_message, run_cycle, and process_message_stream

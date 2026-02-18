@@ -1,3 +1,6 @@
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
 """Unit tests for bootstrap UI feature in server/routes/animas.py.
 
 Tests the bootstrapping flag in list_animas and the POST /animas/{name}/start

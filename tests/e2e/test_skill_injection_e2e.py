@@ -1,3 +1,6 @@
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
 """E2E tests for description-based skill injection in build_system_prompt.
 
 Verifies that build_system_prompt correctly injects skill full text when

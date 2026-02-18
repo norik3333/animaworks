@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
 """
 Memory Performance Evaluation - Phase 5: Experiment Execution
 

@@ -1,3 +1,6 @@
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
 """Unit tests for AnimaRunner on_message_sent callback wiring.
 
 Verifies that AnimaRunner.run() wires up an on_message_sent callback on

@@ -1,3 +1,6 @@
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
 """E2E tests for org-structure-config-sync feature.
 
 Tests the full pipeline of supervisor synchronization between identity.md /

@@ -1,3 +1,6 @@
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
 """E2E tests for /api/system/status endpoint with real FastAPI app.
 
 Verifies the complete response structure including the scheduler_running

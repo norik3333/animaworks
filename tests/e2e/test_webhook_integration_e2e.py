@@ -1,3 +1,6 @@
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
 """E2E tests for webhook integration — full flow from webhook to inbox.
 
 Tests the complete pipeline: HTTP request → signature verification →

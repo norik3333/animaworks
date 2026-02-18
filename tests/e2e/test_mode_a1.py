@@ -1,3 +1,6 @@
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
 """Tests for Mode A1 (Claude Agent SDK) execution.
 
 Mode A1 uses claude_agent_sdk.query() as an async generator.

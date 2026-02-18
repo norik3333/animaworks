@@ -1,3 +1,6 @@
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
 """Unit tests for orphan anima directory detection.
 
 Verifies detect_orphan_animas and _find_orphan_supervisor from core.org_sync,

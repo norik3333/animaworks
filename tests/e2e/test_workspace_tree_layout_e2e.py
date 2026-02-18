@@ -1,3 +1,6 @@
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
 """E2E tests for Workspace 3D office tree layout fix.
 
 Validates that the GET /api/animas endpoint returns the ``supervisor``

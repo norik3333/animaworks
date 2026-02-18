@@ -1,3 +1,6 @@
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
 """E2E tests for heartbeat guard, orphan detection, and org tree.
 
 These tests exercise the full stack: build_system_prompt with real

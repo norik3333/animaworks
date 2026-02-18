@@ -1,3 +1,6 @@
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
 """E2E: Verify background tool name consistency across modules.
 
 Ensures that _DEFAULT_ELIGIBLE_TOOLS, BackgroundTaskConfig.eligible_tools,

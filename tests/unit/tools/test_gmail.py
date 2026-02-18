@@ -1,3 +1,6 @@
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
 """Tests for core/tools/gmail.py — Gmail integration.
 
 We mock google API modules before importing core.tools.gmail

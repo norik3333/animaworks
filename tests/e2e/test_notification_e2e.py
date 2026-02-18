@@ -1,3 +1,6 @@
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
 """E2E tests for the human notification subsystem.
 
 Tests the full flow: config → notifier creation → tool handler → notification dispatch.

@@ -1,3 +1,6 @@
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
 """Unit tests for the commander hiring guardrail in core/prompt/builder.py.
 
 Verifies that the "雇用ルール" section is appended to the system prompt

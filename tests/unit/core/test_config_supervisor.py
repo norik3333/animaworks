@@ -1,3 +1,6 @@
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
 """Unit tests for supervisor-related functions in core/config/models.py.
 
 Tests _resolve_supervisor_name(), read_anima_supervisor(), and

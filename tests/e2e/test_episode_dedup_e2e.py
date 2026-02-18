@@ -1,3 +1,7 @@
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
+
 from __future__ import annotations
 
 """E2E tests for episode dedup, state auto-update, and resolution propagation.

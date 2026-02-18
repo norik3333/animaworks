@@ -1,3 +1,6 @@
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
 """E2E tests for logger.js crypto.randomUUID fallback.
 
 Tests the full application stack to verify that logger.js is correctly

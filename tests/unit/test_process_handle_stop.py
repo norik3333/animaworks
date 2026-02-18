@@ -1,3 +1,6 @@
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
 """
 Unit tests for three bug fixes in ProcessHandle.stop(), SSE stream_done fallback,
 and health check STOPPING state detection.

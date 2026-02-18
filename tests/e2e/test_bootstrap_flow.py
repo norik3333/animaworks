@@ -1,3 +1,6 @@
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
 """E2E test for the bootstrap background execution flow.
 
 Tests the full bootstrap lifecycle using mock IPC (no actual subprocesses).

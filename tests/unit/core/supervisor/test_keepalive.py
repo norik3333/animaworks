@@ -1,3 +1,6 @@
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
 """Unit tests for IPC keep-alive functionality.
 
 Tests keep-alive chunk emission in AnimaRunner._handle_process_message_stream()

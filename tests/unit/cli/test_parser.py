@@ -1,4 +1,8 @@
 """Unit tests for cli/parser.py — Argparse configuration and cli_main."""
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
+
 from __future__ import annotations
 
 import argparse

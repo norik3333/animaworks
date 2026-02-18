@@ -1,3 +1,6 @@
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
 """Unit tests for the Ollama thinking option in LiteLLMExecutor and AssistedExecutor.
 
 The ``thinking`` field on ``ModelConfig`` controls the ``think`` kwarg passed

@@ -1,3 +1,6 @@
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
 """Unit tests for consolidation targeting all initialized animas.
 
 Verifies that ``_iter_consolidation_targets()``, ``_run_daily_consolidation()``,

@@ -1,3 +1,6 @@
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
 """E2E tests for workspace character scale and hierarchy bug fixes.
 
 Bug 1: Validates character.js bone-based bounding box via static file serving.

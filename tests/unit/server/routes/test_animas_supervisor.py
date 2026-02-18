@@ -1,3 +1,6 @@
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
 """Unit tests for supervisor field in GET /api/animas response.
 
 Validates that the list_animas endpoint includes the ``supervisor`` field

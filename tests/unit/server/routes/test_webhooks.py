@@ -1,4 +1,8 @@
 """Unit tests for server/routes/webhooks.py — Slack & Chatwork webhook endpoints."""
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
+
 from __future__ import annotations
 
 import base64

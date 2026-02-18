@@ -1,3 +1,6 @@
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
 """Unit tests for event file notification system (Fix 2a).
 
 Tests AnimaRunner._emit_event() (core/supervisor/runner.py) and

@@ -1,3 +1,6 @@
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
 """E2E tests for Anima birth reveal animation.
 
 Tests the complete flow from asset generation API → WebSocket event emission,

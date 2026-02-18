@@ -1,3 +1,6 @@
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
 """E2E tests for Slack Socket Mode — message routing to anima inbox.
 
 Tests the handler logic end-to-end using real filesystem and Messenger

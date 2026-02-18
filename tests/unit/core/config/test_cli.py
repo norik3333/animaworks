@@ -1,4 +1,8 @@
 """Unit tests for core/config/cli.py — config CLI subcommands."""
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
+
 from __future__ import annotations
 
 import argparse

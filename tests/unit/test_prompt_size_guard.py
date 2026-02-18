@@ -1,3 +1,6 @@
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
 """Unit tests for prompt size guard features.
 
 Tests conversation turn truncation, pre-flight size checks, Agent SDK

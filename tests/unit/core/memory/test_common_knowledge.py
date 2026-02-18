@@ -1,3 +1,6 @@
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
 """Unit tests for common_knowledge RAG infrastructure.
 
 Tests the cross-cutting changes that enable shared common_knowledge:

@@ -1,3 +1,6 @@
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
 """E2E tests for WebSocket stability improvements.
 
 Tests the actual WebSocket endpoint through a real FastAPI app using

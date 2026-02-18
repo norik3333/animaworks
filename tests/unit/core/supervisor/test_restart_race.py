@@ -1,3 +1,6 @@
+# AnimaWorks - Digital Anima Framework
+# Copyright (C) 2026 AnimaWorks Authors
+# SPDX-License-Identifier: Apache-2.0
 """Unit tests for restart/reconciliation race condition fix.
 
 Verifies that start_anima() and _reconcile() skip animas that are
