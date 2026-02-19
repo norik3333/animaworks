@@ -27,6 +27,7 @@ from starlette.responses import JSONResponse as StarletteJSONResponse
 from core.auth.manager import load_auth, validate_session, find_user
 from core.config import load_config
 from core.supervisor import ProcessSupervisor
+from server.localhost import _is_safe_localhost_request
 from server.routes import create_router
 from server.routes.setup import create_setup_router
 from server.websocket import WebSocketManager
@@ -340,6 +341,10 @@ def create_app(animas_dir: Path, shared_dir: Path) -> FastAPI:
 
         # Skip if local_trust mode
         if auth_config.auth_mode == "local_trust":
+            return await call_next(request)
+
+        # Localhost trust: skip auth for verified local connections
+        if auth_config.trust_localhost and _is_safe_localhost_request(request):
             return await call_next(request)
 
         # Skip whitelisted paths

@@ -8,6 +8,7 @@ import logging
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from core.auth.manager import load_auth, validate_session
+from server.localhost import _is_safe_localhost_request
 
 logger = logging.getLogger("animaworks.routes.websocket")
 
@@ -21,11 +22,13 @@ def create_websocket_router() -> APIRouter:
         # Auth check for non-local_trust modes
         auth_config = load_auth()
         if auth_config.auth_mode != "local_trust":
-            token = websocket.cookies.get("session_token")
-            session = validate_session(token) if token else None
-            if not session:
-                await websocket.close(code=4001, reason="Unauthorized")
-                return
+            # Localhost trust bypass with CSRF check
+            if not (auth_config.trust_localhost and _is_safe_localhost_request(websocket)):
+                token = websocket.cookies.get("session_token")
+                session = validate_session(token) if token else None
+                if not session:
+                    await websocket.close(code=4001, reason="Unauthorized")
+                    return
 
         ws_manager = websocket.app.state.ws_manager
         await ws_manager.connect(websocket)

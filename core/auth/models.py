@@ -36,6 +36,7 @@ class AuthConfig(BaseModel):
     """Root authentication configuration stored in auth.json."""
 
     auth_mode: Literal["local_trust", "password", "multi_user"] = "local_trust"
+    trust_localhost: bool = True
     owner: AuthUser | None = None
     users: list[AuthUser] = []
     token_version: int = 1
