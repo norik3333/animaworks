@@ -87,11 +87,11 @@ class TestSaveImages:
         test_data = base64.b64encode(b"fake image content").decode()
         imgs = [ImageAttachment(data=test_data, media_type="image/png")]
 
-        # save_images does a lazy `from core.paths import ANIMAWORKS_DIR`.
-        # We set this attribute on the module so the import succeeds.
+        # save_images does a lazy `from core.paths import get_data_dir`.
+        # We patch get_data_dir() to return tmp_path.
         import core.paths as paths_module
 
-        monkeypatch.setattr(paths_module, "ANIMAWORKS_DIR", tmp_path, raising=False)
+        monkeypatch.setattr(paths_module, "get_data_dir", lambda: tmp_path)
 
         paths = save_images("test-anima", imgs)
 

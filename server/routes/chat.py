@@ -77,9 +77,9 @@ def save_images(anima_name: str, images: list[ImageAttachment]) -> list[str]:
     """
     if not images:
         return []
-    from core.paths import ANIMAWORKS_DIR
+    from core.paths import get_data_dir
 
-    attachments_dir = ANIMAWORKS_DIR / "animas" / anima_name / "attachments"
+    attachments_dir = get_data_dir() / "animas" / anima_name / "attachments"
     attachments_dir.mkdir(parents=True, exist_ok=True)
 
     paths: list[str] = []

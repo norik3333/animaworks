@@ -281,16 +281,17 @@ class TestBuildSystemPromptCurrentTask:
 
 
 class TestBuildSystemPromptHBSummary:
-    """Tests that the activity summary section exists in builder.
+    """Tests that activity summary is provided via PrimingEngine.
 
-    Section 9 (_load_recent_activity_summary) was restored to provide
-    direct activity summary injection into the system prompt.
+    Section 9 (_load_recent_activity_summary) was removed per Arch-1
+    hippocampus model. PrimingEngine Channel B is now the sole
+    activity reader for prompt construction.
     """
 
-    def test_load_recent_activity_summary_exists(self):
-        """_load_recent_activity_summary exists in builder module."""
+    def test_section9_removed_from_builder(self):
+        """_load_recent_activity_summary no longer exists in builder module."""
         import core.prompt.builder as builder_mod
-        assert hasattr(builder_mod, "_load_recent_activity_summary")
+        assert not hasattr(builder_mod, "_load_recent_activity_summary")
 
 
 # ══════════════════════════════════════════════════════════

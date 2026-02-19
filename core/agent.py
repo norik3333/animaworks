@@ -210,8 +210,6 @@ class AgentCore:
         rm = self.model_config.resolved_mode
         if rm:
             mode = rm.lower()  # "A1" → "a1"
-            if mode == "a1" and not self._sdk_available:
-                return "a2"  # SDK unavailable fallback
             return mode
 
         # Fallback (resolved_mode absent = legacy config.md path)

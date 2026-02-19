@@ -57,6 +57,7 @@ class Messenger:
         msg_type: str = "message",
         thread_id: str = "",
         reply_to: str = "",
+        skip_logging: bool = False,
     ) -> Message:
         msg = Message(
             from_person=self.anima_name,
@@ -76,14 +77,15 @@ class Messenger:
         logger.info("Message sent: %s -> %s (%s)", self.anima_name, to, msg.id)
 
         # Activity Log: record dm_sent for all send paths (A1/A2/B/CLI)
-        try:
-            from core.memory.activity import ActivityLogger
-            anima_dir = self.shared_dir.parent / "animas" / self.anima_name
-            if anima_dir.exists():
-                activity = ActivityLogger(anima_dir)
-                activity.log("dm_sent", content=content, to_person=to)
-        except Exception:
-            pass  # Never fail the send itself
+        if not skip_logging:
+            try:
+                from core.memory.activity import ActivityLogger
+                anima_dir = self.shared_dir.parent / "animas" / self.anima_name
+                if anima_dir.exists():
+                    activity = ActivityLogger(anima_dir)
+                    activity.log("dm_sent", content=content, to_person=to)
+            except Exception:
+                pass  # Never fail the send itself
 
         # Parallel write to legacy dm_logs/ (fallback data source)
         try:
@@ -297,6 +299,7 @@ class Messenger:
                             to=sender,
                             content=f"[既読通知] {len(sender_msgs)}件のメッセージを受信しました: {summary}",
                             msg_type="ack",
+                            skip_logging=True,
                         )
                     except Exception:
                         logger.debug(

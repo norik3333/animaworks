@@ -79,6 +79,7 @@ class ProcessHandle:
         self.stats = ProcessStats(started_at=datetime.now())
         self._streaming = False
         self._streaming_started_at: datetime | None = None
+        self.stopping_since: datetime | None = None
         self._stderr_file: Any | None = None
 
     async def start(self) -> None:
@@ -399,6 +400,7 @@ class ProcessHandle:
                 logger.warning("Shutdown request failed for %s: %s", self.anima_name, e)
 
         self.state = ProcessState.STOPPING
+        self.stopping_since = datetime.now()
 
         # Step 2: Wait for graceful exit
         try:

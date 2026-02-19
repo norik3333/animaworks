@@ -919,18 +919,7 @@ function setupWebSocket() {
 
   // ── anima.notification — human notifications ──
   wsUnsubscribers.push(onEvent("anima.notification", (data) => {
-    const animaName = data.name || data.anima || "";
-    const subject = data.subject || "";
-    const body = data.body || "";
-    if (animaName) {
-      addTimelineEvent({
-        id: Date.now().toString(),
-        type: "human_notify",
-        anima: animaName,
-        ts: data.ts || localISOString(),
-        summary: subject || body.slice(0, 100),
-      });
-    }
+    // Timeline entry handled by anima.proactive_message to avoid duplicates
   }));
 
   wsUnsubscribers.push(onEvent("anima.bootstrap", (data) => {

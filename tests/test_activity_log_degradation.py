@@ -15,7 +15,7 @@ activity log recording quality, and fix priming data loss:
 2.  priming.py — _channel_b_recent_activity() integration (no limit, post-score limit)
 3.  messenger.py — send() records dm_sent in activity log
 4.  messenger.py — send() writes to dm_logs/
-5.  builder.py — _load_recent_activity_summary()
+5.  (removed — Section 9 deleted per Arch-1 hippocampus model)
 6.  handler.py — _fanout_board_mentions() includes stopped Animas
 7.  anima.py — DM receive limit 50
 8.  activity.py — format_for_priming() with content_trim parameter
@@ -341,68 +341,9 @@ class TestMessengerSendDmLogs:
         assert entry.get("text") == "Hi Bob!"
 
 
-# ── 5. builder.py — _load_recent_activity_summary() ───────────────
-
-
-class TestLoadRecentActivitySummary:
-    """Tests for builder._load_recent_activity_summary()."""
-
-    def test_returns_formatted_string_when_entries_exist(self, anima_dir: Path):
-        """Verify it returns '直近の活動' section with formatted entries."""
-        from core.prompt.builder import _load_recent_activity_summary
-
-        # Write a heartbeat_end entry to the activity log
-        today = datetime.now().strftime("%Y-%m-%d")
-        now = datetime.now().isoformat()
-        log_dir = anima_dir / "activity_log"
-        log_dir.mkdir(exist_ok=True)
-        entry = json.dumps({
-            "ts": now,
-            "type": "heartbeat_end",
-            "summary": "巡回完了: 異常なし",
-        }, ensure_ascii=False)
-        (log_dir / f"{today}.jsonl").write_text(entry + "\n", encoding="utf-8")
-
-        result = _load_recent_activity_summary(anima_dir)
-        assert "直近の活動" in result
-        assert "巡回完了" in result
-
-    def test_returns_empty_when_no_entries(self, anima_dir: Path):
-        """Verify it returns empty string when no matching entries exist."""
-        from core.prompt.builder import _load_recent_activity_summary
-
-        result = _load_recent_activity_summary(anima_dir)
-        assert result == ""
-
-    def test_only_includes_specified_event_types(self, anima_dir: Path):
-        """Verify only the configured event types are included."""
-        from core.prompt.builder import _load_recent_activity_summary
-
-        today = datetime.now().strftime("%Y-%m-%d")
-        now = datetime.now().isoformat()
-        log_dir = anima_dir / "activity_log"
-        log_dir.mkdir(exist_ok=True)
-
-        # Write various event types
-        entries = [
-            {"ts": now, "type": "heartbeat_end", "summary": "HB done"},
-            {"ts": now, "type": "cron_executed", "summary": "Cron ran"},
-            {"ts": now, "type": "dm_sent", "summary": "Sent DM", "to": "bob"},
-            {"ts": now, "type": "message_received", "summary": "User msg"},  # not included
-            {"ts": now, "type": "tool_use", "summary": "Used tool"},  # not included
-        ]
-        content = "\n".join(
-            json.dumps(e, ensure_ascii=False) for e in entries
-        ) + "\n"
-        (log_dir / f"{today}.jsonl").write_text(content, encoding="utf-8")
-
-        result = _load_recent_activity_summary(anima_dir)
-        assert "HB done" in result or "heartbeat_end" in result
-        assert "Cron ran" in result or "cron_executed" in result
-        assert "Sent DM" in result or "dm_sent" in result
-        # message_received and tool_use should NOT be included
-        assert "User msg" not in result
-        assert "Used tool" not in result
+# ── 5. (Section 9 deleted — Arch-1 hippocampus model) ─────────────
+# _load_recent_activity_summary() has been removed.
+# PrimingEngine Channel B is now the sole activity reader.
 
 
 # ── 6. handler.py — _fanout_board_mentions() includes stopped Animas

@@ -114,9 +114,9 @@ async def test_health_check_recovers_stuck_stopping_e2e():
             shared_dir=Path(tmpdir) / "shared",
         )
 
-        # Set the handle to STOPPING with started_at > 30 seconds ago
+        # Set the handle to STOPPING with stopping_since > 30 seconds ago
         handle.state = ProcessState.STOPPING
-        handle.stats.started_at = datetime.now() - timedelta(seconds=60)
+        handle.stopping_since = datetime.now() - timedelta(seconds=60)
 
         supervisor.processes["test-stuck"] = handle
 
