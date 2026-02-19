@@ -843,7 +843,7 @@ class AgentCore:
             }
             return
 
-        # ── Streaming executor (A1 Agent SDK) ─────────────
+        # ── Streaming executor (A1 / A2 / all modes) ─────────────
         # Priming: Automatic memory retrieval
         priming_section = await self._run_priming(prompt, trigger)
 

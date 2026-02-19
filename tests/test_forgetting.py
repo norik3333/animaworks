@@ -377,17 +377,17 @@ class TestCompleteForgetting:
         assert call_args[0] == "test_anima_knowledge"
         assert call_args[1] == ["forget_me"]
 
-    def test_complete_forgetting_skips_accessed_chunks(self, forgetting_engine, anima_dir):
-        """Test that low-activation chunks with access_count > 0 are NOT deleted.
+    def test_complete_forgetting_skips_frequently_accessed_chunks(self, forgetting_engine, anima_dir):
+        """Test that low-activation chunks with access_count > 2 are NOT deleted.
 
-        Even if low_activation_since is old, a non-zero access_count means
-        the memory was recently recalled and should survive.
+        Even if low_activation_since is old, access_count above the threshold
+        (FORGETTING_MAX_ACCESS_COUNT=2) means the memory should survive.
         """
-        old_low_since = (datetime.now() - timedelta(days=90)).isoformat()
+        old_low_since = (datetime.now() - timedelta(days=120)).isoformat()
         chunks = [
             _make_chunk(
                 doc_id="accessed_low",
-                access_count=1,
+                access_count=3,
                 activation_level="low",
                 low_activation_since=old_low_since,
                 source_file="knowledge/accessed.md",

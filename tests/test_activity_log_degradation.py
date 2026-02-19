@@ -405,8 +405,8 @@ class TestFanoutBoardMentionsStoppedAnimas:
         # running_anima and stopped_anima use underscores so the test
         # covers the actual code path.
 
-    def test_all_mention_includes_stopped_animas(self, tmp_path: Path):
-        """Verify @all mentions reach both running and stopped Animas."""
+    def test_all_mention_excludes_stopped_animas(self, tmp_path: Path):
+        """Verify @all mentions only reach running Animas (Fix 8)."""
         from core.tooling.handler import ToolHandler
 
         data_dir = tmp_path / "data"
@@ -447,11 +447,11 @@ class TestFanoutBoardMentionsStoppedAnimas:
             elif len(call.args) >= 1:
                 sent_targets.add(call.args[0])
         assert "running_anima" in sent_targets, "Running anima should receive @all mention"
-        assert "stopped_anima" in sent_targets, "Stopped anima should receive @all mention"
+        assert "stopped_anima" not in sent_targets, "Stopped anima should NOT receive @all mention"
         assert "self_anima" not in sent_targets, "Self should be excluded from @all"
 
-    def test_named_mention_underscore_name_stopped(self, tmp_path: Path):
-        """Verify named @mentions with underscore names reach stopped Animas."""
+    def test_named_mention_underscore_name_stopped_not_sent(self, tmp_path: Path):
+        """Verify named @mentions do NOT reach stopped Animas (Fix 8: running only)."""
         from core.tooling.handler import ToolHandler
 
         data_dir = tmp_path / "data"
@@ -484,7 +484,7 @@ class TestFanoutBoardMentionsStoppedAnimas:
                 sent_targets.add(call.kwargs["to"])
             elif len(call.args) >= 1:
                 sent_targets.add(call.args[0])
-        assert "stopped_target" in sent_targets
+        assert "stopped_target" not in sent_targets, "Stopped Anima should NOT receive named mention"
 
 
 # ── 7. anima.py — DM receive limit 50 ──────────────────────────────

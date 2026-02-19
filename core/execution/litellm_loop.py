@@ -413,8 +413,8 @@ class LiteLLMExecutor(BaseExecutor):
     ) -> AsyncGenerator[dict[str, Any], None]:
         """Token-level streaming via ``litellm.acompletion(stream=True)``.
 
-        Note: Session chaining is NOT handled in streaming -- AgentCore
-        manages that externally.
+        Note: Session chaining is handled by AgentCore.run_cycle_streaming(),
+        not within this method.
         """
         import litellm
 
@@ -595,8 +595,8 @@ class LiteLLMExecutor(BaseExecutor):
         Each LLM call is blocking (no token streaming). After each
         iteration, the full text and tool events are yielded.
 
-        Note: Session chaining is NOT handled in streaming -- AgentCore
-        manages that externally.
+        Note: Session chaining is handled by AgentCore.run_cycle_streaming(),
+        not within this method.
         """
         import litellm
 

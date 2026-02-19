@@ -239,9 +239,9 @@ class TestBoardMentionFanout:
         bob_board = [m for m in bob_msgs if m.get("type") == "board_mention"]
         assert len(bob_board) == 1, f"Expected 1 board_mention for bob, got {len(bob_board)}"
 
-        # Charlie (stopped) should also receive a board_mention in inbox
+        # Charlie (stopped) should NOT receive a board_mention (Fix 8: running only)
         charlie_msgs = _read_inbox(shared_dir, "charlie")
         charlie_board = [m for m in charlie_msgs if m.get("type") == "board_mention"]
-        assert len(charlie_board) == 1, (
-            "Charlie (stopped) should receive board_mention in inbox for next HB pickup"
+        assert len(charlie_board) == 0, (
+            "Charlie (stopped) should NOT receive board_mention — only running Animas are targets"
         )

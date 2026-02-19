@@ -83,8 +83,26 @@ class StreamingJournal:
         from_person: str = "",
         session_id: str = "",
     ) -> None:
-        """Open the journal and write the start event."""
+        """Open the journal and write the start event.
+
+        If an orphaned journal already exists (e.g. from a concurrent
+        heartbeat + chat), it is recovered first to prevent data loss.
+        """
         self._shortterm_dir.mkdir(parents=True, exist_ok=True)
+        # Recover orphaned journal before overwriting — persist to episode log
+        if self._journal_path.exists():
+            recovery = StreamingJournal.recover(self._anima_dir)
+            if recovery and recovery.recovered_text:
+                logger.warning(
+                    "Orphaned journal recovered on open: %d chars, trigger=%s",
+                    len(recovery.recovered_text),
+                    recovery.trigger,
+                )
+                self._persist_recovery(recovery)
+            else:
+                logger.warning(
+                    "Orphaned journal found on open; no content recovered",
+                )
         self._fd = open(self._journal_path, "w", encoding="utf-8")
         self._buffer = ""
         self._last_flush = time.monotonic()
@@ -270,6 +288,34 @@ class StreamingJournal:
         return recovery
 
     # ── Private helpers ───────────────────────────────────────
+
+    def _persist_recovery(self, recovery: JournalRecovery) -> None:
+        """Persist recovered orphan content to an episode file.
+
+        Saves the recovered text to ``episodes/recovered_{timestamp}.md``
+        so the data is not permanently lost.
+        """
+        episodes_dir = self._anima_dir / "episodes"
+        episodes_dir.mkdir(parents=True, exist_ok=True)
+        ts = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+        recovery_file = episodes_dir / f"recovered_{ts}.md"
+        content_lines = [
+            f"# Recovered Streaming Journal ({recovery.trigger})",
+            f"- from: {recovery.from_person}",
+            f"- session_id: {recovery.session_id}",
+            f"- started_at: {recovery.started_at}",
+            f"- last_event_at: {recovery.last_event_at}",
+            f"- complete: {recovery.is_complete}",
+            "",
+            "## Recovered Text",
+            "",
+            recovery.recovered_text,
+        ]
+        try:
+            recovery_file.write_text("\n".join(content_lines), encoding="utf-8")
+            logger.info("Persisted orphan recovery to %s", recovery_file)
+        except OSError:
+            logger.warning("Failed to persist orphan recovery to %s", recovery_file)
 
     def _write_event(self, event: dict[str, Any]) -> None:
         """Write a single JSONL event line with timestamp."""

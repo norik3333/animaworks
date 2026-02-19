@@ -534,7 +534,7 @@ class ProcessSupervisor:
 
         # During streaming: skip ping (IPC lock held) but still check
         # process liveness and streaming duration timeout.
-        if handle._streaming:
+        if handle.is_streaming:
             # Detect process death during streaming
             if handle.state == ProcessState.FAILED:
                 logger.error(
@@ -554,10 +554,9 @@ class ProcessSupervisor:
                 )
                 return
             # Streaming duration timeout
-            if handle._streaming_started_at is not None:
-                streaming_sec = (
-                    datetime.now() - handle._streaming_started_at
-                ).total_seconds()
+            started_at = handle.streaming_started_at
+            if started_at is not None:
+                streaming_sec = (datetime.now() - started_at).total_seconds()
                 if streaming_sec > self._max_streaming_duration_sec:
                     logger.error(
                         "Streaming timeout for %s (%.0fs > %ds)",

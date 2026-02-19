@@ -77,10 +77,21 @@ class ProcessHandle:
         self.process: subprocess.Popen | None = None
         self.ipc_client: IPCClient | None = None
         self.stats = ProcessStats(started_at=datetime.now())
+        self._streaming_lock = asyncio.Lock()
         self._streaming = False
         self._streaming_started_at: datetime | None = None
         self.stopping_since: datetime | None = None
         self._stderr_file: Any | None = None
+
+    @property
+    def is_streaming(self) -> bool:
+        """Whether the process is currently streaming (read-safe snapshot)."""
+        return self._streaming
+
+    @property
+    def streaming_started_at(self) -> datetime | None:
+        """When the current streaming session started (read-safe snapshot)."""
+        return self._streaming_started_at
 
     async def start(self) -> None:
         """
@@ -306,8 +317,9 @@ class ProcessHandle:
             params=params
         )
 
-        self._streaming = True
-        self._streaming_started_at = datetime.now()
+        async with self._streaming_lock:
+            self._streaming = True
+            self._streaming_started_at = datetime.now()
         logger.info(
             "[PH-STREAM] start anima=%s method=%s req_id=%s state=%s pid=%s",
             self.anima_name, method, request.id, self.state.value,
@@ -328,13 +340,14 @@ class ProcessHandle:
             self.state = ProcessState.FAILED
             raise
         finally:
-            elapsed = (datetime.now() - self._streaming_started_at).total_seconds() if self._streaming_started_at else 0
+            async with self._streaming_lock:
+                elapsed = (datetime.now() - self._streaming_started_at).total_seconds() if self._streaming_started_at else 0
+                self._streaming = False
+                self._streaming_started_at = None
             logger.info(
                 "[PH-STREAM] end anima=%s method=%s chunks=%d elapsed=%.1fs",
                 self.anima_name, method, chunk_count, elapsed,
             )
-            self._streaming = False
-            self._streaming_started_at = None
 
     async def ping(self, timeout: float = 5.0) -> bool:
         """

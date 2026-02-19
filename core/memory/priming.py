@@ -46,6 +46,12 @@ _BUDGET_SKILL_MATCH = 200
 # Rough characters-per-token for Japanese/English mixed text
 _CHARS_PER_TOKEN = 4
 
+# Pre-compiled regex patterns for keyword extraction (avoids ReDoS risk)
+_RE_KATAKANA = re.compile(r"[\u30A0-\u30FF]{2,}")
+_RE_WORDS = re.compile(r"[\w\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]+")
+# Maximum message length to process for keyword extraction
+_MAX_KEYWORD_INPUT_LEN = 5000
+
 
 # ── Data structures ────────────────────────────────────────────
 
@@ -720,8 +726,12 @@ class PrimingEngine:
         2. Known entity matching (knowledge/ filenames)
         3. General keywords (stopword-filtered)
 
-        Future: Use morphological analysis (MeCab/Sudachi) for better quality.
+        Input is truncated to ``_MAX_KEYWORD_INPUT_LEN`` to bound regex cost.
+        Patterns are pre-compiled module-level constants.
         """
+        # Truncate oversized input to bound regex processing time
+        text = message[:_MAX_KEYWORD_INPUT_LEN] if len(message) > _MAX_KEYWORD_INPUT_LEN else message
+
         # Remove common Japanese particles and English stopwords
         stopwords = {
             "の", "に", "は", "を", "が", "で", "と", "から", "まで",
@@ -734,7 +744,7 @@ class PrimingEngine:
         }
 
         # 1. Proper nouns: katakana sequences (2+ chars)
-        katakana_words = re.findall(r"[\u30A0-\u30FF]{2,}", message)
+        katakana_words = _RE_KATAKANA.findall(text)
 
         # 2. Known entities: match against knowledge/ filenames
         known_entities: set[str] = set()
@@ -742,7 +752,7 @@ class PrimingEngine:
             known_entities = {f.stem.lower() for f in self.knowledge_dir.glob("*.md")}
 
         # Split on whitespace and punctuation, keep alphanumeric + Japanese
-        words = re.findall(r"[\w\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]+", message)
+        words = _RE_WORDS.findall(text)
 
         # Filter stopwords and short words
         general_keywords = [

@@ -37,7 +37,8 @@ DOWNSCALING_ACCESS_THRESHOLD = 3  # Minimum access count to avoid marking
 REORGANIZATION_SIMILARITY_THRESHOLD = 0.80  # Vector similarity for merging
 
 # Complete forgetting
-FORGETTING_LOW_ACTIVATION_DAYS = 60  # Days in low activation before deletion
+FORGETTING_LOW_ACTIVATION_DAYS = 90  # Days in low activation before deletion
+FORGETTING_MAX_ACCESS_COUNT = 2  # Max access count to still be eligible for deletion
 
 # Protected memory types (skills and shared_users are fully protected)
 PROTECTED_MEMORY_TYPES = frozenset({"skills", "shared_users"})
@@ -560,7 +561,7 @@ class ForgettingEngine:
     def complete_forgetting(self) -> dict[str, Any]:
         """Archive and delete chunks that remain low-activation (monthly).
 
-        Criteria: low_activation_since > 60 days ago AND access_count == 0
+        Criteria: low_activation_since > 90 days ago AND access_count <= 2
         Action: Move source file to archive/forgotten/, delete from vector index
         """
         logger.info("Starting complete forgetting for anima=%s", self.anima_name)
@@ -600,7 +601,7 @@ class ForgettingEngine:
 
                 # Check criteria
                 access_count = int(meta.get("access_count", 0))
-                if days_low > FORGETTING_LOW_ACTIVATION_DAYS and access_count == 0:
+                if days_low > FORGETTING_LOW_ACTIVATION_DAYS and access_count <= FORGETTING_MAX_ACCESS_COUNT:
                     ids_to_delete.append(chunk["id"])
                     source_file = meta.get("source_file", "")
                     if source_file and source_file != "merged":

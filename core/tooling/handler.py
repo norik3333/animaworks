@@ -686,18 +686,12 @@ class ToolHandler:
         else:
             running = set()
 
-        # Determine all known Animas (running + stopped)
-        data_dir = get_data_dir()
-        all_animas = {
-            p.name for p in (data_dir / "animas").iterdir() if p.is_dir()
-        } if (data_dir / "animas").is_dir() else set()
-
-        # Determine fanout targets (running + stopped)
+        # Determine fanout targets (running only — stopped Animas have no inbox consumer)
         if is_all:
-            targets = (running | all_animas) - {self._anima_name}
+            targets = running - {self._anima_name}
         else:
             named = {m for m in mentions if m != "all"}
-            targets = (named & (running | all_animas)) - {self._anima_name}
+            targets = (named & running) - {self._anima_name}
 
         if not targets:
             return
