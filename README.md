@@ -64,7 +64,7 @@ Most AI agent frameworks truncate memory to fit the context window — leaving a
 If you have [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed, **no API key configuration is needed**. Claude Code handles authentication on its own, and each Anima runs as a Claude Code subprocess with full tool access (Read / Write / Edit / Bash / Grep / Glob).
 
 ```bash
-git clone https://github.com/<your-org>/animaworks.git
+git clone https://github.com/xuiltul/animaworks.git
 cd animaworks
 python3 -m venv .venv
 source .venv/bin/activate
