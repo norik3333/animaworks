@@ -218,7 +218,75 @@
   line-height: 1.55;
   color: #1a1a1a;
   word-wrap: break-word;
-  white-space: pre-wrap;
+}
+
+/* ── Markdown in messages ──────────────────── */
+
+.board-markdown {
+  white-space: normal;
+}
+.board-markdown p { margin: 0.3em 0; }
+.board-markdown p:first-child { margin-top: 0; }
+.board-markdown p:last-child { margin-bottom: 0; }
+.board-markdown h1,
+.board-markdown h2,
+.board-markdown h3,
+.board-markdown h4 { margin: 0.5em 0 0.25em; line-height: 1.3; }
+.board-markdown h1 { font-size: 1.1em; }
+.board-markdown h2 { font-size: 1.05em; }
+.board-markdown h3 { font-size: 1em; }
+.board-markdown ul,
+.board-markdown ol { margin: 0.3em 0; padding-left: 1.4em; }
+.board-markdown li { margin: 0.15em 0; }
+.board-markdown code {
+  background: #e8ecf0;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 0.88em;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+}
+.board-markdown pre {
+  background: #272822;
+  color: #f8f8f2;
+  padding: 8px 10px;
+  border-radius: 4px;
+  overflow-x: auto;
+  margin: 0.4em 0;
+  font-size: 0.85em;
+}
+.board-markdown pre code {
+  background: none;
+  padding: 0;
+  color: inherit;
+}
+.board-markdown blockquote {
+  border-left: 3px solid #ccc;
+  margin: 0.4em 0;
+  padding: 0.2em 0.8em;
+  color: #555;
+}
+.board-markdown table {
+  border-collapse: collapse;
+  margin: 0.4em 0;
+  font-size: 0.88em;
+}
+.board-markdown th,
+.board-markdown td {
+  border: 1px solid #ccc;
+  padding: 4px 8px;
+}
+.board-markdown th {
+  background: #e8e8e8;
+  font-weight: 600;
+}
+.board-markdown a {
+  color: #2563eb;
+  text-decoration: underline;
+}
+.board-markdown hr {
+  border: none;
+  border-top: 1px solid #ccc;
+  margin: 0.5em 0;
 }
 
 /* ── Input Bar ──────────────────────────────── */

@@ -1,6 +1,6 @@
 // ── Board Page (Channels & DMs) ──────────────
 import { api } from "../modules/api.js";
-import { escapeHtml, smartTimestamp } from "../modules/state.js";
+import { escapeHtml, renderMarkdown, smartTimestamp } from "../modules/state.js";
 import { createLogger } from "../shared/logger.js";
 
 const logger = createLogger("board-page");
@@ -370,7 +370,7 @@ function _renderMessages() {
             ${badge}
             <span class="board-msg-ts">${escapeHtml(ts)}</span>
           </div>
-          <div class="board-msg-text">${escapeHtml(text)}</div>
+          <div class="board-msg-text board-markdown">${renderMarkdown(text)}</div>
         </div>
       </div>`;
   }).join("");
