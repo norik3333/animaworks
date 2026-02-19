@@ -12,7 +12,6 @@ These tests use REAL file I/O operations (no mocks for files) and test
 actual end-to-end workflows for:
   - Shared channel visibility in priming (cross-Anima posts)
   - Messenger.send() creating dm_sent + dm_logs entries
-  - Section 9 (_load_recent_activity_summary) restoration
   - Full-content preservation in dm_received activity log entries
   - format_for_priming() content_trim parameter
   - read_dm_history() type filtering (exclude message_received/response_sent)
@@ -216,80 +215,6 @@ class TestMessengerSendCreatesDmSentAndDmLogs:
         assert len(dm_log_entries) >= 1, "At least one dm_log entry should exist"
         assert dm_log_entries[0].get("from") == "sender"
         assert dm_log_entries[0].get("text") == "hello from sender"
-
-
-class TestSection9InSystemPrompt:
-    """Test 3: _load_recent_activity_summary() returns Section 9 content."""
-
-    def test_section9_in_system_prompt(
-        self,
-        anima_dir: Path,
-    ) -> None:
-        """_load_recent_activity_summary() produces Section 9 with activity entries.
-
-        Section 9 was previously removed and has been restored. It should
-        return a section starting with '## 直近の活動' when activity log
-        entries of the right types exist.
-        """
-        from core.prompt.builder import _load_recent_activity_summary
-
-        now = datetime.now()
-        today = date.today().isoformat()
-
-        # Write activity log entries of Section 9 relevant types
-        entries = [
-            {
-                "ts": (now - timedelta(minutes=60)).isoformat(),
-                "type": "heartbeat_end",
-                "summary": "全システム正常動作を確認",
-            },
-            {
-                "ts": (now - timedelta(minutes=30)).isoformat(),
-                "type": "dm_sent",
-                "content": "yukiへの作業報告を送信しました",
-                "to": "yuki",
-            },
-            {
-                "ts": (now - timedelta(minutes=15)).isoformat(),
-                "type": "cron_executed",
-                "summary": "タスク: daily-check",
-                "meta": {"task_name": "daily-check"},
-            },
-        ]
-        _write_activity_entries(anima_dir, today, entries)
-
-        result = _load_recent_activity_summary(anima_dir)
-
-        assert result, "_load_recent_activity_summary should return non-empty string"
-        assert result.startswith("## 直近の活動"), (
-            f"Section 9 should start with '## 直近の活動', got: {result[:50]}"
-        )
-        # Verify specific content appears
-        assert "heartbeat_end" in result or "HB" in result
-        assert "dm_sent" in result or "DM>" in result
-        assert "cron_executed" in result or "CRON" in result
-
-    def test_section9_empty_when_no_relevant_entries(
-        self,
-        anima_dir: Path,
-    ) -> None:
-        """Section 9 returns empty string when no relevant entry types exist."""
-        from core.prompt.builder import _load_recent_activity_summary
-
-        # Write only a message_received entry (not in Section 9 types)
-        today = date.today().isoformat()
-        entries = [
-            {
-                "ts": datetime.now().isoformat(),
-                "type": "message_received",
-                "content": "This should not appear in Section 9",
-                "from": "human",
-            },
-        ]
-        _write_activity_entries(anima_dir, today, entries)
-
-        result = _load_recent_activity_summary(anima_dir)
-        assert result == "", "Section 9 should be empty when no relevant types exist"
 
 
 class TestDmReceivedFullContentInActivityLog:

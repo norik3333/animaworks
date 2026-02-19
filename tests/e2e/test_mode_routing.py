@@ -68,12 +68,13 @@ class TestModeRouting:
         )
         assert agent._resolve_execution_mode() == "b"
 
-    def test_claude_model_without_sdk_routes_to_a2(self, make_agent_core):
-        """Claude model + SDK unavailable → Mode A2 (fallback)."""
+    def test_claude_model_without_sdk_still_routes_to_a1(self, make_agent_core):
+        """Claude model + SDK unavailable → still Mode A1 (executor handles fallback)."""
         agent = make_agent_core(
             name="claude-nosdk",
             model="claude-sonnet-4-20250514",
         )
-        # Force SDK to be unavailable
+        # Force SDK to be unavailable — _resolve_execution_mode no longer
+        # short-circuits to a2; _create_executor handles the fallback chain.
         agent._sdk_available = False
-        assert agent._resolve_execution_mode() == "a2"
+        assert agent._resolve_execution_mode() == "a1"

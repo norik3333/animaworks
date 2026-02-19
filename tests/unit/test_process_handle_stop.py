@@ -387,8 +387,8 @@ class TestHealthCheckStoppingDetection:
             shared_dir=tmp_path / "shared",
         )
         handle.state = ProcessState.STOPPING
-        # Set started_at to >30 seconds ago so the duration check triggers
-        handle.stats.started_at = datetime.now() - timedelta(seconds=60)
+        # Set stopping_since to >30 seconds ago so the duration check triggers
+        handle.stopping_since = datetime.now() - timedelta(seconds=60)
 
         supervisor.processes["stuck-anima"] = handle
 
@@ -422,8 +422,8 @@ class TestHealthCheckStoppingDetection:
             shared_dir=tmp_path / "shared",
         )
         handle.state = ProcessState.STOPPING
-        # Set started_at to just 5 seconds ago (well under the 30s threshold)
-        handle.stats.started_at = datetime.now() - timedelta(seconds=5)
+        # Set stopping_since to just 5 seconds ago (well under the 30s threshold)
+        handle.stopping_since = datetime.now() - timedelta(seconds=5)
 
         supervisor.processes["stopping-anima"] = handle
 

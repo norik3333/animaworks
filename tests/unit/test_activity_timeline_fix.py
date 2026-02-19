@@ -98,10 +98,14 @@ class TestAppJsTimestampUsage:
             )
 
     def test_localISOString_usage_count(self) -> None:
-        """localISOString() should appear at least 7 times (4 existing + 3 new handlers)."""
+        """localISOString() should appear at least 6 times (4 existing + 2 active handlers).
+
+        Note: anima.notification handler no longer adds timeline events
+        (Arch-1 fix for double event), so count reduced from 7 to 6.
+        """
         src = APP_JS.read_text(encoding="utf-8")
         count = src.count("localISOString()")
-        assert count >= 7, f"Expected ≥7 localISOString() usages, got {count}"
+        assert count >= 6, f"Expected ≥6 localISOString() usages, got {count}"
 
 
 # ── Test 5: New event handlers exist in app.js ─────────
@@ -132,11 +136,14 @@ class TestNewEventHandlers:
         block = src[idx:idx + 400]
         assert 'type: "dm_sent"' in block
 
-    def test_notification_uses_human_notify_type(self) -> None:
+    def test_notification_handler_is_noop(self) -> None:
+        """anima.notification handler is a no-op (timeline handled by proactive_message)."""
         src = APP_JS.read_text(encoding="utf-8")
         idx = src.index('onEvent("anima.notification"')
         block = src[idx:idx + 400]
-        assert 'type: "human_notify"' in block
+        # After Arch-1 fix, the handler no longer adds timeline events
+        assert 'type: "human_notify"' not in block
+        assert "addTimelineEvent" not in block
 
 
 # ── Test 6: Backend timestamp format matches client expectation ──

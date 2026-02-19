@@ -434,9 +434,7 @@ class ToolHandler:
         """Record tool usage in unified activity log."""
         try:
             activity = ActivityLogger(self._anima_dir)
-            if name == "send_message":
-                activity.log("dm_sent", content=args.get("content", "")[:200], to_person=args.get("to", ""))
-            elif name == "post_channel":
+            if name == "post_channel":
                 activity.log("channel_post", content=args.get("text", "")[:200], channel=args.get("channel", ""))
             elif name == "read_channel":
                 activity.log("channel_read", channel=args.get("channel", ""), summary=f"最新{args.get('limit', 20)}件を確認")

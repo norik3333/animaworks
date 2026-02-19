@@ -516,8 +516,10 @@ class ProcessSupervisor:
         """Check health of a single process."""
         # Detect handles stuck in STOPPING state (e.g. after failed shutdown)
         if handle.state == ProcessState.STOPPING:
+            if not handle.stopping_since:
+                return
             stopping_duration = (
-                datetime.now() - handle.stats.started_at
+                datetime.now() - handle.stopping_since
             ).total_seconds()
             if stopping_duration > 30:
                 logger.error(
