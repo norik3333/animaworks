@@ -223,12 +223,11 @@ class TestMessageTriggeredHeartbeatGuard:
 
 
 class TestRunnerHeartbeat24hDefault:
-    """Verify SchedulerManager._setup_heartbeat respects 3-tier active hours resolution."""
+    """Verify SchedulerManager._setup_heartbeat respects 2-tier active hours resolution."""
 
-    def test_default_24h_when_no_active_hours(self, tmp_path):
-        """active_hours=None and no time range in heartbeat.md => hour='*'."""
+    def test_default_24h_when_no_time_range(self, tmp_path):
+        """No time range in heartbeat.md => hour='*' (24h)."""
         mock_anima = MagicMock()
-        mock_anima.config.active_hours = None
         mock_anima.memory.read_heartbeat_config.return_value = "- チェック項目A"
 
         mgr = SchedulerManager(
@@ -248,33 +247,9 @@ class TestRunnerHeartbeat24hDefault:
         hour_field = str(trigger.fields[5])
         assert hour_field == "*"
 
-    def test_active_hours_from_config(self, tmp_path):
-        """active_hours=(9,22) from config => hour='9-21'."""
+    def test_heartbeat_md_time_range_restricts_hours(self, tmp_path):
+        """Time range in heartbeat.md restricts heartbeat hours."""
         mock_anima = MagicMock()
-        mock_anima.config.active_hours = (9, 22)
-        mock_anima.memory.read_heartbeat_config.return_value = "- チェック項目B"
-
-        mgr = SchedulerManager(
-            anima=mock_anima,
-            anima_name="guard-test",
-            anima_dir=tmp_path / "animas" / "guard-test",
-            emit_event=MagicMock(),
-        )
-        mock_scheduler = MagicMock()
-        mgr.scheduler = mock_scheduler
-
-        mgr._setup_heartbeat()
-
-        mock_scheduler.add_job.assert_called_once()
-        call_kwargs = mock_scheduler.add_job.call_args
-        trigger = call_kwargs[1]["trigger"] if "trigger" in (call_kwargs[1] or {}) else call_kwargs[0][1]
-        hour_field = str(trigger.fields[5])
-        assert "9-21" in hour_field
-
-    def test_heartbeat_md_time_range_takes_priority(self, tmp_path):
-        """Time range in heartbeat.md overrides config active_hours."""
-        mock_anima = MagicMock()
-        mock_anima.config.active_hours = (9, 22)  # Should be overridden
         mock_anima.memory.read_heartbeat_config.return_value = "稼働時間: 8:00 - 20:00"
 
         mgr = SchedulerManager(

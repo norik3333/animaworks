@@ -95,18 +95,13 @@ class SchedulerManager:
 
         interval, active_start, active_end = parse_heartbeat_config(config)
 
-        # Determine active hours (3-tier, matching lifecycle.py):
+        # Determine active hours:
         # 1. heartbeat.md explicit time range (already parsed above)
-        # 2. AnimaConfig.active_hours if set
-        # 3. Default: 24h (hour="*")
+        # 2. Default: 24h (hour="*")
         m = re.search(r"(\d{1,2}):\d{0,2}\s*-\s*(\d{1,2})", config)
         if m:
             hour_spec = f"{active_start}-{active_end - 1}"
             log_active = f"active {active_start}:00-{active_end}:00"
-        elif self._anima and self._anima.config.active_hours is not None:
-            ah_start, ah_end = self._anima.config.active_hours
-            hour_spec = f"{ah_start}-{ah_end - 1}"
-            log_active = f"active {ah_start}:00-{ah_end}:00"
         else:
             hour_spec = "*"
             log_active = "24h"

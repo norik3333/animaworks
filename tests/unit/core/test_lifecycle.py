@@ -215,7 +215,6 @@ class TestLifecycleManager:
         lm = LifecycleManager()
         dp = MagicMock()
         dp.name = "alice"
-        dp.config.active_hours = None
         dp.memory.read_heartbeat_config.return_value = ""
         dp.memory.read_cron_config.return_value = ""
         dp.set_on_lock_released = MagicMock()
@@ -228,7 +227,6 @@ class TestLifecycleManager:
         lm = LifecycleManager()
         dp = MagicMock()
         dp.name = "alice"
-        dp.config.active_hours = None
         dp.memory.read_heartbeat_config.return_value = ""
         dp.memory.read_cron_config.return_value = ""
         dp.set_on_lock_released = MagicMock()
@@ -303,7 +301,6 @@ class TestSetupHeartbeat:
         lm = LifecycleManager()
         dp = MagicMock()
         dp.name = "alice"
-        dp.config.active_hours = None  # 24h default
         # Even if config says 15 minutes, interval should remain 30
         dp.memory.read_heartbeat_config.return_value = "巡回間隔: 15分"
         dp.memory.read_cron_config.return_value = ""
@@ -320,7 +317,6 @@ class TestSetupHeartbeat:
         lm = LifecycleManager()
         dp = MagicMock()
         dp.name = "bob"
-        dp.config.active_hours = None  # 24h default
         dp.memory.read_heartbeat_config.return_value = "5分ごと"
         dp.memory.read_cron_config.return_value = ""
         dp.set_on_lock_released = MagicMock()
@@ -330,12 +326,11 @@ class TestSetupHeartbeat:
         hb_job = next(j for j in jobs if j.id == "bob_heartbeat")
         assert str(hb_job.trigger).find("*/30") != -1
 
-    def test_default_24h_when_no_active_hours(self):
-        """active_hours=None means 24h heartbeat (hour='*')."""
+    def test_default_24h_when_no_time_range(self):
+        """No time range in heartbeat.md means 24h heartbeat (hour='*')."""
         lm = LifecycleManager()
         dp = MagicMock()
         dp.name = "carol"
-        dp.config.active_hours = None
         dp.memory.read_heartbeat_config.return_value = "- チェック項目"
         dp.memory.read_cron_config.return_value = ""
         dp.set_on_lock_released = MagicMock()
@@ -347,27 +342,11 @@ class TestSetupHeartbeat:
         # hour should not be restricted — no "hour=" range like "9-21"
         assert "*/30" in trigger_str
 
-    def test_active_hours_from_config(self):
-        """active_hours=(9, 22) restricts heartbeat to 9:00-21:00."""
-        lm = LifecycleManager()
-        dp = MagicMock()
-        dp.name = "dave"
-        dp.config.active_hours = (9, 22)
-        dp.memory.read_heartbeat_config.return_value = "- チェック項目"
-        dp.memory.read_cron_config.return_value = ""
-        dp.set_on_lock_released = MagicMock()
-
-        lm.register_anima(dp)
-        jobs = lm.scheduler.get_jobs()
-        hb_job = next(j for j in jobs if j.id == "dave_heartbeat")
-        trigger_str = str(hb_job.trigger)
-        assert "9-21" in trigger_str
-
-    def test_parses_active_hours(self):
+    def test_parses_active_hours_from_heartbeat_md(self):
+        """Time range in heartbeat.md restricts heartbeat hours."""
         lm = LifecycleManager()
         dp = MagicMock()
         dp.name = "bob"
-        dp.config.active_hours = None
         dp.memory.read_heartbeat_config.return_value = "稼働時間: 8:00 - 20:00"
         dp.memory.read_cron_config.return_value = ""
         dp.set_on_lock_released = MagicMock()
@@ -471,7 +450,6 @@ class TestScheduleDeferredTrigger:
 
         dp = MagicMock()
         dp.name = "alice"
-        dp.config.active_hours = None
         dp.memory.read_heartbeat_config.return_value = ""
         dp.memory.read_cron_config.return_value = ""
         dp.set_on_lock_released = MagicMock()
@@ -691,7 +669,6 @@ class TestReloadAnimaSchedule:
         lm = LifecycleManager()
         dp = MagicMock()
         dp.name = "alice"
-        dp.config.active_hours = None
         dp.memory.read_heartbeat_config.return_value = "9:00 - 22:00"
         dp.memory.read_cron_config.return_value = ""
         dp.set_on_lock_released = MagicMock()
@@ -718,7 +695,6 @@ class TestReloadAnimaSchedule:
         lm = LifecycleManager()
         dp = MagicMock()
         dp.name = "bob"
-        dp.config.active_hours = None
         dp.memory.read_heartbeat_config.return_value = "30分ごと\n9:00 - 22:00"
         dp.memory.read_cron_config.return_value = ""
         dp.set_on_lock_released = MagicMock()
@@ -742,7 +718,6 @@ type: llm
         lm = LifecycleManager()
         dp = MagicMock()
         dp.name = "alice"
-        dp.config.active_hours = None
         dp.memory.read_heartbeat_config.return_value = ""
         dp.memory.read_cron_config.return_value = ""
         dp.set_on_lock_released = MagicMock()
