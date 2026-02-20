@@ -16,7 +16,7 @@ from typing import Any
 
 from core.time_utils import now_iso
 
-from core.exceptions import MessagingError, DeliveryError, RecipientNotFoundError
+from core.exceptions import MessagingError, DeliveryError, RecipientNotFoundError  # noqa: F401
 from core.schemas import Message
 
 logger = logging.getLogger("animaworks.messenger")

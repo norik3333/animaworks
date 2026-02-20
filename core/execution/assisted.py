@@ -31,7 +31,7 @@ from collections.abc import AsyncGenerator
 from pathlib import Path
 from typing import Any
 
-from core.exceptions import LLMAPIError, ToolExecutionError, ConfigError
+from core.exceptions import LLMAPIError, ToolExecutionError, ConfigError  # noqa: F401
 from core.execution.base import BaseExecutor, ExecutionResult, StreamDisconnectedError
 from core.execution._streaming import stream_error_boundary
 from core.memory import MemoryManager

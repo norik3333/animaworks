@@ -28,7 +28,7 @@ from core.memory.conversation import ConversationMemory
 from core.memory import MemoryManager
 from core.messenger import InboxItem, Messenger
 from core.paths import load_prompt
-from core.exceptions import AnimaWorksError
+from core.exceptions import AnimaWorksError  # noqa: F401
 from core.schemas import CycleResult, AnimaStatus, VALID_EMOTIONS
 
 logger = logging.getLogger("animaworks.anima")

@@ -26,7 +26,7 @@ from core.time_utils import ensure_aware, now_jst
 from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any, Union
 
-from core.exceptions import ProcessError, MemoryWriteError, ExecutionError
+from core.exceptions import ProcessError, MemoryWriteError, ExecutionError  # noqa: F401
 from core.anima import DigitalAnima
 from core.memory.streaming_journal import StreamingJournal
 from core.supervisor.ipc import IPCServer, IPCRequest, IPCResponse

@@ -24,7 +24,7 @@ from core.config.models import (
     read_anima_supervisor,
     save_config,
 )
-from core.exceptions import AnimaWorksError
+from core.exceptions import AnimaWorksError  # noqa: F401
 from core.messenger import Messenger
 
 logger = logging.getLogger(__name__)

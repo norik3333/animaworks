@@ -121,20 +121,16 @@ class TestNoSilentPasses:
     """Verify no silent 'except Exception: pass' remains in core/."""
 
     def test_no_except_exception_pass_in_core(self):
-        """Grep core/ for 'except Exception: pass' pattern — must find zero."""
+        """Scan core/ for multiline 'except Exception:\\n    pass' — must find zero."""
         core_dir = Path(__file__).resolve().parents[2] / "core"
         assert core_dir.is_dir(), f"core/ not found at {core_dir}"
 
+        # Use multiline grep (-Pz) to match except/pass across lines
         result = subprocess.run(
-            ["grep", "-rn", "except Exception.*:.*pass", str(core_dir)],
+            ["grep", "-Przn", r"except\s+Exception\s*:\s*\n\s+pass\b", str(core_dir)],
             capture_output=True, text=True,
         )
-        # Filter out test files and comments
-        lines = [
-            line for line in result.stdout.strip().split("\n")
-            if line and "test_" not in line and "#" not in line.split("pass")[0]
-        ]
-        assert lines == [] or lines == [""], (
-            f"Found silent 'except Exception: pass' in core/:\n"
-            + "\n".join(lines)
+        matches = result.stdout.strip()
+        assert matches == "", (
+            f"Found silent 'except Exception: pass' in core/:\n{matches}"
         )

@@ -16,7 +16,7 @@ from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from typing import Any, Callable, Awaitable, Union
 
-from core.exceptions import IPCConnectionError as IPCConnectionErr
+from core.exceptions import IPCConnectionError as IPCConnectionErr  # noqa: F401
 
 logger = logging.getLogger(__name__)
 

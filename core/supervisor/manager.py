@@ -21,7 +21,7 @@ from typing import Any
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
-from core.exceptions import (
+from core.exceptions import (  # noqa: F401
     ProcessError, AnimaNotFoundError, IPCConnectionError, ConfigError, MemoryIOError,
 )
 from core.supervisor.ipc import IPCResponse

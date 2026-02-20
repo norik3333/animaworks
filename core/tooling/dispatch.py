@@ -19,7 +19,7 @@ import json
 import logging
 from typing import Any
 
-from core.exceptions import ToolExecutionError
+from core.exceptions import ToolExecutionError  # noqa: F401
 
 logger = logging.getLogger("animaworks.external_tools")
 
