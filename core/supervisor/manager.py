@@ -21,6 +21,9 @@ from typing import Any
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
+from core.exceptions import (  # noqa: F401
+    ProcessError, AnimaNotFoundError, IPCConnectionError, ConfigError, MemoryIOError,
+)
 from core.supervisor.ipc import IPCResponse
 from core.supervisor.process_handle import ProcessHandle, ProcessState
 
@@ -111,7 +114,7 @@ class ProcessSupervisor:
                 srv, "max_streaming_duration", 1800,
             )
         except Exception:
-            pass
+            logger.debug("Config load failed for max_streaming_duration", exc_info=True)
 
         # Callbacks for anima lifecycle events (set by server/app.py)
         self.on_anima_added: Callable[[str], None] | None = None
@@ -478,7 +481,7 @@ class ProcessSupervisor:
                     try:
                         event_file.unlink()
                     except OSError:
-                        pass
+                        logger.debug("Failed to remove corrupted event file %s", event_file, exc_info=True)
 
     async def _health_check_loop(self) -> None:
         """
@@ -872,6 +875,7 @@ class ProcessSupervisor:
             config = load_config()
             consolidation_cfg = getattr(config, "consolidation", None)
         except Exception:
+            logger.debug("Config load failed for consolidation schedule", exc_info=True)
             consolidation_cfg = None
 
         # Daily consolidation
@@ -968,6 +972,7 @@ class ProcessSupervisor:
             config = load_config()
             consolidation_cfg = getattr(config, "consolidation", None)
         except Exception:
+            logger.debug("Config load failed for daily consolidation", exc_info=True)
             consolidation_cfg = None
 
         from core.config.models import ConsolidationConfig
@@ -1019,6 +1024,7 @@ class ProcessSupervisor:
             config = load_config()
             consolidation_cfg = getattr(config, "consolidation", None)
         except Exception:
+            logger.debug("Config load failed for weekly integration", exc_info=True)
             consolidation_cfg = None
 
         from core.config.models import ConsolidationConfig as _CC

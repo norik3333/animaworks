@@ -18,6 +18,8 @@ duplicate definitions that previously lived in ``_build_a2_tools()`` and
 import logging
 from typing import Any
 
+from core.exceptions import ToolConfigError  # noqa: F401
+
 logger = logging.getLogger("animaworks.tool_schemas")
 
 # ── Canonical definitions ────────────────────────────────────

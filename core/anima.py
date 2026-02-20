@@ -28,6 +28,7 @@ from core.memory.conversation import ConversationMemory
 from core.memory import MemoryManager
 from core.messenger import InboxItem, Messenger
 from core.paths import load_prompt
+from core.exceptions import AnimaWorksError  # noqa: F401
 from core.schemas import CycleResult, AnimaStatus, VALID_EMOTIONS
 
 logger = logging.getLogger("animaworks.anima")
@@ -1147,7 +1148,7 @@ class DigitalAnima:
             try:
                 checkpoint_path.unlink(missing_ok=True)
             except Exception:
-                pass
+                logger.debug("[%s] Failed to remove heartbeat checkpoint", self.name, exc_info=True)
 
             return result
         finally:

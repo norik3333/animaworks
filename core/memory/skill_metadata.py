@@ -228,7 +228,7 @@ class SkillMetadataService:
                         if description:
                             description = str(description).strip()
                 except Exception:
-                    pass
+                    logger.debug("Failed to parse YAML frontmatter in %s", path, exc_info=True)
 
         # Fallback: extract from ## 概要 section (legacy format)
         if not description:

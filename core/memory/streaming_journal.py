@@ -180,7 +180,7 @@ class StreamingJournal:
             try:
                 self._flush_buffer()
             except Exception:
-                pass
+                logger.debug("Failed to flush buffer on close", exc_info=True)
         self._close_fd()
 
     # ── Recovery (class methods) ──────────────────────────────
@@ -332,7 +332,7 @@ class StreamingJournal:
         try:
             os.fsync(self._fd.fileno())
         except OSError:
-            pass
+            logger.debug("fsync failed for journal", exc_info=True)
 
     def _flush_buffer(self) -> None:
         """Write buffered text as a single text event."""
@@ -348,5 +348,5 @@ class StreamingJournal:
             try:
                 self._fd.close()
             except OSError:
-                pass
+                logger.debug("Failed to close journal fd", exc_info=True)
             self._fd = None

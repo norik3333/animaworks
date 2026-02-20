@@ -23,6 +23,7 @@ from io import TextIOWrapper
 from pathlib import Path
 from typing import Any
 
+from core.exceptions import IPCConnectionError as IPCConnectionErr  # noqa: F401
 from core.supervisor.ipc import IPCClient, IPCRequest, IPCResponse
 
 logger = logging.getLogger(__name__)
@@ -469,8 +470,8 @@ class ProcessHandle:
         if self._stderr_file:
             try:
                 self._stderr_file.close()
-            except Exception:
-                pass
+            except OSError:
+                logger.debug("Failed to close stderr file", exc_info=True)
             self._stderr_file = None
 
         if self.socket_path.exists():

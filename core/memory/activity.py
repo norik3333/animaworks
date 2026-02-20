@@ -305,7 +305,7 @@ class ActivityLogger:
                             if ts < cutoff:
                                 continue
                         except (ValueError, TypeError):
-                            pass
+                            logger.debug("Failed to parse timestamp for cutoff filtering", exc_info=True)
                     # Map JSONL keys to Python field names
                     if "from" in raw:
                         raw["from_person"] = raw.pop("from")

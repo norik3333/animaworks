@@ -31,6 +31,7 @@ from collections.abc import AsyncGenerator
 from pathlib import Path
 from typing import Any
 
+from core.exceptions import LLMAPIError, ToolExecutionError, ConfigError  # noqa: F401
 from core.execution.base import BaseExecutor, ExecutionResult, StreamDisconnectedError
 from core.execution._streaming import stream_error_boundary
 from core.memory import MemoryManager
@@ -96,7 +97,7 @@ def extract_tool_call(text: str) -> dict | None:
         if isinstance(repaired, dict) and "tool" in repaired:
             return repaired
     except Exception:
-        pass
+        logger.debug("json_repair fallback failed", exc_info=True)
 
     # Step 5: ast.literal_eval (Python dict literal)
     try:
@@ -216,6 +217,7 @@ class AssistedExecutor(BaseExecutor):
         try:
             _cw_overrides = load_config().model_context_windows
         except Exception:
+            logger.debug("Failed to load model context windows", exc_info=True)
             _cw_overrides = None
 
         ctx_window = resolve_context_window(
@@ -228,6 +230,7 @@ class AssistedExecutor(BaseExecutor):
                 messages=messages,
             )
         except Exception:
+            logger.debug("Token counter fallback to char estimate", exc_info=True)
             msg_chars = sum(len(str(m.get("content", ""))) for m in messages)
             est_input = msg_chars // 2
 
@@ -287,6 +290,7 @@ class AssistedExecutor(BaseExecutor):
             try:
                 _cw_overrides = load_config().model_context_windows
             except Exception:
+                logger.debug("Failed to load model context windows", exc_info=True)
                 _cw_overrides = None
             kwargs["num_ctx"] = resolve_context_window(
                 self._model_config.model, _cw_overrides,

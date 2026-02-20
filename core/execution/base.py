@@ -23,22 +23,8 @@ from core.memory.shortterm import ShortTermMemory
 
 # ── Streaming error ──────────────────────────────────────────
 
+from core.exceptions import StreamDisconnectedError  # noqa: F401 – re-export
 
-class StreamDisconnectedError(Exception):
-    """Raised when a streaming session disconnects unexpectedly.
-
-    Carries partial response text accumulated before the disconnect
-    so AgentCore can build a checkpoint-based retry prompt.
-    """
-
-    def __init__(
-        self,
-        message: str = "Stream disconnected",
-        *,
-        partial_text: str = "",
-    ) -> None:
-        super().__init__(message)
-        self.partial_text = partial_text
 
 
 # ── Result ───────────────────────────────────────────────────

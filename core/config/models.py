@@ -23,6 +23,8 @@ from typing import Any
 
 from pydantic import BaseModel, model_validator
 
+from core.exceptions import ConfigError  # noqa: F401
+
 logger = logging.getLogger("animaworks.config")
 
 # ---------------------------------------------------------------------------

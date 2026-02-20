@@ -25,6 +25,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from core.exceptions import ToolExecutionError, MemoryWriteError, ProcessError, DeliveryError  # noqa: F401
 from core.time_utils import now_iso
 
 from core.background import BackgroundTaskManager
@@ -139,6 +140,7 @@ def _validate_skill_format(content: str) -> str:
         if not isinstance(frontmatter, dict):
             frontmatter = {}
     except Exception:
+        logger.debug("YAML parse fallback for skill validation", exc_info=True)
         # Fallback: simple key: value parsing
         frontmatter = {}
         for line in frontmatter_raw.splitlines():
@@ -204,6 +206,7 @@ def _validate_procedure_format(content: str) -> str:
         if not isinstance(frontmatter, dict):
             frontmatter = {}
     except Exception:
+        logger.debug("YAML parse fallback for procedure validation", exc_info=True)
         frontmatter = {}
         for line in frontmatter_raw.splitlines():
             if ":" in line:

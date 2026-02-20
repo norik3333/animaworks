@@ -18,6 +18,7 @@ from apscheduler.triggers.cron import CronTrigger
 
 from core.anima import DigitalAnima
 from core.config.models import load_config
+from core.exceptions import AnimaWorksError  # noqa: F401
 from core.schemas import CronTask
 
 logger = logging.getLogger("animaworks.lifecycle")

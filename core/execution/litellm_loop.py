@@ -25,6 +25,7 @@ from functools import partial
 from pathlib import Path
 from typing import Any
 
+from core.exceptions import LLMAPIError, ToolExecutionError, ConfigError  # noqa: F401
 from core.prompt.context import ContextTracker, resolve_context_window
 from core.execution._session import build_continuation_prompt, handle_session_chaining
 from core.execution._streaming import (
@@ -175,6 +176,7 @@ class LiteLLMExecutor(BaseExecutor):
             try:
                 _cw_overrides = load_config().model_context_windows
             except Exception:
+                logger.debug("Failed to load model context windows", exc_info=True)
                 _cw_overrides = None
             kwargs["num_ctx"] = resolve_context_window(
                 self._model_config.model, _cw_overrides,
@@ -769,6 +771,7 @@ class LiteLLMExecutor(BaseExecutor):
             from core.config import load_config
             _cw_overrides = load_config().model_context_windows
         except Exception:
+            logger.debug("Failed to load model context windows", exc_info=True)
             _cw_overrides = None
         ctx_window = resolve_context_window(
             self._model_config.model, _cw_overrides,
@@ -780,6 +783,7 @@ class LiteLLMExecutor(BaseExecutor):
                 tools=tools,
             )
         except Exception:
+            logger.debug("Token counter fallback to char estimate", exc_info=True)
             msg_chars = sum(len(str(m.get("content", ""))) for m in messages)
             tool_chars = len(_json.dumps(tools)) if tools else 0
             est_input = (msg_chars + tool_chars) // 2

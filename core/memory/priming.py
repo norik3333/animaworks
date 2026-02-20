@@ -667,7 +667,7 @@ class PrimingEngine:
                             metas.append(meta)
                             names.add(meta.name)
                     except Exception:
-                        pass
+                        logger.debug("Failed to extract skill meta from %s", f, exc_info=True)
 
             # Common skills
             common_dir = get_common_skills_dir()
@@ -679,7 +679,7 @@ class PrimingEngine:
                             metas.append(meta)
                             names.add(meta.name)
                     except Exception:
-                        pass
+                        logger.debug("Failed to extract common skill meta from %s", f, exc_info=True)
 
             # Procedures
             procedures_dir = self.anima_dir / "procedures"
@@ -691,7 +691,7 @@ class PrimingEngine:
                             metas.append(meta)
                             names.add(meta.name)
                     except Exception:
-                        pass
+                        logger.debug("Failed to extract procedure meta from %s", f, exc_info=True)
 
             return metas
 

@@ -16,6 +16,7 @@ from typing import Any
 
 from core.time_utils import now_iso
 
+from core.exceptions import MessagingError, DeliveryError, RecipientNotFoundError  # noqa: F401
 from core.schemas import Message
 
 logger = logging.getLogger("animaworks.messenger")
@@ -132,7 +133,7 @@ class Messenger:
         try:
             self._append_dm_log(to, content, intent=intent)
         except Exception:
-            pass  # Never fail the send itself
+            logger.debug("Failed to append dm_log for %s -> %s", self.anima_name, to, exc_info=True)
 
         return msg
 

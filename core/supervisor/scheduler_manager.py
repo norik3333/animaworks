@@ -301,5 +301,5 @@ class SchedulerManager:
             try:
                 self.scheduler.shutdown(wait=False)
             except Exception:
-                pass  # Scheduler may not have been started
+                logger.debug("Scheduler shutdown failed for %s (may not have been started)", self._anima_name, exc_info=True)
             logger.info("Scheduler stopped for %s", self._anima_name)

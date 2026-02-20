@@ -31,6 +31,7 @@ from core.memory import MemoryManager
 from core.messenger import Messenger
 from core.paths import load_prompt
 from core.prompt.builder import BuildResult, build_system_prompt, inject_shortterm
+from core.exceptions import AnimaWorksError  # noqa: F401
 from core.schemas import CycleResult, ModelConfig
 from core.memory.shortterm import SessionState, ShortTermMemory
 from core.tooling.handler import ToolHandler

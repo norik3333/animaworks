@@ -132,7 +132,7 @@ class ConsolidationEngine:
                         parsed = datetime.strptime(ts_match.group(1), "%Y-%m-%d %H:%M")
                         created_at = parsed.isoformat()
                     except ValueError:
-                        pass
+                        logger.debug("Failed to parse consolidation timestamp", exc_info=True)
 
                 # Strip code fences that LLM may have wrapped around content
                 content = re.sub(r"^```(?:markdown|md)?\s*\n", "", text, flags=re.MULTILINE)
