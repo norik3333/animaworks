@@ -111,7 +111,7 @@ class KnowledgeValidator:
         self,
         knowledge_items: list[dict],
         source_episodes: str,
-        model: str = "anthropic/claude-sonnet-4-20250514",
+        model: str = "",
     ) -> list[dict]:
         """Validate knowledge items against source episodes.
 
@@ -132,6 +132,9 @@ class KnowledgeValidator:
             Filtered list of accepted knowledge items with ``confidence``
             field populated
         """
+        if not model:
+            from core.config.models import ConsolidationConfig
+            model = ConsolidationConfig().llm_model
         if self._nli_pipeline is None and self._nli_available:
             self._load_nli_model()
 

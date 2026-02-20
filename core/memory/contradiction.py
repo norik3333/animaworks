@@ -403,7 +403,7 @@ class ContradictionDetector:
     async def scan_contradictions(
         self,
         target_file: Path | None = None,
-        model: str = "anthropic/claude-sonnet-4-20250514",
+        model: str = "",
     ) -> list[ContradictionPair]:
         """Scan knowledge files for contradictions.
 
@@ -419,6 +419,9 @@ class ContradictionDetector:
         Returns:
             List of detected contradiction pairs with resolution proposals
         """
+        if not model:
+            from core.config.models import ConsolidationConfig
+            model = ConsolidationConfig().llm_model
         logger.info(
             "Starting contradiction scan for anima=%s target=%s",
             self.anima_name,
@@ -510,7 +513,7 @@ class ContradictionDetector:
     async def resolve_contradictions(
         self,
         pairs: list[ContradictionPair],
-        model: str = "anthropic/claude-sonnet-4-20250514",
+        model: str = "",
     ) -> dict[str, int]:
         """Resolve detected contradictions by applying the proposed strategy.
 
@@ -526,6 +529,9 @@ class ContradictionDetector:
         Returns:
             Summary dict with counts: superseded, merged, coexisted, errors
         """
+        if not model:
+            from core.config.models import ConsolidationConfig
+            model = ConsolidationConfig().llm_model
         results = {"superseded": 0, "merged": 0, "coexisted": 0, "errors": 0}
 
         for pair in pairs:

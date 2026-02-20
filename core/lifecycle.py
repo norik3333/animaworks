@@ -648,7 +648,8 @@ class LifecycleManager:
 
         # Default config if not present
         enabled = True
-        model = "anthropic/claude-sonnet-4-20250514"
+        from core.config.models import ConsolidationConfig
+        model = ConsolidationConfig().llm_model
         min_episodes = 1
 
         if consolidation_cfg:
@@ -711,7 +712,8 @@ class LifecycleManager:
 
         # Default config
         enabled = True  # Phase 3 implementation
-        model = "anthropic/claude-sonnet-4-20250514"
+        from core.config.models import ConsolidationConfig as _CC
+        model = _CC().llm_model
         duplicate_threshold = 0.85
         episode_retention_days = 30
 

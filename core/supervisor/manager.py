@@ -970,7 +970,8 @@ class ProcessSupervisor:
         except Exception:
             consolidation_cfg = None
 
-        model = "anthropic/claude-sonnet-4-20250514"
+        from core.config.models import ConsolidationConfig
+        model = ConsolidationConfig().llm_model
         min_episodes = 1
         if consolidation_cfg:
             model = getattr(consolidation_cfg, "llm_model", model)
@@ -1020,7 +1021,8 @@ class ProcessSupervisor:
         except Exception:
             consolidation_cfg = None
 
-        model = "anthropic/claude-sonnet-4-20250514"
+        from core.config.models import ConsolidationConfig as _CC
+        model = _CC().llm_model
         duplicate_threshold = 0.85
         episode_retention_days = 30
         if consolidation_cfg:

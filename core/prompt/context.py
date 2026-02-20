@@ -92,7 +92,7 @@ class ContextTracker:
       2. Usage-based (Anthropic SDK / ResultMessage): direct input_tokens from API
     """
 
-    model: str = "claude-sonnet-4-20250514"
+    model: str = ""
     threshold: float = 0.50
     context_window_overrides: dict[str, int] = field(default_factory=dict)
 
@@ -101,6 +101,11 @@ class ContextTracker:
     _threshold_hit: bool = field(default=False, init=False, repr=False)
     _input_tokens: int = field(default=0, init=False, repr=False)
     _output_tokens: int = field(default=0, init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        if not self.model:
+            from core.config.models import AnimaDefaults
+            self.model = AnimaDefaults().model
 
     @property
     def context_window(self) -> int:

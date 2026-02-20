@@ -174,7 +174,7 @@ class ConsolidationEngine:
 
     async def daily_consolidate(
         self,
-        model: str = "anthropic/claude-sonnet-4-20250514",
+        model: str = "",
         min_episodes: int = 1,
     ) -> dict[str, Any]:
         """Perform daily consolidation: Episodes → Knowledge.
@@ -193,6 +193,9 @@ class ConsolidationEngine:
             - knowledge_files_updated: List of updated knowledge files
             - skipped: True if consolidation was skipped
         """
+        if not model:
+            from core.config.models import ConsolidationConfig
+            model = ConsolidationConfig().llm_model
         logger.info("Starting daily consolidation for anima=%s", self.anima_name)
 
         # Run legacy migration (once)
@@ -1078,7 +1081,7 @@ class ConsolidationEngine:
 
     async def weekly_integrate(
         self,
-        model: str = "anthropic/claude-sonnet-4-20250514",
+        model: str = "",
         duplicate_threshold: float = 0.85,
         episode_retention_days: int = 30,
     ) -> dict[str, Any]:
@@ -1095,6 +1098,9 @@ class ConsolidationEngine:
             - episodes_compressed: Number of episodes compressed
             - skipped: True if integration was skipped
         """
+        if not model:
+            from core.config.models import ConsolidationConfig
+            model = ConsolidationConfig().llm_model
         logger.info("Starting weekly integration for anima=%s", self.anima_name)
 
         results = {
@@ -1369,7 +1375,7 @@ class ConsolidationEngine:
     async def _compress_old_episodes(
         self,
         retention_days: int = 30,
-        model: str = "anthropic/claude-sonnet-4-20250514",
+        model: str = "",
     ) -> int:
         """Compress old episodes that don't have [IMPORTANT] tags.
 
@@ -1380,6 +1386,9 @@ class ConsolidationEngine:
         Returns:
             Number of episodes compressed
         """
+        if not model:
+            from core.config.models import ConsolidationConfig
+            model = ConsolidationConfig().llm_model
         cutoff_date = now_jst().date() - timedelta(days=retention_days)
         compressed_count = 0
 

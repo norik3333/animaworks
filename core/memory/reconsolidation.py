@@ -103,7 +103,7 @@ class ReconsolidationEngine:
     async def apply_reconsolidation(
         self,
         targets: list[Path],
-        model: str = "anthropic/claude-sonnet-4-20250514",
+        model: str = "",
     ) -> dict[str, int]:
         """Revise procedures using LLM and reset counters.
 
@@ -121,6 +121,9 @@ class ReconsolidationEngine:
         Returns:
             Dict with counts: "updated", "skipped", "errors".
         """
+        if not model:
+            from core.config.models import ConsolidationConfig
+            model = ConsolidationConfig().llm_model
         results: dict[str, int] = {"updated": 0, "skipped": 0, "errors": 0}
 
         for proc_path in targets:
@@ -290,7 +293,7 @@ class ReconsolidationEngine:
 
     async def reconsolidate_knowledge(
         self,
-        model: str = "anthropic/claude-sonnet-4-20250514",
+        model: str = "",
     ) -> dict[str, int]:
         """Revise knowledge files using LLM and reset counters.
 
@@ -304,6 +307,9 @@ class ReconsolidationEngine:
         Returns:
             Dict with counts: "targets_found", "updated", "skipped", "errors".
         """
+        if not model:
+            from core.config.models import ConsolidationConfig
+            model = ConsolidationConfig().llm_model
         targets = await self.find_knowledge_reconsolidation_targets()
         results: dict[str, Any] = {
             "targets_found": len(targets),

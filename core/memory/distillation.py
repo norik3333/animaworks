@@ -62,7 +62,7 @@ class ProceduralDistiller:
     async def classify_and_distill(
         self,
         episodes_text: str,
-        model: str = "anthropic/claude-sonnet-4-20250514",
+        model: str = "",
     ) -> dict:
         """Classify episodes and extract both knowledge and procedures via LLM.
 
@@ -81,6 +81,10 @@ class ProceduralDistiller:
                 ``description``, ``tags``, ``content``
               - ``raw_response``: raw LLM output string
         """
+        if not model:
+            from core.config.models import ConsolidationConfig
+            model = ConsolidationConfig().llm_model
+
         result = {
             "knowledge_items": [],
             "procedure_items": [],
@@ -134,7 +138,7 @@ class ProceduralDistiller:
     async def distill_procedures(
         self,
         procedural_episodes: str,
-        model: str = "anthropic/claude-sonnet-4-20250514",
+        model: str = "",
     ) -> list[dict]:
         """Extract reusable procedures from episode text via LLM classification.
 
@@ -149,6 +153,9 @@ class ProceduralDistiller:
             List of dicts, each with keys ``title``, ``description``,
             ``tags``, and ``content``.
         """
+        if not model:
+            from core.config.models import ConsolidationConfig
+            model = ConsolidationConfig().llm_model
         if not procedural_episodes.strip():
             return []
 
@@ -195,7 +202,7 @@ class ProceduralDistiller:
 
     async def weekly_pattern_distill(
         self,
-        model: str = "anthropic/claude-sonnet-4-20250514",
+        model: str = "",
         days: int = 7,
     ) -> dict:
         """Detect repeated action patterns from activity_log and distill.
@@ -212,6 +219,10 @@ class ProceduralDistiller:
             Dict with ``procedures_created`` (list of file paths) and
             ``patterns_detected`` (int).
         """
+        if not model:
+            from core.config.models import ConsolidationConfig
+            model = ConsolidationConfig().llm_model
+
         # 1. Load activity entries
         entries = self._load_activity_entries(days=days)
         if not entries:
