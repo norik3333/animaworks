@@ -37,6 +37,24 @@ __all__ = ["AgentSDKExecutor", "StreamDisconnectedError"]
 
 _BASH_SEND_RE = re.compile(r"^\s*(?:bash\s+)?send\s+(\S+)\s+")
 
+# ── A1 Bash blocklist ────────────────────────────────────────
+
+# Patterns that are unconditionally blocked in Bash tool calls.
+# Each entry is (compiled_regex, human-readable reason).
+# NOTE: Patterns are intentionally broad (security over convenience).
+# False positives (e.g. "echo chatwork send") are acceptable — the LLM
+# can retry with a different phrasing, while a missed send is unrecoverable.
+_BASH_BLOCKED_PATTERNS: list[tuple[re.Pattern[str], str]] = [
+    (re.compile(r"chatwork.*\bsend\b", re.IGNORECASE),
+     "Chatwork send is blocked"),
+    (re.compile(r"chatwork_cli.*\bsend\b", re.IGNORECASE),
+     "Chatwork CLI send is blocked"),
+    (re.compile(r"curl.*api\.chatwork\.com.*/messages", re.IGNORECASE),
+     "Direct Chatwork API post is blocked"),
+    (re.compile(r"wget.*api\.chatwork\.com.*/messages", re.IGNORECASE),
+     "Direct Chatwork API post via wget is blocked"),
+]
+
 # ── A1 mode security ──────────────────────────────────────────
 
 # Files that animas cannot modify themselves (identity/privilege protection).
@@ -87,10 +105,20 @@ def _check_a1_file_access(
 
 
 def _check_a1_bash_command(command: str, anima_dir: Path) -> str | None:
-    """Check bash commands for obvious file operation violations.
+    """Check bash commands against blocklist patterns and file operation violations.
+
+    Blocklist patterns are matched against the raw command string (before
+    shlex parsing) to prevent bypass via pipes/subshells.  Path traversal
+    checks use parsed argv for precision.
 
     This is a best-effort heuristic — not a complete sandbox.
     """
+    # Blocklist check (raw command string, before shlex parsing)
+    for pattern, reason in _BASH_BLOCKED_PATTERNS:
+        if pattern.search(command):
+            logger.warning("Bash command blocked: %s (command: %s)", reason, command[:200])
+            return reason
+
     import shlex
 
     try:
@@ -215,11 +243,73 @@ def _cleanup_tool_outputs(anima_dir: Path) -> None:
         logger.debug("Cleaned up tool output directory: %s", tool_output_dir)
 
 
+def _summarise_tool_input(tool_name: str, tool_input: dict[str, Any]) -> str:
+    """Return a concise one-line summary of tool_input for activity log content."""
+    if tool_name == "Bash":
+        cmd = tool_input.get("command", "")
+        return cmd[:300] if cmd else "(empty)"
+    if tool_name in ("Read", "Write", "Edit"):
+        return tool_input.get("file_path", "(no path)")
+    if tool_name == "Grep":
+        return tool_input.get("pattern", "(no pattern)")
+    if tool_name == "Glob":
+        return tool_input.get("pattern", "(no pattern)")
+    return str(tool_input)[:300]
+
+
+def _sanitise_tool_args(tool_name: str, tool_input: dict[str, Any]) -> dict[str, Any]:
+    """Strip large payload fields from tool_input before logging."""
+    if tool_name == "Write":
+        # content can be an entire file — only keep the path and length.
+        sanitised = {k: v for k, v in tool_input.items() if k != "content"}
+        if "content" in tool_input:
+            sanitised["content_length"] = len(tool_input["content"])
+        return sanitised
+    if tool_name == "Edit":
+        # old_string / new_string can be large diffs.
+        sanitised = {}
+        for k, v in tool_input.items():
+            if k in ("old_string", "new_string"):
+                sanitised[k] = v[:200] if isinstance(v, str) else v
+            else:
+                sanitised[k] = v
+        return sanitised
+    return tool_input
+
+
+def _log_tool_use(
+    anima_dir: Path,
+    tool_name: str,
+    tool_input: dict[str, Any],
+    *,
+    blocked: bool = False,
+    block_reason: str = "",
+) -> None:
+    """Record a tool call to the activity log (best-effort, never raises)."""
+    try:
+        from core.memory.activity import ActivityLogger
+
+        activity = ActivityLogger(anima_dir)
+        meta: dict[str, Any] = {"args": _sanitise_tool_args(tool_name, tool_input)}
+        if blocked:
+            meta["blocked"] = True
+            meta["reason"] = block_reason
+        activity.log(
+            "tool_use",
+            tool=tool_name,
+            content=_summarise_tool_input(tool_name, tool_input),
+            meta=meta,
+        )
+    except Exception:
+        # Never let logging failures disrupt tool execution.
+        logger.debug("Failed to log tool_use for %s", tool_name, exc_info=True)
+
+
 def _build_pre_tool_hook(
     anima_dir: Path,
     pending_sends: list[dict],
 ) -> Callable:
-    """Build a PreToolUse hook with security checks, output guards, and send tracking."""
+    """Build a PreToolUse hook with security checks, output guards, send tracking, and tool logging."""
     from claude_agent_sdk.types import (
         HookContext,
         HookInput,
@@ -242,6 +332,7 @@ def _build_pre_tool_hook(
                 file_path, anima_dir, write=True,
             )
             if violation:
+                _log_tool_use(anima_dir, tool_name, tool_input, blocked=True, block_reason=violation)
                 return SyncHookJSONOutput(
                     hookSpecificOutput=PreToolUseHookSpecificOutput(
                         hookEventName="PreToolUse",
@@ -257,6 +348,7 @@ def _build_pre_tool_hook(
                 file_path, anima_dir, write=False,
             )
             if violation:
+                _log_tool_use(anima_dir, tool_name, tool_input, blocked=True, block_reason=violation)
                 return SyncHookJSONOutput(
                     hookSpecificOutput=PreToolUseHookSpecificOutput(
                         hookEventName="PreToolUse",
@@ -270,6 +362,7 @@ def _build_pre_tool_hook(
             command = tool_input.get("command", "")
             violation = _check_a1_bash_command(command, anima_dir)
             if violation:
+                _log_tool_use(anima_dir, tool_name, tool_input, blocked=True, block_reason=violation)
                 return SyncHookJSONOutput(
                     hookSpecificOutput=PreToolUseHookSpecificOutput(
                         hookEventName="PreToolUse",
@@ -288,6 +381,9 @@ def _build_pre_tool_hook(
                     "to": m.group(1),
                     "command": command,
                 })
+
+        # Log the tool call (allowed)
+        _log_tool_use(anima_dir, tool_name, tool_input)
 
         # Output guard
         updated = _build_output_guard(tool_name, tool_input, anima_dir)
