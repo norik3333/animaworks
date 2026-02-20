@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Any
 
 from core.paths import load_prompt
-from core.time_utils import now_iso, now_jst
+from core.time_utils import ensure_aware, now_iso, now_jst
 
 logger = logging.getLogger("animaworks.consolidation")
 
@@ -463,10 +463,10 @@ class ConsolidationEngine:
 
                         # Parse timestamp
                         try:
-                            entry_dt = datetime.strptime(
+                            entry_dt = ensure_aware(datetime.strptime(
                                 f"{target_date} {time_str}",
                                 "%Y-%m-%d %H:%M",
-                            )
+                            ))
 
                             # Only include if within time window
                             if entry_dt >= cutoff:
@@ -482,9 +482,9 @@ class ConsolidationEngine:
                             )
                 else:
                     # Fallback: treat entire file as a single entry using mtime
-                    file_mtime = datetime.fromtimestamp(
+                    file_mtime = ensure_aware(datetime.fromtimestamp(
                         episode_file.stat().st_mtime,
-                    )
+                    ))
                     if file_mtime >= cutoff:
                         entries.append({
                             "date": str(target_date),

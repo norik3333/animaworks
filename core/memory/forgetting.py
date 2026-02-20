@@ -26,7 +26,7 @@ from pathlib import Path
 from typing import Any
 
 from core.paths import load_prompt
-from core.time_utils import now_iso, now_jst
+from core.time_utils import ensure_aware, now_iso, now_jst
 
 logger = logging.getLogger("animaworks.forgetting")
 
@@ -122,7 +122,7 @@ class ForgettingEngine:
 
         if last_used_str:
             try:
-                last_used_dt = datetime.fromisoformat(str(last_used_str))
+                last_used_dt = ensure_aware(datetime.fromisoformat(str(last_used_str)))
                 days_since = (now - last_used_dt).total_seconds() / 86400.0
             except (ValueError, TypeError):
                 days_since = float("inf")
@@ -221,7 +221,7 @@ class ForgettingEngine:
 
                 if last_accessed_str:
                     try:
-                        last_accessed = datetime.fromisoformat(str(last_accessed_str))
+                        last_accessed = ensure_aware(datetime.fromisoformat(str(last_accessed_str)))
                         days_since = (now - last_accessed).total_seconds() / 86400.0
                     except (ValueError, TypeError):
                         days_since = float("inf")
@@ -230,7 +230,7 @@ class ForgettingEngine:
                     updated_str = meta.get("updated_at", "")
                     if updated_str:
                         try:
-                            updated_at = datetime.fromisoformat(str(updated_str))
+                            updated_at = ensure_aware(datetime.fromisoformat(str(updated_str)))
                             days_since = (now - updated_at).total_seconds() / 86400.0
                         except (ValueError, TypeError):
                             days_since = float("inf")
@@ -587,7 +587,7 @@ class ForgettingEngine:
                     continue
 
                 try:
-                    low_since = datetime.fromisoformat(str(low_since_str))
+                    low_since = ensure_aware(datetime.fromisoformat(str(low_since_str)))
                     days_low = (now - low_since).total_seconds() / 86400.0
                 except (ValueError, TypeError):
                     continue
