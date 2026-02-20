@@ -127,15 +127,10 @@ class LifecycleManager:
 
         # Determine active hours:
         # 1. heartbeat.md explicit time range takes priority
-        # 2. AnimaConfig.active_hours if set
-        # 3. Default: 24h (hour="*")
+        # 2. Default: 24h (hour="*")
         m = re.search(r"(\d{1,2}):\d{0,2}\s*-\s*(\d{1,2})", config)
         if m:
             active_start, active_end = int(m.group(1)), int(m.group(2))
-            hour_spec = f"{active_start}-{active_end - 1}"
-            log_active = f"active {active_start}:00-{active_end}:00"
-        elif anima.config.active_hours is not None:
-            active_start, active_end = anima.config.active_hours
             hour_spec = f"{active_start}-{active_end - 1}"
             log_active = f"active {active_start}:00-{active_end}:00"
         else:
