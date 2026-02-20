@@ -320,8 +320,6 @@ class ConversationMemory:
         self, content: str, from_person: str = "human"
     ) -> str:
         """Build the user prompt with conversation history injected."""
-        from core.paths import load_prompt
-
         state = self.load()
         history_block = self._format_history(state)
 

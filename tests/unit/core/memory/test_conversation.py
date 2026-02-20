@@ -221,7 +221,7 @@ class TestClear:
 
 class TestBuildChatPrompt:
     def test_no_history(self, conv, anima_dir):
-        with patch("core.paths.load_prompt") as mock_load:
+        with patch("core.memory.conversation.load_prompt") as mock_load:
             mock_load.return_value = "prompt text"
             result = conv.build_chat_prompt("Hello", from_person="human")
             mock_load.assert_called_once_with(
@@ -232,7 +232,7 @@ class TestBuildChatPrompt:
         conv.append_turn("human", "Previous question")
         conv.append_turn("assistant", "Previous answer")
 
-        with patch("core.paths.load_prompt") as mock_load:
+        with patch("core.memory.conversation.load_prompt") as mock_load:
             mock_load.return_value = "prompt with history"
             result = conv.build_chat_prompt("New question", from_person="bob")
             mock_load.assert_called_once()

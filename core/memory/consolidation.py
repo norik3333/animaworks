@@ -693,7 +693,7 @@ class ConsolidationEngine:
         # Fetch related knowledge via RAG for context
         related_knowledge = self._fetch_related_knowledge(episodes_text)
 
-        # Build consolidation prompt
+        # Build consolidation prompt: data → context → task instructions
         prompt = load_prompt(
             "memory/daily_consolidation",
             anima_name=self.anima_name,
@@ -701,14 +701,14 @@ class ConsolidationEngine:
             knowledge_list=knowledge_list,
         )
 
-        # Inject related knowledge content
+        # Inject related knowledge content (between data and task)
         if related_knowledge:
             prompt += load_prompt(
                 "memory/daily_consolidation_related",
                 related_knowledge=related_knowledge,
             )
 
-        # Inject resolved events into prompt
+        # Inject resolved events into prompt (between data and task)
         if resolved_events:
             resolved_text = "\n".join(
                 f"- {r.get('ts', '')[:16]}: {r.get('content', '')}" for r in resolved_events
@@ -717,6 +717,9 @@ class ConsolidationEngine:
                 "memory/daily_consolidation_resolved",
                 resolved_text=resolved_text,
             )
+
+        # Append task instructions after all context
+        prompt += load_prompt("memory/daily_consolidation_task")
 
         # Call LLM
         try:
