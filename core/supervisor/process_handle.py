@@ -396,8 +396,15 @@ class ProcessHandle:
             timeout: Total timeout in seconds for graceful shutdown
         """
         if self.state in (ProcessState.STOPPED, ProcessState.FAILED):
-            logger.debug("Process already stopped: %s", self.anima_name)
-            return
+            if self.process and self.process.poll() is None:
+                logger.warning(
+                    "Process %s in %s state but still alive (PID %s), forcing stop",
+                    self.anima_name, self.state.value, self.process.pid,
+                )
+            else:
+                logger.debug("Process already stopped: %s", self.anima_name)
+                await self._cleanup()
+                return
 
         logger.info("Stopping process: %s", self.anima_name)
 
