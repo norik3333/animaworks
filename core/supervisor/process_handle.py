@@ -469,7 +469,20 @@ class ProcessHandle:
         await self._cleanup()
 
     async def _cleanup(self) -> None:
-        """Clean up resources."""
+        """Clean up resources (including killing orphaned subprocesses)."""
+        # Kill subprocess if still alive
+        if self.process and self.process.poll() is None:
+            logger.warning(
+                "Killing orphaned subprocess: %s (PID %s)",
+                self.anima_name, self.process.pid,
+            )
+            self.process.terminate()
+            try:
+                self.process.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                self.process.kill()
+                self.process.wait()
+
         if self.ipc_client:
             try:
                 await self.ipc_client.close()

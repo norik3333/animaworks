@@ -133,9 +133,15 @@ class ProcessSupervisor:
         """
         logger.info("Starting %d Anima processes", len(anima_names))
 
-        # Create socket directory
+        # Create socket directory and clean up stale sockets from previous runs
         socket_dir = self.run_dir / "sockets"
         socket_dir.mkdir(parents=True, exist_ok=True)
+        for stale_sock in socket_dir.glob("*.sock"):
+            try:
+                stale_sock.unlink()
+                logger.debug("Removed stale socket: %s", stale_sock)
+            except OSError as exc:
+                logger.warning("Failed to remove stale socket %s: %s", stale_sock, exc)
 
         # Start each process
         for anima_name in anima_names:
