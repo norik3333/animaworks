@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
+import signal as _signal
 import subprocess
 import sys
 import uuid
@@ -153,6 +155,7 @@ class ProcessHandle:
                 cmd,
                 stdout=subprocess.DEVNULL,
                 stderr=self._stderr_file if self._stderr_file else subprocess.DEVNULL,
+                start_new_session=True,
             )
             logger.info("Process started: %s (PID %s)", self.anima_name, self.process.pid)
 
@@ -440,10 +443,13 @@ class ProcessHandle:
             logger.info("Process exited gracefully: %s (code=%s)", self.anima_name, self.stats.exit_code)
 
         except asyncio.TimeoutError:
-            # Step 3: Send SIGTERM
+            # Step 3: Send SIGTERM to process session group
             logger.warning("Process did not exit gracefully, sending SIGTERM: %s", self.anima_name)
             try:
-                self.process.terminate()
+                try:
+                    os.killpg(os.getpgid(self.process.pid), _signal.SIGTERM)
+                except (ProcessLookupError, PermissionError):
+                    self.process.terminate()
                 async with asyncio.timeout(timeout / 2):
                     while self.process.poll() is None:
                         await asyncio.sleep(0.1)
@@ -466,7 +472,10 @@ class ProcessHandle:
             return
 
         logger.warning("Killing process: %s (PID %s)", self.anima_name, self.process.pid)
-        self.process.kill()
+        try:
+            os.killpg(os.getpgid(self.process.pid), _signal.SIGKILL)
+        except (ProcessLookupError, PermissionError):
+            self.process.kill()
         await asyncio.get_running_loop().run_in_executor(None, self.process.wait)
         self.stats.exit_code = self.process.returncode
         self.state = ProcessState.FAILED
@@ -474,17 +483,23 @@ class ProcessHandle:
 
     async def _cleanup(self) -> None:
         """Clean up resources (including killing orphaned subprocesses)."""
-        # Kill subprocess if still alive
+        # Kill subprocess (and its entire session group) if still alive
         if self.process and self.process.poll() is None:
             logger.warning(
                 "Killing orphaned subprocess: %s (PID %s)",
                 self.anima_name, self.process.pid,
             )
-            self.process.terminate()
+            try:
+                os.killpg(os.getpgid(self.process.pid), _signal.SIGTERM)
+            except (ProcessLookupError, PermissionError):
+                self.process.terminate()
             try:
                 self.process.wait(timeout=2)
             except subprocess.TimeoutExpired:
-                self.process.kill()
+                try:
+                    os.killpg(os.getpgid(self.process.pid), _signal.SIGKILL)
+                except (ProcessLookupError, PermissionError):
+                    self.process.kill()
                 self.process.wait()
 
         if self.ipc_client:

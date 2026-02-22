@@ -99,6 +99,8 @@ class ProcessSupervisor:
         self._scheduler_running: bool = False
         self._restart_counts: dict[str, int] = {}
         self._restarting: set[str] = set()
+        self._permanently_failed: set[str] = set()
+        self._failed_log_times: dict[str, float] = {}
         self._bootstrapping: set[str] = set()
         self._bootstrap_retry_counts: dict[str, int] = {}
         self._bootstrap_max_retries: int = 3
@@ -348,6 +350,11 @@ class ProcessSupervisor:
         """Restart a Anima process."""
         logger.info("Restarting process: %s", anima_name)
 
+        # Reset failure tracking on restart
+        self._restart_counts.pop(anima_name, None)
+        self._permanently_failed.discard(anima_name)
+        self._failed_log_times.pop(anima_name, None)
+
         # Stop existing process
         if anima_name in self.processes:
             await self.stop_anima(anima_name)
@@ -524,6 +531,19 @@ class ProcessSupervisor:
         handle: ProcessHandle
     ) -> None:
         """Check health of a single process."""
+        # Skip permanently failed processes (log at WARNING every 5 minutes)
+        if anima_name in self._permanently_failed:
+            now = asyncio.get_event_loop().time()
+            last_log = self._failed_log_times.get(anima_name, 0)
+            if now - last_log >= 300:
+                logger.warning(
+                    "Process still in FAILED state: %s "
+                    "(awaiting reconciliation recovery)",
+                    anima_name,
+                )
+                self._failed_log_times[anima_name] = now
+            return
+
         # Detect handles stuck in STOPPING state (e.g. after failed shutdown)
         if handle.state == ProcessState.STOPPING:
             if not handle.stopping_since:
@@ -669,6 +689,8 @@ class ProcessSupervisor:
                     anima_name
                 )
                 handle.state = ProcessState.FAILED
+                self._permanently_failed.add(anima_name)
+                self._failed_log_times[anima_name] = asyncio.get_event_loop().time()
                 return
 
             # Calculate backoff delay
@@ -781,6 +803,39 @@ class ProcessSupervisor:
                 on_disk_incomplete.add(anima_dir.name)
                 continue
             on_disk[anima_dir.name] = self.read_anima_enabled(anima_dir)
+
+        # permanently failed + enabled → recover after 1-minute cooldown
+        for name in list(self._permanently_failed):
+            handle = self.processes.get(name)
+            if handle is None:
+                self._permanently_failed.discard(name)
+                continue
+            if name not in on_disk or not on_disk[name]:
+                continue
+            now = asyncio.get_event_loop().time()
+            failed_since = self._failed_log_times.get(name, 0)
+            if now - failed_since < 60:
+                continue
+            logger.info(
+                "Reconciliation: recovering permanently failed process %s "
+                "(cooldown elapsed, resetting retries)",
+                name,
+            )
+            del self.processes[name]
+            self._restart_counts.pop(name, None)
+            self._permanently_failed.discard(name)
+            self._failed_log_times.pop(name, None)
+            try:
+                await self.start_anima(name)
+                if self.on_anima_added:
+                    self.on_anima_added(name)
+            except Exception:
+                logger.exception(
+                    "Reconciliation: failed to recover %s", name,
+                )
+
+        # Update running set after recovery attempts
+        running = set(self.processes.keys())
 
         # enabled + not running → start
         for name, enabled in on_disk.items():
