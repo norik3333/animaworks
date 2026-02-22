@@ -523,12 +523,25 @@ class ToolHandler:
             path = get_common_knowledge_dir() / suffix
         else:
             path = self._anima_dir / rel
-            # Prevent path traversal outside anima_dir
-            if not path.resolve().is_relative_to(self._anima_dir.resolve()):
-                return _error_result(
-                    "PermissionDenied",
-                    "Path resolves outside anima directory",
-                )
+            resolved = path.resolve()
+            # Allow if within own anima_dir
+            if not resolved.is_relative_to(self._anima_dir.resolve()):
+                # Check subordinate read permissions (activity_log, cron.md, heartbeat.md)
+                allowed = False
+                for sub_activity in self._subordinate_activity_dirs:
+                    if resolved.is_relative_to(sub_activity):
+                        allowed = True
+                        break
+                if not allowed:
+                    for mgmt_file in self._subordinate_management_files:
+                        if resolved == mgmt_file:
+                            allowed = True
+                            break
+                if not allowed:
+                    return _error_result(
+                        "PermissionDenied",
+                        "Path resolves outside anima directory",
+                    )
         if path.exists() and path.is_file():
             logger.debug("read_memory_file path=%s", rel)
             return path.read_text(encoding="utf-8")
@@ -542,7 +555,15 @@ class ToolHandler:
         # Security check: block protected files and path traversal
         err = _is_protected_write(self._anima_dir, path)
         if err:
-            return err
+            # Before denying, check if this is a subordinate's cron.md/heartbeat.md
+            resolved = path.resolve()
+            subordinate_allowed = False
+            for mgmt_file in self._subordinate_management_files:
+                if resolved == mgmt_file:
+                    subordinate_allowed = True
+                    break
+            if not subordinate_allowed:
+                return err
 
         # Tool creation permission check
         if rel.startswith("tools/") and rel.endswith(".py"):
