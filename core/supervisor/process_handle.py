@@ -502,15 +502,11 @@ class ProcessHandle:
             logger.debug("Socket file removed: %s", self.socket_path)
 
     def is_alive(self) -> bool:
-        """Check if process is alive and IPC connection is active."""
+        """Check if process is alive."""
         if not self.process:
             return False
         if self.process.poll() is not None:
             return False
-        # IPC connection check: detect dead connections
-        if self.ipc_client and self.ipc_client.writer:
-            if self.ipc_client.writer.is_closing():
-                return False
         return True
 
     def get_pid(self) -> int | None:
