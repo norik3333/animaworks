@@ -541,19 +541,6 @@ def build_system_prompt(
     if common_knowledge_dir.exists() and any(common_knowledge_dir.rglob("*.md")):
         parts.append(load_prompt("builder/common_knowledge_hint"))
 
-    # Unified skills/procedures table
-    rows: list[str] = []
-    for m in skill_metas:
-        rows.append(f"| {m.name} | 個人 | {m.description} |")
-    for m in common_skill_metas:
-        rows.append(f"| {m.name} | 共通 | {m.description} |")
-    for m in procedure_metas:
-        rows.append(f"| {m.name} | 手順 | {m.description} |")
-    if rows:
-        table_header = "| 名前 | 種別 | 概要 |\n|------|------|------|\n"
-        table = table_header + "\n".join(rows)
-        parts.append(load_prompt("skills_guide") + "\n\n" + table)
-
     # Commander hiring guardrail: force create_anima tool/CLI usage
     has_newstaff = any(m.name == "newstaff" for m in skill_metas)
     if has_newstaff:
