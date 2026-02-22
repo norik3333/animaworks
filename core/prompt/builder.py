@@ -144,6 +144,7 @@ def _build_org_context(anima_name: str, other_animas: list[str], execution_mode:
     and returns a formatted prompt section.
     """
     from core.config import load_config
+    from core.tooling.prompt_db import get_prompt_store
 
     try:
         config = load_config()
@@ -169,8 +170,13 @@ def _build_org_context(anima_name: str, other_animas: list[str], execution_mode:
             ),
         ]
         if other_animas:
-            cr_template = "communication_rules_a1" if execution_mode == "a1" else "communication_rules"
-            parts.append(load_prompt(cr_template))
+            cr_key = "communication_rules_a1" if execution_mode == "a1" else "communication_rules"
+            _cr_store = get_prompt_store()
+            _cr = (
+                _cr_store.get_section(cr_key) if _cr_store else None
+            ) or load_prompt(cr_key)
+            if _cr:
+                parts.append(_cr)
         return "\n\n".join(parts)
 
     # Non-top-level: existing logic
@@ -218,8 +224,13 @@ def _build_org_context(anima_name: str, other_animas: list[str], execution_mode:
 
     # Communication rules: only when there are other animas
     if other_animas:
-        cr_template = "communication_rules_a1" if execution_mode == "a1" else "communication_rules"
-        parts.append(load_prompt(cr_template))
+        cr_key = "communication_rules_a1" if execution_mode == "a1" else "communication_rules"
+        _cr_store = get_prompt_store()
+        _cr = (
+            _cr_store.get_section(cr_key) if _cr_store else None
+        ) or load_prompt(cr_key)
+        if _cr:
+            parts.append(_cr)
 
     return "\n\n".join(parts)
 
@@ -230,15 +241,26 @@ def _build_messaging_section(
     execution_mode: str = "a1",
 ) -> str:
     """Build the messaging instructions with resolved paths."""
+    from core.tooling.prompt_db import get_prompt_store
+
     self_name = anima_dir.name
     main_py = PROJECT_DIR / "main.py"
     animas_line = (
         ", ".join(other_animas) if other_animas else "(まだ他の社員はいません)"
     )
 
-    template_name = "messaging_a1" if execution_mode == "a1" else "messaging"
+    db_key = "messaging_a1" if execution_mode == "a1" else "messaging"
+    _msg_store = get_prompt_store()
+    raw = (_msg_store.get_section(db_key) if _msg_store else None)
+    if raw:
+        try:
+            return raw.format(
+                animas_line=animas_line, main_py=main_py, self_name=self_name,
+            )
+        except (KeyError, IndexError):
+            return raw
     return load_prompt(
-        template_name,
+        db_key,
         animas_line=animas_line,
         main_py=main_py,
         self_name=self_name,
@@ -325,6 +347,10 @@ def build_system_prompt(
 
     # ── Pre-compute values needed across multiple groups ──────────
 
+    # DB-first prompt store (singleton); used for system sections & tool guides
+    from core.tooling.prompt_db import DEFAULT_GUIDES, get_prompt_store
+    _prompt_store = get_prompt_store()
+
     # other_animas is needed by Group 5 (org_context, messaging)
     other_animas = _discover_other_animas(pd)
 
@@ -339,16 +365,25 @@ def build_system_prompt(
     # ── Group 1: 動作環境と行動ルール ─────────────────────────
     parts.append("# 1. 動作環境と行動ルール")
 
-    parts.append(load_prompt(
-        "environment",
-        data_dir=data_dir,
-        anima_name=pd.name,
-    ))
+    _env = (_prompt_store.get_section("environment") if _prompt_store else None)
+    if _env:
+        try:
+            _env = _env.format(data_dir=data_dir, anima_name=pd.name)
+        except (KeyError, IndexError):
+            pass
+    else:
+        _env = load_prompt("environment", data_dir=data_dir, anima_name=pd.name)
+    if _env:
+        parts.append(_env)
 
     current_time = now_jst().strftime("%Y-%m-%d %H:%M (%Z)")
     parts.append(f"**現在時刻**: {current_time}")
 
-    parts.append(load_prompt("behavior_rules"))
+    _br = (
+        _prompt_store.get_section("behavior_rules") if _prompt_store else None
+    ) or load_prompt("behavior_rules")
+    if _br:
+        parts.append(_br)
 
     # ── Group 2: あなた自身 ───────────────────────────────────
     parts.append("# 2. あなた自身")
@@ -483,9 +518,6 @@ def build_system_prompt(
         parts.append(load_prompt("skills_guide") + "\n\n" + table)
 
     # ── Tool usage guides from DB (with hardcoded fallback) ──
-    from core.tooling.prompt_db import DEFAULT_GUIDES, get_prompt_store
-
-    _prompt_store = get_prompt_store()
     if not _prompt_store:
         logger.warning("Tool prompt DB unavailable; using hardcoded fallback guides")
 
@@ -532,7 +564,12 @@ def build_system_prompt(
         try:
             model_config = memory.read_model_config()
             if model_config.supervisor is None:
-                parts.append(load_prompt("hiring_context"))
+                _hc = (
+                    _prompt_store.get_section("hiring_context")
+                    if _prompt_store else None
+                ) or load_prompt("hiring_context")
+                if _hc:
+                    parts.append(_hc)
         except Exception:
             logger.debug("Skipped hiring context injection", exc_info=True)
 
@@ -556,12 +593,20 @@ def build_system_prompt(
     # ── Group 6: メタ設定 ─────────────────────────────────────
     parts.append("# 6. メタ設定")
 
-    parts.append(EMOTION_INSTRUCTION)
+    _ei = (
+        _prompt_store.get_section("emotion_instruction")
+        if _prompt_store else None
+    ) or EMOTION_INSTRUCTION
+    if _ei:
+        parts.append(_ei)
 
     if execution_mode == "a2":
-        reflection = _load_a2_reflection()
-        if reflection:
-            parts.append(reflection)
+        _ar = (
+            _prompt_store.get_section("a2_reflection")
+            if _prompt_store else None
+        ) or _load_a2_reflection()
+        if _ar:
+            parts.append(_ar)
 
     # ── Final assembly ────────────────────────────────────────
     prompt = "\n\n---\n\n".join(parts)

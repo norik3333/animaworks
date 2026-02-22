@@ -27,6 +27,7 @@ from typing import Any
 from core.prompt.context import ContextTracker, resolve_context_window
 from core.exceptions import ExecutionError, LLMAPIError, MemoryWriteError  # noqa: F401
 from core.execution.base import BaseExecutor, ExecutionResult, StreamDisconnectedError, ToolCallRecord, _truncate_for_record, tool_input_save_budget, tool_result_save_budget
+from core.execution.reminder import SystemReminderQueue
 from core.schemas import ModelConfig
 from core.memory.shortterm import ShortTermMemory
 from pathlib import Path
@@ -526,9 +527,9 @@ class AgentSDKExecutor(BaseExecutor):
         )
 
         threshold = self._model_config.context_threshold
-        _hook_fired = False
         _transcript_path = ""
         _tool_results_cache: dict[str, str] = {}
+        _reminder_queue = self.reminder_queue
 
         async def _post_tool_hook(
             input_data: HookInput,
@@ -537,7 +538,7 @@ class AgentSDKExecutor(BaseExecutor):
         ) -> SyncHookJSONOutput:
             logger.info("PostToolUse ENTERED tool_use_id=%s", tool_use_id)
             try:
-                nonlocal _hook_fired, _transcript_path
+                nonlocal _transcript_path
                 # ── Capture tool result into cache ──
                 transcript_path = input_data.get("transcript_path", "")
                 _transcript_path = transcript_path or _transcript_path
@@ -565,25 +566,25 @@ class AgentSDKExecutor(BaseExecutor):
                 logger.exception("PostToolUse hook error")
                 return SyncHookJSONOutput()
 
-            # ── Context threshold check ──
-            if tracker is None:
-                return SyncHookJSONOutput()
-            ratio = tracker.estimate_from_transcript(transcript_path)
-            if ratio >= threshold and not _hook_fired:
-                _hook_fired = True
-                logger.info(
-                    "PostToolUse hook: context at %.1f%%, injecting save instruction",
-                    ratio * 100,
-                )
+            # ── P1-1: Context threshold check → push to queue ──
+            if tracker is not None:
+                ratio = tracker.estimate_from_transcript(transcript_path)
+                try:
+                    ratio_f = float(ratio)
+                except (TypeError, ValueError):
+                    ratio_f = 0.0
+                if ratio_f >= threshold:
+                    _reminder_queue.push_sync(
+                        f"コンテキスト使用量: {ratio_f:.0%}。session_state.md にセッション状態を保存せよ。"
+                    )
+
+            # ── Drain reminder queue ──
+            reminder = _reminder_queue.drain_sync()
+            if reminder:
                 return SyncHookJSONOutput(
                     hookSpecificOutput=PostToolUseHookSpecificOutput(
                         hookEventName="PostToolUse",
-                        additionalContext=(
-                            f"\u30b3\u30f3\u30c6\u30ad\u30b9\u30c8\u4f7f\u7528\u7387\u304c{ratio:.0%}\u306b\u9054\u3057\u307e\u3057\u305f\u3002"
-                            "shortterm/session_state.md \u306b\u73fe\u5728\u306e\u4f5c\u696d\u72b6\u614b\u3092\u66f8\u304d\u51fa\u3057\u3066\u304f\u3060\u3055\u3044\u3002"
-                            "\u5185\u5bb9: \u4f55\u3092\u3057\u3066\u3044\u305f\u304b\u3001\u3069\u3053\u307e\u3067\u9032\u3093\u3060\u304b\u3001\u6b21\u306b\u4f55\u3092\u3059\u3079\u304d\u304b\u3002"
-                            "\u66f8\u304d\u51fa\u3057\u5f8c\u3001\u4f5c\u696d\u3092\u4e2d\u65ad\u3057\u3066\u305d\u306e\u65e8\u3092\u5831\u544a\u3057\u3066\u304f\u3060\u3055\u3044\u3002"
-                        ),
+                        additionalContext=reminder,
                     )
                 )
             return SyncHookJSONOutput()
@@ -743,9 +744,9 @@ class AgentSDKExecutor(BaseExecutor):
         )
 
         threshold = self._model_config.context_threshold
-        _hook_fired = False
         _transcript_path = ""
         _tool_results_cache: dict[str, str] = {}
+        _reminder_queue = self.reminder_queue
 
         async def _post_tool_hook(
             input_data: HookInput,
@@ -754,7 +755,7 @@ class AgentSDKExecutor(BaseExecutor):
         ) -> SyncHookJSONOutput:
             logger.info("PostToolUse(stream) ENTERED tool_use_id=%s", tool_use_id)
             try:
-                nonlocal _hook_fired, _transcript_path
+                nonlocal _transcript_path
                 # ── Capture tool result into cache ──
                 transcript_path = input_data.get("transcript_path", "")
                 _transcript_path = transcript_path or _transcript_path
@@ -782,23 +783,24 @@ class AgentSDKExecutor(BaseExecutor):
                 logger.exception("PostToolUse(stream) hook error")
                 return SyncHookJSONOutput()
 
-            # ── Context threshold check ──
+            # ── P1-1: Context threshold check → push to queue ──
             ratio = tracker.estimate_from_transcript(transcript_path)
-            if ratio >= threshold and not _hook_fired:
-                _hook_fired = True
-                logger.info(
-                    "PostToolUse hook (stream): context at %.1f%%",
-                    ratio * 100,
+            try:
+                ratio_f = float(ratio)
+            except (TypeError, ValueError):
+                ratio_f = 0.0
+            if ratio_f >= threshold:
+                _reminder_queue.push_sync(
+                    f"コンテキスト使用量: {ratio_f:.0%}。session_state.md にセッション状態を保存せよ。"
                 )
+
+            # ── Drain reminder queue ──
+            reminder = _reminder_queue.drain_sync()
+            if reminder:
                 return SyncHookJSONOutput(
                     hookSpecificOutput=PostToolUseHookSpecificOutput(
                         hookEventName="PostToolUse",
-                        additionalContext=(
-                            f"\u30b3\u30f3\u30c6\u30ad\u30b9\u30c8\u4f7f\u7528\u7387\u304c{ratio:.0%}\u306b\u9054\u3057\u307e\u3057\u305f\u3002"
-                            "shortterm/session_state.md \u306b\u73fe\u5728\u306e\u4f5c\u696d\u72b6\u614b\u3092\u66f8\u304d\u51fa\u3057\u3066\u304f\u3060\u3055\u3044\u3002"
-                            "\u5185\u5bb9: \u4f55\u3092\u3057\u3066\u3044\u305f\u304b\u3001\u3069\u3053\u307e\u3067\u9032\u3093\u3060\u304b\u3001\u6b21\u306b\u4f55\u3092\u3059\u3079\u304d\u304b\u3002"
-                            "\u66f8\u304d\u51fa\u3057\u5f8c\u3001\u4f5c\u696d\u3092\u4e2d\u65ad\u3057\u3066\u305d\u306e\u65e8\u3092\u5831\u544a\u3057\u3066\u304f\u3060\u3055\u3044\u3002"
-                        ),
+                        additionalContext=reminder,
                     )
                 )
             return SyncHookJSONOutput()

@@ -21,6 +21,11 @@ class GuideUpdate(BaseModel):
     content: str
 
 
+class SectionUpdate(BaseModel):
+    content: str
+    condition: str | None = None
+
+
 class SchemaPreviewRequest(BaseModel):
     mode: str = "anthropic"  # "anthropic", "litellm", "text"
 
@@ -94,6 +99,39 @@ def create_tool_prompts_router() -> APIRouter:
         if not body.content.strip():
             raise HTTPException(400, "Content cannot be empty")
         result = store.set_guide(key, body.content.strip())
+        return result
+
+    # ── Sections CRUD ─────────────────────────────────────
+
+    @router.get("/tool-prompts/sections")
+    async def list_sections():
+        """List all system sections from the prompt DB."""
+        store = get_prompt_store()
+        if not store:
+            raise HTTPException(500, "Tool prompt DB not available")
+        return {"sections": store.list_sections()}
+
+    @router.get("/tool-prompts/sections/{key}")
+    async def get_section(key: str):
+        """Get a single system section by key."""
+        store = get_prompt_store()
+        if not store:
+            raise HTTPException(500, "Tool prompt DB not available")
+        result = store.get_section_with_condition(key)
+        if result is None:
+            raise HTTPException(404, f"Section '{key}' not found")
+        content, condition = result
+        return {"key": key, "content": content, "condition": condition}
+
+    @router.put("/tool-prompts/sections/{key}")
+    async def update_section(key: str, body: SectionUpdate):
+        """Update a system section."""
+        store = get_prompt_store()
+        if not store:
+            raise HTTPException(500, "Tool prompt DB not available")
+        if not body.content.strip():
+            raise HTTPException(400, "Content cannot be empty")
+        result = store.set_section(key, body.content.strip(), body.condition)
         return result
 
     # ── Preview endpoints ──────────────────────────────────

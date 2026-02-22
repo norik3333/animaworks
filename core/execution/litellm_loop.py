@@ -34,6 +34,7 @@ from core.execution._streaming import (
     stream_error_boundary,
 )
 from core.execution.base import BaseExecutor, ExecutionResult, StreamDisconnectedError, ToolCallRecord, _truncate_for_record, tool_input_save_budget, tool_result_save_budget
+from core.execution.reminder import SystemReminderQueue
 from core.memory import MemoryManager
 from core.prompt.builder import build_system_prompt
 from core.schemas import ModelConfig
@@ -367,6 +368,16 @@ class LiteLLMExecutor(BaseExecutor):
                 }
                 tracker.update_from_usage(usage_dict)
 
+                # P1-1: context threshold reminder
+                if tracker.threshold_exceeded:
+                    try:
+                        ratio = float(tracker.usage_ratio)
+                    except (TypeError, ValueError):
+                        ratio = 0.0
+                    self.reminder_queue.push_sync(
+                        f"コンテキスト使用量: {ratio:.0%}。出力を簡潔にし、重要な状態をセッション状態に保存せよ。"
+                    )
+
                 current_text = message.content or ""
                 new_sys, chain_count = await handle_session_chaining(
                     tracker=tracker,
@@ -399,6 +410,12 @@ class LiteLLMExecutor(BaseExecutor):
                     ]
                     continue
 
+            # ── P1-2: output truncation reminder ─────────────────
+            if choice.finish_reason == "length":
+                self.reminder_queue.push_sync(
+                    "出力がmax_tokensで途切れた。残りの内容を小さく分割して続行せよ。"
+                )
+
             # ── Check for tool calls ──────────────────────────
             tool_calls = message.tool_calls
             if not tool_calls:
@@ -426,6 +443,14 @@ class LiteLLMExecutor(BaseExecutor):
             ):
                 if "record" in _event:
                     all_tool_records.append(_event["record"])
+
+            # ── Drain reminder queue after tool results ────────
+            reminder = self.reminder_queue.drain_sync()
+            if reminder:
+                messages.append({
+                    "role": "user",
+                    "content": SystemReminderQueue.format_reminder(reminder),
+                })
 
         logger.warning("A2 max iterations (%d) reached", max_iterations)
         return ExecutionResult(
@@ -584,6 +609,22 @@ class LiteLLMExecutor(BaseExecutor):
                 if tracker and usage_data:
                     tracker.update_from_usage(usage_data)
 
+                    # P1-1: context threshold reminder
+                    if tracker.threshold_exceeded:
+                        try:
+                            ratio = float(tracker.usage_ratio)
+                        except (TypeError, ValueError):
+                            ratio = 0.0
+                        self.reminder_queue.push_sync(
+                            f"コンテキスト使用量: {ratio:.0%}。出力を簡潔にし、重要な状態をセッション状態に保存せよ。"
+                        )
+
+                # P1-2: output truncation reminder
+                if finish_reason == "length":
+                    self.reminder_queue.push_sync(
+                        "出力がmax_tokensで途切れた。残りの内容を小さく分割して続行せよ。"
+                    )
+
                 iter_text = "".join(iter_text_parts)
                 if iter_text:
                     all_response_text.append(iter_text)
@@ -640,6 +681,14 @@ class LiteLLMExecutor(BaseExecutor):
                     if "record" in event:
                         all_tool_records.append(event["record"])
                     yield event
+
+                # ── Drain reminder queue after tool results ────
+                reminder = self.reminder_queue.drain_sync()
+                if reminder:
+                    messages.append({
+                        "role": "user",
+                        "content": SystemReminderQueue.format_reminder(reminder),
+                    })
 
         # If we exit the loop without returning, max iterations reached
         full_text = "\n".join(all_response_text) or "(max iterations reached)"
@@ -724,6 +773,22 @@ class LiteLLMExecutor(BaseExecutor):
                     }
                     tracker.update_from_usage(usage_dict)
 
+                    # P1-1: context threshold reminder
+                    if tracker.threshold_exceeded:
+                        try:
+                            ratio = float(tracker.usage_ratio)
+                        except (TypeError, ValueError):
+                            ratio = 0.0
+                        self.reminder_queue.push_sync(
+                            f"コンテキスト使用量: {ratio:.0%}。出力を簡潔にし、重要な状態をセッション状態に保存せよ。"
+                        )
+
+                # P1-2: output truncation reminder
+                if choice.finish_reason == "length":
+                    self.reminder_queue.push_sync(
+                        "出力がmax_tokensで途切れた。残りの内容を小さく分割して続行せよ。"
+                    )
+
                 # ── Yield iteration text ──
                 iter_text = message.content or ""
                 if iter_text:
@@ -778,6 +843,14 @@ class LiteLLMExecutor(BaseExecutor):
                     if "record" in event:
                         all_tool_records.append(event["record"])
                     yield event
+
+                # ── Drain reminder queue after tool results ────
+                reminder = self.reminder_queue.drain_sync()
+                if reminder:
+                    messages.append({
+                        "role": "user",
+                        "content": SystemReminderQueue.format_reminder(reminder),
+                    })
 
         # Max iterations reached
         full_text = "\n".join(all_response_text) or "(max iterations reached)"

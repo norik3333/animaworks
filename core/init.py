@@ -24,11 +24,58 @@ _INFRASTRUCTURE_DIRS = {"prompts", "company", "common_skills", "common_knowledge
 
 def _ensure_tool_prompt_db(data_dir: Path) -> None:
     """Create and seed the tool prompt DB if needed."""
-    from core.tooling.prompt_db import DEFAULT_DESCRIPTIONS, DEFAULT_GUIDES, ToolPromptStore
+    from core.tooling.prompt_db import (
+        DEFAULT_DESCRIPTIONS,
+        DEFAULT_GUIDES,
+        SECTION_CONDITIONS,
+        ToolPromptStore,
+    )
 
     tool_db_path = data_dir / "tool_prompts.sqlite3"
     tool_store = ToolPromptStore(tool_db_path)
-    tool_store.seed_defaults(descriptions=DEFAULT_DESCRIPTIONS, guides=DEFAULT_GUIDES)
+
+    # Load section content from runtime prompts directory
+    sections: dict[str, tuple[str, str | None]] = {}
+    prompts_dir = data_dir / "prompts"
+
+    _SECTION_FILES: dict[str, str] = {
+        "behavior_rules": "behavior_rules.md",
+        "environment": "environment.md",
+        "messaging_a1": "messaging_a1.md",
+        "messaging": "messaging.md",
+        "communication_rules_a1": "communication_rules_a1.md",
+        "communication_rules": "communication_rules.md",
+        "session_continuation": "session_continuation.md",
+        "a2_reflection": "a2_reflection.md",
+        "hiring_context": "hiring_context.md",
+    }
+
+    for key, filename in _SECTION_FILES.items():
+        filepath = prompts_dir / filename
+        if filepath.exists():
+            try:
+                content = filepath.read_text(encoding="utf-8").strip()
+                if content:
+                    condition = SECTION_CONDITIONS.get(key)
+                    sections[key] = (content, condition)
+            except Exception:
+                logger.warning("Failed to read section template: %s", filepath)
+
+    # emotion_instruction: built at runtime from valid emotions list
+    try:
+        from core.prompt.builder import _build_emotion_instruction
+
+        emotion = _build_emotion_instruction()
+        if emotion:
+            sections["emotion_instruction"] = (emotion, None)
+    except Exception:
+        logger.warning("Failed to build emotion instruction for seeding")
+
+    tool_store.seed_defaults(
+        descriptions=DEFAULT_DESCRIPTIONS,
+        guides=DEFAULT_GUIDES,
+        sections=sections,
+    )
     logger.info("Tool prompt DB initialised: %s", tool_db_path)
 
 

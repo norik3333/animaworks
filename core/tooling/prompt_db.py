@@ -38,6 +38,12 @@ CREATE TABLE IF NOT EXISTS tool_guides (
     content     TEXT NOT NULL CHECK(length(content) > 0),
     updated_at  TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS system_sections (
+    key         TEXT PRIMARY KEY,
+    content     TEXT NOT NULL CHECK(length(content) > 0),
+    condition   TEXT,
+    updated_at  TEXT NOT NULL
+);
 """
 
 # ── Default descriptions ────────────────────────────────────
@@ -393,6 +399,24 @@ DEFAULT_GUIDES: dict[str, str] = {
 """,
 }
 
+# ── Section conditions ─────────────────────────────────────
+#
+# Metadata for system_sections: key -> condition string (or None).
+# Actual content is loaded from runtime prompts at seed time.
+
+SECTION_CONDITIONS: dict[str, str | None] = {
+    "behavior_rules": None,
+    "environment": None,
+    "messaging_a1": "mode:a1",
+    "messaging": "mode:non_a1",
+    "communication_rules_a1": "mode:a1",
+    "communication_rules": "mode:non_a1",
+    "emotion_instruction": None,
+    "session_continuation": None,
+    "a2_reflection": "mode:a2",
+    "hiring_context": "solo_top_level",
+}
+
 # ── ToolPromptStore ─────────────────────────────────────────
 
 
@@ -487,14 +511,69 @@ class ToolPromptStore:
             ).fetchall()
         return [dict(r) for r in rows]
 
+    # ── Sections CRUD ────────────────────────────────────────
+
+    def get_section(self, key: str) -> str | None:
+        """Return the section content for *key*, or ``None`` if not found."""
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT content FROM system_sections WHERE key = ?",
+                (key,),
+            ).fetchone()
+        return row["content"] if row else None
+
+    def get_section_with_condition(
+        self, key: str
+    ) -> tuple[str, str | None] | None:
+        """Return ``(content, condition)`` for *key*, or ``None``."""
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT content, condition FROM system_sections WHERE key = ?",
+                (key,),
+            ).fetchone()
+        return (row["content"], row["condition"]) if row else None
+
+    def set_section(
+        self,
+        key: str,
+        content: str,
+        condition: str | None = None,
+    ) -> dict[str, Any]:
+        """Insert or update a system section.  Returns the saved record."""
+        ts = now_jst().isoformat()
+        with self._connect() as conn:
+            conn.execute(
+                "INSERT INTO system_sections (key, content, condition, updated_at) "
+                "VALUES (?, ?, ?, ?) "
+                "ON CONFLICT(key) DO UPDATE SET content=excluded.content, "
+                "condition=excluded.condition, updated_at=excluded.updated_at",
+                (key, content, condition, ts),
+            )
+        return {
+            "key": key,
+            "content": content,
+            "condition": condition,
+            "updated_at": ts,
+        }
+
+    def list_sections(self) -> list[dict[str, Any]]:
+        """Return all system sections as dicts."""
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT key, content, condition, updated_at "
+                "FROM system_sections ORDER BY key",
+            ).fetchall()
+        return [dict(r) for r in rows]
+
     # ── Seeding ─────────────────────────────────────────────
 
     def seed_defaults(
         self,
         descriptions: dict[str, str] | None = None,
         guides: dict[str, str] | None = None,
+        sections: dict[str, tuple[str, str | None]] | None = None,
     ) -> None:
-        """Seed default descriptions and guides.
+        """Seed default descriptions, guides, and sections.
 
         Uses INSERT OR IGNORE so existing user edits are preserved.
         """
@@ -511,6 +590,15 @@ class ToolPromptStore:
                     "INSERT OR IGNORE INTO tool_guides "
                     "(key, content, updated_at) VALUES (?, ?, ?)",
                     [(k, v, ts) for k, v in guides.items()],
+                )
+            if sections:
+                conn.executemany(
+                    "INSERT OR IGNORE INTO system_sections "
+                    "(key, content, condition, updated_at) VALUES (?, ?, ?, ?)",
+                    [
+                        (k, content, cond, ts)
+                        for k, (content, cond) in sections.items()
+                    ],
                 )
 
 

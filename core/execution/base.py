@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from core.prompt.context import ContextTracker
+from core.execution.reminder import SystemReminderQueue
 from core.schemas import ModelConfig
 from core.memory.shortterm import ShortTermMemory
 
@@ -135,6 +136,7 @@ class BaseExecutor(ABC):
     ) -> None:
         self._model_config = model_config
         self._anima_dir = anima_dir
+        self.reminder_queue: SystemReminderQueue = SystemReminderQueue()
 
     # -- Properties ----------------------------------------
 

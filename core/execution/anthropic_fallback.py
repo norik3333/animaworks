@@ -26,6 +26,7 @@ from core.prompt.context import ContextTracker, resolve_context_window
 from core.execution._session import build_continuation_prompt, handle_session_chaining
 from core.execution._streaming import stream_error_boundary
 from core.execution.base import BaseExecutor, ExecutionResult, StreamDisconnectedError, ToolCallRecord, _truncate_for_record, tool_input_save_budget, tool_result_save_budget
+from core.execution.reminder import SystemReminderQueue
 from core.memory import MemoryManager
 from core.prompt.builder import build_system_prompt
 from core.schemas import ModelConfig
@@ -205,6 +206,16 @@ class AnthropicFallbackExecutor(BaseExecutor):
                 }
                 tracker.update_from_usage(usage_dict)
 
+                # P1-1: context threshold reminder
+                if tracker.threshold_exceeded:
+                    try:
+                        ratio = float(tracker.usage_ratio)
+                    except (TypeError, ValueError):
+                        ratio = 0.0
+                    self.reminder_queue.push_sync(
+                        f"コンテキスト使用量: {ratio:.0%}。出力を簡潔にし、重要な状態をセッション状態に保存せよ。"
+                    )
+
                 current_text = "\n".join(
                     b.text for b in response.content if b.type == "text"
                 )
@@ -236,6 +247,12 @@ class AnthropicFallbackExecutor(BaseExecutor):
                         {"role": "user", "content": build_continuation_prompt()}
                     ]
                     continue
+
+            # ── P1-2: output truncation reminder ─────────────────
+            if response.stop_reason == "max_tokens":
+                self.reminder_queue.push_sync(
+                    "出力がmax_tokensで途切れた。残りの内容を小さく分割して続行せよ。"
+                )
 
             # ── Check for tool use ────────────────────────────
             tool_uses = [b for b in response.content if b.type == "tool_use"]
@@ -272,6 +289,19 @@ class AnthropicFallbackExecutor(BaseExecutor):
                     result_summary=_truncate_for_record(str(result), tool_result_save_budget(tu.name, context_window)),
                 ))
             messages.append({"role": "user", "content": tool_results})
+
+            # ── Drain reminder queue into tool result message ──
+            reminder = self.reminder_queue.drain_sync()
+            if reminder:
+                formatted = SystemReminderQueue.format_reminder(reminder)
+                last_content = messages[-1]["content"]
+                if isinstance(last_content, list):
+                    last_content.append({
+                        "type": "text",
+                        "text": formatted,
+                    })
+                elif isinstance(last_content, str):
+                    messages[-1]["content"] += "\n\n" + formatted
 
         logger.warning("Max iterations (10) reached, returning fallback response")
         return ExecutionResult(
@@ -360,6 +390,22 @@ class AnthropicFallbackExecutor(BaseExecutor):
                     }
                     tracker.update_from_usage(usage_dict)
 
+                    # P1-1: context threshold reminder
+                    if tracker.threshold_exceeded:
+                        try:
+                            ratio = float(tracker.usage_ratio)
+                        except (TypeError, ValueError):
+                            ratio = 0.0
+                        self.reminder_queue.push_sync(
+                            f"コンテキスト使用量: {ratio:.0%}。出力を簡潔にし、重要な状態をセッション状態に保存せよ。"
+                        )
+
+                # P1-2: output truncation reminder
+                if final_message and getattr(final_message, "stop_reason", None) == "max_tokens":
+                    self.reminder_queue.push_sync(
+                        "出力がmax_tokensで途切れた。残りの内容を小さく分割して続行せよ。"
+                    )
+
                 # ── Check for tool use ────────────────────────
                 tool_uses = [
                     b for b in final_message.content if b.type == "tool_use"
@@ -418,6 +464,19 @@ class AnthropicFallbackExecutor(BaseExecutor):
                         "tool_name": tu.name,
                     }
                 messages.append({"role": "user", "content": tool_results})
+
+                # ── Drain reminder queue into tool result message ──
+                reminder = self.reminder_queue.drain_sync()
+                if reminder:
+                    formatted = SystemReminderQueue.format_reminder(reminder)
+                    last_content = messages[-1]["content"]
+                    if isinstance(last_content, list):
+                        last_content.append({
+                            "type": "text",
+                            "text": formatted,
+                        })
+                    elif isinstance(last_content, str):
+                        messages[-1]["content"] += "\n\n" + formatted
             else:
                 # for-else: max iterations reached without break
                 logger.warning(

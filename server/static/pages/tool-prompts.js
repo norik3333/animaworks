@@ -1,4 +1,4 @@
-// ── Tool Prompt Management ──────────────────
+// ── Prompt Settings Management ──────────────────
 import { api } from "../modules/api.js";
 
 let _activeTab = "descriptions";
@@ -6,11 +6,12 @@ let _activeTab = "descriptions";
 export function render(container) {
   container.innerHTML = `
     <div class="page-header">
-      <h2>ツール設定</h2>
+      <h2>プロンプト設定</h2>
     </div>
     <div class="page-tabs" id="toolPromptTabs">
-      <button class="page-tab active" data-tab="descriptions">Descriptions</button>
-      <button class="page-tab" data-tab="guides">Guides</button>
+      <button class="page-tab active" data-tab="descriptions">ツール説明</button>
+      <button class="page-tab" data-tab="guides">ツールガイド</button>
+      <button class="page-tab" data-tab="sections">システムセクション</button>
       <button class="page-tab" data-tab="preview">プレビュー</button>
     </div>
     <div id="toolPromptContent">
@@ -46,6 +47,8 @@ async function _renderTab() {
       await _renderDescriptions(content);
     } else if (_activeTab === "guides") {
       await _renderGuides(content);
+    } else if (_activeTab === "sections") {
+      await _renderSections(content);
     } else if (_activeTab === "preview") {
       await _renderPreview(content);
     }
@@ -225,6 +228,90 @@ async function _renderGuides(container) {
   });
 }
 
+// ── Sections Tab ──────────────────────────
+
+async function _renderSections(container) {
+  const data = await api("/api/tool-prompts/sections");
+  const sections = data.sections || [];
+
+  if (sections.length === 0) {
+    container.innerHTML = `<div class="card"><div class="card-body">
+      <div class="loading-placeholder">システムセクションがありません。animaworks init を実行してください。</div>
+    </div></div>`;
+    return;
+  }
+
+  container.innerHTML = `
+    <div style="margin-bottom:1rem;">
+      <p style="color:var(--text-secondary);font-size:0.85rem;margin:0;">
+        システムプロンプトに注入されるセクションを編集できます。条件付きセクションは該当条件でのみ注入されます。
+      </p>
+    </div>
+  ` + sections.map((s) => `
+    <div class="card" style="margin-bottom:1rem;" data-key="${_esc(s.key)}">
+      <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+        <div style="display:flex;align-items:center;gap:0.75rem;">
+          <h3 style="margin:0;"><code>${_esc(s.key)}</code></h3>
+          <span style="display:inline-block;padding:0.15rem 0.5rem;border-radius:4px;font-size:0.75rem;
+            background:${_conditionColor(s.condition)};color:#fff;">
+            ${_esc(_conditionLabel(s.condition))}
+          </span>
+        </div>
+        <div style="display:flex;align-items:center;gap:0.5rem;">
+          <span class="section-status" style="font-size:0.8rem;"></span>
+          <button class="btn-primary btn-save-section" data-key="${_esc(s.key)}"
+            data-condition="${_esc(s.condition || "")}"
+            style="font-size:0.85rem;padding:0.4rem 1rem;">保存</button>
+        </div>
+      </div>
+      <div class="card-body" style="padding:0;">
+        <textarea class="section-textarea"
+          style="width:100%;min-height:300px;font-family:'Menlo','Monaco','Courier New',monospace;font-size:0.85rem;
+            resize:vertical;border:none;border-top:1px solid #eee;padding:1rem;line-height:1.5;box-sizing:border-box;"
+        >${_esc(s.content)}</textarea>
+      </div>
+    </div>
+  `).join("");
+
+  // Save handlers
+  container.querySelectorAll(".btn-save-section").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const key = btn.dataset.key;
+      const condition = btn.dataset.condition || null;
+      const card = btn.closest(".card");
+      const textarea = card.querySelector(".section-textarea");
+      const status = card.querySelector(".section-status");
+      const content = textarea.value.trim();
+
+      if (!content) {
+        status.textContent = "空にできません";
+        status.style.color = "#dc2626";
+        return;
+      }
+
+      btn.disabled = true;
+      status.textContent = "保存中...";
+      status.style.color = "#666";
+
+      try {
+        await api(`/api/tool-prompts/sections/${encodeURIComponent(key)}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content, condition: condition || null }),
+        });
+        status.textContent = "保存完了";
+        status.style.color = "#16a34a";
+      } catch (err) {
+        status.textContent = "エラー";
+        status.style.color = "#dc2626";
+      } finally {
+        btn.disabled = false;
+        setTimeout(() => { status.textContent = ""; }, 3000);
+      }
+    });
+  });
+}
+
 // ── Preview Tab ────────────────────────────
 
 async function _renderPreview(container) {
@@ -353,4 +440,22 @@ function _esc(str) {
   const el = document.createElement("span");
   el.textContent = str;
   return el.innerHTML;
+}
+
+function _conditionLabel(condition) {
+  if (!condition) return "常時";
+  const labels = {
+    "mode:a1": "A1モード",
+    "mode:non_a1": "非A1モード",
+    "mode:a2": "A2モード",
+    "solo_top_level": "ソロトップレベル",
+  };
+  return labels[condition] || condition;
+}
+
+function _conditionColor(condition) {
+  if (!condition) return "#6b7280";
+  if (condition.startsWith("mode:")) return "#2563eb";
+  if (condition === "solo_top_level") return "#7c3aed";
+  return "#6b7280";
 }

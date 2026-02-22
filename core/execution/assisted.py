@@ -34,6 +34,7 @@ from typing import Any
 
 from core.exceptions import LLMAPIError, ToolExecutionError, ConfigError  # noqa: F401
 from core.execution.base import BaseExecutor, ExecutionResult, StreamDisconnectedError, ToolCallRecord, _truncate_for_record, tool_input_save_budget, tool_result_save_budget
+from core.execution.reminder import SystemReminderQueue
 from core.execution._streaming import stream_error_boundary
 from core.memory import MemoryManager
 from core.messenger import Messenger
@@ -361,7 +362,14 @@ class AssistedExecutor(BaseExecutor):
                 logger.exception("LiteLLM API error in Mode B")
                 return ExecutionResult(text=f"[LLM API Error: {e}]")
 
-            content = response.choices[0].message.content or ""
+            choice = response.choices[0]
+            content = choice.message.content or ""
+
+            # P1-2: output truncation reminder
+            if choice.finish_reason == "length":
+                self.reminder_queue.push_sync(
+                    "出力がmax_tokensで途切れた。残りの内容を小さく分割して続行せよ。"
+                )
 
             # ── 3. Extract tool call ─────────────────────────
             tool_call = extract_tool_call(content)
@@ -432,6 +440,11 @@ class AssistedExecutor(BaseExecutor):
                 "role": "user",
                 "content": f"ツール実行結果:\n{result}",
             })
+
+            # ── Drain reminder queue into tool result message ──
+            reminder = self.reminder_queue.drain_sync()
+            if reminder:
+                messages[-1]["content"] += "\n\n" + SystemReminderQueue.format_reminder(reminder)
         else:
             # max_turns reached
             logger.warning(
@@ -512,7 +525,14 @@ class AssistedExecutor(BaseExecutor):
                     messages,
                     max_tokens_override=preflight.get("max_tokens"),
                 )
-                content = response.choices[0].message.content or ""
+                choice = response.choices[0]
+                content = choice.message.content or ""
+
+                # P1-2: output truncation reminder
+                if choice.finish_reason == "length":
+                    self.reminder_queue.push_sync(
+                        "出力がmax_tokensで途切れた。残りの内容を小さく分割して続行せよ。"
+                    )
 
                 # ── 3. Extract tool call ─────────────────────
                 tool_call = extract_tool_call(content)
@@ -604,6 +624,11 @@ class AssistedExecutor(BaseExecutor):
                     "role": "user",
                     "content": f"ツール実行結果:\n{result}",
                 })
+
+                # ── Drain reminder queue into tool result message ──
+                reminder = self.reminder_queue.drain_sync()
+                if reminder:
+                    messages[-1]["content"] += "\n\n" + SystemReminderQueue.format_reminder(reminder)
             else:
                 # max_turns reached
                 logger.warning(
