@@ -80,7 +80,12 @@ _SDK_MAX_BUFFER_SIZE = 4 * 1024 * 1024  # 4 MB
 
 
 def _check_a1_file_access(
-    file_path: str, anima_dir: Path, *, write: bool,
+    file_path: str,
+    anima_dir: Path,
+    *,
+    write: bool,
+    subordinate_activity_dirs: list[Path] | None = None,
+    subordinate_management_files: list[Path] | None = None,
 ) -> str | None:
     """Check if a file path is allowed for A1 mode tools.
 
@@ -96,6 +101,18 @@ def _check_a1_file_access(
     # Block access to other animas' directories
     if resolved.is_relative_to(animas_root):
         if not resolved.is_relative_to(anima_resolved):
+            # Supervisor can read subordinate's activity_log
+            if not write and subordinate_activity_dirs:
+                for sub_activity in subordinate_activity_dirs:
+                    if resolved.is_relative_to(sub_activity):
+                        return None
+
+            # Supervisor can read/write subordinate's cron.md & heartbeat.md
+            if subordinate_management_files:
+                for mgmt_file in subordinate_management_files:
+                    if resolved == mgmt_file:
+                        return None
+
             return f"Access to other anima's directory is not allowed: {file_path}"
 
         # Block writes to protected files within own directory
@@ -331,6 +348,30 @@ def _log_tool_result(
         logger.debug("Failed to log tool_result for %s", tool_name, exc_info=True)
 
 
+def _cache_subordinate_paths(
+    anima_dir: Path,
+) -> tuple[list[Path], list[Path]]:
+    """Cache subordinate paths for permission checks at hook build time."""
+    sub_activity_dirs: list[Path] = []
+    sub_mgmt_files: list[Path] = []
+    try:
+        from core.config.models import load_config
+        from core.paths import get_animas_dir
+
+        cfg = load_config()
+        animas_dir = get_animas_dir()
+        anima_name = anima_dir.name
+        for sub_name, sub_cfg in cfg.animas.items():
+            if sub_cfg.supervisor == anima_name:
+                sub_dir = (animas_dir / sub_name).resolve()
+                sub_activity_dirs.append(sub_dir / "activity_log")
+                sub_mgmt_files.append(sub_dir / "cron.md")
+                sub_mgmt_files.append(sub_dir / "heartbeat.md")
+    except Exception:
+        logger.debug("Failed to cache subordinate paths for A1 hook", exc_info=True)
+    return sub_activity_dirs, sub_mgmt_files
+
+
 def _build_pre_tool_hook(
     anima_dir: Path,
 ) -> Callable:
@@ -341,6 +382,9 @@ def _build_pre_tool_hook(
         PreToolUseHookSpecificOutput,
         SyncHookJSONOutput,
     )
+
+    # Cache subordinate paths once at hook build time
+    _sub_activity_dirs, _sub_mgmt_files = _cache_subordinate_paths(anima_dir)
 
     async def _pre_tool_hook(
         input_data: HookInput,
@@ -355,6 +399,8 @@ def _build_pre_tool_hook(
             file_path = tool_input.get("file_path", "")
             violation = _check_a1_file_access(
                 file_path, anima_dir, write=True,
+                subordinate_activity_dirs=_sub_activity_dirs,
+                subordinate_management_files=_sub_mgmt_files,
             )
             if violation:
                 _log_tool_use(anima_dir, tool_name, tool_input, blocked=True, block_reason=violation)
@@ -371,6 +417,8 @@ def _build_pre_tool_hook(
             file_path = tool_input.get("file_path", "")
             violation = _check_a1_file_access(
                 file_path, anima_dir, write=False,
+                subordinate_activity_dirs=_sub_activity_dirs,
+                subordinate_management_files=_sub_mgmt_files,
             )
             if violation:
                 _log_tool_use(anima_dir, tool_name, tool_input, blocked=True, block_reason=violation)
