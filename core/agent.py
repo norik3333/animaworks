@@ -930,7 +930,17 @@ class AgentCore:
         result_msg = result.result_message
         accumulated_tool_records = _tool_records_to_dicts(result)
 
-        # Session chaining: if threshold was crossed, continue in a new session
+        # Session chaining: if threshold was crossed, continue in a new session.
+        # force_chain is set by A1 mid-session context auto-compact (PreToolUse
+        # hook returned continue_=False).  In that case ResultMessage.usage may
+        # not have updated the tracker, so we force the threshold flag.
+        if result.force_chain and not tracker.threshold_exceeded:
+            tracker.force_threshold()
+            logger.info(
+                "Context auto-compact: forcing threshold_exceeded for session "
+                "chaining (A1 mid-session context budget exceeded)"
+            )
+
         session_chained = False
         total_turns = result_msg.num_turns if result_msg else 0
         chain_count = 0
@@ -1161,6 +1171,7 @@ class AgentCore:
         full_text_parts: list[str] = []
         all_tool_call_records: list[dict] = []
         result_message: Any = None
+        _stream_force_chain = False
         current_prompt = prompt
         current_system_prompt = system_prompt
         retry_count = 0
@@ -1188,6 +1199,9 @@ class AgentCore:
                         transcript_replied = chunk.get("replied_to_from_transcript", set())
                         if transcript_replied:
                             self._tool_handler.merge_replied_to(transcript_replied)
+                        # Capture force_chain from A1 auto-compact
+                        if chunk.get("force_chain", False):
+                            _stream_force_chain = True
                         stream_succeeded = True
                     elif chunk["type"] == "tool_end" and checkpoint_enabled:
                         completed_tools.append({
@@ -1287,7 +1301,14 @@ class AgentCore:
                 shortterm.clear_checkpoint()
                 break
 
-        # Session chaining
+        # Session chaining — force_chain from A1 mid-session auto-compact.
+        if _stream_force_chain and not tracker.threshold_exceeded:
+            tracker.force_threshold()
+            logger.info(
+                "Context auto-compact (stream): forcing threshold_exceeded "
+                "for session chaining"
+            )
+
         session_chained = False
         total_turns = result_message.num_turns if result_message else 0
         chain_count = 0

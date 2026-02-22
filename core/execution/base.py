@@ -98,6 +98,10 @@ class ExecutionResult:
         result_message: Provider-specific metadata (e.g. ResultMessage
             from Claude Agent SDK).  Used for session chaining in A1 mode.
         tool_call_records: Tool calls made during this execution session.
+        force_chain: When True, AgentCore should force session chaining
+            regardless of the ContextTracker state.  Set by the A1 executor
+            when mid-session context auto-compact triggers via PreToolUse
+            ``continue_=False``.
     """
 
     text: str
@@ -105,6 +109,7 @@ class ExecutionResult:
     replied_to_from_transcript: set[str] = field(default_factory=set)
     unconfirmed_sends: list[dict] = field(default_factory=list)
     tool_call_records: list[ToolCallRecord] = field(default_factory=list)
+    force_chain: bool = False
 
 
 class BaseExecutor(ABC):
