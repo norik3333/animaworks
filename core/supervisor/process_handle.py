@@ -448,7 +448,7 @@ class ProcessHandle:
             try:
                 try:
                     os.killpg(os.getpgid(self.process.pid), _signal.SIGTERM)
-                except (ProcessLookupError, PermissionError):
+                except OSError:
                     self.process.terminate()
                 async with asyncio.timeout(timeout / 2):
                     while self.process.poll() is None:
@@ -474,7 +474,7 @@ class ProcessHandle:
         logger.warning("Killing process: %s (PID %s)", self.anima_name, self.process.pid)
         try:
             os.killpg(os.getpgid(self.process.pid), _signal.SIGKILL)
-        except (ProcessLookupError, PermissionError):
+        except OSError:
             self.process.kill()
         await asyncio.get_running_loop().run_in_executor(None, self.process.wait)
         self.stats.exit_code = self.process.returncode
@@ -491,14 +491,14 @@ class ProcessHandle:
             )
             try:
                 os.killpg(os.getpgid(self.process.pid), _signal.SIGTERM)
-            except (ProcessLookupError, PermissionError):
+            except OSError:
                 self.process.terminate()
             try:
                 self.process.wait(timeout=2)
             except subprocess.TimeoutExpired:
                 try:
                     os.killpg(os.getpgid(self.process.pid), _signal.SIGKILL)
-                except (ProcessLookupError, PermissionError):
+                except OSError:
                     self.process.kill()
                 self.process.wait()
 

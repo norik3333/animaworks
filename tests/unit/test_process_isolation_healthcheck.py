@@ -143,10 +143,10 @@ class TestProcessGroupIsolation:
             )
 
     @pytest.mark.asyncio
-    async def test_stop_falls_back_to_terminate_on_process_lookup_error(
+    async def test_stop_falls_back_to_terminate_on_os_error(
         self, handle: ProcessHandle,
     ):
-        """Verify stop() falls back to process.terminate() if killpg raises ProcessLookupError."""
+        """Verify stop() falls back to process.terminate() if killpg raises OSError."""
         terminate_called = False
 
         def poll_side_effect():
@@ -170,7 +170,7 @@ class TestProcessGroupIsolation:
             raise ConnectionError("IPC lost")
         handle.send_request = fail_send
 
-        with patch("core.supervisor.process_handle.os.killpg", side_effect=ProcessLookupError), \
+        with patch("core.supervisor.process_handle.os.killpg", side_effect=OSError("ESRCH")), \
              patch("core.supervisor.process_handle.os.getpgid", return_value=12345):
             await handle.stop(timeout=2.0)
 
@@ -196,14 +196,14 @@ class TestProcessGroupIsolation:
             )
 
     @pytest.mark.asyncio
-    async def test_kill_falls_back_on_process_lookup_error(
+    async def test_kill_falls_back_on_os_error(
         self, handle: ProcessHandle,
     ):
-        """Verify kill() falls back to process.kill() if killpg raises ProcessLookupError."""
+        """Verify kill() falls back to process.kill() if killpg raises OSError."""
         handle.process.wait.return_value = -9
         handle.process.returncode = -9
 
-        with patch("core.supervisor.process_handle.os.killpg", side_effect=ProcessLookupError), \
+        with patch("core.supervisor.process_handle.os.killpg", side_effect=OSError("ESRCH")), \
              patch("core.supervisor.process_handle.os.getpgid", return_value=12345):
             await handle.kill()
 
@@ -261,7 +261,7 @@ class TestFailedLogSpamSuppression:
         handle.state = ProcessState.FAILED
         supervisor._permanently_failed.add("test-anima")
         # Set last log time to now so it won't log again within 5 min
-        supervisor._failed_log_times["test-anima"] = asyncio.get_event_loop().time()
+        supervisor._failed_log_times["test-anima"] = asyncio.get_running_loop().time()
 
         with patch.object(
             supervisor, "_handle_process_failure", new_callable=AsyncMock,
@@ -283,7 +283,7 @@ class TestFailedLogSpamSuppression:
         supervisor._permanently_failed.add("test-anima")
         # Set last log time to 301 seconds ago
         supervisor._failed_log_times["test-anima"] = (
-            asyncio.get_event_loop().time() - 301
+            asyncio.get_running_loop().time() - 301
         )
 
         with caplog.at_level(logging.WARNING):
@@ -306,7 +306,7 @@ class TestFailedLogSpamSuppression:
         supervisor._permanently_failed.add("test-anima")
         # Set last log time to just 10 seconds ago
         supervisor._failed_log_times["test-anima"] = (
-            asyncio.get_event_loop().time() - 10
+            asyncio.get_running_loop().time() - 10
         )
 
         with caplog.at_level(logging.WARNING):
@@ -369,7 +369,7 @@ class TestReconciliationAutoRecovery:
         # Mark as permanently failed with cooldown elapsed (>60s)
         supervisor._permanently_failed.add("alice")
         supervisor._restart_counts["alice"] = 5
-        supervisor._failed_log_times["alice"] = asyncio.get_event_loop().time() - 61
+        supervisor._failed_log_times["alice"] = asyncio.get_running_loop().time() - 61
 
         supervisor.start_anima = AsyncMock()
         supervisor.stop_anima = AsyncMock()
@@ -408,7 +408,7 @@ class TestReconciliationAutoRecovery:
         # Cooldown NOT elapsed (only 10 seconds)
         supervisor._permanently_failed.add("alice")
         supervisor._restart_counts["alice"] = 5
-        supervisor._failed_log_times["alice"] = asyncio.get_event_loop().time() - 10
+        supervisor._failed_log_times["alice"] = asyncio.get_running_loop().time() - 10
 
         supervisor.start_anima = AsyncMock()
         supervisor.stop_anima = AsyncMock()
@@ -443,7 +443,7 @@ class TestReconciliationAutoRecovery:
 
         supervisor._permanently_failed.add("alice")
         supervisor._restart_counts["alice"] = 5
-        supervisor._failed_log_times["alice"] = asyncio.get_event_loop().time() - 120
+        supervisor._failed_log_times["alice"] = asyncio.get_running_loop().time() - 120
 
         supervisor.start_anima = AsyncMock()
         supervisor.stop_anima = AsyncMock()
@@ -535,6 +535,53 @@ class TestRestartCounterReset:
         supervisor.start_anima.assert_called_once_with("new-anima")
         assert "new-anima" not in supervisor._restart_counts
 
+    @pytest.mark.asyncio
+    async def test_restart_preserves_counters_when_reset_disabled(
+        self, supervisor: ProcessSupervisor,
+    ):
+        """Verify restart_anima(_reset_counters=False) preserves failure tracking."""
+        supervisor._restart_counts["alice"] = 3
+        supervisor._permanently_failed.add("alice")
+        supervisor._failed_log_times["alice"] = 99.0
+
+        handle = MagicMock(spec=ProcessHandle)
+        handle.anima_name = "alice"
+        supervisor.processes["alice"] = handle
+
+        supervisor.stop_anima = AsyncMock()
+        supervisor.start_anima = AsyncMock()
+
+        await supervisor.restart_anima("alice", _reset_counters=False)
+
+        # Counters must be preserved
+        assert supervisor._restart_counts["alice"] == 3
+        assert "alice" in supervisor._permanently_failed
+        assert supervisor._failed_log_times["alice"] == 99.0
+
+    @pytest.mark.asyncio
+    async def test_handle_process_failure_preserves_counter_through_restart(
+        self, supervisor: ProcessSupervisor, handle: ProcessHandle,
+    ):
+        """Verify _handle_process_failure increments counter and restart doesn't erase it."""
+        supervisor.processes["test-anima"] = handle
+        supervisor._restart_counts["test-anima"] = 1  # Already retried once
+
+        # Mock stop/start so restart_anima succeeds
+        async def mock_stop(name):
+            del supervisor.processes[name]
+        async def mock_start(name):
+            new_h = MagicMock(spec=ProcessHandle)
+            new_h.anima_name = name
+            new_h.get_pid.return_value = 99999
+            supervisor.processes[name] = new_h
+        supervisor.stop_anima = mock_stop
+        supervisor.start_anima = mock_start
+
+        await supervisor._handle_process_failure("test-anima", handle)
+
+        # Counter should be incremented (1 → 2), NOT reset to 0
+        assert supervisor._restart_counts["test-anima"] == 2
+
 
 # ── Integration: Full failure-recovery cycle ──────────────────
 
@@ -573,7 +620,7 @@ class TestFailureRecoveryCycle:
         assert handle.state == ProcessState.FAILED
 
         # Step 3: Health check should skip (no log spam)
-        supervisor._failed_log_times["alice"] = asyncio.get_event_loop().time()
+        supervisor._failed_log_times["alice"] = asyncio.get_running_loop().time()
 
         with patch.object(
             supervisor, "_handle_process_failure", new_callable=AsyncMock,
@@ -583,7 +630,7 @@ class TestFailureRecoveryCycle:
 
         # Step 4: Simulate cooldown elapsed
         supervisor._failed_log_times["alice"] = (
-            asyncio.get_event_loop().time() - 61
+            asyncio.get_running_loop().time() - 61
         )
 
         supervisor.start_anima = AsyncMock()

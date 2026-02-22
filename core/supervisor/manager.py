@@ -346,14 +346,23 @@ class ProcessSupervisor:
         del self.processes[anima_name]
         logger.info("Anima process stopped: %s", anima_name)
 
-    async def restart_anima(self, anima_name: str) -> None:
-        """Restart a Anima process."""
+    async def restart_anima(
+        self, anima_name: str, *, _reset_counters: bool = True,
+    ) -> None:
+        """Restart a Anima process.
+
+        Args:
+            _reset_counters: When True (default), resets failure tracking
+                state.  Internal callers (e.g. ``_handle_process_failure``)
+                pass False to preserve the retry counter.
+        """
         logger.info("Restarting process: %s", anima_name)
 
-        # Reset failure tracking on restart
-        self._restart_counts.pop(anima_name, None)
-        self._permanently_failed.discard(anima_name)
-        self._failed_log_times.pop(anima_name, None)
+        if _reset_counters:
+            # Reset failure tracking (manual restart only)
+            self._restart_counts.pop(anima_name, None)
+            self._permanently_failed.discard(anima_name)
+            self._failed_log_times.pop(anima_name, None)
 
         # Stop existing process
         if anima_name in self.processes:
@@ -533,7 +542,7 @@ class ProcessSupervisor:
         """Check health of a single process."""
         # Skip permanently failed processes (log at WARNING every 5 minutes)
         if anima_name in self._permanently_failed:
-            now = asyncio.get_event_loop().time()
+            now = asyncio.get_running_loop().time()
             last_log = self._failed_log_times.get(anima_name, 0)
             if now - last_log >= 300:
                 logger.warning(
@@ -690,7 +699,7 @@ class ProcessSupervisor:
                 )
                 handle.state = ProcessState.FAILED
                 self._permanently_failed.add(anima_name)
-                self._failed_log_times[anima_name] = asyncio.get_event_loop().time()
+                self._failed_log_times[anima_name] = asyncio.get_running_loop().time()
                 return
 
             # Calculate backoff delay
@@ -708,7 +717,7 @@ class ProcessSupervisor:
             await asyncio.sleep(backoff)
 
             self._restart_counts[anima_name] = count + 1
-            await self.restart_anima(anima_name)
+            await self.restart_anima(anima_name, _reset_counters=False)
 
             new_handle = self.processes.get(anima_name)
             if new_handle:
@@ -812,7 +821,7 @@ class ProcessSupervisor:
                 continue
             if name not in on_disk or not on_disk[name]:
                 continue
-            now = asyncio.get_event_loop().time()
+            now = asyncio.get_running_loop().time()
             failed_since = self._failed_log_times.get(name, 0)
             if now - failed_since < 60:
                 continue

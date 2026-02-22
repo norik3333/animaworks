@@ -183,7 +183,9 @@ class TestHandleProcessFailureSetsRestarting:
         # The state should have been set to RESTARTING during the call
         # (it may have been changed back by restart_anima, but we can check
         #  that restart_anima was called — which proves RESTARTING was set)
-        supervisor.restart_anima.assert_awaited_once_with("test-anima")
+        supervisor.restart_anima.assert_awaited_once_with(
+            "test-anima", _reset_counters=False,
+        )
 
     @pytest.mark.asyncio
     async def test_health_check_skips_restarting(self, tmp_path: Path):
@@ -193,6 +195,8 @@ class TestHandleProcessFailureSetsRestarting:
         supervisor = ProcessSupervisor.__new__(ProcessSupervisor)
         supervisor._restarting = set()
         supervisor._restart_counts = {}
+        supervisor._permanently_failed = set()
+        supervisor._failed_log_times = {}
 
         handle = ProcessHandle(
             anima_name="test-anima",

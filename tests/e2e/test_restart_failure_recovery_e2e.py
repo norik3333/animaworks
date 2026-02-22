@@ -57,7 +57,7 @@ class TestFailureToRestartFlow:
         new_handle.get_pid.return_value = 99999
         new_handle.state = ProcessState.RUNNING
 
-        async def mock_restart(anima_name: str) -> None:
+        async def mock_restart(anima_name: str, **kwargs) -> None:
             supervisor.processes[anima_name] = new_handle
 
         supervisor.restart_anima = AsyncMock(side_effect=mock_restart)
@@ -66,7 +66,9 @@ class TestFailureToRestartFlow:
             await supervisor._handle_process_failure(name, old_handle)
 
         # restart_anima was called (not blocked by _restarting guard)
-        supervisor.restart_anima.assert_awaited_once_with(name)
+        supervisor.restart_anima.assert_awaited_once_with(
+            name, _reset_counters=False,
+        )
 
         # processes[name] has the new handle (no KeyError)
         assert supervisor.processes[name] is new_handle
@@ -135,7 +137,7 @@ class TestHangToRestartFlow:
         new_handle.get_pid.return_value = 88888
         new_handle.state = ProcessState.RUNNING
 
-        async def mock_restart(anima_name: str) -> None:
+        async def mock_restart(anima_name: str, **kwargs) -> None:
             supervisor.processes[anima_name] = new_handle
 
         supervisor.restart_anima = AsyncMock(side_effect=mock_restart)
@@ -147,7 +149,9 @@ class TestHangToRestartFlow:
         hung_handle.kill.assert_awaited_once()
 
         # restart_anima was called (via _handle_process_failure)
-        supervisor.restart_anima.assert_awaited_once_with(name)
+        supervisor.restart_anima.assert_awaited_once_with(
+            name, _reset_counters=False,
+        )
 
         # New handle is in processes
         assert supervisor.processes[name] is new_handle
