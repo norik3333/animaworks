@@ -16,6 +16,7 @@ from core.execution.agent_sdk import (
     _WRITE_COMMANDS,
     _check_a1_bash_command,
     _check_a1_file_access,
+    _collect_all_subordinates,
     _log_tool_use,
     _sanitise_tool_args,
     _summarise_tool_input,
@@ -376,3 +377,69 @@ class TestSanitiseToolArgs:
         inp = {"file_path": "/tmp/foo"}
         result = _sanitise_tool_args("Read", inp)
         assert result is inp
+
+
+# ── _collect_all_subordinates ────────────────────────────────
+
+
+class _FakeCfg:
+    """Minimal stand-in for AnimaModelConfig with a supervisor field."""
+
+    def __init__(self, supervisor: str | None = None):
+        self.supervisor = supervisor
+
+
+class TestCollectAllSubordinates:
+    def test_direct_subordinates(self):
+        animas = {
+            "mio": _FakeCfg("sakura"),
+            "yuki": _FakeCfg("mio"),
+            "ren": _FakeCfg(None),
+        }
+        result = _collect_all_subordinates("sakura", animas)
+        assert result == {"mio", "yuki"}
+
+    def test_no_subordinates(self):
+        animas = {
+            "mio": _FakeCfg("sakura"),
+            "yuki": _FakeCfg("mio"),
+        }
+        result = _collect_all_subordinates("yuki", animas)
+        assert result == set()
+
+    def test_deep_hierarchy(self):
+        animas = {
+            "a": _FakeCfg("root"),
+            "b": _FakeCfg("a"),
+            "c": _FakeCfg("b"),
+            "d": _FakeCfg("c"),
+        }
+        result = _collect_all_subordinates("root", animas)
+        assert result == {"a", "b", "c", "d"}
+
+    def test_multiple_branches(self):
+        animas = {
+            "eng1": _FakeCfg("lead"),
+            "eng2": _FakeCfg("lead"),
+            "intern": _FakeCfg("eng1"),
+        }
+        result = _collect_all_subordinates("lead", animas)
+        assert result == {"eng1", "eng2", "intern"}
+
+    def test_does_not_include_self(self):
+        animas = {
+            "sakura": _FakeCfg(None),
+            "mio": _FakeCfg("sakura"),
+        }
+        result = _collect_all_subordinates("sakura", animas)
+        assert "sakura" not in result
+
+    def test_circular_reference_does_not_loop(self):
+        """Circular supervisor chains should not cause infinite loops."""
+        animas = {
+            "a": _FakeCfg("b"),
+            "b": _FakeCfg("a"),
+        }
+        # Both end up reachable due to circular chain; key assertion is no hang
+        result = _collect_all_subordinates("a", animas)
+        assert "b" in result

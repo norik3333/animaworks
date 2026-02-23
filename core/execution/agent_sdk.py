@@ -389,10 +389,31 @@ def _log_tool_result(
         logger.debug("Failed to log tool_result for %s", tool_name, exc_info=True)
 
 
+def _collect_all_subordinates(
+    anima_name: str,
+    animas_cfg: dict[str, Any],
+) -> set[str]:
+    """Recursively collect all subordinates (direct + transitive) of *anima_name*."""
+    result: set[str] = set()
+    queue = [anima_name]
+    while queue:
+        current = queue.pop()
+        for sub_name, sub_cfg in animas_cfg.items():
+            if sub_cfg.supervisor == current and sub_name not in result:
+                result.add(sub_name)
+                queue.append(sub_name)
+    return result
+
+
 def _cache_subordinate_paths(
     anima_dir: Path,
 ) -> tuple[list[Path], list[Path]]:
-    """Cache subordinate paths for permission checks at hook build time."""
+    """Cache subordinate paths for permission checks at hook build time.
+
+    Collects paths for **all** hierarchical subordinates (not just direct
+    reports) so that a top-level supervisor can access cron.md, heartbeat.md,
+    and activity_log of any anima beneath them in the org tree.
+    """
     sub_activity_dirs: list[Path] = []
     sub_mgmt_files: list[Path] = []
     try:
@@ -402,12 +423,12 @@ def _cache_subordinate_paths(
         cfg = load_config()
         animas_dir = get_animas_dir()
         anima_name = anima_dir.name
-        for sub_name, sub_cfg in cfg.animas.items():
-            if sub_cfg.supervisor == anima_name:
-                sub_dir = (animas_dir / sub_name).resolve()
-                sub_activity_dirs.append(sub_dir / "activity_log")
-                sub_mgmt_files.append(sub_dir / "cron.md")
-                sub_mgmt_files.append(sub_dir / "heartbeat.md")
+        all_subs = _collect_all_subordinates(anima_name, cfg.animas)
+        for sub_name in all_subs:
+            sub_dir = (animas_dir / sub_name).resolve()
+            sub_activity_dirs.append(sub_dir / "activity_log")
+            sub_mgmt_files.append(sub_dir / "cron.md")
+            sub_mgmt_files.append(sub_dir / "heartbeat.md")
     except Exception:
         logger.debug("Failed to cache subordinate paths for A1 hook", exc_info=True)
     return sub_activity_dirs, sub_mgmt_files
