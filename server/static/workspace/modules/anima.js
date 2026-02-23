@@ -39,16 +39,16 @@ function statusLabel(status) {
 function modelAlias(model) {
   if (!model) return "";
   const m = model.toLowerCase();
-  // A1: Claude models
+  // S: Claude models
   if (m.includes("opus")) return "Opus";
   if (m.includes("sonnet")) return "Sonnet";
   if (m.includes("haiku")) return "Haiku";
-  // A2: OpenAI
+  // A: OpenAI
   if (m.includes("gpt-4o")) return "GPT-4o";
   if (m.includes("gpt-4")) return "GPT-4";
   if (m.includes("o3")) return "o3";
   if (m.includes("o1")) return "o1";
-  // A2: Google
+  // A: Google
   if (m.includes("gemini")) return "Gemini";
   // B: Ollama / OSS
   if (m.includes("ollama/")) return model.split("/").pop();

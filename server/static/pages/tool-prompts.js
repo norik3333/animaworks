@@ -163,9 +163,9 @@ async function _renderGuides(container) {
   }
 
   const guideLabels = {
-    a1_builtin: "A1 ビルトインツール（Read/Write/Edit/Bash/Grep/Glob）",
-    a1_mcp: "A1 MCPツール（mcp__aw__*）",
-    non_a1: "非A1モード（A1F/A2/B）のツール使用ガイド",
+    s_builtin: "Sモード ビルトインツール（Read/Write/Edit/Bash/Grep/Glob）",
+    s_mcp: "Sモード MCPツール（mcp__aw__*）",
+    non_s: "非Sモード（A/B）のツール使用ガイド",
   };
 
   container.innerHTML = guides.map((g) => `
@@ -445,9 +445,9 @@ function _esc(str) {
 function _conditionLabel(condition) {
   if (!condition) return "常時";
   const labels = {
-    "mode:a1": "A1モード",
-    "mode:non_a1": "非A1モード",
-    "mode:a2": "A2モード",
+    "mode:s": "Sモード",
+    "mode:non_s": "非Sモード",
+    "mode:a": "Aモード",
     "solo_top_level": "ソロトップレベル",
   };
   return labels[condition] || condition;
