@@ -474,6 +474,7 @@ class AssistedExecutor(BaseExecutor):
         images: list[dict[str, Any]] | None = None,
         prior_messages: list[dict[str, Any]] | None = None,
         max_turns_override: int | None = None,
+        trigger: str = "",
     ) -> AsyncGenerator[dict[str, Any], None]:
         """Stream execution events from the text-based tool-call loop.
 

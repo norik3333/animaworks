@@ -103,8 +103,15 @@ def _load_session_id(anima_dir: Path) -> str | None:
         return None
 
 
-def _save_session_id(anima_dir: Path, session_id: str) -> None:
-    """Persist session ID for future SDK session resume."""
+def _save_session_id(
+    anima_dir: Path, session_id: str, *, trigger: str = "",
+) -> None:
+    """Persist session ID for future SDK session resume.
+
+    Heartbeat triggers skip saving to avoid polluting conversation sessions.
+    """
+    if trigger.startswith("heartbeat"):
+        return
     path = anima_dir / "state" / _SESSION_FILE
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps({
@@ -823,6 +830,7 @@ class AgentSDKExecutor(BaseExecutor):
         pending_records: dict[str, ToolCallRecord],
         session_stats: dict[str, Any],
         tracker: ContextTracker | None,
+        trigger: str = "",
     ) -> "ResultMessage | None":
         """Run query + message loop for blocking (non-streaming) execution.
 
@@ -848,7 +856,10 @@ class AgentSDKExecutor(BaseExecutor):
             if isinstance(message, ResultMessage):
                 result_message = message
                 if message.session_id:
-                    _save_session_id(self._anima_dir, message.session_id)
+                    _save_session_id(
+                        self._anima_dir, message.session_id,
+                        trigger=trigger,
+                    )
                 if tracker:
                     tracker.update_from_result_message(message.usage)
             elif isinstance(message, AssistantMessage):
@@ -936,7 +947,10 @@ class AgentSDKExecutor(BaseExecutor):
             "force_chain": False,
         }
 
-        session_id_to_resume = _load_session_id(self._anima_dir)
+        session_id_to_resume = (
+            None if trigger.startswith("heartbeat")
+            else _load_session_id(self._anima_dir)
+        )
 
         options = self._build_sdk_options(
             system_prompt, _max_turns, _cw, session_stats,
@@ -957,7 +971,7 @@ class AgentSDKExecutor(BaseExecutor):
                 logger.info("ClaudeSDKClient connected")
                 result_message = await self._process_blocking_messages(
                     client, prompt, response_text, pending_records,
-                    session_stats, tracker,
+                    session_stats, tracker, trigger=trigger,
                 )
             logger.debug("ClaudeSDKClient disconnected")
         except (ProcessError, ClaudeSDKError) as e:
@@ -978,7 +992,7 @@ class AgentSDKExecutor(BaseExecutor):
                         logger.info("ClaudeSDKClient connected (fresh session retry)")
                         result_message = await self._process_blocking_messages(
                             client, prompt, response_text, pending_records,
-                            session_stats, tracker,
+                            session_stats, tracker, trigger=trigger,
                         )
                 except Exception as retry_exc:
                     logger.exception("Agent SDK execution error (fresh session retry)")
@@ -1032,6 +1046,7 @@ class AgentSDKExecutor(BaseExecutor):
         # and the current user message.
         prior_messages: list[dict[str, Any]] | None = None,
         max_turns_override: int | None = None,
+        trigger: str = "",
     ) -> AsyncGenerator[dict[str, Any], None]:
         """Stream events from Claude Agent SDK.
 
@@ -1072,7 +1087,10 @@ class AgentSDKExecutor(BaseExecutor):
             "force_chain": False,
         }
 
-        session_id_to_resume = _load_session_id(self._anima_dir)
+        session_id_to_resume = (
+            None if trigger.startswith("heartbeat")
+            else _load_session_id(self._anima_dir)
+        )
 
         options = self._build_sdk_options(
             system_prompt, _max_turns, _cw, session_stats,
@@ -1150,7 +1168,10 @@ class AgentSDKExecutor(BaseExecutor):
                 elif isinstance(message, ResultMessage):
                     result_message = message
                     if message.session_id:
-                        _save_session_id(self._anima_dir, message.session_id)
+                        _save_session_id(
+                            self._anima_dir, message.session_id,
+                            trigger=trigger,
+                        )
                     tracker.update_from_result_message(message.usage)
                     break  # receive_messages() does not auto-stop on ResultMessage
 

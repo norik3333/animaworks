@@ -876,7 +876,7 @@ class AgentCore:
                 injected_procedures,
                 session_id=self._tool_handler.session_id,
             )
-        if shortterm.has_pending():
+        if shortterm.has_pending() and not trigger.startswith("heartbeat"):
             system_prompt = inject_shortterm(system_prompt, shortterm)
             logger.info("Injected short-term memory into system prompt")
 
@@ -1206,7 +1206,7 @@ class AgentCore:
                 build_result.injected_procedures,
                 session_id=self._tool_handler.session_id,
             )
-        if shortterm.has_pending():
+        if shortterm.has_pending() and not trigger.startswith("heartbeat"):
             system_prompt = inject_shortterm(system_prompt, shortterm)
 
         # Pre-flight size check for streaming path
@@ -1289,6 +1289,7 @@ class AgentCore:
                     images=images,
                     prior_messages=prior_messages,
                     max_turns_override=max_turns_override,
+                    trigger=trigger,
                 ):
                     if chunk["type"] == "done":
                         full_text_parts.append(chunk["full_text"])
@@ -1464,6 +1465,7 @@ class AgentCore:
                 async for chunk in self._executor.execute_streaming(
                     system_prompt_2, continuation_prompt, tracker,
                     max_turns_override=max_turns_override,
+                    trigger=trigger,
                 ):
                     if chunk["type"] == "done":
                         full_text_parts.append(chunk["full_text"])
