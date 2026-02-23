@@ -407,8 +407,8 @@ class DigitalAnima:
                 mode = self.agent.execution_mode
                 prior_messages = None
                 if mode == "s":
-                    # S mode: SDK manages conversation history internally.
-                    # AnimaWorks only sends the current user message.
+                    # S mode: SDK manages conversation history internally,
+                    # but we still save turns for downstream memory processes.
                     prompt = content
                 elif mode == "a":
                     # A mode: AnimaWorks manages history via structured messages
@@ -568,7 +568,8 @@ class DigitalAnima:
                 mode = self.agent.execution_mode
                 prior_messages = None
                 if mode == "s":
-                    # S mode: SDK manages conversation history internally.
+                    # S mode: SDK manages conversation history internally,
+                    # but we still save turns for downstream memory processes.
                     prompt = content
                 elif mode == "a":
                     # A mode: AnimaWorks manages history via structured messages
