@@ -87,8 +87,9 @@ _EXPRESSION_PROMPTS: dict[str, str] = {
         "Same character identity, outfit, and hairstyle."
     ),
     "smile": (
-        "Change the character's expression to a bright happy smile. "
-        "Cheeks raised, eyes softened with warmth, gentle closed-mouth smile. "
+        "Change the character's expression to a bright smile. "
+        "Eyes curving upward into happy crescents, "
+        "rosy flushed cheeks, joyful and cheerful expression. "
         "Head tilted slightly to one side, hands relaxed naturally. "
         "Bust-up portrait, anime illustration, soft lighting. "
         "Same character identity, outfit, and hairstyle."
