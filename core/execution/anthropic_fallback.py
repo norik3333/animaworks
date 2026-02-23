@@ -437,6 +437,7 @@ class AnthropicFallbackExecutor(BaseExecutor):
                             self._tool_handler.handle,
                             tu.name,
                             tu.input,
+                            tu.id,
                         )
                     except Exception as tool_err:
                         logger.exception("Tool execution error: %s", tu.name)

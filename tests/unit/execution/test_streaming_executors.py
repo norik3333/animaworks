@@ -1153,7 +1153,7 @@ class TestA1FallbackStreamingWithToolCall:
 
         # Verify tool_handler was called
         anthropic_fallback_executor._tool_handler.handle.assert_called_once_with(
-            "search_memory", {"query": "test"},
+            "search_memory", {"query": "test"}, "toolu_001",
         )
 
         # Verify done
