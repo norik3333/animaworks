@@ -39,7 +39,7 @@ logger = logging.getLogger("animaworks.execution.agent_sdk")
 
 
 # Re-export for backward compatibility (agent.py imports from here)
-__all__ = ["AgentSDKExecutor", "StreamDisconnectedError"]
+__all__ = ["AgentSDKExecutor", "StreamDisconnectedError", "clear_session_ids"]
 
 
 # ── A1 Bash blocklist ────────────────────────────────────────
@@ -79,6 +79,11 @@ _WRITE_COMMANDS = frozenset({
 # small when system_prompt + conversation history grow large; 4 MB gives
 # comfortable headroom while still catching genuinely broken messages.
 _SDK_MAX_BUFFER_SIZE = 4 * 1024 * 1024  # 4 MB
+
+# SDK Issue #387: invalid session ID causes SDK to hang for ~60s before
+# raising an error.  We wrap the first-event receive in asyncio.wait_for
+# so that a stale/invalid resume fails fast and falls back to a fresh session.
+RESUME_TIMEOUT_SEC = 15.0
 
 # When estimated context usage leaves fewer than max_tokens * this factor
 # free, the PreToolUse hook triggers session termination for auto-compact.
@@ -120,6 +125,15 @@ def _clear_session_id(anima_dir: Path, session_type: str = "chat") -> None:
     path = anima_dir / "state" / _session_file(session_type)
     if path.exists():
         path.unlink(missing_ok=True)
+
+
+def clear_session_ids(anima_dir: Path) -> None:
+    """Clear all session IDs for an anima (chat and heartbeat).
+
+    Public wrapper for use by streaming_handler.py on done=False disconnection.
+    """
+    for session_type in ("chat", "heartbeat"):
+        _clear_session_id(anima_dir, session_type)
 
 
 def _check_a1_file_access(
@@ -1238,57 +1252,96 @@ class AgentSDKExecutor(BaseExecutor):
                             else:
                                 logger.info("MCP server '%s' connected successfully", name)
 
+        async def _run_fresh_session() -> AsyncGenerator[dict[str, Any], None]:
+            """Run a fresh (no-resume) streaming session and yield events."""
+            fresh_options = self._build_sdk_options(
+                system_prompt, _max_turns, _cw, session_stats,
+                resume=None,
+                include_partial_messages=True,
+            )
+            try:
+                async with ClaudeSDKClient(options=fresh_options) as fresh_client:
+                    logger.info("ClaudeSDKClient connected (fresh session retry)")
+                    async for event in _stream_messages(fresh_client):
+                        yield event
+            except BaseException as retry_exc:
+                if isinstance(retry_exc, asyncio.CancelledError):
+                    raise
+                if not isinstance(retry_exc, Exception):
+                    logger.critical(
+                        "Agent SDK raised %s during streaming retry: %s",
+                        type(retry_exc).__name__, retry_exc,
+                    )
+                else:
+                    logger.exception("Agent SDK streaming error (fresh session retry)")
+                partial = "\n".join(response_text)
+                raise StreamDisconnectedError(
+                    f"Agent SDK stream error ({type(retry_exc).__name__}): {retry_exc}",
+                    partial_text=partial,
+                ) from retry_exc
+
         try:
             logger.info(
                 "ClaudeSDKClient connecting (streaming mode, resume=%s)",
                 session_id_to_resume,
             )
-            async with ClaudeSDKClient(options=options) as client:
-                logger.info("ClaudeSDKClient connected")
-                async for event in _stream_messages(client):
-                    yield event
-            logger.debug("ClaudeSDKClient disconnected")
-        except (ProcessError, ClaudeSDKError) as e:
             if session_id_to_resume:
-                logger.warning(
-                    "SDK session resume failed (session_id=%s): %s. "
-                    "Retrying with fresh session.",
-                    session_id_to_resume, e,
-                )
-                _clear_session_id(self._anima_dir, session_type)
-                # Retry without resume
-                options = self._build_sdk_options(
-                    system_prompt, _max_turns, _cw, session_stats,
-                    resume=None,
-                    include_partial_messages=True,
-                )
+                # SDK Issue #387: an invalid/stale session ID causes the SDK to
+                # hang for ~60 s before raising.  Guard the connection and first
+                # event with RESUME_TIMEOUT_SEC; on timeout (or any SDK error)
+                # clear the bad session ID and fall back to a fresh session.
+                #
+                # NOTE: The timeout guards "first yield from _stream_messages",
+                # which occurs at content_block_start/delta — NOT at
+                # message_start (which only updates the context tracker).
+                # This means a valid resume where the model runs a long tool
+                # before producing text could be falsely timed out.  In
+                # practice 15 s is generous for the connection + first chunk
+                # latency; long-running tools are rare on resume.
+                fell_back = False
                 try:
                     async with ClaudeSDKClient(options=options) as client:
-                        logger.info("ClaudeSDKClient connected (fresh session retry)")
-                        async for event in _stream_messages(client):
-                            yield event
-                except BaseException as retry_exc:
-                    if isinstance(retry_exc, asyncio.CancelledError):
-                        raise
-                    if not isinstance(retry_exc, Exception):
-                        logger.critical(
-                            "Agent SDK raised %s during streaming retry: %s",
-                            type(retry_exc).__name__, retry_exc,
-                        )
-                    else:
-                        logger.exception("Agent SDK streaming error (fresh session retry)")
-                    partial = "\n".join(response_text)
-                    raise StreamDisconnectedError(
-                        f"Agent SDK stream error ({type(retry_exc).__name__}): {retry_exc}",
-                        partial_text=partial,
-                    ) from retry_exc
+                        logger.info("ClaudeSDKClient connected")
+                        stream_gen = _stream_messages(client)
+
+                        async def _get_first_event() -> dict[str, Any]:
+                            return await stream_gen.__anext__()
+
+                        try:
+                            first_event = await asyncio.wait_for(
+                                _get_first_event(), timeout=RESUME_TIMEOUT_SEC
+                            )
+                        except asyncio.TimeoutError:
+                            logger.warning(
+                                "Resume timed out after %.1fs (SDK Issue #387, "
+                                "session_id=%s), falling back to fresh session.",
+                                RESUME_TIMEOUT_SEC, session_id_to_resume,
+                            )
+                            await stream_gen.aclose()
+                            _clear_session_id(self._anima_dir, session_type)
+                            fell_back = True
+                        else:
+                            yield first_event
+                            async for event in stream_gen:
+                                yield event
+                except (ProcessError, ClaudeSDKError) as e:
+                    logger.warning(
+                        "SDK session resume failed (session_id=%s): %s. "
+                        "Retrying with fresh session.",
+                        session_id_to_resume, e,
+                    )
+                    _clear_session_id(self._anima_dir, session_type)
+                    fell_back = True
+
+                if fell_back:
+                    async for event in _run_fresh_session():
+                        yield event
             else:
-                # No session to resume — propagate as StreamDisconnectedError
-                partial = "\n".join(response_text)
-                raise StreamDisconnectedError(
-                    f"Agent SDK stream error ({type(e).__name__}): {e}",
-                    partial_text=partial,
-                ) from e
+                async with ClaudeSDKClient(options=options) as client:
+                    logger.info("ClaudeSDKClient connected")
+                    async for event in _stream_messages(client):
+                        yield event
+            logger.debug("ClaudeSDKClient disconnected")
         except BaseException as e:
             # CancelledError は正常な asyncio ライフサイクル（SIGTERM等）。
             # 捕捉せずそのまま伝播させる。

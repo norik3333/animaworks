@@ -1360,6 +1360,14 @@ class AgentCore:
                     "Stream disconnected, retrying %d/%d after %.1fs",
                     retry_count, max_retries, retry_delay,
                 )
+                # リトライ1回目は必ずfresh session（壊れたセッションIDを持ち越さない）
+                if retry_count == 1:
+                    try:
+                        from core.execution.agent_sdk import clear_session_ids
+                        clear_session_ids(self.anima_dir)
+                        logger.info("Session IDs cleared for retry 1 (fresh session forced)")
+                    except Exception as e:
+                        logger.warning("Failed to clear session IDs for retry: %s", e)
                 yield {
                     "type": "retry_start",
                     "retry": retry_count,
