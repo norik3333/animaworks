@@ -230,6 +230,10 @@ class AgentCore:
         """Clear reply tracking (call at start of each heartbeat cycle)."""
         self._tool_handler.reset_replied_to(session_type=session_type)
 
+    def reset_posted_channels(self, session_type: str | None = None) -> None:
+        """Clear posted-channels tracking (call at start of each heartbeat cycle)."""
+        self._tool_handler.reset_posted_channels(session_type=session_type)
+
     @property
     def replied_to(self) -> set[str]:
         """Anima names this agent has sent messages to in the current cycle."""

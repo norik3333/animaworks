@@ -10,7 +10,6 @@ from __future__ import annotations
 import json
 import logging
 import re
-import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -23,9 +22,6 @@ from core.schemas import Message
 logger = logging.getLogger("animaworks.messenger")
 
 _SAFE_NAME_RE = re.compile(r"^[a-z][a-z0-9_-]{0,30}$")
-
-# Per-anima board post rate limiter: "{anima_name}:{channel}" -> last_post_epoch
-_channel_post_timestamps: dict[str, float] = {}
 
 
 def _validate_name(name: str, kind: str = "name") -> None:
@@ -74,7 +70,8 @@ class Messenger:
             is_internal = (animas_dir / to).is_dir() if animas_dir.exists() else False
             if is_internal:
                 from core.cascade_limiter import depth_limiter
-                if not depth_limiter.check_and_record(self.anima_name, to):
+                sender_dir = animas_dir / self.anima_name
+                if not depth_limiter.check_depth(self.anima_name, to, sender_dir):
                     logger.warning(
                         "Depth limit exceeded: %s -> %s. Message not sent.",
                         self.anima_name, to,
@@ -157,33 +154,10 @@ class Messenger:
         self, channel: str, text: str, source: str = "anima",
         from_name: str | None = None,
     ) -> None:
-        """Post a message to a shared channel (append-only JSONL).
-
-        Rate-limited per Anima: ``heartbeat.channel_post_cooldown_s`` seconds
-        must elapse between posts from the same Anima to the same channel.
-        Set ``channel_post_cooldown_s = 0`` to disable the limit.
-        """
+        """Post a message to a shared channel (append-only JSONL)."""
         _validate_name(channel, "channel name")
 
-        # Rate limit: skip if posted too recently
         poster = from_name or self.anima_name
-        rate_key = f"{poster}:{channel}"
-        try:
-            from core.config.models import load_config
-            cooldown = load_config().heartbeat.channel_post_cooldown_s
-        except Exception:
-            cooldown = 300
-        if cooldown > 0:
-            last = _channel_post_timestamps.get(rate_key, 0.0)
-            elapsed = time.monotonic() - last
-            if elapsed < cooldown:
-                logger.info(
-                    "Channel post rate-limited: %s -> #%s (%.0fs / %ds cooldown)",
-                    poster, channel, elapsed, cooldown,
-                )
-                return
-        _channel_post_timestamps[rate_key] = time.monotonic()
-
         channels_dir = self.shared_dir / "channels"
         channels_dir.mkdir(parents=True, exist_ok=True)
         filepath = channels_dir / f"{channel}.jsonl"
@@ -199,6 +173,30 @@ class Messenger:
             logger.info("Channel post: %s -> #%s", poster, channel)
         except OSError:
             logger.warning("Failed to post to channel: %s", channel)
+
+    def last_post_by(self, anima_name: str, channel: str) -> dict | None:
+        """Return the last post by *anima_name* in *channel*, or None.
+
+        Scans the channel JSONL file from the tail for efficiency.
+        Used by ToolHandler for cross-run cooldown checks.
+        """
+        filepath = self.shared_dir / "channels" / f"{channel}.jsonl"
+        if not filepath.exists():
+            return None
+        try:
+            lines = filepath.read_text(encoding="utf-8").strip().splitlines()
+            for line in reversed(lines):
+                if not line.strip():
+                    continue
+                try:
+                    entry = json.loads(line)
+                    if entry.get("from") == anima_name:
+                        return entry
+                except json.JSONDecodeError:
+                    continue
+        except OSError:
+            pass
+        return None
 
     def read_channel(
         self, channel: str, limit: int = 20, human_only: bool = False,

@@ -297,6 +297,7 @@ class ToolHandler:
         self._background_manager = background_manager
         self._pending_notifications: list[dict[str, Any]] = []
         self._replied_to: dict[str, set[str]] = {"chat": set(), "background": set()}
+        self._posted_channels: dict[str, set[str]] = {"chat": set(), "background": set()}
         self._session_id: str = uuid.uuid4().hex[:12]
         self._activity = ActivityLogger(self._anima_dir)
         self._external = ExternalToolDispatcher(
@@ -409,6 +410,18 @@ class ToolHandler:
             self._replied_to.get(session_type, set()).clear()
         else:
             for s in self._replied_to.values():
+                s.clear()
+
+    def posted_channels_for(self, session_type: str) -> set[str]:
+        """Channels already posted to in a specific session type."""
+        return self._posted_channels.get(session_type, set())
+
+    def reset_posted_channels(self, session_type: str | None = None) -> None:
+        """Reset posted-channels tracking. If session_type given, clear only that session."""
+        if session_type:
+            self._posted_channels.get(session_type, set()).clear()
+        else:
+            for s in self._posted_channels.values():
                 s.clear()
 
     def _persist_replied_to(self, to: str, *, success: bool) -> None:
@@ -886,7 +899,40 @@ class ToolHandler:
         text = args.get("text", "")
         if not channel or not text:
             return _error_result("InvalidArguments", "channel and text are required")
+
+        # ── Per-run guard: 同一チャネルに1回まで ──────────
+        current_posted = self.posted_channels_for(active_session_type.get())
+        if channel in current_posted:
+            return (
+                f"Error: このrunで既に #{channel} に投稿済みです。"
+                "同一チャネルへの連投はできません。"
+            )
+
+        # ── Cross-run guard: ファイルベース cooldown チェック ──
+        try:
+            from core.config.models import load_config
+            cooldown = load_config().heartbeat.channel_post_cooldown_s
+        except Exception:
+            cooldown = 300
+        if cooldown > 0:
+            last = self._messenger.last_post_by(self._anima_name, channel)
+            if last:
+                from datetime import datetime
+                from core.time_utils import ensure_aware, now_jst
+                try:
+                    ts = ensure_aware(datetime.fromisoformat(last["ts"]))
+                    elapsed = (now_jst() - ts).total_seconds()
+                    if elapsed < cooldown:
+                        return (
+                            f"Error: #{channel} には {last['ts'][11:16]} に投稿済みです"
+                            f"（{int(elapsed)}秒前）。"
+                            f"クールダウン {cooldown}秒が必要です。"
+                        )
+                except (ValueError, TypeError):
+                    pass
+
         self._messenger.post_channel(channel, text)
+        self._posted_channels.setdefault(active_session_type.get(), set()).add(channel)
         logger.info("post_channel channel=%s anima=%s", channel, self._anima_name)
 
         # ── Board mention fanout ──────────────────────────────
