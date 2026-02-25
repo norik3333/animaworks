@@ -183,19 +183,22 @@ def create_users_router() -> APIRouter:
         """Change (or initially set) the current user's password."""
         caller = getattr(request.state, "user", None)
         auth_config = load_auth()
+        via_local_trust = False
 
         # In local_trust mode, middleware skips auth — use owner directly
         if not caller:
             if auth_config.auth_mode == "local_trust" and auth_config.owner:
                 caller = auth_config.owner
+                via_local_trust = True
             else:
                 return JSONResponse(
                     {"error": "Not authenticated"},
                     status_code=401,
                 )
 
-        if caller.password_hash:
+        if caller.password_hash and not via_local_trust:
             # Existing password — require current password verification
+            # Skip when accessed via local_trust (trusted connection)
             if not verify_password(body.current_password, caller.password_hash):
                 return JSONResponse(
                     {"error": "Current password is incorrect"},
@@ -221,17 +224,18 @@ def create_users_router() -> APIRouter:
                 status_code=404,
             )
 
-        initial_setup = not user.password_hash
         user.password_hash = hash_password(body.new_password)
 
-        # Upgrade auth mode on initial password setup
-        if initial_setup and auth_config.auth_mode == "local_trust":
+        # Upgrade auth mode when password is set in local_trust mode
+        need_session = False
+        if auth_config.auth_mode == "local_trust":
             auth_config.auth_mode = "password"
+            need_session = True
 
         save_auth(auth_config)
 
-        # Create session so user stays logged in after initial setup
-        if initial_setup:
+        # Create session so user stays logged in after mode upgrade
+        if need_session:
             token = create_session(auth_config, user.username)
             save_auth(auth_config)
             response = JSONResponse({"status": "ok"})
@@ -242,7 +246,7 @@ def create_users_router() -> APIRouter:
                 samesite="strict",
                 path="/",
             )
-            logger.info("User '%s' set initial password", caller.username)
+            logger.info("User '%s' set password (upgraded from local_trust)", caller.username)
             return response
 
         logger.info("User '%s' changed their password", caller.username)

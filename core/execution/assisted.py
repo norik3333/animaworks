@@ -245,6 +245,39 @@ class AssistedExecutor(BaseExecutor):
         configured_max = self._model_config.max_tokens
 
         if available - 128 < 256:
+            # Last resort: truncate system message to fit
+            if (
+                messages
+                and messages[0].get("role") == "system"
+                and isinstance(messages[0].get("content"), str)
+            ):
+                sys_content = messages[0]["content"]
+                excess_tokens = est_input - ctx_window + 512
+                excess_chars = excess_tokens * 4
+                if len(sys_content) > excess_chars + 2000:
+                    messages[0]["content"] = sys_content[
+                        : len(sys_content) - excess_chars
+                    ]
+                    logger.warning(
+                        "Mode B preflight: hard-truncated system prompt "
+                        "by %d chars to fit context window %d",
+                        excess_chars, ctx_window,
+                    )
+                    try:
+                        est_input = _litellm.token_counter(
+                            model=self._model_config.model,
+                            messages=messages,
+                        )
+                    except Exception:
+                        msg_chars = sum(
+                            len(str(m.get("content", ""))) for m in messages
+                        )
+                        est_input = msg_chars // 2
+                    available = ctx_window - est_input
+                    if available - 128 >= 256:
+                        clamped = min(available - 128, configured_max)
+                        return {"max_tokens": clamped}
+
             logger.error(
                 "Mode B preflight: prompt too large "
                 "(~%d tokens input, %d window)",

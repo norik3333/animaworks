@@ -48,6 +48,8 @@ EXECUTION_PROFILE: dict[str, dict[str, object]] = {
     "tasks":    {"expected_seconds": 10, "background_eligible": False},
     "mentions": {"expected_seconds": 60, "background_eligible": False},
     "stats":    {"expected_seconds": 5,  "background_eligible": False},
+    "files":    {"expected_seconds": 10, "background_eligible": False},
+    "download": {"expected_seconds": 60, "background_eligible": True},
 }
 
 requests = None
@@ -228,6 +230,32 @@ class ChatworkClient:
             "limit": limit,
             "limit_type": limit_type,
         })
+
+    def get_files(self, room_id: str, account_id: str | None = None) -> list[dict]:
+        """List files uploaded to a room."""
+        params: dict = {}
+        if account_id:
+            params["account_id"] = account_id
+        return self.get(f"/rooms/{room_id}/files", params=params) or []
+
+    def get_file(
+        self, room_id: str, file_id: str, create_download_url: bool = True
+    ) -> dict:
+        """Get file details, optionally with a one-time download URL."""
+        params = {"create_download_url": 1 if create_download_url else 0}
+        return self.get(f"/rooms/{room_id}/files/{file_id}", params=params)
+
+    def download_file(self, download_url: str, output_path: Path) -> int:
+        """Download a file to *output_path*. Returns the number of bytes written."""
+        _require_requests()
+        resp = self.session.get(download_url, stream=True)
+        resp.raise_for_status()
+        total = 0
+        with open(output_path, "wb") as f:
+            for chunk in resp.iter_content(chunk_size=8192):
+                f.write(chunk)
+                total += len(chunk)
+        return total
 
     def get_room_by_name(self, name: str) -> dict | None:
         """Search for a room by name (exact match preferred, then partial)."""
@@ -688,6 +716,8 @@ animaworks-tool chatwork contacts
 animaworks-tool chatwork task <ルーム名またはID> "タスク本文" "担当者ID(カンマ区切り)"
 animaworks-tool chatwork mytasks [--done]
 animaworks-tool chatwork tasks <ルーム名またはID> [--done]
+animaworks-tool chatwork files <ルーム名またはID> [--account-id ID]
+animaworks-tool chatwork download <ルーム名またはID> <file_id> [-o 保存先パス]
 animaworks-tool chatwork stats
 ```"""
 
@@ -780,6 +810,22 @@ def cli_main(argv: list[str] | None = None) -> None:
         "-n", "--num", type=int, default=200, help="Max mentions (default 200)"
     )
     p.add_argument("--json", action="store_true", help="Output as JSON")
+
+    # files
+    p = sub.add_parser("files", help="List files in a room")
+    p.add_argument("room", help="Room name or ID")
+    p.add_argument(
+        "--account-id", help="Filter by uploader account ID"
+    )
+
+    # download
+    p = sub.add_parser("download", help="Download a file from a room")
+    p.add_argument("room", help="Room name or ID")
+    p.add_argument("file_id", help="File ID")
+    p.add_argument(
+        "-o", "--output",
+        help="Output file path (default: original filename in current directory)",
+    )
 
     # stats
     sub.add_parser("stats", help="Show cache statistics")
@@ -1130,6 +1176,34 @@ def cli_main(argv: list[str] | None = None) -> None:
                     print()
         finally:
             cache.close()
+
+    elif args.command == "files":
+        room_id = client.resolve_room_id(args.room)
+        files = client.get_files(room_id, account_id=getattr(args, "account_id", None))
+        if not files:
+            print("No files found.")
+        else:
+            print(f"{'File ID':>12}  {'Size':>10}  {'Uploaded':19}  {'Uploader':20}  Name")
+            print("-" * 90)
+            for f in files:
+                ts = _format_timestamp(f.get("upload_time", 0))
+                uploader = f.get("account", {}).get("name", "?")
+                size = f.get("filesize", 0)
+                name = f.get("filename", "?")
+                print(f"{f['file_id']:>12}  {size:>10}  {ts}  {uploader:20}  {name}")
+
+    elif args.command == "download":
+        room_id = client.resolve_room_id(args.room)
+        file_info = client.get_file(room_id, args.file_id, create_download_url=True)
+        download_url = file_info.get("download_url")
+        if not download_url:
+            print("Error: download URL not available.", file=sys.stderr)
+            sys.exit(1)
+        filename = file_info.get("filename", args.file_id)
+        output_path = Path(args.output) if args.output else Path(filename)
+        print(f"Downloading '{filename}' → {output_path} ...", end=" ", flush=True)
+        size = client.download_file(download_url, output_path)
+        print(f"done ({size:,} bytes)")
 
     elif args.command == "stats":
         cache = MessageCache()

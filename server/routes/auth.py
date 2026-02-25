@@ -111,6 +111,7 @@ def create_auth_router() -> APIRouter:
             "bio": user.bio,
             "role": user.role,
             "auth_mode": auth_config.auth_mode,
+            "has_password": bool(user.password_hash),
         }
 
     return router

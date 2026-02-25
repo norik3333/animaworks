@@ -54,13 +54,13 @@ class ConversationDepthLimiter:
         self,
         sender: str,
         sender_anima_dir: Path,
-    ) -> bool:
+    ) -> bool | str:
         """Check if sender has exceeded global outbound message limit.
 
         Counts all dm_sent / message_sent events from sender
         in the last hour and last 24 hours.
 
-        Returns True if allowed, False if limit exceeded.
+        Returns True if allowed, or a descriptive error string if blocked.
         """
         try:
             from core.memory.activity import ActivityLogger
@@ -77,13 +77,14 @@ class ConversationDepthLimiter:
                 sender_anima_dir,
                 exc_info=True,
             )
-            return False  # fail-closed
+            return "GlobalOutboundLimitExceeded: アクティビティログ読み取り失敗のため送信をブロックしました"
 
         now = now_jst()
         hourly_cutoff = now - timedelta(hours=1)
         daily_cutoff = now - timedelta(hours=24)
         hourly_count = 0
         daily_count = 0
+        earliest_hourly_ts: datetime | None = None
 
         for e in entries:
             try:
@@ -92,6 +93,8 @@ class ConversationDepthLimiter:
                     daily_count += 1
                     if ts >= hourly_cutoff:
                         hourly_count += 1
+                        if earliest_hourly_ts is None or ts < earliest_hourly_ts:
+                            earliest_hourly_ts = ts
             except (ValueError, TypeError):
                 continue
 
@@ -101,14 +104,31 @@ class ConversationDepthLimiter:
                 sender,
                 hourly_count,
             )
-            return False
+            reset_at = ""
+            if earliest_hourly_ts:
+                reset_time = earliest_hourly_ts + timedelta(hours=1)
+                reset_at = f" 次の送信可能時刻（目安）: {reset_time.strftime('%H:%M')}"
+            return (
+                f"GlobalOutboundLimitExceeded: 1時間あたりの送信上限"
+                f"（{self._max_per_hour}通）に到達しています"
+                f"（現在{hourly_count}通/1h, {daily_count}通/24h）。"
+                f"{reset_at}"
+                f" このターンではsend_messageを使わず、送信内容を"
+                f"current_task.mdに記録して次のセッションで送信してください。"
+            )
         if daily_count >= self._max_per_day:
             logger.warning(
                 "GLOBAL DAILY LIMIT: %s blocked (%d msgs in last 24h)",
                 sender,
                 daily_count,
             )
-            return False
+            return (
+                f"GlobalOutboundLimitExceeded: 24時間あたりの送信上限"
+                f"（{self._max_per_day}通）に到達しています"
+                f"（現在{daily_count}通/24h）。"
+                f" このターンではsend_messageを使わず、送信内容を"
+                f"current_task.mdに記録して次のセッションで送信してください。"
+            )
         return True
 
     def check_depth(

@@ -193,12 +193,13 @@ async function _loadAuthSettings() {
     </div>`;
 
     // Password change / initial setup form
-    const isInitial = me.auth_mode === "local_trust";
+    const isInitial = !me.has_password;
+    const skipCurrentPw = me.auth_mode === "local_trust";
     html += `
       <div style="margin-bottom: 1.5rem;">
         <h4 style="margin-bottom: 0.5rem;">${isInitial ? "パスワード設定" : "パスワード変更"}</h4>
         <form id="changePasswordForm" style="display:flex; flex-direction:column; gap:0.5rem; max-width:300px;">
-          ${isInitial ? "" : '<input type="password" id="currentPassword" placeholder="現在のパスワード" required>'}
+          ${isInitial || skipCurrentPw ? "" : '<input type="password" id="currentPassword" placeholder="現在のパスワード" required>'}
           <input type="password" id="newPassword" placeholder="新しいパスワード" required>
           <input type="password" id="confirmPassword" placeholder="新しいパスワード（確認）" required>
           <div id="pwChangeResult" class="login-error hidden"></div>
@@ -270,11 +271,12 @@ async function _loadAuthSettings() {
           });
           const data = await res.json();
           if (res.ok) {
-            result.textContent = isInitial ? "パスワードを設定しました。ページをリロードします…" : "パスワードを変更しました";
+            const willReload = isInitial || skipCurrentPw;
+            result.textContent = willReload ? "パスワードを設定しました。ページをリロードします…" : "パスワードを変更しました";
             result.style.color = "#22c55e";
             result.classList.remove("hidden");
             pwForm.reset();
-            if (isInitial) setTimeout(() => location.reload(), 1000);
+            if (willReload) setTimeout(() => location.reload(), 1000);
           } else {
             result.style.color = "#ef4444";
             result.textContent = data.error || "変更に失敗しました";

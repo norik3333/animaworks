@@ -7,6 +7,64 @@ adhering to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-02-25
+
+### Added
+
+#### Execution & Architecture
+- 3-path execution separation — Heartbeat/Inbox/TaskExec with independent locks and trigger-based prompt filtering
+- Tiered System Prompt — 4-tier progressive reduction (T1 Full → T4 Minimal) based on context window size
+- Prompt injection defense with boundary labeling (`trusted`/`medium`/`untrusted` trust levels on tool results and Priming data)
+- `debug_superuser` flag for unrestricted file/command access bypass (debug Anima support)
+
+#### Supervisor & Organization
+- Supervisor tools expansion — 6 new tools for manager Animas (`org_dashboard`, `ping_subordinate`, `read_subordinate_state`, `delegate_task`, `task_tracker`, `restart_subordinate`)
+- Per-anima denied command enforcement from `permissions.md`
+
+#### Memory & Knowledge
+- Tool result consolidation — persist tool results to long-term memory via daily consolidation
+- Procedures/knowledge separated injection into system prompt (distinct budget allocation)
+- `write_memory_file` enables `common_knowledge/` writes with improved hints
+- `read_file` hardening — dynamic line limits, line numbers, code block formatting, safety notes, partial reads
+
+#### Communication & UI
+- Messaging data model unification — DM/Message event names consolidated, `dm_logs` deprecated (activity_log is primary)
+- Board reverse pagination — newest messages first with infinite scroll
+- Board DM list UI improvements — mini avatars, sorting, layout optimization
+- Activity timeline — per-anima selection fix and trigger-based grouping
+- Chatwork `files`/`download` subcommands
+
+#### Configuration
+- `status.json` as Single Source of Truth for Anima model configuration (2-layer resolution: status.json → anima_defaults)
+- DM log rotation registered as daily system cron in LifecycleManager
+- Orphan Anima archival before auto-deletion
+
+### Fixed
+
+- Context window exceeded: automatic tier downgrade with hard truncation fallback
+- `max_tokens` default raised from 4096 → 8192
+- LiteLLM streaming empty response diagnostics and ContextVar reset safety
+- MCP integer type validation auto-relaxation and rate limit error messages
+- Setup page password configuration failure
+- Activity timeline grouping — per-anima tracking eliminates cross-anima orphans
+- Command meta-character blanket rejection relaxed to blocklist approach
+- Final iteration tool exclusion to force final text answer
+- DM display issues — dedup, garbage pair filter, arrow notation
+- Board offset calculation for 3+ page channels
+- Board infinite scroll completion
+- Skill descriptions included in system prompt `memory_guide` section
+- Heartbeat tool instruction and org context directory scan
+- `check_permissions` external tool enumeration bug and `task_tracker` private method usage
+- `permissions.md` section header inconsistency and DM question intent
+- 3-path execution review fixes — `state_file_lock`, inbox status, wake signal
+- 24 failing tests updated to match current source code
+
+### Changed
+
+- `injection.md` model info abolished — `status.json` is now the sole model config source
+- `identity.md`/`injection.md` placed immediately after Group 1 to guarantee personality resolution before any context
+- Remove system prompt duplicates and unify legacy terminology
+
 ## [0.3.1] - 2026-02-25
 
 ### Changed
@@ -152,5 +210,6 @@ memory, and decision-making criteria.
 - Moved model mode patterns from config.json to models.json
 - Tool permissions changed from whitelist to default-allow (blacklist) model
 
-[Unreleased]: https://github.com/xuiltul/animaworks/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/xuiltul/animaworks/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/xuiltul/animaworks/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/xuiltul/animaworks/compare/v0.3.0...v0.3.1

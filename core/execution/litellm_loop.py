@@ -600,8 +600,11 @@ class LiteLLMExecutor(BaseExecutor):
                 tool_calls_acc: dict[int, dict[str, Any]] = {}
                 finish_reason: str | None = None
                 usage_data: dict[str, int] | None = None
+                _chunk_count = 0
+                _reasoning_seen = False
 
                 async for chunk in response:
+                    _chunk_count += 1
                     choice = chunk.choices[0] if chunk.choices else None
                     if choice is None:
                         # Usage-only chunk (last chunk with stream_options)
@@ -621,6 +624,17 @@ class LiteLLMExecutor(BaseExecutor):
                     if delta.content:
                         iter_text_parts.append(delta.content)
                         yield {"type": "text_delta", "text": delta.content}
+
+                    # Fallback: capture reasoning_content as text when
+                    # content is empty (e.g. GLM thinking mode via vLLM)
+                    reasoning = getattr(delta, "reasoning_content", None)
+                    if reasoning and not delta.content:
+                        if not _reasoning_seen:
+                            _reasoning_seen = True
+                            logger.info(
+                                "A stream: reasoning_content detected "
+                                "(model may be in thinking mode)",
+                            )
 
                     # H1: Use accumulate_tool_call_chunks return value
                     if delta.tool_calls:
@@ -647,6 +661,17 @@ class LiteLLMExecutor(BaseExecutor):
                             "input_tokens": chunk.usage.prompt_tokens or 0,
                             "output_tokens": chunk.usage.completion_tokens or 0,
                         }
+
+                # Post-stream diagnostics
+                if not iter_text_parts and not tool_calls_acc:
+                    logger.warning(
+                        "A stream: empty response at iteration=%d "
+                        "chunks=%d finish_reason=%s reasoning_seen=%s "
+                        "usage=%s model=%s",
+                        iteration, _chunk_count, finish_reason,
+                        _reasoning_seen, usage_data,
+                        self._model_config.model,
+                    )
 
                 # Update context tracker
                 if tracker and usage_data:
@@ -987,6 +1012,9 @@ class LiteLLMExecutor(BaseExecutor):
 
         Returns the (possibly adjusted) kwargs dict, or ``None`` if the
         prompt is too large to fit in the context window at all.
+
+        As a last resort, truncates the system message to fit within the
+        context window rather than failing outright.
         """
         try:
             from core.config import load_config
@@ -997,35 +1025,64 @@ class LiteLLMExecutor(BaseExecutor):
         ctx_window = resolve_context_window(
             self._model_config.model, _cw_overrides,
         )
-        try:
-            est_input = litellm.token_counter(
-                model=self._model_config.model,
-                messages=messages,
-                tools=tools,
-            )
-        except Exception:
-            logger.debug("Token counter fallback to char estimate", exc_info=True)
-            msg_chars = sum(len(str(m.get("content", ""))) for m in messages)
-            tool_chars = len(_json.dumps(tools)) if tools else 0
-            est_input = (msg_chars + tool_chars) // 2
+
+        def _estimate_tokens() -> int:
+            try:
+                return litellm.token_counter(
+                    model=self._model_config.model,
+                    messages=messages,
+                    tools=tools,
+                )
+            except Exception:
+                logger.debug("Token counter fallback to char estimate", exc_info=True)
+                msg_chars = sum(len(str(m.get("content", ""))) for m in messages)
+                tool_chars = len(_json.dumps(tools)) if tools else 0
+                return (msg_chars + tool_chars) // 2
+
+        est_input = _estimate_tokens()
         available = ctx_window - est_input
-        configured_max = llm_kwargs.get("max_tokens", 4096)
+        configured_max = llm_kwargs.get("max_tokens", 8192)
 
         if available < configured_max:
-            if available - 128 < 256:
-                logger.error(
-                    "Prompt too large for context window: "
-                    "~%d tokens input, %d window",
-                    est_input, ctx_window,
+            if available - 128 >= 256:
+                clamped = available - 128
+                logger.info(
+                    "Clamping max_tokens %d -> %d "
+                    "(est_input ~%d, window %d)",
+                    configured_max, clamped, est_input, ctx_window,
                 )
-                return None
-            clamped = available - 128
-            logger.info(
-                "Clamping max_tokens %d -> %d "
-                "(est_input ~%d, window %d)",
-                configured_max, clamped, est_input, ctx_window,
+                return {**llm_kwargs, "max_tokens": clamped}
+
+            # Last resort: truncate system message to fit
+            if (
+                messages
+                and messages[0].get("role") == "system"
+                and isinstance(messages[0].get("content"), str)
+            ):
+                sys_content = messages[0]["content"]
+                excess_tokens = est_input - ctx_window + 512
+                excess_chars = excess_tokens * 4
+                if len(sys_content) > excess_chars + 2000:
+                    messages[0]["content"] = sys_content[
+                        : len(sys_content) - excess_chars
+                    ]
+                    logger.warning(
+                        "Hard-truncated system prompt by %d chars "
+                        "to fit context window %d "
+                        "(est_input ~%d, excess ~%d tokens)",
+                        excess_chars, ctx_window, est_input, excess_tokens,
+                    )
+                    est_input = _estimate_tokens()
+                    available = ctx_window - est_input
+                    if available - 128 >= 256:
+                        return {**llm_kwargs, "max_tokens": available - 128}
+
+            logger.error(
+                "Prompt too large for context window: "
+                "~%d tokens input, %d window",
+                est_input, ctx_window,
             )
-            return {**llm_kwargs, "max_tokens": clamped}
+            return None
 
         return llm_kwargs
 

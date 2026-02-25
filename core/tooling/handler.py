@@ -344,8 +344,10 @@ class ToolHandler:
         background_manager: BackgroundTaskManager | None = None,
         context_window: int = 32_000,
         process_supervisor: Any | None = None,
+        superuser: bool = False,
     ) -> None:
         self._anima_dir = anima_dir
+        self._superuser = superuser
         self._anima_name = anima_dir.name
         self._memory = memory
         self._messenger = messenger
@@ -684,7 +686,7 @@ class ToolHandler:
             path = self._anima_dir / rel
             resolved = path.resolve()
             # Allow if within own anima_dir
-            if not resolved.is_relative_to(self._anima_dir.resolve()):
+            if not self._superuser and not resolved.is_relative_to(self._anima_dir.resolve()):
                 # Check subordinate read permissions (activity_log, cron.md, heartbeat.md)
                 allowed = False
                 for sub_activity in self._subordinate_activity_dirs:
@@ -729,7 +731,7 @@ class ToolHandler:
 
         # Security check: block protected files and path traversal
         # (common_knowledge writes skip anima_dir containment check)
-        if not rel.startswith("common_knowledge/"):
+        if not self._superuser and not rel.startswith("common_knowledge/"):
             err = _is_protected_write(self._anima_dir, path)
             if err:
                 # Before denying, check if this is a subordinate's cron.md/heartbeat.md
@@ -2790,12 +2792,15 @@ class ToolHandler:
         Returns ``None`` if allowed, or an error message string if denied.
 
         Access rules (evaluated in order):
+          0. debug_superuser -- bypass all checks
           1. Own anima_dir -- always allowed for reads; writes to protected files blocked
           2. Subordinate's activity_log/ -- read-only for direct supervisors
           3. Subordinate's cron.md & heartbeat.md -- read/write for direct supervisors
           4. Paths listed under ``ファイル操作`` section in permissions.md
           5. Everything else -- denied
         """
+        if self._superuser:
+            return None
         resolved = Path(path).resolve()
 
         # Own anima_dir
@@ -2914,6 +2919,7 @@ class ToolHandler:
         Returns ``None`` if allowed, or an error message string if denied.
 
         Security layers (evaluated in order):
+          0. debug_superuser -- bypass all checks
           1. Injection patterns (;  `  $()  ${}) — always blocked
           2. Dangerous command patterns (rm -rf, curl|sh, etc.) — always blocked
           2.5. Per-anima denied commands from permissions.md
@@ -2921,6 +2927,8 @@ class ToolHandler:
           4. Per-command allowlist (if section lists specific commands)
           5. Path traversal check on arguments
         """
+        if self._superuser:
+            return None
         if not command or not command.strip():
             logger.warning("permission_denied anima=%s command=<empty>", self._anima_name)
             return _error_result("PermissionDenied", "Empty command")

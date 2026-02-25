@@ -210,6 +210,7 @@ def create_setup_router() -> APIRouter:
                 username=body.user.username,
                 display_name=body.user.display_name,
                 bio=body.user.bio,
+                role="owner",
             )
             auth_config = AuthConfig(owner=owner)
             save_auth(auth_config)
