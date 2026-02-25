@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Any
 
 from core.prompt.context import ContextTracker, resolve_context_window
+from core.execution._sanitize import wrap_tool_result
 from core.execution._session import build_continuation_prompt, handle_session_chaining
 from core.execution._streaming import stream_error_boundary
 from core.execution.base import BaseExecutor, ExecutionResult, StreamDisconnectedError, ToolCallRecord, _truncate_for_record, tool_input_save_budget, tool_result_save_budget
@@ -275,7 +276,7 @@ class AnthropicFallbackExecutor(BaseExecutor):
                 tool_results.append({
                     "type": "tool_result",
                     "tool_use_id": tu.id,
-                    "content": result,
+                    "content": wrap_tool_result(tu.name, result),
                 })
                 all_tool_records.append(ToolCallRecord(
                     tool_name=tu.name,
@@ -446,7 +447,7 @@ class AnthropicFallbackExecutor(BaseExecutor):
                     tool_results.append({
                         "type": "tool_result",
                         "tool_use_id": tu.id,
-                        "content": result,
+                        "content": wrap_tool_result(tu.name, result),
                     })
                     all_tool_records.append(ToolCallRecord(
                         tool_name=tu.name,

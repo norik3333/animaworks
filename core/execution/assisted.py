@@ -33,6 +33,7 @@ from pathlib import Path
 from typing import Any
 
 from core.exceptions import LLMAPIError, ToolExecutionError, ConfigError  # noqa: F401
+from core.execution._sanitize import wrap_tool_result
 from core.execution.base import BaseExecutor, ExecutionResult, StreamDisconnectedError, ToolCallRecord, _truncate_for_record, tool_input_save_budget, tool_result_save_budget
 from core.execution.reminder import MSG_OUTPUT_TRUNCATED, SystemReminderQueue
 from core.execution._streaming import stream_error_boundary
@@ -443,7 +444,7 @@ class AssistedExecutor(BaseExecutor):
             messages.append({"role": "assistant", "content": content})
             messages.append({
                 "role": "user",
-                "content": f"ツール実行結果:\n{result}",
+                "content": f"ツール実行結果:\n{wrap_tool_result(tool_name, result)}",
             })
 
             # ── Drain reminder queue into tool result message ──
@@ -632,7 +633,7 @@ class AssistedExecutor(BaseExecutor):
                 messages.append({"role": "assistant", "content": content})
                 messages.append({
                     "role": "user",
-                    "content": f"ツール実行結果:\n{result}",
+                    "content": f"ツール実行結果:\n{wrap_tool_result(tool_name, result)}",
                 })
 
                 # ── Drain reminder queue into tool result message ──

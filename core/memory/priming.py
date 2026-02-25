@@ -1028,6 +1028,8 @@ def format_priming_section(result: PrimingResult, sender_name: str = "human") ->
     Returns:
         Formatted markdown section, or empty string if no memories primed
     """
+    from core.execution._sanitize import wrap_priming
+
     if result.is_empty():
         return ""
 
@@ -1040,19 +1042,19 @@ def format_priming_section(result: PrimingResult, sender_name: str = "human") ->
     if result.sender_profile:
         parts.append(f"### {sender_name} について")
         parts.append("")
-        parts.append(result.sender_profile)
+        parts.append(wrap_priming("sender_profile", result.sender_profile, trust="medium"))
         parts.append("")
 
     if result.recent_activity:
         parts.append("### 直近のアクティビティ")
         parts.append("")
-        parts.append(result.recent_activity)
+        parts.append(wrap_priming("recent_activity", result.recent_activity, trust="untrusted"))
         parts.append("")
 
     if result.related_knowledge:
         parts.append("### 関連する知識")
         parts.append("")
-        parts.append(result.related_knowledge)
+        parts.append(wrap_priming("related_knowledge", result.related_knowledge, trust="medium"))
         parts.append("")
 
     if result.matched_skills:
@@ -1067,7 +1069,7 @@ def format_priming_section(result: PrimingResult, sender_name: str = "human") ->
     if result.pending_tasks:
         parts.append("### 未完了タスク")
         parts.append("")
-        parts.append(result.pending_tasks)
+        parts.append(wrap_priming("pending_tasks", result.pending_tasks, trust="medium"))
         parts.append("")
 
     return "\n".join(parts)
