@@ -250,12 +250,16 @@ def _send_via_slack(user_id: str, content: str, sender_name: str) -> str:
 
 def _send_via_chatwork(room_id: str, content: str, sender_name: str) -> str:
     """Send a message via Chatwork API."""
+    from core.tools._base import get_credential
     from core.tools.chatwork import ChatworkClient
 
     prefix = f"[{sender_name}] " if sender_name else ""
     body = f"{prefix}{content}"
 
-    client = ChatworkClient()
+    write_token = get_credential(
+        "chatwork_write", "chatwork", env_var="CHATWORK_API_TOKEN_WRITE"
+    )
+    client = ChatworkClient(api_token=write_token)
     response = client.post_message(room_id, body)
     message_id = response.get("message_id", "") if response else ""
 

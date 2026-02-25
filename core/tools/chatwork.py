@@ -840,13 +840,10 @@ def cli_main(argv: list[str] | None = None) -> None:
         sys.exit(1)
 
     if args.command == "send":
-        try:
-            write_token = get_credential(
-                "chatwork", "chatwork", env_var="CHATWORK_API_TOKEN_WRITE"
-            )
-            write_client = ChatworkClient(api_token=write_token)
-        except ToolConfigError:
-            write_client = client
+        write_token = get_credential(
+            "chatwork_write", "chatwork", env_var="CHATWORK_API_TOKEN_WRITE"
+        )
+        write_client = ChatworkClient(api_token=write_token)
         room_id = client.resolve_room_id(args.room)
         message = " ".join(args.message)
         result = write_client.post_message(room_id, message)
@@ -1223,13 +1220,10 @@ def cli_main(argv: list[str] | None = None) -> None:
 def dispatch(name: str, args: dict[str, Any]) -> Any:
     """Dispatch a tool call by schema name."""
     if name == "chatwork_send":
-        try:
-            write_token = get_credential(
-                "chatwork", "chatwork", env_var="CHATWORK_API_TOKEN_WRITE"
-            )
-            write_client = ChatworkClient(api_token=write_token)
-        except ToolConfigError:
-            write_client = ChatworkClient()
+        write_token = get_credential(
+            "chatwork_write", "chatwork", env_var="CHATWORK_API_TOKEN_WRITE"
+        )
+        write_client = ChatworkClient(api_token=write_token)
         read_client = ChatworkClient()
         room_id = read_client.resolve_room_id(args["room"])
         return write_client.post_message(room_id, args["message"])
