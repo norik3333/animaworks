@@ -11,6 +11,7 @@ import asyncio
 import json
 import logging
 import re
+import threading
 import time
 from collections.abc import AsyncGenerator, Callable
 from dataclasses import dataclass, field
@@ -96,12 +97,14 @@ class DigitalAnima:
         self._conversation_lock = asyncio.Lock()
         self._inbox_lock = asyncio.Lock()
         self._background_lock = asyncio.Lock()
-        self._state_file_lock = asyncio.Lock()  # protects current_task.md / pending.md
+        self._state_file_lock = threading.Lock()  # protects current_task.md / pending.md
+        self.agent._tool_handler.set_state_file_lock(self._state_file_lock)
         self._status_slots: dict[str, str] = {"conversation": "idle", "inbox": "idle", "background": "idle"}
         self._task_slots: dict[str, str] = {"conversation": "", "inbox": "", "background": ""}
         self._last_heartbeat: datetime | None = None
         self._last_activity: datetime | None = None
         self._on_lock_released: Callable[[], None] | None = None
+        self._pending_executor: Any | None = None  # set by runner after PendingTaskExecutor init
 
         # Greet cache (1-hour cooldown)
         self._last_greet_at: float | None = None
@@ -316,18 +319,24 @@ class DigitalAnima:
 
     @property
     def primary_status(self) -> str:
-        """Primary status: conversation takes priority over background."""
+        """Primary status: conversation > inbox > background."""
         conv = self._status_slots.get("conversation", "idle")
         if conv != "idle":
             return conv
+        inbox = self._status_slots.get("inbox", "idle")
+        if inbox != "idle":
+            return inbox
         return self._status_slots.get("background", "idle")
 
     @property
     def primary_task(self) -> str:
-        """Primary task: conversation takes priority over background."""
+        """Primary task: conversation > inbox > background."""
         conv = self._task_slots.get("conversation", "")
         if conv:
             return conv
+        inbox = self._task_slots.get("inbox", "")
+        if inbox:
+            return inbox
         return self._task_slots.get("background", "")
 
     @property
@@ -1489,6 +1498,8 @@ class DigitalAnima:
                 "[%s] %d pending tasks found after heartbeat, signaling executor",
                 self.name, len(task_files),
             )
+            if self._pending_executor is not None:
+                self._pending_executor.wake()
 
     async def run_heartbeat(
         self,

@@ -101,27 +101,19 @@ class TestWatcherLoop:
         pending_dir = executor._anima_dir / "state" / "background_tasks" / "pending"
         pending_dir.mkdir(parents=True, exist_ok=True)
 
-        # Write a pending task file
         task = {"task_id": "test-1", "tool_name": "test_tool", "subcommand": "", "raw_args": []}
         (pending_dir / "task1.json").write_text(json.dumps(task))
 
-        # Stop after first iteration
-        iteration_count = 0
-        original_sleep = asyncio.sleep
+        original_wait_for = asyncio.wait_for
 
-        async def mock_sleep(duration):
-            nonlocal iteration_count
-            iteration_count += 1
-            if iteration_count >= 1:
-                executor._shutdown_event.set()
-            await original_sleep(0)
+        async def stop_after_first(coro, *, timeout):
+            executor._shutdown_event.set()
+            raise asyncio.TimeoutError
 
-        with patch("asyncio.sleep", side_effect=mock_sleep):
+        with patch("core.supervisor.pending_executor.asyncio.wait_for", side_effect=stop_after_first):
             await executor.watcher_loop()
 
-        # File should have been removed
         assert not (pending_dir / "task1.json").exists()
-        # Background manager should have been called
         executor._anima.agent.background_manager.submit.assert_called_once()
 
     @pytest.mark.asyncio
@@ -131,21 +123,13 @@ class TestWatcherLoop:
         pending_dir = executor._anima_dir / "state" / "background_tasks" / "pending"
         pending_dir.mkdir(parents=True, exist_ok=True)
 
-        # Write invalid JSON
         (pending_dir / "bad.json").write_text("not json")
 
-        iteration_count = 0
-        original_sleep = asyncio.sleep
+        async def stop_after_first(coro, *, timeout):
+            executor._shutdown_event.set()
+            raise asyncio.TimeoutError
 
-        async def mock_sleep(duration):
-            nonlocal iteration_count
-            iteration_count += 1
-            if iteration_count >= 1:
-                executor._shutdown_event.set()
-            await original_sleep(0)
-
-        with patch("asyncio.sleep", side_effect=mock_sleep):
+        with patch("core.supervisor.pending_executor.asyncio.wait_for", side_effect=stop_after_first):
             await executor.watcher_loop()
 
-        # Bad file should be removed
         assert not (pending_dir / "bad.json").exists()

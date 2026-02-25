@@ -120,6 +120,7 @@ class AnimaRunner:
                 anima_dir=self._anima_dir,
                 shutdown_event=self.shutdown_event,
             )
+            self.anima._pending_executor = self._pending_executor
             self._streaming_handler = StreamingIPCHandler(
                 anima=self.anima,
                 anima_name=self.anima_name,

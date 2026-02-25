@@ -42,6 +42,7 @@ class TestThreeLockStructure:
             assert isinstance(dp._inbox_lock, asyncio.Lock)
 
     def test_state_file_lock_exists(self, data_dir, make_anima):
+        import threading
         anima_dir = make_anima("lock_test2")
         shared_dir = data_dir / "shared"
 
@@ -50,7 +51,7 @@ class TestThreeLockStructure:
             from core.anima import DigitalAnima
             dp = DigitalAnima(anima_dir, shared_dir)
             assert hasattr(dp, "_state_file_lock")
-            assert isinstance(dp._state_file_lock, asyncio.Lock)
+            assert isinstance(dp._state_file_lock, type(threading.Lock()))
 
     def test_three_status_slots(self, data_dir, make_anima):
         anima_dir = make_anima("lock_test3")
@@ -432,6 +433,148 @@ class TestPendingTaskExecutorLLM:
 
         with patch.object(dp, "_background_lock", asyncio.Lock()):
             await executor.execute_pending_task(task)
+
+
+# ── Runner IPC ──────────────────────────────────────────────
+
+
+# ── primary_status / primary_task ────────────────────────────
+
+
+class TestPrimaryStatusInbox:
+    """Verify primary_status includes inbox slot."""
+
+    def test_inbox_processing_shows_in_status(self, data_dir, make_anima):
+        anima_dir = make_anima("status_test")
+        shared_dir = data_dir / "shared"
+
+        with patch("core.anima.AgentCore"), \
+             patch("core.anima.ConversationMemory"):
+            from core.anima import DigitalAnima
+            dp = DigitalAnima(anima_dir, shared_dir)
+
+            assert dp.primary_status == "idle"
+
+            dp._status_slots["inbox"] = "processing"
+            assert dp.primary_status == "processing"
+
+    def test_conversation_takes_priority_over_inbox(self, data_dir, make_anima):
+        anima_dir = make_anima("status_test2")
+        shared_dir = data_dir / "shared"
+
+        with patch("core.anima.AgentCore"), \
+             patch("core.anima.ConversationMemory"):
+            from core.anima import DigitalAnima
+            dp = DigitalAnima(anima_dir, shared_dir)
+
+            dp._status_slots["inbox"] = "processing"
+            dp._status_slots["conversation"] = "chatting"
+            assert dp.primary_status == "chatting"
+
+    def test_inbox_task_shows_in_primary_task(self, data_dir, make_anima):
+        anima_dir = make_anima("status_test3")
+        shared_dir = data_dir / "shared"
+
+        with patch("core.anima.AgentCore"), \
+             patch("core.anima.ConversationMemory"):
+            from core.anima import DigitalAnima
+            dp = DigitalAnima(anima_dir, shared_dir)
+
+            dp._task_slots["inbox"] = "replying to alice"
+            assert dp.primary_task == "replying to alice"
+
+
+# ── State File Lock ─────────────────────────────────────────
+
+
+class TestStateFileLock:
+    """Verify _state_file_lock is passed to ToolHandler."""
+
+    def test_tool_handler_receives_lock(self, data_dir, make_anima):
+        """set_state_file_lock is called on ToolHandler with the lock."""
+        anima_dir = make_anima("lock_pass_test")
+        shared_dir = data_dir / "shared"
+
+        with patch("core.anima.AgentCore"), \
+             patch("core.anima.ConversationMemory"):
+            from core.anima import DigitalAnima
+            dp = DigitalAnima(anima_dir, shared_dir)
+            dp.agent._tool_handler.set_state_file_lock.assert_called_once_with(
+                dp._state_file_lock
+            )
+
+    def test_is_state_file_detection(self, data_dir, make_anima):
+        from core.tooling.handler import ToolHandler
+        from core.memory.manager import MemoryManager
+        anima_dir = make_anima("state_detect")
+        mm = MemoryManager(anima_dir)
+        handler = ToolHandler(anima_dir=anima_dir, memory=mm)
+        state_dir = anima_dir / "state"
+        state_dir.mkdir(exist_ok=True)
+        assert handler._is_state_file(state_dir / "current_task.md")
+        assert handler._is_state_file(state_dir / "pending.md")
+        assert not handler._is_state_file(anima_dir / "identity.md")
+
+
+# ── Wake Event ──────────────────────────────────────────────
+
+
+class TestPendingExecutorWake:
+    """Verify PendingTaskExecutor wake event."""
+
+    def test_wake_event_exists(self, data_dir, make_anima):
+        anima_dir = make_anima("wake_test")
+        shared_dir = data_dir / "shared"
+
+        with patch("core.anima.AgentCore"), \
+             patch("core.anima.ConversationMemory"):
+            from core.anima import DigitalAnima
+            dp = DigitalAnima(anima_dir, shared_dir)
+
+        from core.supervisor.pending_executor import PendingTaskExecutor
+        executor = PendingTaskExecutor(
+            anima=dp, anima_name="wake_test",
+            anima_dir=anima_dir, shutdown_event=asyncio.Event(),
+        )
+        assert hasattr(executor, "_wake_event")
+        assert isinstance(executor._wake_event, asyncio.Event)
+
+    def test_wake_sets_event(self, data_dir, make_anima):
+        anima_dir = make_anima("wake_test2")
+        shared_dir = data_dir / "shared"
+
+        with patch("core.anima.AgentCore"), \
+             patch("core.anima.ConversationMemory"):
+            from core.anima import DigitalAnima
+            dp = DigitalAnima(anima_dir, shared_dir)
+
+        from core.supervisor.pending_executor import PendingTaskExecutor
+        executor = PendingTaskExecutor(
+            anima=dp, anima_name="wake_test2",
+            anima_dir=anima_dir, shutdown_event=asyncio.Event(),
+        )
+        assert not executor._wake_event.is_set()
+        executor.wake()
+        assert executor._wake_event.is_set()
+
+    def test_trigger_calls_wake(self, data_dir, make_anima):
+        """_trigger_pending_task_execution should call wake on executor."""
+        anima_dir = make_anima("trigger_wake")
+        shared_dir = data_dir / "shared"
+
+        with patch("core.anima.AgentCore"), \
+             patch("core.anima.ConversationMemory"):
+            from core.anima import DigitalAnima
+            dp = DigitalAnima(anima_dir, shared_dir)
+
+        pending_dir = anima_dir / "state" / "pending"
+        pending_dir.mkdir(parents=True, exist_ok=True)
+        (pending_dir / "test-task.json").write_text('{"task_type": "llm"}')
+
+        mock_executor = MagicMock()
+        dp._pending_executor = mock_executor
+        dp._trigger_pending_task_execution()
+        mock_executor.wake.assert_called_once()
 
 
 # ── Runner IPC ──────────────────────────────────────────────

@@ -20,6 +20,7 @@ import logging
 import re
 import shlex
 import subprocess
+import threading
 import uuid
 from collections.abc import Callable
 from datetime import datetime
@@ -300,6 +301,7 @@ class ToolHandler:
         self._posted_channels: dict[str, set[str]] = {"chat": set(), "background": set()}
         self._session_id: str = uuid.uuid4().hex[:12]
         self._activity = ActivityLogger(self._anima_dir)
+        self._state_file_lock: threading.Lock | None = None
         self._external = ExternalToolDispatcher(
             tool_registry or [],
             personal_tools=personal_tools,
@@ -387,6 +389,22 @@ class ToolHandler:
     def replied_to_for(self, session_type: str) -> set[str]:
         """Names already replied to in a specific session type."""
         return self._replied_to.get(session_type, set())
+
+    def set_state_file_lock(self, lock: threading.Lock) -> None:
+        """Attach a state-file lock from DigitalAnima for concurrent write protection."""
+        self._state_file_lock = lock
+
+    def _is_state_file(self, path: Path) -> bool:
+        """Return True if *path* resolves to state/current_task.md or state/pending.md."""
+        try:
+            resolved = path.resolve()
+            anima_resolved = self._anima_dir.resolve()
+            if not resolved.is_relative_to(anima_resolved):
+                return False
+            rel = str(resolved.relative_to(anima_resolved))
+            return rel in ("state/current_task.md", "state/pending.md")
+        except (OSError, ValueError):
+            return False
 
     def set_active_session_type(self, session_type: str) -> contextvars.Token:
         """Set the active session type for the current context.
@@ -637,25 +655,32 @@ class ToolHandler:
 
         path.parent.mkdir(parents=True, exist_ok=True)
 
-        # Auto-add YAML frontmatter for procedure overwrite writes
-        auto_frontmatter_applied = False
-        if (rel.startswith("procedures/") and rel.endswith(".md")
-                and mode == "overwrite"
-                and not content.lstrip().startswith("---")):
-            desc = _extract_first_heading(content)
-            metadata = {
-                "description": desc,
-                "success_count": 0,
-                "failure_count": 0,
-                "confidence": 0.5,
-            }
-            self._memory.write_procedure_with_meta(path, content, metadata)
-            auto_frontmatter_applied = True
-        elif mode == "append":
-            with open(path, "a", encoding="utf-8") as f:
-                f.write(content)
-        else:
-            path.write_text(content, encoding="utf-8")
+        use_lock = self._state_file_lock and self._is_state_file(path)
+        if use_lock:
+            self._state_file_lock.acquire()
+        try:
+            # Auto-add YAML frontmatter for procedure overwrite writes
+            auto_frontmatter_applied = False
+            if (rel.startswith("procedures/") and rel.endswith(".md")
+                    and mode == "overwrite"
+                    and not content.lstrip().startswith("---")):
+                desc = _extract_first_heading(content)
+                metadata = {
+                    "description": desc,
+                    "success_count": 0,
+                    "failure_count": 0,
+                    "confidence": 0.5,
+                }
+                self._memory.write_procedure_with_meta(path, content, metadata)
+                auto_frontmatter_applied = True
+            elif mode == "append":
+                with open(path, "a", encoding="utf-8") as f:
+                    f.write(content)
+            else:
+                path.write_text(content, encoding="utf-8")
+        finally:
+            if use_lock:
+                self._state_file_lock.release()
         logger.info(
             "write_memory_file path=%s mode=%s",
             args["path"], args.get("mode", "overwrite"),
@@ -1817,7 +1842,11 @@ class ToolHandler:
         path = Path(path_str)
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(args.get("content", ""), encoding="utf-8")
+            if self._state_file_lock and self._is_state_file(path):
+                with self._state_file_lock:
+                    path.write_text(args.get("content", ""), encoding="utf-8")
+            else:
+                path.write_text(args.get("content", ""), encoding="utf-8")
             logger.info("write_file path=%s", path_str)
             return f"Written to {path_str}"
         except Exception as e:
@@ -1832,16 +1861,23 @@ class ToolHandler:
         if not path.exists():
             return _error_result("FileNotFound", f"File not found: {path_str}", suggestion="Use list_directory to find the correct path")
         try:
-            content = path.read_text(encoding="utf-8")
-            old = args.get("old_string", "")
-            new = args.get("new_string", "")
-            if old not in content:
-                return _error_result("StringNotFound", f"old_string not found in {path_str}", suggestion="Use search_code to find the exact string")
-            count = content.count(old)
-            if count > 1:
-                return _error_result("AmbiguousMatch", f"old_string matches {count} locations", context={"match_count": count}, suggestion="Provide more surrounding context to make it unique")
-            content = content.replace(old, new, 1)
-            path.write_text(content, encoding="utf-8")
+            use_lock = self._state_file_lock and self._is_state_file(path)
+            if use_lock:
+                self._state_file_lock.acquire()
+            try:
+                content = path.read_text(encoding="utf-8")
+                old = args.get("old_string", "")
+                new = args.get("new_string", "")
+                if old not in content:
+                    return _error_result("StringNotFound", f"old_string not found in {path_str}", suggestion="Use search_code to find the exact string")
+                count = content.count(old)
+                if count > 1:
+                    return _error_result("AmbiguousMatch", f"old_string matches {count} locations", context={"match_count": count}, suggestion="Provide more surrounding context to make it unique")
+                content = content.replace(old, new, 1)
+                path.write_text(content, encoding="utf-8")
+            finally:
+                if use_lock:
+                    self._state_file_lock.release()
             logger.info("edit_file path=%s", path_str)
             return f"Edited {path_str}"
         except Exception as e:

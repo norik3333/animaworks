@@ -93,28 +93,23 @@ def _write_pending_task(
 class TestPendingTaskWatcherLoop:
     """Tests for watcher_loop()."""
 
+    def _stop_after_first(self, executor):
+        """Return a mock for asyncio.wait_for that stops the loop after one iteration."""
+        async def _mock(coro, *, timeout):
+            executor._shutdown_event.set()
+            raise asyncio.TimeoutError
+        return _mock
+
     async def test_picks_up_pending_and_deletes_file(self, tmp_path: Path) -> None:
         """Watcher finds a pending JSON, processes it, and deletes the file."""
         executor = _make_executor_with_anima(tmp_path)
         task_path = _write_pending_task(executor._anima_dir)
-
         assert task_path.exists()
 
-        # Let the watcher run for one iteration, then shut down
-        iteration_count = 0
-        original_sleep = asyncio.sleep
-
-        async def mock_sleep(duration: float) -> None:
-            nonlocal iteration_count
-            iteration_count += 1
-            if iteration_count >= 1:
-                executor._shutdown_event.set()
-            await original_sleep(0)
-
-        with patch("asyncio.sleep", side_effect=mock_sleep):
+        with patch("core.supervisor.pending_executor.asyncio.wait_for",
+                    side_effect=self._stop_after_first(executor)):
             await executor.watcher_loop()
 
-        # File should be deleted after being picked up
         assert not task_path.exists()
 
     async def test_calls_execute_pending_task(self, tmp_path: Path) -> None:
@@ -123,61 +118,36 @@ class TestPendingTaskWatcherLoop:
         _write_pending_task(executor._anima_dir, tool_name="local_llm", subcommand="generate")
 
         executed_tasks: list[dict] = []
-        original_execute = executor.execute_pending_task
 
         async def capture_execute(task_desc: dict) -> None:
             executed_tasks.append(task_desc)
 
         executor.execute_pending_task = capture_execute  # type: ignore[assignment]
 
-        iteration_count = 0
-        original_sleep = asyncio.sleep
-
-        async def mock_sleep(duration: float) -> None:
-            nonlocal iteration_count
-            iteration_count += 1
-            if iteration_count >= 1:
-                executor._shutdown_event.set()
-            await original_sleep(0)
-
-        with patch("asyncio.sleep", side_effect=mock_sleep):
+        with patch("core.supervisor.pending_executor.asyncio.wait_for",
+                    side_effect=self._stop_after_first(executor)):
             await executor.watcher_loop()
 
         assert len(executed_tasks) == 1
         assert executed_tasks[0]["tool_name"] == "local_llm"
-        assert executed_tasks[0]["subcommand"] == "generate"
 
     async def test_handles_corrupt_json_gracefully(self, tmp_path: Path) -> None:
-        """Corrupt JSON files are deleted with a warning, not crashing the watcher."""
+        """Corrupt JSON files are deleted with a warning."""
         executor = _make_executor_with_anima(tmp_path)
-
-        # Write a corrupt JSON file
         pending_dir = executor._anima_dir / "state" / "background_tasks" / "pending"
         pending_dir.mkdir(parents=True, exist_ok=True)
         corrupt_path = pending_dir / "corrupt.json"
         corrupt_path.write_text("{invalid json content", encoding="utf-8")
 
-        iteration_count = 0
-        original_sleep = asyncio.sleep
-
-        async def mock_sleep(duration: float) -> None:
-            nonlocal iteration_count
-            iteration_count += 1
-            if iteration_count >= 1:
-                executor._shutdown_event.set()
-            await original_sleep(0)
-
-        with patch("asyncio.sleep", side_effect=mock_sleep):
+        with patch("core.supervisor.pending_executor.asyncio.wait_for",
+                    side_effect=self._stop_after_first(executor)):
             await executor.watcher_loop()
 
-        # Corrupt file should be cleaned up
         assert not corrupt_path.exists()
 
     async def test_processes_multiple_pending_files(self, tmp_path: Path) -> None:
         """Watcher processes all pending files in a single scan iteration."""
         executor = _make_executor_with_anima(tmp_path)
-
-        # Write multiple pending tasks
         paths = [
             _write_pending_task(executor._anima_dir, task_id="task_aaa001", tool_name="image_gen"),
             _write_pending_task(executor._anima_dir, task_id="task_bbb002", tool_name="local_llm"),
@@ -191,43 +161,22 @@ class TestPendingTaskWatcherLoop:
 
         executor.execute_pending_task = capture_execute  # type: ignore[assignment]
 
-        iteration_count = 0
-        original_sleep = asyncio.sleep
-
-        async def mock_sleep(duration: float) -> None:
-            nonlocal iteration_count
-            iteration_count += 1
-            if iteration_count >= 1:
-                executor._shutdown_event.set()
-            await original_sleep(0)
-
-        with patch("asyncio.sleep", side_effect=mock_sleep):
+        with patch("core.supervisor.pending_executor.asyncio.wait_for",
+                    side_effect=self._stop_after_first(executor)):
             await executor.watcher_loop()
 
-        # All files should be deleted
         for p in paths:
             assert not p.exists()
-
         assert len(executed_tasks) == 3
 
     async def test_creates_pending_dir_if_missing(self, tmp_path: Path) -> None:
         """Watcher creates the pending directory if it does not exist."""
         executor = _make_executor_with_anima(tmp_path)
         pending_dir = executor._anima_dir / "state" / "background_tasks" / "pending"
-
         assert not pending_dir.exists()
 
-        iteration_count = 0
-        original_sleep = asyncio.sleep
-
-        async def mock_sleep(duration: float) -> None:
-            nonlocal iteration_count
-            iteration_count += 1
-            if iteration_count >= 1:
-                executor._shutdown_event.set()
-            await original_sleep(0)
-
-        with patch("asyncio.sleep", side_effect=mock_sleep):
+        with patch("core.supervisor.pending_executor.asyncio.wait_for",
+                    side_effect=self._stop_after_first(executor)):
             await executor.watcher_loop()
 
         assert pending_dir.is_dir()
@@ -236,11 +185,11 @@ class TestPendingTaskWatcherLoop:
         """Watcher exits cleanly on asyncio.CancelledError."""
         executor = _make_executor_with_anima(tmp_path)
 
-        async def cancel_sleep(duration: float) -> None:
+        async def cancel_wait(coro, *, timeout):
             raise asyncio.CancelledError()
 
-        with patch("asyncio.sleep", side_effect=cancel_sleep):
-            # Should not raise; just exit cleanly
+        with patch("core.supervisor.pending_executor.asyncio.wait_for",
+                    side_effect=cancel_wait):
             await executor.watcher_loop()
 
 

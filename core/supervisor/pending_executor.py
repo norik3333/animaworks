@@ -41,6 +41,7 @@ class PendingTaskExecutor:
         self._anima_name = anima_name
         self._anima_dir = anima_dir
         self._shutdown_event = shutdown_event
+        self._wake_event = asyncio.Event()
 
     async def watcher_loop(self) -> None:
         """Watch state/background_tasks/pending/ for submitted tasks.
@@ -101,7 +102,14 @@ class PendingTaskExecutor:
                             "Error processing LLM pending task file: %s", path.name,
                         )
 
-                await asyncio.sleep(_PENDING_WATCHER_POLL_INTERVAL)
+                try:
+                    await asyncio.wait_for(
+                        self._wake_event.wait(),
+                        timeout=_PENDING_WATCHER_POLL_INTERVAL,
+                    )
+                    self._wake_event.clear()
+                except asyncio.TimeoutError:
+                    pass
             except asyncio.CancelledError:
                 break
             except Exception:
@@ -111,6 +119,10 @@ class PendingTaskExecutor:
                 await asyncio.sleep(_PENDING_WATCHER_POLL_INTERVAL)
 
         logger.info("Pending task watcher stopped for %s", self._anima_name)
+
+    def wake(self) -> None:
+        """Signal the watcher to check for new tasks immediately."""
+        self._wake_event.set()
 
     async def execute_pending_task(self, task_desc: dict[str, Any]) -> None:
         """Execute a pending task via BackgroundTaskManager or LLM.
