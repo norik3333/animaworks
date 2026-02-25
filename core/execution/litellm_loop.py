@@ -28,6 +28,7 @@ from typing import Any
 from core.exceptions import LLMAPIError, ToolExecutionError, ConfigError  # noqa: F401
 from core.prompt.context import ContextTracker, resolve_context_window
 from core.execution._session import build_continuation_prompt, handle_session_chaining
+from core.execution._sanitize import wrap_tool_result
 from core.execution._streaming import (
     accumulate_tool_call_chunks,
     parse_accumulated_tool_calls,
@@ -290,7 +291,7 @@ class LiteLLMExecutor(BaseExecutor):
             fn_args,
             tc.id,
         )
-        return {"role": "tool", "tool_call_id": tc.id, "content": result}
+        return {"role": "tool", "tool_call_id": tc.id, "content": wrap_tool_result(tc.function.name, result)}
 
     # ── C3b: execute() uses _build_initial_messages / _preflight_clamp ──
 
@@ -1002,7 +1003,7 @@ class LiteLLMExecutor(BaseExecutor):
                 messages.append({
                     "role": "tool",
                     "tool_call_id": tc_id,
-                    "content": error_content,
+                    "content": wrap_tool_result(fn_name, error_content),
                 })
                 yield {
                     "type": "tool_end", "tool_id": tc_id, "tool_name": fn_name,
@@ -1032,7 +1033,7 @@ class LiteLLMExecutor(BaseExecutor):
                 messages.append({
                     "role": "tool",
                     "tool_call_id": tc_id,
-                    "content": result,
+                    "content": wrap_tool_result(fn_name, result),
                 })
                 yield {
                     "type": "tool_end", "tool_id": tc_id, "tool_name": fn_name,
@@ -1050,7 +1051,7 @@ class LiteLLMExecutor(BaseExecutor):
                 messages.append({
                     "role": "tool",
                     "tool_call_id": tc_id,
-                    "content": result,
+                    "content": wrap_tool_result(fn_name, result),
                 })
                 yield {
                     "type": "tool_end", "tool_id": tc_id, "tool_name": fn_name,
@@ -1105,7 +1106,7 @@ class LiteLLMExecutor(BaseExecutor):
                     messages.append({
                         "role": "tool",
                         "tool_call_id": shim.id,
-                        "content": error_content,
+                        "content": wrap_tool_result(shim.function.name, error_content),
                     })
                     result_summary = _truncate_for_record(error_content, tool_result_save_budget(shim.function.name, context_window))
                 else:
@@ -1139,7 +1140,7 @@ class LiteLLMExecutor(BaseExecutor):
                     messages.append({
                         "role": "tool",
                         "tool_call_id": shim.id,
-                        "content": error_content,
+                        "content": wrap_tool_result(shim.function.name, error_content),
                     })
                     result_summary = _truncate_for_record(error_content, tool_result_save_budget(shim.function.name, context_window))
                 yield {

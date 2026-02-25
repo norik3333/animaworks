@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -377,7 +378,12 @@ class TestToolExecutionErrorHandling:
         assert len(tool_msgs) >= 1
         err_msg = tool_msgs[0]
         assert err_msg["tool_call_id"] == "call_err_1"
-        parsed = json.loads(err_msg["content"])
+        # Content may be wrapped for prompt injection defense; extract inner JSON
+        content = err_msg["content"]
+        if "<tool_result" in content:
+            match = re.search(r">\s*\n(.*)\n\s*</tool_result>", content, re.DOTALL)
+            content = match.group(1).strip() if match else content
+        parsed = json.loads(content)
         assert parsed["status"] == "error"
         assert parsed["error_type"] == "ExecutionError"
         assert "disk failure" in parsed["message"]
@@ -415,7 +421,12 @@ class TestToolExecutionErrorHandling:
         tool_msgs = [m for m in second_call_messages if m.get("role") == "tool"]
         err_msgs = [m for m in tool_msgs if m["tool_call_id"] == "call_w2"]
         assert len(err_msgs) == 1
-        parsed = json.loads(err_msgs[0]["content"])
+        # Content may be wrapped for prompt injection defense; extract inner JSON
+        content = err_msgs[0]["content"]
+        if "<tool_result" in content:
+            match = re.search(r">\s*\n(.*)\n\s*</tool_result>", content, re.DOTALL)
+            content = match.group(1).strip() if match else content
+        parsed = json.loads(content)
         assert parsed["status"] == "error"
         assert "serial write failed" in parsed["message"]
 

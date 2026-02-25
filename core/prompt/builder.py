@@ -443,6 +443,10 @@ def build_system_prompt(
     if _br:
         parts.append(_br)
 
+    _tdi = load_prompt("tool_data_interpretation")
+    if _tdi:
+        parts.append(_tdi)
+
     # ── Group 2: あなた自身 ───────────────────────────────────
     parts.append("# 2. あなた自身")
 
