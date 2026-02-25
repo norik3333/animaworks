@@ -310,6 +310,17 @@ def _get_tool_handler() -> Any:
         # ── ToolHandler ──
         from core.tooling.handler import ToolHandler
 
+        # Check debug_superuser flag from status.json
+        _superuser = False
+        _status_path = anima_dir / "status.json"
+        if _status_path.is_file():
+            try:
+                import json as _json_mod
+                _su_data = _json_mod.loads(_status_path.read_text(encoding="utf-8"))
+                _superuser = bool(_su_data.get("debug_superuser"))
+            except (ValueError, OSError):
+                pass
+
         _tool_handler = ToolHandler(
             anima_dir=anima_dir,
             memory=memory,
@@ -320,6 +331,7 @@ def _get_tool_handler() -> Any:
             on_schedule_changed=None,
             human_notifier=human_notifier,
             background_manager=None,
+            superuser=_superuser,
         )
 
         logger.info(

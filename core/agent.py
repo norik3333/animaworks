@@ -206,6 +206,7 @@ class AgentCore:
             human_notifier=human_notifier,
             background_manager=self._background_manager,
             context_window=cw,
+            superuser=self._is_debug_superuser(),
         )
         self._executor = self._create_executor()
 
@@ -362,6 +363,18 @@ class AgentCore:
             logger.warning(
                 "claude-agent-sdk not available, falling back to anthropic SDK"
             )
+            return False
+
+    def _is_debug_superuser(self) -> bool:
+        """Check if this anima has debug_superuser flag in status.json."""
+        status_path = self.anima_dir / "status.json"
+        if not status_path.is_file():
+            return False
+        try:
+            import json as _json_mod
+            data = _json_mod.loads(status_path.read_text(encoding="utf-8"))
+            return bool(data.get("debug_superuser"))
+        except (ValueError, OSError):
             return False
 
     # Matches permission lines like "- image_gen: yes", "* web_search: OK"

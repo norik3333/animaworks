@@ -89,6 +89,18 @@ _SDK_MAX_BUFFER_SIZE = 4 * 1024 * 1024  # 4 MB
 # temp file and passed via the CLI's undocumented --system-prompt-file flag.
 _PROMPT_FILE_THRESHOLD = 100_000  # 100 KB
 
+
+def _is_debug_superuser(anima_dir: Path) -> bool:
+    """Check if an anima has debug_superuser flag in status.json."""
+    status_path = anima_dir / "status.json"
+    if not status_path.is_file():
+        return False
+    try:
+        data = json.loads(status_path.read_text(encoding="utf-8"))
+        return bool(data.get("debug_superuser"))
+    except (json.JSONDecodeError, OSError):
+        return False
+
 # SDK Issue #387: invalid session ID causes SDK to hang for ~60s before
 # raising an error.  We wrap the first-event receive in asyncio.wait_for
 # so that a stale/invalid resume fails fast and falls back to a fresh session.
@@ -161,11 +173,14 @@ def _check_a1_file_access(
     write: bool,
     subordinate_activity_dirs: list[Path] | None = None,
     subordinate_management_files: list[Path] | None = None,
+    superuser: bool = False,
 ) -> str | None:
     """Check if a file path is allowed for Mode S tools.
 
     Returns violation reason string if blocked, None if allowed.
     """
+    if superuser:
+        return None
     if not file_path:
         return None
 
@@ -199,7 +214,12 @@ def _check_a1_file_access(
     return None
 
 
-def _check_a1_bash_command(command: str, anima_dir: Path) -> str | None:
+def _check_a1_bash_command(
+    command: str,
+    anima_dir: Path,
+    *,
+    superuser: bool = False,
+) -> str | None:
     """Check bash commands against blocklist patterns and file operation violations.
 
     Blocklist patterns are matched against the raw command string (before
@@ -208,6 +228,8 @@ def _check_a1_bash_command(command: str, anima_dir: Path) -> str | None:
 
     This is a best-effort heuristic — not a complete sandbox.
     """
+    if superuser:
+        return None
     # Blocklist check (raw command string, before shlex parsing)
     for pattern, reason in _BASH_BLOCKED_PATTERNS:
         if pattern.search(command):
@@ -477,6 +499,7 @@ def _build_pre_tool_hook(
     max_tokens: int = 8192,
     context_window: int = 200_000,
     session_stats: dict[str, Any] | None = None,
+    superuser: bool = False,
 ) -> Callable:
     """Build a PreToolUse hook with security checks, output guards, and tool logging.
 
@@ -540,6 +563,7 @@ def _build_pre_tool_hook(
                 file_path, anima_dir, write=True,
                 subordinate_activity_dirs=_sub_activity_dirs,
                 subordinate_management_files=_sub_mgmt_files,
+                superuser=superuser,
             )
             if violation:
                 _log_tool_use(anima_dir, tool_name, tool_input, tool_use_id=tool_use_id, blocked=True, block_reason=violation)
@@ -558,6 +582,7 @@ def _build_pre_tool_hook(
                 file_path, anima_dir, write=False,
                 subordinate_activity_dirs=_sub_activity_dirs,
                 subordinate_management_files=_sub_mgmt_files,
+                superuser=superuser,
             )
             if violation:
                 _log_tool_use(anima_dir, tool_name, tool_input, tool_use_id=tool_use_id, blocked=True, block_reason=violation)
@@ -572,7 +597,7 @@ def _build_pre_tool_hook(
         # Bash: inspect command
         if tool_name == "Bash":
             command = tool_input.get("command", "")
-            violation = _check_a1_bash_command(command, anima_dir)
+            violation = _check_a1_bash_command(command, anima_dir, superuser=superuser)
             if violation:
                 _log_tool_use(anima_dir, tool_name, tool_input, tool_use_id=tool_use_id, blocked=True, block_reason=violation)
                 return SyncHookJSONOutput(
@@ -917,6 +942,7 @@ class AgentSDKExecutor(BaseExecutor):
                         max_tokens=self._model_config.max_tokens or 8192,
                         context_window=_cw,
                         session_stats=session_stats,
+                        superuser=_is_debug_superuser(self._anima_dir),
                     )],
                 )],
                 "PreCompact": [HookMatcher(
