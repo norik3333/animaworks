@@ -5,8 +5,8 @@ from __future__ import annotations
 
 """call_human CLI — send human escalation notification via configured channels.
 
-Available as ``animaworks-tool call_human`` so that A1-mode animas can escalate
-to humans from Bash without needing ToolHandler (A2/B only).
+Available as ``animaworks-tool call_human`` so that Mode S animas can escalate
+to humans from Bash without needing ToolHandler (Mode A/B only).
 
 Usage:
     animaworks-tool call_human "Subject" "Body text" [--priority high]

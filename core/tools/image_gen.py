@@ -1972,7 +1972,7 @@ def get_cli_guide() -> str:
     return """\
 ### 画像・3Dモデル生成 (image_gen)
 
-A2モードのツール名: `generate_character_assets` / `generate_fullbody` / `generate_bustup` 等
+Aモードのツール名: `generate_character_assets` / `generate_fullbody` / `generate_bustup` 等
 
 ```bash
 # 全6ステップ一括生成（推奨）

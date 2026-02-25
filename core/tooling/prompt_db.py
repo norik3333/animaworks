@@ -111,7 +111,7 @@ DEFAULT_DESCRIPTIONS: dict[str, str] = {
         "以前のやり取りの文脈を確認したいとき、"
         "報告や委任の進捗を追跡したいときに使う。"
     ),
-    # -- File tools (A2/B modes) --
+    # -- File tools (Mode A/B) --
     "read_file": (
         "任意のファイルを絶対パスで読む（permissions.mdの許可範囲内）。"
         "出力は行番号付き（N|content形式）でコードブロックに囲まれる。"
@@ -133,7 +133,7 @@ DEFAULT_DESCRIPTIONS: dict[str, str] = {
         "ファイル操作にはread_file/write_file/edit_fileを優先し、"
         "コマンド実行が本当に必要な場合のみ使う。"
     ),
-    # -- Search tools (A2/B modes) --
+    # -- Search tools (Mode A/B) --
     "search_code": (
         "正規表現パターンでファイル内のテキストを検索する。"
         "マッチした行をファイルパスと行番号付きで返す。"

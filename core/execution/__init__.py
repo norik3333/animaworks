@@ -9,8 +9,8 @@ from __future__ import annotations
 """Execution engines for AgentCore.
 
 Each engine implements one execution mode:
-  - ``AgentSDKExecutor``  (A1): Claude Agent SDK -- full tool access via subprocess
-  - ``LiteLLMExecutor``   (A2): LiteLLM + tool_use loop -- any model with tool support
+  - ``AgentSDKExecutor``  (S): Claude Agent SDK -- full tool access via subprocess
+  - ``LiteLLMExecutor``   (A): LiteLLM + tool_use loop -- any model with tool support
   - ``AssistedExecutor``  (B):  1-shot LLM call -- framework handles memory I/O
   - ``AnthropicFallbackExecutor``: Anthropic SDK direct -- fallback when Agent SDK unavailable
 """

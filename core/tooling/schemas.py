@@ -879,7 +879,7 @@ def build_tool_list(
     """Assemble a tool list from canonical definitions.
 
     Args:
-        include_file_tools: Include file/command operation tools (for A2 mode).
+        include_file_tools: Include file/command operation tools (for Mode A).
         include_search_tools: Include search_code/list_directory tools.
         include_discovery_tools: Include discover_tools tool.
         include_notification_tools: Include call_human tool (for top-level Animas).

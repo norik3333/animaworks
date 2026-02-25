@@ -7,7 +7,7 @@ from __future__ import annotations
 # See LICENSE for the full license text.
 
 
-"""Shared session-chaining helper for inline executors (A2 / Fallback).
+"""Shared session-chaining helper for inline executors (Mode A / Fallback).
 
 Both ``LiteLLMExecutor`` and ``AnthropicFallbackExecutor`` monitor context
 usage mid-conversation and restart the session with short-term memory when

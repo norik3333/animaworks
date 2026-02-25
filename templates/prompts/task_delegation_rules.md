@@ -1,6 +1,6 @@
 ## タスク委任ルール
 
-タスクを pending/ に書き出す際は、**実行者が記憶やコンテキストを持たない前提**で記述すること。
+タスクを state/pending/ に書き出す際は、**実行者が記憶やコンテキストを持たない前提**で記述すること。
 実行者はサブエージェントとして動作し、あなたの知識・記憶・組織情報にアクセスできません。
 
 ### 必須記載事項
@@ -11,20 +11,21 @@
 - **制約**: やってはいけないこと、互換性要件
 
 ### タスクファイル形式
-pending/ ディレクトリに以下の形式のJSONファイルを作成してください:
+state/pending/ ディレクトリに以下の形式のJSONファイルを作成してください:
 
 ```json
 {{
     "task_type": "llm",
     "task_id": "YYYYMMDD-短い説明",
     "title": "タスクのタイトル",
+    "submitted_by": "自分のAnima名",
+    "submitted_at": "ISO8601形式の現在時刻",
     "description": "具体的な作業内容",
     "context": "背景情報",
     "acceptance_criteria": ["完了条件1", "完了条件2"],
     "constraints": ["制約1"],
     "file_paths": ["path/to/file.py:行番号"],
     "reply_to": "送信者名またはnull",
-    "reply_type": "dm",
     "priority": 1
 }}
 ```

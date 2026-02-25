@@ -1231,7 +1231,7 @@ class DigitalAnima:
             prompt: The heartbeat prompt text.
             inbox_items: Inbox items being processed.
             unread_count: Number of unread messages.
-            prior_messages: Structured conversation history for A2/A1F modes.
+            prior_messages: Structured conversation history for Mode A.
 
         Returns the CycleResult from the agent execution.
         """
@@ -1616,7 +1616,7 @@ class DigitalAnima:
         write_memory_file, archive_memory_file) to organize, consolidate,
         and clean up its memories within a tool-call loop.
 
-        Works with all execution modes: A1, A2, A1 Fallback, and B.
+        Works with all execution modes: S, A, and B.
 
         Args:
             consolidation_type: "daily" or "weekly"

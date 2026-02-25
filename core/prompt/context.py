@@ -131,7 +131,7 @@ class ContextTracker:
         return self._threshold_hit
 
     def force_threshold(self) -> None:
-        """Force the threshold flag for external triggers (e.g. A1 auto-compact)."""
+        """Force the threshold flag for external triggers (e.g. Mode S auto-compact)."""
         if not self._threshold_hit:
             self._threshold_hit = True
 
@@ -233,7 +233,7 @@ class ContextTracker:
     # ── Legacy convenience methods (delegate to update()) ─
 
     def update_from_usage(self, usage: dict) -> bool:
-        """Update from per-request API usage (A2 / Fallback).
+        """Update from per-request API usage (Mode A / Fallback).
 
         Uses ``input_tokens`` alone as the fullness measure because output
         tokens from prior turns are already included in the next request's

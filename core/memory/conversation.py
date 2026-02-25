@@ -419,7 +419,7 @@ class ConversationMemory:
         content: str,
         fmt: str = "openai",
     ) -> list[dict[str, Any]]:
-        """Build structured message history for A2/Fallback modes.
+        """Build structured message history for Mode A/Fallback.
 
         Preserves tool_use/tool_result structure to prevent the LLM
         from learning to describe tool calls in text instead of actually

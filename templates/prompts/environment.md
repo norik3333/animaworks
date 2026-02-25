@@ -67,8 +67,8 @@ IMPORTANT: You must NEVER generate or guess URLs for the user. You may use URLs 
 
 1. **自分のディレクトリ** (`{data_dir}/animas/{anima_name}/`): 自由に読み書き可能
 2. **共有領域** (`{data_dir}/shared/`): 読み書き可能。メッセージ送受信およびユーザー記憶の共有に使用
-3. **共通スキル** (`{data_dir}/common_skills/`): 司令塔メンバーのみ書き込み可能。その他のメンバーは書き込み不可。全員が使えるスキル
-4. **会社情報** (`{data_dir}/company/`): 司令塔メンバーのみ書き込み可能
+3. **共通スキル** (`{data_dir}/common_skills/`): トップレベルメンバー（supervisor未設定）のみ書き込み可能。その他のメンバーは読み取り専用。全員が使えるスキル
+4. **会社情報** (`{data_dir}/company/`): トップレベルメンバーのみ書き込み可能
 5. **プロンプト** (`{data_dir}/prompts/`): 読み取り専用。キャラクター設計ガイド等のテンプレート
 6. **他の社員のディレクトリ**: permissions.md に明示された範囲のみアクセス可能
 

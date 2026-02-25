@@ -7,7 +7,7 @@ from __future__ import annotations
 # See LICENSE for the full license text.
 
 
-"""Mode A1 executor: Claude Agent SDK.
+"""Mode S executor: Claude Agent SDK.
 
 Runs Claude as a fully autonomous agent with Read/Write/Edit/Bash/Grep/Glob
 tools via the Agent SDK subprocess.  Supports both blocking and streaming
@@ -43,7 +43,7 @@ logger = logging.getLogger("animaworks.execution.agent_sdk")
 __all__ = ["AgentSDKExecutor", "StreamDisconnectedError", "clear_session_ids"]
 
 
-# ── A1 Bash blocklist ────────────────────────────────────────
+# ── Mode S Bash blocklist ────────────────────────────────────
 
 # Patterns that are unconditionally blocked in Bash tool calls.
 # Each entry is (compiled_regex, human-readable reason).
@@ -61,7 +61,7 @@ _BASH_BLOCKED_PATTERNS: list[tuple[re.Pattern[str], str]] = [
      "Direct Chatwork API post via wget is blocked"),
 ]
 
-# ── A1 mode security ──────────────────────────────────────────
+# ── Mode S security ──────────────────────────────────────────
 
 # Files that animas cannot modify themselves (privilege/bootstrap protection).
 # identity.md and specialty_prompt.md are intentionally editable —
@@ -162,7 +162,7 @@ def _check_a1_file_access(
     subordinate_activity_dirs: list[Path] | None = None,
     subordinate_management_files: list[Path] | None = None,
 ) -> str | None:
-    """Check if a file path is allowed for A1 mode tools.
+    """Check if a file path is allowed for Mode S tools.
 
     Returns violation reason string if blocked, None if allowed.
     """
@@ -246,7 +246,7 @@ def _check_a1_bash_command(command: str, anima_dir: Path) -> str | None:
     return None
 
 
-# ── A1 output guard ──────────────────────────────────────────
+# ── Mode S output guard ──────────────────────────────────────
 
 _BASH_TRUNCATE_BYTES = 10_000   # 10 KB
 _BASH_HEAD_BYTES = 5_000        # head display
@@ -467,7 +467,7 @@ def _cache_subordinate_paths(
             sub_mgmt_files.append(sub_dir / "cron.md")
             sub_mgmt_files.append(sub_dir / "heartbeat.md")
     except Exception:
-        logger.debug("Failed to cache subordinate paths for A1 hook", exc_info=True)
+        logger.debug("Failed to cache subordinate paths for Mode S hook", exc_info=True)
     return sub_activity_dirs, sub_mgmt_files
 
 
@@ -757,7 +757,7 @@ def _finalize_pending_records(
 
 
 class AgentSDKExecutor(BaseExecutor):
-    """Execute via Claude Agent SDK (Mode A1).
+    """Execute via Claude Agent SDK (Mode S).
 
     The SDK spawns a subprocess where Claude has full tool access.
     Tool results are captured from UserMessage ToolResultBlock content
@@ -789,7 +789,7 @@ class AgentSDKExecutor(BaseExecutor):
     def _build_env(self) -> dict[str, str]:
         """Build env dict for the Claude Code child process.
 
-        A1 mode does NOT pass ``ANTHROPIC_API_KEY`` so that the Claude Code
+        Mode S does NOT pass ``ANTHROPIC_API_KEY`` so that the Claude Code
         subprocess uses its own subscription authentication (Max plan etc.)
         instead of consuming API credits.
 

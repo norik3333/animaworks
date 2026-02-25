@@ -7,7 +7,7 @@ from __future__ import annotations
 # See LICENSE for the full license text.
 
 
-"""Stdio MCP server exposing AnimaWorks tools for A1 mode.
+"""Stdio MCP server exposing AnimaWorks tools for Mode S.
 
 Launched as ``python -m core.mcp.server``.  Receives configuration via
 environment variables:
@@ -46,7 +46,7 @@ server = Server("aw")
 #
 # The tools to expose, drawn from canonical schema lists in
 # ``core/tooling/schemas.py``.  We pick them by name to build a
-# stable, curated subset suitable for A1 mode.
+# stable, curated subset suitable for Mode S.
 
 _EXPOSED_TOOL_NAMES: frozenset[str] = frozenset({
     "send_message",

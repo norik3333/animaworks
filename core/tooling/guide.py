@@ -7,7 +7,7 @@ from __future__ import annotations
 # See LICENSE for the full license text.
 
 
-"""Dynamic tool guide generation for A1 (CLI) and A2 (schema) modes."""
+"""Dynamic tool guide generation for Mode S (CLI) and Mode A (schema)."""
 
 import importlib
 import importlib.util
@@ -95,7 +95,7 @@ def load_tool_schemas(
     tool_registry: list[str],
     personal_tools: dict[str, str] | None = None,
 ) -> list[dict[str, Any]]:
-    """Load structured schemas for A2 mode.
+    """Load structured schemas for Mode A.
 
     Delegates to ``schemas.load_all_tool_schemas()`` which handles both
     core and personal tool modules with consistent normalisation.

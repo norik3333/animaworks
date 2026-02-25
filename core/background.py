@@ -145,7 +145,7 @@ class BackgroundTaskManager:
         """Create a BackgroundTaskManager with eligible tools derived from EXECUTION_PROFILE.
 
         Merges three layers (later overrides earlier):
-        1. ``_DEFAULT_ELIGIBLE_TOOLS`` — hardcoded defaults for A2 compat
+        1. ``_DEFAULT_ELIGIBLE_TOOLS`` — hardcoded defaults for Mode A compat
         2. ``profiles`` — EXECUTION_PROFILE from tool modules
         3. ``config_eligible`` — explicit config.json overrides
         """
@@ -164,8 +164,8 @@ class BackgroundTaskManager:
         """Check if a tool is eligible for background execution.
 
         Accepts both formats:
-        - Schema name: ``"generate_3d_model"`` (Mode A2)
-        - Profile key: ``"image_gen:3d"`` (Mode A1 submit)
+        - Schema name: ``"generate_3d_model"`` (Mode A)
+        - Profile key: ``"image_gen:3d"`` (Mode S submit)
         """
         return tool_name in self._eligible_tools
 

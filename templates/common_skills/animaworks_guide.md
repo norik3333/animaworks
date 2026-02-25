@@ -2,7 +2,7 @@
 name: animaworks-guide
 description: >-
   AnimaWorksフレームワークのアーキテクチャ・設計思想・操作方法を解説する共通ナレッジ。
-  記憶システム(RAG/Priming/Consolidation)、実行モード(A1/A2/B)、
+  記憶システム(RAG/Priming/Consolidation)、実行モード(S/A/B)、
   プロンプト構築、ツール権限、ロールテンプレート等の内部構造への質問に参照する。
   「AnimaWorks」「システムの使い方」「動作原理」「仕組み」「フレームワーク」「アーキテクチャ」
 ---

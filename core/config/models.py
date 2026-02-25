@@ -274,7 +274,7 @@ class AnimaWorksConfig(BaseModel):
     locale: str = "ja"
     system: SystemConfig = SystemConfig()
     credentials: dict[str, CredentialConfig] = {"anthropic": CredentialConfig()}
-    model_modes: dict[str, str] = {}  # モデル名 → "A1"/"A2"/"B"
+    model_modes: dict[str, str] = {}  # モデル名 → "S"/"A"/"B" (legacy: "A1"/"A2" も可)
     model_context_windows: dict[str, int] = {}  # モデル名パターン → コンテキストウィンドウサイズ
     anima_defaults: AnimaDefaults = AnimaDefaults()
     animas: dict[str, AnimaModelConfig] = {}
@@ -608,7 +608,7 @@ KNOWN_MODELS: list[dict[str, str]] = [
 ]
 
 # ── Legacy mode value mapping ──────────────────────────────
-# Maps old A1/A1F/A2/B and text-based values to new S/A/B scheme.
+# Maps legacy A1/A1F/A2 and text-based values to canonical S/A/B scheme.
 _LEGACY_MODE_MAP: dict[str, str] = {
     "autonomous": "A",
     "assisted": "B",
@@ -722,7 +722,7 @@ def _match_pattern_table(
     Phase 1: O(1) exact dict lookup.
     Phase 2: fnmatch scan in specificity-descending order.
 
-    Returns the mode string (e.g. ``"A1"``) or ``None`` if no match.
+    Returns the mode string (e.g. ``"S"``) or ``None`` if no match.
     """
     # Phase 1: exact match
     if model_name in table:
@@ -787,8 +787,8 @@ def load_model_config(anima_dir: Path) -> "ModelConfig":
 def _normalise_mode(raw: str) -> str:
     """Normalise a mode value to S/A/B, applying legacy mapping if needed.
 
-    Accepts old values (``"A1"``, ``"A2"``, ``"autonomous"``, etc.) and
-    new values (``"S"``, ``"A"``, ``"B"``).  Returns uppercase S/A/B.
+    Accepts legacy values (``"A1"``, ``"A2"``, ``"autonomous"``, etc.) and
+    canonical values (``"S"``, ``"A"``, ``"B"``).  Returns uppercase S/A/B.
     """
     lower = raw.strip().lower()
     mapped = _LEGACY_MODE_MAP.get(lower)
