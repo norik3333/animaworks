@@ -35,11 +35,11 @@ class TestFormatEntryUsesAsciiLabels:
 
     _TYPE_TO_LABEL: dict[str, str] = {
         "message_received": "MSG<",
-        "response_sent": "MSG>",
+        "response_sent": "RESP>",
         "channel_read": "CH.R",
         "channel_post": "CH.W",
-        "dm_received": "DM<",
-        "dm_sent": "DM>",
+        "dm_received": "MSG<",
+        "dm_sent": "MSG>",
         "human_notify": "NTFY",
         "tool_use": "TOOL",
         "heartbeat_start": "HB",
@@ -149,7 +149,7 @@ class TestFormatForPrimingBasics:
         ]
         result = activity_logger.format_for_priming(entries)
         assert "MSG<" in result
-        assert "MSG>" in result
+        assert "RESP>" in result
 
     def test_format_budget_truncation(
         self, activity_logger: ActivityLogger

@@ -203,7 +203,7 @@ class TestFormatGroup:
         assert "DM" in lines[0]
         # Child lines should be indented and contain DM direction labels
         child_lines = [ln for ln in lines[1:] if not ln.strip().startswith("->")]
-        directions = {"DM<", "DM>"}
+        directions = {"MSG<", "MSG>"}
         for cl in child_lines:
             assert cl.startswith("  "), f"Child line not indented: {cl!r}"
             assert any(d in cl for d in directions), f"No DM direction in: {cl!r}"

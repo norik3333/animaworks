@@ -286,7 +286,7 @@ class TestBuildRecentOutboundSection:
 
         entries = [
             json.dumps({"ts": ts1, "type": "channel_post", "content": "Hello general", "channel": "general"}, ensure_ascii=False),
-            json.dumps({"ts": ts2, "type": "dm_sent", "content": "Hi bob", "to": "bob"}, ensure_ascii=False),
+            json.dumps({"ts": ts2, "type": "message_sent", "content": "Hi bob", "to": "bob"}, ensure_ascii=False),
         ]
         log_file.write_text("\n".join(entries) + "\n", encoding="utf-8")
 
@@ -296,7 +296,7 @@ class TestBuildRecentOutboundSection:
 
         assert "直近のアウトバウンド行動" in result
         assert "#general に投稿済み" in result
-        assert "bob にDM送信済み" in result
+        assert "bob にメッセージ送信済み" in result
 
     def test_build_recent_outbound_section_empty(self, tmp_path: Path) -> None:
         """エントリなしで空文字列を返す。"""

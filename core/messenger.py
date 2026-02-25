@@ -113,28 +113,22 @@ class Messenger:
 
         logger.info("Message sent: %s -> %s (%s)", self.anima_name, to, msg.id)
 
-        # Activity Log: record dm_sent for all send paths (A1/A2/B/CLI)
+        # Activity Log: record message_sent for all send paths (S/A/B/CLI)
         if not skip_logging:
             try:
                 from core.memory.activity import ActivityLogger
                 anima_dir = self.shared_dir.parent / "animas" / self.anima_name
                 if anima_dir.exists():
                     activity = ActivityLogger(anima_dir)
-                    log_kwargs: dict[str, Any] = {"content": content, "to_person": to}
+                    meta: dict[str, Any] = {"from_type": "anima"}
                     if intent:
-                        log_kwargs["meta"] = {"intent": intent}
-                    activity.log("dm_sent", **log_kwargs)
+                        meta["intent"] = intent
+                    activity.log("message_sent", content=content, to_person=to, meta=meta)
             except Exception as e:
                 logger.warning(
-                    "Activity logging failed for dm_sent (%s -> %s): %s",
+                    "Activity logging failed for message_sent (%s -> %s): %s",
                     self.anima_name, to, e,
                 )
-
-        # Parallel write to legacy dm_logs/ (fallback data source)
-        try:
-            self._append_dm_log(to, content, intent=intent)
-        except Exception:
-            logger.debug("Failed to append dm_log for %s -> %s", self.anima_name, to, exc_info=True)
 
         return msg
 
@@ -256,10 +250,13 @@ class Messenger:
                 activity = ActivityLogger(anima_dir)
                 recent = activity.recent(
                     days=30, limit=limit * 2,
-                    types=["dm_sent", "dm_received"],
+                    types=["message_sent", "message_received"],
                     involving=peer,
                 )
                 for e in recent:
+                    # Exclude chat message_received (from_type=human)
+                    if e.type == "message_received" and e.meta.get("from_type") != "anima":
+                        continue
                     entries.append({
                         "ts": e.ts,
                         "from": e.from_person or self.anima_name,

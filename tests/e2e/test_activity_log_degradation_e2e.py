@@ -11,10 +11,10 @@ from __future__ import annotations
 These tests use REAL file I/O operations (no mocks for files) and test
 actual end-to-end workflows for:
   - Shared channel visibility in priming (cross-Anima posts)
-  - Messenger.send() creating dm_sent + dm_logs entries
+  - Messenger.send() creating message_sent (dm_logs no longer written)
   - Full-content preservation in dm_received activity log entries
   - format_for_priming() content_trim parameter
-  - read_dm_history() type filtering (exclude message_received/response_sent)
+  - read_dm_history() type filtering (message_sent/message_received, exclude response_sent)
   - read_dm_history() 30-day range retrieval
 
 References:
@@ -172,18 +172,18 @@ class TestSharedChannelVisibleInPriming:
         )
 
 
-class TestMessengerSendCreatesDmSentAndDmLogs:
-    """Test 2: Messenger.send() creates both dm_sent and dm_logs entries."""
+class TestMessengerSendCreatesMessageSent:
+    """Test 2: Messenger.send() creates message_sent in activity log (dm_logs abolished)."""
 
-    def test_messenger_send_creates_dm_sent_and_dm_logs(
+    def test_messenger_send_creates_message_sent(
         self,
         tmp_path: Path,
     ) -> None:
-        """Messenger.send() records dm_sent in activity log and dm_logs.
+        """Messenger.send() records message_sent in activity log.
 
-        After the fix, send() writes to:
-        1. animas/{sender}/activity_log/{date}.jsonl (dm_sent)
-        2. shared/dm_logs/{pair}.jsonl (legacy fallback)
+        After unification, send() writes only to:
+        animas/{sender}/activity_log/{date}.jsonl (message_sent).
+        dm_logs/ is no longer written.
         """
         # Build directory structure
         shared_dir = tmp_path / "shared"
@@ -194,28 +194,23 @@ class TestMessengerSendCreatesDmSentAndDmLogs:
         messenger = Messenger(shared_dir, "sender")
         messenger.send("recipient", "hello from sender")
 
-        # 1. Check activity log has dm_sent entry
+        # 1. Check activity log has message_sent entry
         today = date.today().isoformat()
         activity_log_path = sender_anima_dir / "activity_log" / f"{today}.jsonl"
         assert activity_log_path.exists(), "Activity log file should be created"
 
         activity_entries = _read_jsonl(activity_log_path)
-        dm_sent_entries = [e for e in activity_entries if e.get("type") == "dm_sent"]
-        assert len(dm_sent_entries) >= 1, "At least one dm_sent entry should exist"
+        msg_sent_entries = [e for e in activity_entries if e.get("type") == "message_sent"]
+        assert len(msg_sent_entries) >= 1, "At least one message_sent entry should exist"
 
-        dm_entry = dm_sent_entries[0]
-        assert dm_entry.get("to") == "recipient"
-        assert dm_entry.get("content") == "hello from sender"
+        msg_entry = msg_sent_entries[0]
+        assert msg_entry.get("to") == "recipient"
+        assert msg_entry.get("content") == "hello from sender"
 
-        # 2. Check dm_logs has an entry
+        # 2. dm_logs is no longer written
         pair = sorted(["sender", "recipient"])
         dm_log_path = shared_dir / "dm_logs" / f"{pair[0]}-{pair[1]}.jsonl"
-        assert dm_log_path.exists(), "DM log file should be created"
-
-        dm_log_entries = _read_jsonl(dm_log_path)
-        assert len(dm_log_entries) >= 1, "At least one dm_log entry should exist"
-        assert dm_log_entries[0].get("from") == "sender"
-        assert dm_log_entries[0].get("text") == "hello from sender"
+        assert not dm_log_path.exists(), "DM log file should not be created (dm_logs abolished)"
 
 
 class TestDmReceivedFullContentInActivityLog:
@@ -324,16 +319,16 @@ class TestFormatForPrimingContentTrim:
 
 
 class TestReadDmHistoryExcludesMessageTypes:
-    """Test 6: read_dm_history() excludes message_received/response_sent."""
+    """Test 6: read_dm_history() returns message_sent/message_received, excludes response_sent."""
 
     def test_read_dm_history_excludes_message_types(
         self,
         tmp_path: Path,
     ) -> None:
-        """read_dm_history() only returns dm_sent and dm_received entries.
+        """read_dm_history() returns message_sent and message_received (DM) entries.
 
-        After the fix, the type filter no longer includes message_received
-        and response_sent, which polluted DM history with chat conversations.
+        Type filter includes message_sent and message_received. Chat
+        message_received (from_type=human) and response_sent are excluded.
         """
         # Build directory structure
         shared_dir = tmp_path / "shared"
@@ -345,18 +340,21 @@ class TestReadDmHistoryExcludesMessageTypes:
         today = date.today().isoformat()
 
         # Write mixed activity log entries involving "peer-anima"
+        # DM entries (message_sent, message_received with from_type=anima)
         entries = [
             {
                 "ts": (now - timedelta(minutes=40)).isoformat(),
-                "type": "dm_sent",
+                "type": "message_sent",
                 "content": "DM送信: タスクの確認です",
                 "to": "peer-anima",
+                "meta": {"from_type": "anima"},
             },
             {
                 "ts": (now - timedelta(minutes=35)).isoformat(),
-                "type": "dm_received",
+                "type": "message_received",
                 "content": "DM受信: 了解しました",
                 "from": "peer-anima",
+                "meta": {"from_type": "anima"},
             },
             {
                 "ts": (now - timedelta(minutes=30)).isoformat(),
@@ -364,6 +362,7 @@ class TestReadDmHistoryExcludesMessageTypes:
                 "content": "MSG受信: これはチャットメッセージ",
                 "from": "peer-anima",
                 "channel": "chat",
+                "meta": {"from_type": "human"},
             },
             {
                 "ts": (now - timedelta(minutes=25)).isoformat(),
@@ -378,23 +377,23 @@ class TestReadDmHistoryExcludesMessageTypes:
         messenger = Messenger(shared_dir, "test-anima")
         history = messenger.read_dm_history("peer-anima", limit=20)
 
-        # Should only contain dm_sent and dm_received
+        # Should only contain message_sent and message_received (DM) entries
         for entry in history:
             text = entry.get("text", "")
             assert "DM送信" in text or "DM受信" in text, (
-                f"Only dm_sent/dm_received should appear, got: {text}"
+                f"Only message_sent/message_received (DM) should appear, got: {text}"
             )
 
-        # Should NOT contain message_received or response_sent content
+        # Should NOT contain response_sent or chat message_received content
         all_texts = " ".join(e.get("text", "") for e in history)
         assert "MSG受信" not in all_texts, (
-            "message_received content should not appear in DM history"
+            "chat message_received content should not appear in DM history"
         )
         assert "MSG送信" not in all_texts, (
             "response_sent content should not appear in DM history"
         )
 
-        # Should have exactly 2 entries (dm_sent + dm_received)
+        # Should have exactly 2 entries (message_sent + message_received with from_type=anima)
         assert len(history) == 2, f"Expected 2 DM entries, got {len(history)}"
 
 
@@ -416,7 +415,7 @@ class TestReadDmHistory30DayRange:
         anima_dir = tmp_path / "animas" / "test-anima"
         (anima_dir / "activity_log").mkdir(parents=True)
 
-        # Write a dm_sent entry dated 10 days ago
+        # Write message_sent and message_received entries dated 10 days ago
         old_date = date.today() - timedelta(days=10)
         old_date_str = old_date.isoformat()
         old_ts = datetime.combine(old_date, datetime.min.time().replace(hour=14))
@@ -424,15 +423,17 @@ class TestReadDmHistory30DayRange:
         entries = [
             {
                 "ts": old_ts.isoformat(),
-                "type": "dm_sent",
+                "type": "message_sent",
                 "content": "OLD_DM_FROM_10_DAYS_AGO",
                 "to": "peer-anima",
+                "meta": {"from_type": "anima"},
             },
             {
                 "ts": (old_ts + timedelta(minutes=5)).isoformat(),
-                "type": "dm_received",
+                "type": "message_received",
                 "content": "OLD_DM_REPLY_FROM_10_DAYS_AGO",
                 "from": "peer-anima",
+                "meta": {"from_type": "anima"},
             },
         ]
         _write_activity_entries(anima_dir, old_date_str, entries)
@@ -447,8 +448,8 @@ class TestReadDmHistory30DayRange:
 
         all_texts = " ".join(e.get("text", "") for e in history)
         assert "OLD_DM_FROM_10_DAYS_AGO" in all_texts, (
-            "10-day-old dm_sent should be retrievable with days=30"
+            "10-day-old message_sent should be retrievable with days=30"
         )
         assert "OLD_DM_REPLY_FROM_10_DAYS_AGO" in all_texts, (
-            "10-day-old dm_received should be retrievable with days=30"
+            "10-day-old message_received should be retrievable with days=30"
         )

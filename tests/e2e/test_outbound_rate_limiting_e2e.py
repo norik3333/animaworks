@@ -216,7 +216,7 @@ class TestCascadeLimiterFileBasedE2E:
 
 @pytest.mark.e2e
 class TestPrimingOutboundSectionE2E:
-    """activity_log に channel_post と dm_sent を書き込み、
+    """activity_log に channel_post と message_sent を書き込み、
     _build_recent_outbound_section が正しくセクションを生成することを確認する。
     """
 
@@ -241,13 +241,13 @@ class TestPrimingOutboundSectionE2E:
             }, ensure_ascii=False),
             json.dumps({
                 "ts": ts2,
-                "type": "dm_sent",
+                "type": "message_sent",
                 "content": "確認お願いします",
                 "to": "bob",
             }, ensure_ascii=False),
             json.dumps({
                 "ts": ts3,
-                "type": "dm_sent",
+                "type": "message_sent",
                 "content": "ありがとうございました",
                 "to": "charlie",
             }, ensure_ascii=False),
@@ -265,8 +265,8 @@ class TestPrimingOutboundSectionE2E:
         assert "#general に投稿済み" in result
         assert "進捗報告です" in result
 
-        # ── dm_sent entries formatted correctly ──
-        assert "bob にDM送信済み" in result or "charlie にDM送信済み" in result
+        # ── message_sent entries formatted correctly ──
+        assert "bob にメッセージ送信済み" in result or "charlie にメッセージ送信済み" in result
 
         # ── max_entries=3 respected (all 3 should appear) ──
         # Check that all entries within 2 hours are included

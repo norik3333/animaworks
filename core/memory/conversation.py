@@ -882,7 +882,7 @@ class ConversationMemory:
                 days=1,
                 limit=30,
                 types=[
-                    "dm_sent", "dm_received", "channel_post", "channel_read",
+                    "message_sent", "message_received", "channel_post", "channel_read",
                     "tool_use", "human_notify", "cron_executed",
                 ],
             )

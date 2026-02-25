@@ -454,7 +454,7 @@ class DigitalAnima:
                 conv_memory.save()
 
                 # Activity log: message received
-                self._activity.log("message_received", content=content, summary=content[:100], from_person=from_person, channel="chat")
+                self._activity.log("message_received", content=content, summary=content[:100], from_person=from_person, channel="chat", meta={"from_type": "human"})
 
                 try:
                     result = await self.agent.run_cycle(
@@ -575,7 +575,7 @@ class DigitalAnima:
                 conv_memory.save()
 
                 # Activity log: message received
-                self._activity.log("message_received", content=content, summary=content[:100], from_person=from_person, channel="chat")
+                self._activity.log("message_received", content=content, summary=content[:100], from_person=from_person, channel="chat", meta={"from_type": "human"})
 
                 # Streaming journal: write-ahead log for crash recovery
                 journal = StreamingJournal(self.anima_dir)
@@ -1206,9 +1206,9 @@ class DigitalAnima:
                     self.name, _m.from_person, exc_info=True,
                 )
 
-        # Activity log: DM received (full content, summary truncated)
+        # Activity log: message received from Anima (full content, summary truncated)
         for _m in _recordable[:50]:
-            self._activity.log("dm_received", content=_m.content, summary=_m.content[:200], from_person=_m.from_person, to_person=self.name)
+            self._activity.log("message_received", content=_m.content, summary=_m.content[:200], from_person=_m.from_person, to_person=self.name, meta={"from_type": "anima"})
 
         return InboxResult(
             inbox_items=inbox_items,

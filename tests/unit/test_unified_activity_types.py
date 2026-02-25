@@ -210,11 +210,11 @@ class TestBackendActivityLogSummary:
             f"Expected 2 message_received calls with summary, found {len(matches)}"
         )
 
-    def test_dm_received_has_summary(self) -> None:
+    def test_message_received_from_anima_has_summary(self) -> None:
         content = self._ANIMA_PY.read_text(encoding="utf-8")
-        pattern = r'activity\.log\("dm_received",\s*content=_m\.content,\s*summary=_m\.content\[:200\]'
+        pattern = r'activity\.log\("message_received",\s*content=_m\.content,\s*summary=_m\.content\[:200\]'
         assert re.search(pattern, content), (
-            "dm_received activity.log() should use full content and summary=_m.content[:200]"
+            "message_received (from anima) activity.log() should use full content and summary=_m.content[:200]"
         )
 
 

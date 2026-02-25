@@ -275,10 +275,10 @@ class TestChannelBRecentActivity:
 
 
 class TestMessengerSendActivityLog:
-    """Tests for Messenger.send() recording dm_sent in activity log."""
+    """Tests for Messenger.send() recording message_sent in activity log."""
 
     def test_send_creates_dm_sent_entry(self, tmp_path: Path):
-        """Verify that send() creates a dm_sent entry in activity_log/{date}.jsonl."""
+        """Verify that send() creates a message_sent entry in activity_log/{date}.jsonl."""
         from core.messenger import Messenger
 
         # Setup directory structure: shared/inbox/sender/ and animas/sender/activity_log/
@@ -299,47 +299,40 @@ class TestMessengerSendActivityLog:
         lines = log_file.read_text(encoding="utf-8").strip().splitlines()
         assert len(lines) >= 1
 
-        found_dm_sent = False
+        found_message_sent = False
         for line in lines:
             entry = json.loads(line)
-            if entry.get("type") == "dm_sent":
-                found_dm_sent = True
+            if entry.get("type") == "message_sent":
+                found_message_sent = True
                 assert entry.get("to") == "receiver"
                 assert "Hello receiver!" in entry.get("content", "")
+                meta = entry.get("meta") or {}
+                assert meta.get("from_type") == "anima"
                 break
-        assert found_dm_sent, "Should find a dm_sent entry in activity log"
+        assert found_message_sent, "Should find a message_sent entry in activity log"
 
 
-# ── 4. messenger.py — send() writes to dm_logs/ ───────────────────
+# ── 4. messenger.py — send() no longer writes to dm_logs/ ────────────
 
 
 class TestMessengerSendDmLogs:
-    """Tests for Messenger.send() appending to dm_logs/."""
+    """Tests for Messenger.send() NOT writing to dm_logs/ (abolished)."""
 
     def test_send_appends_to_dm_logs(self, tmp_path: Path):
-        """Verify that send() writes an entry to shared/dm_logs/{pair}.jsonl."""
+        """Verify that send() does NOT write to shared/dm_logs/ (dm_logs abolished)."""
         from core.messenger import Messenger
 
         shared = tmp_path / "shared"
         (shared / "inbox" / "alice").mkdir(parents=True)
         (shared / "inbox" / "bob").mkdir(parents=True)
-        # Also need animas dir for activity log (don't fail on missing)
         (tmp_path / "animas" / "alice").mkdir(parents=True)
 
         messenger = Messenger(shared, "alice")
         messenger.send(to="bob", content="Hi Bob!")
 
-        # dm_logs path uses sorted pair: alice-bob.jsonl
+        # dm_logs is no longer written; verify it does NOT exist
         dm_log = shared / "dm_logs" / "alice-bob.jsonl"
-        assert dm_log.exists(), "dm_logs file should exist"
-
-        lines = dm_log.read_text(encoding="utf-8").strip().splitlines()
-        assert len(lines) >= 1
-
-        entry = json.loads(lines[-1])
-        assert entry.get("from") == "alice"
-        assert entry.get("to") == "bob"
-        assert entry.get("text") == "Hi Bob!"
+        assert not dm_log.exists(), "dm_logs should NOT be written (abolished)"
 
 
 # ── 5. (Section 9 deleted — Arch-1 hippocampus model) ─────────────
@@ -581,7 +574,7 @@ class TestReadDmHistoryTypeFilter:
     """Tests for Messenger.read_dm_history() using correct type filters."""
 
     def test_only_requests_dm_types(self, tmp_path: Path):
-        """Verify read_dm_history only queries dm_sent and dm_received types."""
+        """Verify read_dm_history queries message_sent and message_received types."""
         from core.messenger import Messenger
 
         shared = tmp_path / "shared"
@@ -598,11 +591,11 @@ class TestReadDmHistoryTypeFilter:
             # Verify the types parameter
             call_kwargs = mock_recent.call_args[1] if mock_recent.call_args else {}
             types = call_kwargs.get("types", [])
-            assert "dm_sent" in types
-            assert "dm_received" in types
-            # The fix removes message_received and response_sent from the filter
-            assert "message_received" not in types
-            assert "response_sent" not in types
+            assert "message_sent" in types
+            assert "message_received" in types
+            # Legacy dm_sent/dm_received are no longer requested
+            assert "dm_sent" not in types
+            assert "dm_received" not in types
 
     def test_read_dm_history_days_30(self, tmp_path: Path):
         """Verify read_dm_history uses days=30 for broader history."""
@@ -699,10 +692,10 @@ class TestFormatEntryContentTrim:
     def test_format_entry_type_icons(self):
         """Verify type-to-icon mapping works correctly."""
         test_cases = [
-            ("dm_sent", "DM>"),
-            ("dm_received", "DM<"),
+            ("dm_sent", "MSG>"),
+            ("dm_received", "MSG<"),
             ("message_received", "MSG<"),
-            ("response_sent", "MSG>"),
+            ("response_sent", "RESP>"),
             ("channel_post", "CH.W"),
             ("tool_use", "TOOL"),
             ("heartbeat_start", "HB"),
@@ -782,7 +775,7 @@ class TestMessengerSendIntegration:
         """
 
     def test_send_writes_both_activity_and_dm_logs(self, tmp_path: Path):
-        """Verify send() writes to both activity log and dm_logs."""
+        """Verify send() writes only to activity log (dm_logs abolished)."""
         from core.messenger import Messenger
 
         shared = tmp_path / "shared"
@@ -802,19 +795,12 @@ class TestMessengerSendIntegration:
             json.loads(line)
             for line in activity_file.read_text(encoding="utf-8").strip().splitlines()
         ]
-        dm_sent_entries = [e for e in activity_entries if e.get("type") == "dm_sent"]
-        assert len(dm_sent_entries) >= 1
+        message_sent_entries = [e for e in activity_entries if e.get("type") == "message_sent"]
+        assert len(message_sent_entries) >= 1
 
-        # Check dm_logs
+        # dm_logs is no longer written
         dm_log = shared / "dm_logs" / "alice-bob.jsonl"
-        assert dm_log.exists()
-        dm_entries = [
-            json.loads(line)
-            for line in dm_log.read_text(encoding="utf-8").strip().splitlines()
-        ]
-        assert len(dm_entries) >= 1
-        assert dm_entries[-1]["from"] == "alice"
-        assert dm_entries[-1]["to"] == "bob"
+        assert not dm_log.exists(), "dm_logs should NOT be written (abolished)"
 
     def test_send_does_not_fail_if_anima_dir_missing(self, tmp_path: Path):
         """Verify send() succeeds even if animas/ directory doesn't exist."""

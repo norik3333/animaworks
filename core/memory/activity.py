@@ -33,6 +33,33 @@ logger = logging.getLogger("animaworks.activity")
 # Rough characters-per-token for Japanese/English mixed text.
 _CHARS_PER_TOKEN = 4
 
+# Alias mapping: old event type → new canonical name.
+# Used for backward compatibility with existing JSONL logs.
+_EVENT_TYPE_ALIASES: dict[str, str] = {
+    "dm_sent": "message_sent",
+    "dm_received": "message_received",
+}
+
+
+def _resolve_type_filter(types: list[str] | None) -> set[str] | None:
+    """Expand a type filter list to include aliases.
+
+    When the caller requests ``["message_sent"]``, the resolved set
+    also includes ``"dm_sent"`` so that older log entries still match.
+    Conversely, requesting ``["dm_sent"]`` also matches ``"message_sent"``.
+    """
+    if types is None:
+        return None
+    resolved: set[str] = set()
+    for t in types:
+        resolved.add(t)
+        for old, new in _EVENT_TYPE_ALIASES.items():
+            if t == new:
+                resolved.add(old)
+            elif t == old:
+                resolved.add(new)
+    return resolved
+
 
 # ── Data model ────────────────────────────────────────────────
 
@@ -116,7 +143,7 @@ class ActivityPage:
 def _get_peer(group: EntryGroup) -> str:
     """Get the peer name from the first entry of a DM group."""
     e = group.entries[0]
-    if e.type == "dm_sent":
+    if e.type in ("dm_sent", "message_sent"):
         return e.to_person
     return e.from_person
 
@@ -266,7 +293,7 @@ class ActivityLogger:
         entries: list[ActivityEntry] = []
         now = now_jst()
         today = now.date()
-        type_set = set(types) if types else None
+        type_set = _resolve_type_filter(types)
 
         # Determine scan range
         scan_days = days
@@ -485,11 +512,12 @@ class ActivityLogger:
 
         type_map: dict[str, str] = {
             "message_received": "MSG<",
-            "response_sent": "MSG>",
+            "message_sent": "MSG>",
+            "response_sent": "RESP>",
             "channel_read": "CH.R",
             "channel_post": "CH.W",
-            "dm_received": "DM<",
-            "dm_sent": "DM>",
+            "dm_received": "MSG<",
+            "dm_sent": "MSG>",
             "human_notify": "NTFY",
             "tool_use": "TOOL",
             "tool_result": "TRES",
@@ -542,9 +570,13 @@ class ActivityLogger:
         for entry in entries:
             entry_type = entry.type
 
-            # DM grouping
-            if entry_type in ("dm_sent", "dm_received"):
-                peer = entry.to_person if entry_type == "dm_sent" else entry.from_person
+            # DM / inter-Anima message grouping (includes legacy aliases).
+            # Human-chat message_received (from_type="human") is excluded.
+            _is_dm_event = entry_type in ("dm_sent", "dm_received", "message_sent")
+            if entry_type == "message_received":
+                _is_dm_event = entry.meta.get("from_type") == "anima"
+            if _is_dm_event:
+                peer = entry.to_person if entry_type in ("dm_sent", "message_sent") else entry.from_person
                 if (
                     current_group
                     and current_group.type == "dm"
@@ -646,9 +678,8 @@ class ActivityLogger:
             # Header: [HH:MM-HH:MM] DM {peer}:
             peer = _get_peer(group)
             lines = [f"{time_range} DM {peer}:"]
-            # Child lines: indented DM direction + summary
             for e in group.entries:
-                direction = "DM<" if e.type == "dm_received" else "DM>"
+                direction = "MSG<" if e.type in ("dm_received", "message_received") else "MSG>"
                 text = e.summary or e.content[:100]
                 if len(text) > 100:
                     text = text[:100]

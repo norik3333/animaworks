@@ -32,9 +32,9 @@ class ConversationDepthLimiter:
     """Track message exchange depth between Anima pairs via activity log.
 
     File-based: reads ``activity_log/{date}.jsonl`` to count recent
-    dm_sent and dm_received events involving the target pair.  This
-    replaces the previous in-memory implementation that was lost on
-    process restart.
+    message_sent and message_received events involving the target pair.
+    Alias resolution in ActivityLogger ensures legacy ``dm_sent`` /
+    ``dm_received`` entries are also matched.
     """
 
     def __init__(
@@ -54,7 +54,7 @@ class ConversationDepthLimiter:
     ) -> bool:
         """Check if the exchange is allowed by scanning activity_log.
 
-        Counts dm_sent and dm_received entries involving the
+        Counts message_sent and message_received entries involving the
         (sender, receiver) pair within ``depth_window_s``.
 
         Args:

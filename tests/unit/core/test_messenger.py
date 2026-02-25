@@ -100,22 +100,26 @@ class TestSend:
         data = json.loads(files[0].read_text(encoding="utf-8"))
         assert data["intent"] == "report"
 
-    def test_send_intent_in_dm_log(self, shared_dir, messenger):
+    def test_send_intent_in_activity_log_meta(self, shared_dir, messenger):
+        anima_dir = shared_dir.parent / "animas" / "alice"
+        anima_dir.mkdir(parents=True, exist_ok=True)
+        (anima_dir / "activity_log").mkdir(parents=True, exist_ok=True)
         messenger.send("bob", "Report", intent="report")
-        log_path = shared_dir / "dm_logs"
-        assert log_path.exists()
-        files = list(log_path.glob("*.jsonl"))
-        assert len(files) == 1
-        entry = json.loads(files[0].read_text(encoding="utf-8").strip().split("\n")[0])
-        assert entry.get("intent") == "report"
 
-    def test_send_no_intent_not_in_dm_log(self, shared_dir, messenger):
+        from core.memory.activity import ActivityLogger
+        activity = ActivityLogger(anima_dir)
+        entries = activity.recent(days=1, types=["message_sent"])
+        assert len(entries) >= 1
+        assert entries[-1].meta.get("intent") == "report"
+
+    def test_send_no_dm_logs_written(self, shared_dir, messenger):
         messenger.send("bob", "Hello")
         log_path = shared_dir / "dm_logs"
-        files = list(log_path.glob("*.jsonl"))
-        if files:
-            entry = json.loads(files[0].read_text(encoding="utf-8").strip().split("\n")[0])
-            assert "intent" not in entry
+        if log_path.exists():
+            files = list(log_path.glob("*.jsonl"))
+            for f in files:
+                content = f.read_text(encoding="utf-8").strip()
+                assert content == ""
 
 
 # ── reply ─────────────────────────────────────────────────
@@ -347,30 +351,39 @@ class TestSendAsync:
         assert msg.intent == "report"
 
 
-# ── send() writes DM log (restored) ────────────────────
+# ── send() no longer writes DM log ────────────────────
 
 
-class TestSendCreatesDmLog:
-    """send() writes to dm_logs/ again for legacy fallback support."""
+class TestSendNoDmLog:
+    """send() no longer writes to dm_logs/ (dm_logs write abolished)."""
 
-    def test_send_creates_dm_log(self, shared_dir, messenger):
+    def test_send_does_not_create_dm_log(self, shared_dir, messenger):
         messenger.send("bob", "Hello Bob!")
-        log_dir = shared_dir / "dm_logs"
-        assert log_dir.exists()
+        dm_log_dir = shared_dir / "dm_logs"
+        if dm_log_dir.exists():
+            files = list(dm_log_dir.glob("*.jsonl"))
+            for f in files:
+                assert f.read_text(encoding="utf-8").strip() == ""
 
-    def test_reply_creates_dm_log(self, shared_dir, messenger):
+    def test_reply_does_not_create_dm_log(self, shared_dir, messenger):
         original = Message(
             from_person="bob", to_person="alice",
             content="original", thread_id="thread-abc",
         )
         messenger.reply(original, "Got it!")
-        log_dir = shared_dir / "dm_logs"
-        assert log_dir.exists()
+        dm_log_dir = shared_dir / "dm_logs"
+        if dm_log_dir.exists():
+            files = list(dm_log_dir.glob("*.jsonl"))
+            for f in files:
+                assert f.read_text(encoding="utf-8").strip() == ""
 
-    async def test_send_async_creates_dm_log(self, shared_dir, messenger):
+    async def test_send_async_does_not_create_dm_log(self, shared_dir, messenger):
         await messenger.send_async("bob", "async msg")
-        log_dir = shared_dir / "dm_logs"
-        assert log_dir.exists()
+        dm_log_dir = shared_dir / "dm_logs"
+        if dm_log_dir.exists():
+            files = list(dm_log_dir.glob("*.jsonl"))
+            for f in files:
+                assert f.read_text(encoding="utf-8").strip() == ""
 
 
 # ── receive_with_paths ───────────────────────────────────

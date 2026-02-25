@@ -339,7 +339,7 @@ def _build_recent_tool_section(anima_dir: Path, model_config: Any) -> str:
 def _build_recent_outbound_section(anima_dir: Path, max_entries: int = 3) -> str:
     """Build a short section showing the Anima's recent outbound actions.
 
-    Reads activity_log for channel_post and dm_sent within the last 2 hours.
+    Reads activity_log for channel_post and message_sent within the last 2 hours.
     Returns empty string if no recent outbound actions.
     """
     try:
@@ -349,7 +349,7 @@ def _build_recent_outbound_section(anima_dir: Path, max_entries: int = 3) -> str
         entries = activity.recent(
             days=1,
             limit=20,
-            types=["channel_post", "dm_sent"],
+            types=["channel_post", "message_sent"],
         )
     except Exception:
         return ""
@@ -385,9 +385,9 @@ def _build_recent_outbound_section(anima_dir: Path, max_entries: int = 3) -> str
         if e.type == "channel_post":
             ch = e.channel or "?"
             lines.append(f"- [{time_str}] #{ch} に投稿済み: 「{text_preview}」")
-        elif e.type == "dm_sent":
+        elif e.type in ("dm_sent", "message_sent"):
             to = e.to_person or "?"
-            lines.append(f"- [{time_str}] {to} にDM送信済み: 「{text_preview}」")
+            lines.append(f"- [{time_str}] {to} にメッセージ送信済み: 「{text_preview}」")
     lines.append("")
     return "\n".join(lines)
 

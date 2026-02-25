@@ -176,7 +176,7 @@ class TestDmReceivedSummary:
 
     @pytest.mark.asyncio
     async def test_inbox_with_dm_logs_summary(self, data_dir, make_anima) -> None:
-        """process_inbox_message processing DMs should log dm_received with summary."""
+        """process_inbox_message processing DMs should log message_received with from_type=anima and summary."""
         anima_dir = make_anima("carol")
         shared_dir = data_dir / "shared"
 
@@ -239,10 +239,11 @@ class TestDmReceivedSummary:
             await anima.process_inbox_message()
 
             entries = _read_activity_entries(anima_dir)
-            dm_entries = _find_entries_by_type(entries, "dm_received")
-            assert len(dm_entries) >= 1, "Expected at least 1 dm_received entry"
+            msg_entries = _find_entries_by_type(entries, "message_received")
+            dm_entries = [e for e in msg_entries if e.get("meta", {}).get("from_type") == "anima"]
+            assert len(dm_entries) >= 1, "Expected at least 1 message_received entry with from_type=anima"
             assert dm_entries[0].get("summary") == dm_content[:100], (
-                f"dm_received summary should be content[:100], got: {dm_entries[0].get('summary')}"
+                f"message_received summary should be content[:100], got: {dm_entries[0].get('summary')}"
             )
 
 

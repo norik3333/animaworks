@@ -211,9 +211,9 @@ class TestReadDmHistory:
         assert len(result) == 3
 
     def test_send_creates_dm_log(self, shared_dir, messenger):
-        """send() writes to dm_logs/ again for legacy fallback support."""
+        """send() no longer writes to dm_logs/ (dm_logs abolished)."""
         messenger.send("bob", "Hello!")
-        assert (shared_dir / "dm_logs").exists()
+        assert not (shared_dir / "dm_logs").exists()
 
     def test_send_no_message_log(self, shared_dir, messenger):
         """send() should NOT create message_log anymore."""

@@ -34,8 +34,8 @@ class TestE2EDMFlow:
         state to clear.  This fixture is kept for backward compatibility.
         """
 
-    def test_send_creates_inbox_and_dm_log(self, shared_dir):
-        """send() creates inbox file and writes dm_log (parallel fallback)."""
+    def test_send_creates_inbox(self, shared_dir):
+        """send() creates inbox file (dm_logs no longer written)."""
         alice = Messenger(shared_dir, "alice")
         alice.send("bob", "Hello Bob!")
 
@@ -43,9 +43,9 @@ class TestE2EDMFlow:
         bob_inbox = shared_dir / "inbox" / "bob"
         assert len(list(bob_inbox.glob("*.json"))) == 1
 
-        # DM log should be created (restored as parallel fallback)
+        # dm_logs is no longer written
         dm_log = shared_dir / "dm_logs" / "alice-bob.jsonl"
-        assert dm_log.exists()
+        assert not dm_log.exists()
 
     def test_bidirectional_inbox_conversation(self, shared_dir):
         """Bidirectional messages are delivered via inbox.
