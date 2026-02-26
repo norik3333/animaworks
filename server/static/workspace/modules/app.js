@@ -288,7 +288,9 @@ async function switchView(view) {
     dom.orgPanel.classList.remove("hidden");
 
     const { animas } = getState();
-    await initOrgDashboard(dom.orgPanel, animas);
+    await initOrgDashboard(dom.orgPanel, animas, {
+      onNodeClick: (name) => selectAnima(name),
+    });
   } else {
     // Dispose org dashboard before switching
     dom.orgPanel.classList.add("hidden");

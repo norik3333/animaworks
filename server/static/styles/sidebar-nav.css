@@ -78,6 +78,9 @@
   flex-shrink: 0;
 }
 
+.nav-emoji { display: var(--aw-emoji-display); }
+.nav-lucide { display: var(--aw-icon-display); }
+
 /* ── External Link ───────────────────────────── */
 
 .nav-external {

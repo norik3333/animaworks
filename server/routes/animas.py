@@ -53,11 +53,16 @@ def create_animas_router() -> APIRouter:
             # Read supervisor from config
             anima_cfg = config.animas.get(name, AnimaModelConfig())
 
-            # Resolve model name
+            # Resolve model name and role from status.json
             model = None
+            role = None
             try:
                 resolved, _ = resolve_anima_config(config, name, anima_dir=anima_dir)
                 model = resolved.model
+                status_path = anima_dir / "status.json"
+                if status_path.exists():
+                    status_data = json.loads(status_path.read_text(encoding="utf-8"))
+                    role = status_data.get("role")
             except Exception:
                 logger.debug("Failed to resolve model for anima '%s'", name, exc_info=True)
 
@@ -70,6 +75,8 @@ def create_animas_router() -> APIRouter:
                 "uptime_sec": proc_status.get("uptime_sec"),
                 "appearance": appearance,
                 "supervisor": anima_cfg.supervisor,
+                "speciality": anima_cfg.speciality,
+                "role": role,
                 "model": model,
             }
             result.append(data)
