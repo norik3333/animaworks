@@ -2,7 +2,7 @@
 
 import { state, dom, escapeHtml } from "./state.js";
 import { api } from "./api.js";
-import { renderChat, resumeActiveStream, loadConversationHistory, setupScrollObserver } from "./chat.js";
+import { renderChat, resumeActiveStream, loadConversationHistory, setupScrollObserver, updateVoiceAnima } from "./chat.js";
 import { loadMemoryTab } from "./memory.js";
 import { hideHistoryDetail, loadSessionList } from "./history.js";
 
@@ -64,6 +64,7 @@ export async function selectAnima(name) {
   }
 
   state.selectedAnima = name;
+  updateVoiceAnima(name);
 
   // Update dropdown
   const dropdown = dom.animaDropdown || document.getElementById("animaDropdown");

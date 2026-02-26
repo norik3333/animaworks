@@ -23,6 +23,7 @@ import { streamChat, fetchActiveStream, fetchStreamProgress } from "../../shared
 import { SwipeHandler } from "../../modules/touch.js";
 import { createLogger } from "../../shared/logger.js";
 import { createImageInput, initLightbox, renderChatImages } from "../../shared/image-input.js";
+import { initVoiceUI, destroyVoiceUI } from "../../modules/voice-ui.js";
 import { getIcon } from "../../shared/activity-types.js";
 
 const logger = createLogger("ws-app");
@@ -286,6 +287,7 @@ let _scrollObserver = null;
 async function openConversation(animaName) {
   if (!dom.convOverlay) return;
 
+  destroyVoiceUI();
   setState({ conversationOpen: true, conversationAnima: animaName });
 
   // Show conversation overlay on top of office
@@ -321,6 +323,12 @@ async function openConversation(animaName) {
 
   // Focus input
   dom.convInput?.focus();
+
+  // Initialize voice input for conversation
+  const convInputArea = document.querySelector(".ws-conv-input-area");
+  if (convInputArea && animaName) {
+    initVoiceUI(convInputArea, animaName);
+  }
 }
 
 function closeConversation() {
@@ -357,6 +365,9 @@ function closeConversation() {
     convStreamController.abort();
     convStreamController = null;
   }
+
+  // Destroy voice UI
+  destroyVoiceUI();
 }
 
 // ── Greeting on Character Click ──────────────────────

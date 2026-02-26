@@ -258,6 +258,46 @@ class HeartbeatConfig(BaseModel):
     max_messages_per_day: int = 100  # Global outbound DM limit per Anima per day
 
 
+# ── Voice Chat Config ───────────────────────────────────────────────────────
+
+
+class VoicevoxConfig(BaseModel):
+    """VOICEVOX Engine connection settings."""
+
+    base_url: str = "http://localhost:50021"
+
+
+class ElevenLabsVoiceConfig(BaseModel):
+    """ElevenLabs TTS API settings."""
+
+    api_key_env: str = "ELEVENLABS_API_KEY"
+    model_id: str = "eleven_flash_v2_5"
+
+
+class StyleBertVits2Config(BaseModel):
+    """Style-BERT-VITS2 / AivisSpeech connection settings."""
+
+    base_url: str = "http://localhost:5000"
+
+
+class VoiceConfig(BaseModel):
+    """Voice chat configuration."""
+
+    stt_model: str = "large-v3-turbo"
+    stt_device: str = "auto"
+    stt_compute_type: str = "default"
+    stt_language: str | None = None
+    stt_refine_enabled: bool = False
+    default_tts_provider: str = "voicevox"
+    audio_format: str = "wav"
+    voicevox: VoicevoxConfig = VoicevoxConfig()
+    elevenlabs: ElevenLabsVoiceConfig = ElevenLabsVoiceConfig()
+    style_bert_vits2: StyleBertVits2Config = StyleBertVits2Config()
+
+
+# ── Main Config ─────────────────────────────────────────────────────────────
+
+
 class AnimaWorksConfig(BaseModel):
     version: int = 1
     setup_complete: bool = False
@@ -278,6 +318,7 @@ class AnimaWorksConfig(BaseModel):
     background_task: BackgroundTaskConfig = BackgroundTaskConfig()
     activity_log: ActivityLogConfig = ActivityLogConfig()
     heartbeat: HeartbeatConfig = HeartbeatConfig()
+    voice: VoiceConfig = VoiceConfig()
 
 
 # ---------------------------------------------------------------------------

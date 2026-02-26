@@ -360,7 +360,7 @@ def create_app(animas_dir: Path, shared_dir: Path) -> FastAPI:
             return await call_next(request)
 
         # Only protect /api/ and /ws paths
-        if not path.startswith("/api/") and path != "/ws":
+        if not path.startswith("/api/") and path != "/ws" and not path.startswith("/ws/"):
             return await call_next(request)
 
         # Validate session token from cookie

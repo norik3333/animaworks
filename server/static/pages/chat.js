@@ -4,6 +4,8 @@ import { escapeHtml, renderMarkdown, timeStr, smartTimestamp } from "../modules/
 import { streamChat } from "../shared/chat-stream.js";
 import { createLogger } from "../shared/logger.js";
 import { createImageInput, initLightbox, renderChatImages } from "../shared/image-input.js";
+import { initVoiceUI } from "../modules/voice-ui.js";
+import { updateVoiceAnima } from "../modules/chat.js";
 import { getIcon, getDisplaySummary } from "../shared/activity-types.js";
 
 const logger = createLogger("chat-page");
@@ -318,6 +320,7 @@ function _renderAnimaDropdown() {
 
 async function _selectAnima(name) {
   _selectedAnima = name;
+  updateVoiceAnima(name);
 
   const select = _$("chatPageAnimaSelect");
   if (select) select.value = name;
@@ -1291,6 +1294,12 @@ function _initImageInput() {
 
   // Initialize lightbox for image clicks
   initLightbox();
+
+  // Initialize voice input
+  const chatInputFormEl = _$("chatPageForm") || document.querySelector(".chat-input-form");
+  if (chatInputFormEl && _selectedAnima) {
+    initVoiceUI(chatInputFormEl, _selectedAnima);
+  }
 }
 
 async function _loadMemoryContent(tab, file) {

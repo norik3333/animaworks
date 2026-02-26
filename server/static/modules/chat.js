@@ -5,6 +5,7 @@ import { addActivity } from "./activity.js";
 import { streamChat, fetchActiveStream, fetchStreamProgress } from "../shared/chat-stream.js";
 import { createLogger } from "../shared/logger.js";
 import { createImageInput, initLightbox, renderChatImages } from "../shared/image-input.js";
+import { initVoiceUI, updateVoiceUIAnima } from "./voice-ui.js";
 import { api } from "./api.js";
 
 const logger = createLogger("chat");
@@ -636,6 +637,12 @@ export function initImageInput() {
 
   // Initialize lightbox for image clicks
   initLightbox();
+
+  // Initialize voice input
+  const chatInputFormEl = document.querySelector('.chat-input-form');
+  if (chatInputFormEl && state.selectedAnima) {
+    initVoiceUI(chatInputFormEl, state.selectedAnima);
+  }
 }
 
 /**
@@ -756,3 +763,11 @@ export { _renderToolCalls as renderToolCalls };
 export { _renderSessionDivider as renderSessionDivider };
 export { _bindToolCallHandlers as bindToolCallHandlers };
 export { _fetchConversationHistory as fetchConversationHistory };
+
+export function updateVoiceAnima(animaName) {
+  updateVoiceUIAnima(animaName);
+  const chatInputForm = document.querySelector('.chat-input-form');
+  if (chatInputForm && animaName) {
+    initVoiceUI(chatInputForm, animaName);
+  }
+}
