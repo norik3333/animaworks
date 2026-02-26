@@ -915,6 +915,7 @@ class AgentSDKExecutor(BaseExecutor):
             system_prompt=prompt_kwarg,
             allowed_tools=[
                 "Read", "Write", "Edit", "Bash", "Grep", "Glob",
+                "WebFetch", "WebSearch",
                 "mcp__aw__*",
             ],
             permission_mode="acceptEdits",
