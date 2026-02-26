@@ -7,6 +7,8 @@ adhering to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-02-26
+
 ### Added
 - voice chat bubble integration, thinking delta, mobile touch improvements
 - add Codex SDK execution mode C for OpenAI Codex CLI integration
@@ -46,6 +48,7 @@ adhering to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 - move outbound section to PrimingEngine
+
 
 ## [0.4.1] - 2026-02-25
 
@@ -263,7 +266,7 @@ memory, and decision-making criteria.
 - Moved model mode patterns from config.json to models.json
 - Tool permissions changed from whitelist to default-allow (blacklist) model
 
-[Unreleased]: https://github.com/xuiltul/animaworks/compare/v0.4.1...HEAD
-[0.4.1]: https://github.com/xuiltul/animaworks/compare/v0.4.0...v0.4.1
+[Unreleased]: https://github.com/xuiltul/animaworks/compare/v0.4.2...HEAD
+[0.4.2]: https://github.com/xuiltul/animaworks/compare/v0.4.1...v0.4.2
 [0.4.0]: https://github.com/xuiltul/animaworks/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/xuiltul/animaworks/compare/v0.3.0...v0.3.1
