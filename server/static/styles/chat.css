@@ -787,3 +787,92 @@
   border-color: var(--aw-color-text-placeholder);
   border-top-color: transparent;
 }
+
+/* ── Thinking Block ──────────────────────── */
+
+.thinking-block {
+  margin-bottom: 8px;
+  border: 1px solid var(--aw-color-border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.thinking-summary {
+  cursor: pointer;
+  padding: 6px 10px;
+  background: var(--aw-color-bg-secondary, #f8f9fa);
+  font-size: 0.82rem;
+  color: var(--aw-color-text-secondary);
+  user-select: none;
+  list-style: none;
+}
+
+.thinking-summary:hover {
+  background: var(--aw-color-bg-hover, #eef0f2);
+}
+
+.thinking-summary:active {
+  background: var(--aw-color-bg-active, #e2e4e6);
+}
+
+.thinking-summary::-webkit-details-marker {
+  display: none;
+}
+
+.thinking-summary::before {
+  content: "▸ ";
+  transition: transform 0.15s;
+}
+
+.thinking-block[open] .thinking-summary::before {
+  content: "▾ ";
+}
+
+.thinking-icon {
+  margin-right: 4px;
+}
+
+.thinking-content {
+  padding: 8px 10px;
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--aw-color-text-secondary);
+  background: var(--aw-color-bg-tertiary, #f0f1f3);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+/* Dark mode overrides */
+@media (prefers-color-scheme: dark) {
+  .thinking-summary {
+    background: var(--aw-color-bg-secondary, #2a2d32);
+  }
+  .thinking-summary:hover {
+    background: var(--aw-color-bg-hover, #33363c);
+  }
+  .thinking-summary:active {
+    background: var(--aw-color-bg-active, #3c3f45);
+  }
+  .thinking-content {
+    background: var(--aw-color-bg-tertiary, #1e2126);
+  }
+}
+
+[data-theme="dark"] .thinking-summary {
+  background: var(--aw-color-bg-secondary, #2a2d32);
+}
+
+[data-theme="dark"] .thinking-summary:hover {
+  background: var(--aw-color-bg-hover, #33363c);
+}
+
+[data-theme="dark"] .thinking-summary:active {
+  background: var(--aw-color-bg-active, #3c3f45);
+}
+
+[data-theme="dark"] .thinking-content {
+  background: var(--aw-color-bg-tertiary, #1e2126);
+}

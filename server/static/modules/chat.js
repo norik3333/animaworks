@@ -397,6 +397,13 @@ function renderStreamingBubble(msg) {
 
   let html = "";
 
+  // Thinking block (collapsible)
+  if (msg.thinkingText) {
+    const open = msg.thinking ? " open" : "";
+    const summary = msg.thinking ? "Thinking..." : `Thinking (${msg.thinkingText.length} chars)`;
+    html += `<details class="thinking-block"${open}><summary class="thinking-summary"><span class="thinking-icon">💭</span> ${escapeHtml(summary)}</summary><pre class="thinking-content">${escapeHtml(msg.thinkingText)}</pre></details>`;
+  }
+
   if (msg.heartbeatRelay) {
     html += '<div class="heartbeat-relay-indicator"><span class="tool-spinner"></span>\u30CF\u30FC\u30C8\u30D3\u30FC\u30C8\u51E6\u7406\u4E2D...</div>';
     if (msg.heartbeatText) {
@@ -526,6 +533,19 @@ export async function sendChat(message) {
         streamingMsg.heartbeatRelay = false;
         streamingMsg.heartbeatText = "";
         streamingMsg.afterHeartbeatRelay = true;
+        renderStreamingBubble(streamingMsg);
+      },
+      onThinkingStart: () => {
+        streamingMsg.thinkingText = "";
+        streamingMsg.thinking = true;
+        renderStreamingBubble(streamingMsg);
+      },
+      onThinkingDelta: (text) => {
+        streamingMsg.thinkingText = (streamingMsg.thinkingText || "") + text;
+        renderStreamingBubble(streamingMsg);
+      },
+      onThinkingEnd: () => {
+        streamingMsg.thinking = false;
         renderStreamingBubble(streamingMsg);
       },
       onError: ({ message: errorMsg }) => {
