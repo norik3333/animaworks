@@ -436,6 +436,7 @@ class ToolHandler:
             "report_procedure_outcome": self._handle_report_procedure_outcome,
             "report_knowledge_outcome": self._handle_report_knowledge_outcome,
             "skill": self._handle_skill,
+            "create_skill": self._handle_create_skill,
             "add_task": self._handle_add_task,
             "update_task": self._handle_update_task,
             "list_tasks": self._handle_list_tasks,
@@ -2385,6 +2386,41 @@ class ToolHandler:
             common_skills_dir=get_common_skills_dir(),
             procedures_dir=self._anima_dir / "procedures",
             context=context,
+        )
+
+    def _handle_create_skill(self, args: dict[str, Any]) -> str:
+        """Handle create_skill tool — create skill directory structure."""
+        from core.paths import get_common_skills_dir
+        from core.tooling.skill_creator import create_skill_directory
+
+        skill_name = args.get("skill_name", "")
+        description = args.get("description", "")
+        body = args.get("body", "")
+        location = args.get("location", "personal")
+        references = args.get("references")
+        templates = args.get("templates")
+        allowed_tools = args.get("allowed_tools")
+
+        if not skill_name:
+            return "skill_name パラメータは必須です。"
+        if not description:
+            return "description パラメータは必須です。"
+        if not body:
+            return "body パラメータは必須です。"
+
+        if location == "common":
+            base_dir = get_common_skills_dir()
+        else:
+            base_dir = self._anima_dir / "skills"
+
+        return create_skill_directory(
+            skill_name=skill_name,
+            description=description,
+            body=body,
+            base_dir=base_dir,
+            references=references,
+            templates=templates,
+            allowed_tools=allowed_tools,
         )
 
     # ── Task queue handlers ─────────────────────────────────

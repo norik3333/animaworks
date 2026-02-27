@@ -811,6 +811,66 @@ SKILL_TOOLS: list[dict[str, Any]] = [
             "required": ["skill_name"],
         },
     },
+    {
+        "name": "create_skill",
+        "description": (
+            "スキルをディレクトリ構造で作成する。"
+            "SKILL.md（frontmatter + 本文）を生成し、"
+            "オプションでreferences/やtemplates/にファイルを配置する。"
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "skill_name": {
+                    "type": "string",
+                    "description": "スキル名（ケバブケース。例: my-skill）",
+                },
+                "description": {
+                    "type": "string",
+                    "description": "frontmatter description（トリガーキーワード含む）",
+                },
+                "body": {
+                    "type": "string",
+                    "description": "SKILL.md本文（Markdown）",
+                },
+                "location": {
+                    "type": "string",
+                    "enum": ["personal", "common"],
+                    "description": "保存先。personal=個人スキル、common=共通スキル。デフォルト: personal",
+                },
+                "references": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "filename": {"type": "string"},
+                            "content": {"type": "string"},
+                        },
+                        "required": ["filename", "content"],
+                    },
+                    "description": "references/ に配置するファイル群（任意）",
+                },
+                "templates": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "filename": {"type": "string"},
+                            "content": {"type": "string"},
+                        },
+                        "required": ["filename", "content"],
+                    },
+                    "description": "templates/ に配置するファイル群（任意）",
+                },
+                "allowed_tools": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "frontmatter allowed_tools（任意）",
+                },
+            },
+            "required": ["skill_name", "description", "body"],
+        },
+    },
 ]
 
 TASK_TOOLS: list[dict[str, Any]] = [
@@ -1074,6 +1134,9 @@ def build_tool_list(
         )
         skill_tool_schema = {**SKILL_TOOLS[0], "description": desc}
         tools.append(skill_tool_schema)
+        # create_skill has static description; append remaining SKILL_TOOLS
+        for st in SKILL_TOOLS[1:]:
+            tools.append(st)
     return tools
 
 

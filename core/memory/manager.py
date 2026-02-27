@@ -241,7 +241,7 @@ class MemoryManager:
         return [f.stem for f in sorted(self.procedures_dir.glob("*.md"))]
 
     def list_skill_files(self) -> list[str]:
-        return [f.stem for f in sorted(self.skills_dir.glob("*.md"))]
+        return [f.parent.name for f in sorted(self.skills_dir.glob("*/SKILL.md"))]
 
     # ── Shared user memory ────────────────────────────────
 
