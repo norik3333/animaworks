@@ -180,6 +180,7 @@ async function _sendConversation(text, overrideImages = null) {
     }
     setTalking(false); _commitThread(animaName, threadId); renderConvMessages();
   } finally {
+    if (dom.convInput) dom.convInput.disabled = false;
     _setStreamController(null); wsUpdateSendButton(false); wsSaveDraft(); dom.convInput?.focus();
     _drainQueue();
   }
