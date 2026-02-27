@@ -1099,7 +1099,7 @@ html, body {
   align-items: stretch;
   justify-content: center;
   background: rgba(0, 0, 0, 0.35);
-  padding: 20px;
+  padding: 20px 20px 0;
   animation: overlay-fade-in 0.25s ease-out;
 }
 
@@ -1273,7 +1273,7 @@ html, body {
   border-top: 1px solid #e5e5e5;
   background: #fff;
   flex-shrink: 0;
-  padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: max(6px, env(safe-area-inset-bottom, 0px));
 }
 
 /* ── Textarea + Buttons Container (workspace) ── */
@@ -1284,7 +1284,7 @@ html, body {
   background: #fff;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: visible;
   transition: border-color 0.15s;
 }
 
@@ -1337,7 +1337,8 @@ html, body {
   gap: 4px;
   justify-content: flex-end;
   align-items: center;
-  padding: 4px 6px 6px;
+  padding: 2px 6px 4px;
+  min-height: 36px;
 }
 
 .ws-conv-send:hover {
@@ -1534,7 +1535,7 @@ html, body {
 
 @media (max-width: 900px) {
   .ws-conv-overlay {
-    padding: 10px;
+    padding: 10px 10px 0;
   }
 
   .ws-conv-layout {

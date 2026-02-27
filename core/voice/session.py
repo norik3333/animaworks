@@ -45,12 +45,13 @@ _RE_MD_LIST_BULLET = re.compile(r"^[\s]*[-*+]\s+", re.MULTILINE)
 _RE_MD_LIST_NUMBERED = re.compile(r"^[\s]*\d+\.\s+", re.MULTILINE)
 _RE_MD_TABLE_PIPE = re.compile(r"\|")
 _RE_MD_HR = re.compile(r"^-{3,}$", re.MULTILINE)
-_RE_EMOTION_TYPO = re.compile(r"\bemothion\b", re.IGNORECASE)
+_RE_TRAILING_HTML_COMMENT = re.compile(r"\s*<!--[\s\S]*?-->\s*$", re.DOTALL)
 
 
 def sanitize_for_tts(text: str) -> str:
     """Strip Markdown formatting and emotion metadata for TTS consumption."""
     text = _RE_EMOTION_TAG.sub("", text)
+    text = _RE_TRAILING_HTML_COMMENT.sub("", text)
     text = _RE_MD_CODE_BLOCK.sub("", text)
     text = _RE_MD_HEADING.sub("", text)
     text = _RE_MD_BOLD.sub(r"\1", text)
@@ -84,10 +85,6 @@ def _normalized_rms_from_pcm16(audio_data: bytes) -> float:
         return 0.0
     return (sum_sq / count) ** 0.5
 
-
-def normalize_voice_input(text: str) -> str:
-    """Normalize common STT typo patterns used as control words."""
-    return _RE_EMOTION_TYPO.sub("emotion", text)
 
 # ── VoiceSession ────────────────────────────────────────────────
 
@@ -215,8 +212,6 @@ class VoiceSession:
                 text = refined.get("refined_text", text)
             except Exception as e:
                 logger.warning("STT refine failed, using raw: %s", e)
-
-        text = normalize_voice_input(text)
 
         # 3. Send transcript to client
         await self._ws.send_json({"type": "transcript", "text": text})

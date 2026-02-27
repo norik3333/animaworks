@@ -261,11 +261,12 @@ export function initVoiceUI(chatInputForm, animaName, callbacks) {
     _voiceStreamingMsg.text += text;
     _chatCallbacks.updateStreamingBubble(_voiceStreamingMsg);
   });
-  _bindVoice('responseDone', () => {
+  _bindVoice('responseDone', ({ emotion }) => {
     if (!_voiceStreamingMsg || !_chatCallbacks) return;
     _voiceStreamingMsg.streaming = false;
     if (!_voiceStreamingMsg.text) _voiceStreamingMsg.text = '(空の応答)';
     _chatCallbacks.finalizeStreamingBubble(_voiceStreamingMsg);
+    _chatCallbacks.applyEmotion?.(emotion);
     _voiceStreamingMsg = null;
   });
   _bindVoice('thinkingStatus', (thinking) => {

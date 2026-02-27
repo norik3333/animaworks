@@ -289,6 +289,13 @@ class TestSanitizeForTTS:
         assert "項目A" in result
 
 
+    def test_strip_trailing_html_comment(self) -> None:
+        from core.voice.session import sanitize_for_tts
+
+        text = '了解しました。\n<!-- emothion: {"emotion": "smile"} -->'
+        assert sanitize_for_tts(text) == "了解しました。"
+
+
 # ── TestVoiceModeSuffix ──────────────────────────────────────────
 
 

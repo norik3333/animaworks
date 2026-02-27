@@ -1568,6 +1568,11 @@ function _buildVoiceChatCallbacks(animaName) {
       setState({ chatMessagesByThread: nextByThread });
       renderConvMessages();
     },
+    applyEmotion(emotion) {
+      if (!emotion) return;
+      setExpression(emotion);
+      setTimeout(() => setExpression("neutral"), 3000);
+    },
   };
 }
 
@@ -2257,6 +2262,11 @@ async function startDashboard() {
 
   // Make the whole input container focus the textarea (except control buttons).
   const convInputWrap = document.querySelector(".ws-conv-input-area .chat-input-wrap");
+  const convInputFocusHandler = (e) => {
+    if (e.target instanceof Element && e.target.closest("button, input, select, textarea, a")) return;
+    dom.convInput?.focus();
+  };
+  convInputWrap?.addEventListener("pointerdown", convInputFocusHandler);
   convInputWrap?.addEventListener("click", (e) => {
     if (e.target instanceof Element && e.target.closest("button, input, select, textarea, a")) return;
     dom.convInput?.focus();
