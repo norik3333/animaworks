@@ -198,7 +198,12 @@ def _dismiss_login(page: Page) -> None:
     """
     page.evaluate("""
         const ls = document.getElementById('loginScreen');
-        if (ls) ls.classList.add('hidden');
+        if (ls) {
+            ls.classList.add('hidden');
+            // Keep overlay non-interactive even if login.js toggles classes later.
+            ls.style.setProperty('display', 'none', 'important');
+            ls.style.setProperty('pointer-events', 'none', 'important');
+        }
     """)
     page.wait_for_timeout(200)
 

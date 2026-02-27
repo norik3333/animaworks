@@ -12,6 +12,7 @@ from pathlib import Path
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
+from core.schedule_parser import parse_cron_md, parse_schedule
 from core.time_utils import now_jst
 
 logger = logging.getLogger("animaworks.routes.system")
@@ -59,8 +60,46 @@ def _get_frontend_logger() -> logging.Logger:
     return _frontend_logger
 
 
+def _collect_cron_last_runs(anima_dir: Path, task_names: set[str]) -> dict[str, str]:
+    """Collect latest run timestamp per task from state/cron_logs JSONL files."""
+    if not task_names:
+        return {}
+
+    log_dir = anima_dir / "state" / "cron_logs"
+    if not log_dir.exists():
+        return {}
+
+    found: dict[str, str] = {}
+    log_files = sorted(log_dir.glob("*.jsonl"), reverse=True)
+    for log_file in log_files:
+        try:
+            lines = log_file.read_text(encoding="utf-8").splitlines()
+        except OSError:
+            continue
+
+        for line in reversed(lines):
+            if not line.strip():
+                continue
+            try:
+                entry = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+
+            task = str(entry.get("task", "")).strip()
+            ts = str(entry.get("timestamp", "")).strip()
+            if not task or not ts:
+                continue
+            if task in task_names and task not in found:
+                found[task] = ts
+
+        if len(found) == len(task_names):
+            break
+
+    return found
+
+
 def _parse_cron_jobs(animas_dir: Path, anima_names: list[str]) -> list[dict]:
-    """Parse cron.md files from all animas and return job definitions."""
+    """Parse cron.md files and enrich with schedule/next/last execution data."""
     jobs: list[dict] = []
     for name in anima_names:
         cron_path = animas_dir / name / "cron.md"
@@ -70,41 +109,33 @@ def _parse_cron_jobs(animas_dir: Path, anima_names: list[str]) -> list[dict]:
             content = cron_path.read_text(encoding="utf-8")
         except OSError:
             continue
-        # Parse markdown sections: ## Title (schedule info)
-        # Skip commented-out sections (inside <!-- --> blocks)
-        in_comment = False
-        current_title = ""
-        current_type = ""
-        for line in content.splitlines():
-            stripped = line.strip()
-            if "<!--" in stripped:
-                in_comment = True
-            if "-->" in stripped:
-                in_comment = False
-                continue
-            if in_comment:
-                continue
-            if stripped.startswith("## "):
-                current_title = stripped[3:].strip()
-                current_type = ""
-            elif stripped.startswith("type:"):
-                current_type = stripped[5:].strip()
-            elif current_title and current_type:
-                # Extract schedule from title parentheses
-                schedule = ""
-                m = re.search(r"[（(](.+?)[）)]", current_title)
+        parsed_tasks = parse_cron_md(content)
+        task_names = {task.name for task in parsed_tasks if task.name}
+        last_runs = _collect_cron_last_runs(animas_dir / name, task_names)
+        now = now_jst()
+        for idx, task in enumerate(parsed_tasks):
+            trigger = parse_schedule(task.schedule)
+            next_run_dt = (
+                trigger.get_next_fire_time(None, now)
+                if trigger is not None
+                else None
+            )
+            next_run = next_run_dt.isoformat() if next_run_dt else None
+            schedule = task.schedule.strip() if task.schedule else ""
+            if not schedule:
+                m = re.search(r"[（(](.+?)[）)]", task.name)
                 if m:
-                    schedule = m.group(1)
-                jobs.append({
-                    "id": f"cron-{name}-{len(jobs)}",
-                    "name": current_title,
-                    "anima": name,
-                    "type": current_type,
-                    "schedule": schedule,
-                    "next_run": None,
-                })
-                current_title = ""
-                current_type = ""
+                    schedule = m.group(1).strip()
+
+            jobs.append({
+                "id": f"cron-{name}-{idx}",
+                "name": task.name,
+                "anima": name,
+                "type": task.type,
+                "schedule": schedule,
+                "last_run": last_runs.get(task.name),
+                "next_run": next_run,
+            })
     return jobs
 
 

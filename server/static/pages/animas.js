@@ -7,6 +7,15 @@ let _viewMode = "list"; // "list" | "detail"
 let _selectedName = null;
 let _container = null;
 
+function _extractStatsCount(value) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (value && typeof value === "object") {
+    const count = value.count;
+    if (typeof count === "number" && Number.isFinite(count)) return count;
+  }
+  return 0;
+}
+
 export function render(container) {
   _container = container;
   _viewMode = "list";
@@ -213,9 +222,9 @@ async function _showDetail(name) {
     html += "</div>";
 
     // Memory stats
-    const epCount = detail.episode_files?.length ?? memoryStats?.episodes ?? 0;
-    const knCount = detail.knowledge_files?.length ?? memoryStats?.knowledge ?? 0;
-    const prCount = detail.procedure_files?.length ?? memoryStats?.procedures ?? 0;
+    const epCount = detail.episode_files?.length ?? _extractStatsCount(memoryStats?.episodes);
+    const knCount = detail.knowledge_files?.length ?? _extractStatsCount(memoryStats?.knowledge);
+    const prCount = detail.procedure_files?.length ?? _extractStatsCount(memoryStats?.procedures);
 
     html += `
       <div class="card-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 1.5rem;">

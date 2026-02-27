@@ -14,9 +14,9 @@ import pytest
 from mcp.types import TextContent, Tool
 
 
-# ── Expected tool names ──────────────────────────────────────────────
+# ── Expected internal tool names (fixed set) ─────────────────────────
 
-EXPECTED_TOOL_NAMES: frozenset[str] = frozenset({
+EXPECTED_INTERNAL_TOOL_NAMES: frozenset[str] = frozenset({
     "send_message",
     "post_channel",
     "read_channel",
@@ -28,7 +28,6 @@ EXPECTED_TOOL_NAMES: frozenset[str] = frozenset({
     "search_memory",
     "report_procedure_outcome",
     "report_knowledge_outcome",
-    "discover_tools",
     "disable_subordinate",
     "enable_subordinate",
     "skill",
@@ -41,18 +40,26 @@ EXPECTED_TOOL_NAMES: frozenset[str] = frozenset({
 class TestMcpToolSchemas:
     """Tests for the static MCP_TOOLS list built at import time."""
 
-    def test_mcp_tools_count(self) -> None:
-        """MCP_TOOLS has exactly 15 tools."""
-        from core.mcp.server import MCP_TOOLS
-
-        assert len(MCP_TOOLS) == 15
-
-    def test_all_expected_tool_names_present(self) -> None:
-        """All 15 expected tool names are present in MCP_TOOLS."""
+    def test_mcp_tools_includes_all_internal(self) -> None:
+        """MCP_TOOLS includes at least all 14 internal tools."""
         from core.mcp.server import MCP_TOOLS
 
         actual_names = {t.name for t in MCP_TOOLS}
-        assert actual_names == EXPECTED_TOOL_NAMES
+        assert EXPECTED_INTERNAL_TOOL_NAMES <= actual_names
+
+    def test_all_expected_internal_tool_names_present(self) -> None:
+        """All 14 expected internal tool names are present in MCP_TOOLS."""
+        from core.mcp.server import MCP_TOOLS
+
+        actual_names = {t.name for t in MCP_TOOLS}
+        assert EXPECTED_INTERNAL_TOOL_NAMES <= actual_names
+
+    def test_discover_tools_not_exposed(self) -> None:
+        """discover_tools is no longer in the MCP tool list."""
+        from core.mcp.server import MCP_TOOLS
+
+        actual_names = {t.name for t in MCP_TOOLS}
+        assert "discover_tools" not in actual_names
 
     def test_each_tool_has_nonempty_description(self) -> None:
         """Every tool has a non-empty description string."""
@@ -87,25 +94,26 @@ class TestMcpToolSchemas:
 class TestBuildMcpTools:
     """Tests for the _build_mcp_tools() helper function."""
 
-    def test_returns_tool_objects(self) -> None:
-        """_build_mcp_tools() returns a list of mcp.types.Tool objects."""
+    def test_returns_tuple(self) -> None:
+        """_build_mcp_tools() returns a (tools, exposed_names) tuple."""
         from core.mcp.server import _build_mcp_tools
 
-        tools = _build_mcp_tools()
+        result = _build_mcp_tools()
+        assert isinstance(result, tuple)
+        tools, exposed = result
         assert isinstance(tools, list)
+        assert isinstance(exposed, frozenset)
         for tool in tools:
             assert isinstance(tool, Tool)
 
-    def test_filters_by_exposed_tool_names(self) -> None:
-        """Only tools in _EXPOSED_TOOL_NAMES are returned."""
+    def test_internal_tools_always_included(self) -> None:
+        """Internal tools from _EXPOSED_TOOL_NAMES are always returned."""
         from core.mcp.server import _EXPOSED_TOOL_NAMES, _build_mcp_tools
 
-        tools = _build_mcp_tools()
+        tools, exposed = _build_mcp_tools()
         actual_names = {t.name for t in tools}
-        # Every returned tool must be in the exposed set
-        assert actual_names <= _EXPOSED_TOOL_NAMES
-        # And the full set should be covered (no missing schemas)
-        assert actual_names == _EXPOSED_TOOL_NAMES
+        assert _EXPOSED_TOOL_NAMES <= actual_names
+        assert _EXPOSED_TOOL_NAMES <= exposed
 
 
 # ── TestListToolsHandler ─────────────────────────────────────────────
@@ -149,12 +157,12 @@ class TestCallToolHandler:
         assert payload["error_type"] == "ToolNotFound"
         assert "nonexistent_tool" in payload["message"]
 
-    async def test_rejects_external_tool_name(self) -> None:
-        """call_tool() rejects a tool that exists in ToolHandler but is not exposed."""
+    async def test_rejects_tool_name_not_in_exposed_names(self) -> None:
+        """call_tool() rejects a tool not in the dynamic _EXPOSED_NAMES set."""
         import core.mcp.server as mcp_mod
 
-        # web_search exists in ToolHandler dispatch but NOT in _EXPOSED_TOOL_NAMES
-        result = await mcp_mod.call_tool("web_search", {"query": "test"})
+        # A completely fabricated name that won't be in any exposed set
+        result = await mcp_mod.call_tool("__totally_fake_tool__", {"query": "test"})
 
         assert len(result) == 1
         payload = json.loads(result[0].text)
@@ -487,3 +495,153 @@ class TestGetToolHandler:
         call_kwargs = mock_th_cls.call_args.kwargs
         assert call_kwargs["tool_registry"] == []
         assert call_kwargs["personal_tools"] == {}
+
+
+# ── TestLoadPermittedCategories ──────────────────────────────────────
+
+
+class TestLoadPermittedCategories:
+    """Tests for _load_permitted_categories() permissions.md parser."""
+
+    def test_no_permissions_file_returns_all(self, tmp_path: Path) -> None:
+        """Without permissions.md, all tools are returned."""
+        from core.mcp.server import _load_permitted_categories
+
+        with patch("core.tools.TOOL_MODULES", {"chatwork": "core.tools.chatwork", "slack": "core.tools.slack"}):
+            result = _load_permitted_categories(tmp_path)
+        assert result == {"chatwork", "slack"}
+
+    def test_no_external_tools_section_returns_all(self, tmp_path: Path) -> None:
+        """When permissions.md has no 外部ツール section, returns all."""
+        from core.mcp.server import _load_permitted_categories
+
+        perms = tmp_path / "permissions.md"
+        perms.write_text("## 実行できるコマンド\n- git: OK\n", encoding="utf-8")
+
+        with patch("core.tools.TOOL_MODULES", {"chatwork": "x", "slack": "x"}):
+            result = _load_permitted_categories(tmp_path)
+        assert result == {"chatwork", "slack"}
+
+    def test_whitelist_mode(self, tmp_path: Path) -> None:
+        """Individual allow entries produce a whitelist."""
+        from core.mcp.server import _load_permitted_categories
+
+        perms = tmp_path / "permissions.md"
+        perms.write_text(
+            "## 外部ツール\n- chatwork: 全権限\n- slack: 読み取りのみ\n",
+            encoding="utf-8",
+        )
+
+        with patch("core.tools.TOOL_MODULES", {"chatwork": "x", "slack": "x", "gmail": "x"}):
+            result = _load_permitted_categories(tmp_path)
+        assert result == {"chatwork", "slack"}
+        assert "gmail" not in result
+
+    def test_all_yes_mode(self, tmp_path: Path) -> None:
+        """'all: yes' enables all tools."""
+        from core.mcp.server import _load_permitted_categories
+
+        perms = tmp_path / "permissions.md"
+        perms.write_text("## 外部ツール\n- all: yes\n", encoding="utf-8")
+
+        with patch("core.tools.TOOL_MODULES", {"chatwork": "x", "slack": "x", "gmail": "x"}):
+            result = _load_permitted_categories(tmp_path)
+        assert result == {"chatwork", "slack", "gmail"}
+
+    def test_all_yes_with_deny(self, tmp_path: Path) -> None:
+        """'all: yes' with individual deny entries."""
+        from core.mcp.server import _load_permitted_categories
+
+        perms = tmp_path / "permissions.md"
+        perms.write_text("## 外部ツール\n- all: yes\n- gmail: no\n", encoding="utf-8")
+
+        with patch("core.tools.TOOL_MODULES", {"chatwork": "x", "slack": "x", "gmail": "x"}):
+            result = _load_permitted_categories(tmp_path)
+        assert result == {"chatwork", "slack"}
+        assert "gmail" not in result
+
+
+# ── TestExternalToolsInMcpTools ──────────────────────────────────────
+
+
+class TestExternalToolsInMcpTools:
+    """Tests for external tool schema loading in _build_mcp_tools()."""
+
+    def test_external_tools_loaded_when_permitted(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """External tool schemas appear in MCP tools when permissions allow."""
+        from core.mcp.server import _build_mcp_tools
+
+        anima_dir = tmp_path / "test-anima"
+        anima_dir.mkdir()
+        perms = anima_dir / "permissions.md"
+        perms.write_text("## 外部ツール\n- chatwork: 全権限\n", encoding="utf-8")
+        monkeypatch.setenv("ANIMAWORKS_ANIMA_DIR", str(anima_dir))
+
+        fake_schemas = [
+            {
+                "name": "chatwork_send",
+                "description": "Send chatwork message",
+                "parameters": {"type": "object", "properties": {}},
+            },
+        ]
+
+        with patch(
+            "core.tooling.schemas.load_external_schemas_by_category",
+            return_value=fake_schemas,
+        ):
+            tools, exposed = _build_mcp_tools()
+
+        tool_names = {t.name for t in tools}
+        assert "chatwork_send" in tool_names
+        assert "chatwork_send" in exposed
+
+    def test_unpermitted_tools_excluded(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """External tools not in permissions.md are excluded."""
+        from core.mcp.server import _build_mcp_tools
+
+        anima_dir = tmp_path / "test-anima"
+        anima_dir.mkdir()
+        perms = anima_dir / "permissions.md"
+        perms.write_text("## 外部ツール\n- chatwork: 全権限\n", encoding="utf-8")
+        monkeypatch.setenv("ANIMAWORKS_ANIMA_DIR", str(anima_dir))
+
+        with patch(
+            "core.tooling.schemas.load_external_schemas_by_category",
+            return_value=[],
+        ):
+            tools, exposed = _build_mcp_tools()
+
+        tool_names = {t.name for t in tools}
+        assert "gmail_send" not in tool_names
+
+    def test_external_tool_dispatch_via_call_tool(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """call_tool() dispatches external tools through ToolHandler."""
+        import core.mcp.server as mcp_mod
+
+        # Temporarily add an external tool to the exposed set
+        original_exposed = mcp_mod._EXPOSED_NAMES
+        mcp_mod._EXPOSED_NAMES = original_exposed | frozenset({"chatwork_send"})
+
+        mock_handler = MagicMock()
+        mock_handler.handle.return_value = '{"status": "ok"}'
+
+        try:
+            import asyncio
+            with patch.object(mcp_mod, "_get_tool_handler", return_value=mock_handler):
+                result = asyncio.run(
+                    mcp_mod.call_tool("chatwork_send", {"room_id": "123", "body": "test"})
+                )
+
+            assert len(result) == 1
+            assert "ok" in result[0].text
+            mock_handler.handle.assert_called_once_with(
+                "chatwork_send", {"room_id": "123", "body": "test"},
+            )
+        finally:
+            mcp_mod._EXPOSED_NAMES = original_exposed

@@ -2,15 +2,23 @@ from __future__ import annotations
 
 import json
 import re
+from urllib.parse import urlparse
 from typing import Any
 
-_IMAGE_URL_RE = re.compile(r"https://[^\s\"'<>]+", re.IGNORECASE)
 _IMAGE_PATH_RE = re.compile(
     r"(?:assets|attachments)/[A-Za-z0-9._/\-]+\.(?:png|jpe?g|gif|webp)",
     re.IGNORECASE,
 )
 _IMAGE_EXT_RE = re.compile(r"\.(?:png|jpe?g|gif|webp)(?:$|\?)", re.IGNORECASE)
 _MAX_ARTIFACTS_PER_RESPONSE = 5
+_ALLOWED_SEARCHED_IMAGE_HOSTS = {
+    "cdn.search.brave.com",
+    "images.unsplash.com",
+    "images.pexels.com",
+    "upload.wikimedia.org",
+}
+_PATH_KEYS = {"path", "file", "filepath", "asset_path"}
+_URL_KEYS = {"url", "image_url", "thumbnail", "src"}
 
 
 def extract_image_artifacts_from_tool_records(
@@ -47,15 +55,16 @@ def extract_image_artifacts_from_tool_records(
             item["url"] = clean_url
         artifacts.append(item)
 
-    def _handle_string(text: str, tool_name: str) -> None:
-        if not text:
-            return
-        for m in _IMAGE_PATH_RE.finditer(text):
-            _append(tool_name=tool_name, path=m.group(0), source="generated")
-        for m in _IMAGE_URL_RE.finditer(text):
-            url = m.group(0).rstrip(").,")
-            if _IMAGE_EXT_RE.search(url):
-                _append(tool_name=tool_name, url=url, source="searched")
+    def _is_allowed_searched_url(value: str) -> bool:
+        if not value.startswith("https://"):
+            return False
+        if not _IMAGE_EXT_RE.search(value):
+            return False
+        parsed = urlparse(value)
+        host = (parsed.hostname or "").lower()
+        if not host:
+            return False
+        return any(host == d or host.endswith(f".{d}") for d in _ALLOWED_SEARCHED_IMAGE_HOSTS)
 
     def _walk(value: Any, tool_name: str) -> None:
         if len(artifacts) >= _MAX_ARTIFACTS_PER_RESPONSE:
@@ -64,13 +73,12 @@ def extract_image_artifacts_from_tool_records(
             for key, val in value.items():
                 key_l = str(key).lower()
                 if isinstance(val, str):
-                    if key_l in {"path", "file", "filepath", "asset_path"}:
+                    if key_l in _PATH_KEYS:
                         if _IMAGE_PATH_RE.search(val):
                             _append(tool_name=tool_name, path=val, source="generated")
-                    elif key_l in {"url", "image_url", "thumbnail", "src"}:
-                        if val.startswith("https://") and _IMAGE_EXT_RE.search(val):
+                    elif key_l in _URL_KEYS:
+                        if _is_allowed_searched_url(val):
                             _append(tool_name=tool_name, url=val, source="searched")
-                    _handle_string(val, tool_name)
                 else:
                     _walk(val, tool_name)
             return
@@ -84,9 +92,8 @@ def extract_image_artifacts_from_tool_records(
                 try:
                     parsed = json.loads(stripped)
                     _walk(parsed, tool_name)
-                except Exception:
-                    pass
-            _handle_string(value, tool_name)
+                except json.JSONDecodeError:
+                    return
 
     for record in tool_call_records:
         tool_name = str(record.get("tool_name", ""))

@@ -44,3 +44,24 @@ def test_extract_image_artifacts_marks_image_gen_as_generated():
     assert artifacts[0]["trust"] == "trusted"
     assert artifacts[0]["path"] == "assets/avatar_fullbody.png"
 
+
+def test_extract_image_artifacts_ignores_non_skill_urls():
+    records = [
+        {
+            "tool_name": "chatwork_rooms",
+            "result_summary": {
+                "rooms": [
+                    {"icon_path": "https://appdata.chatwork.com/icon/ico_group.png"},
+                    {"name": "x", "url": "https://appdata.chatwork.com/avatar/u.jpg"},
+                    {"name": "y", "url": "https://images.unsplash.com/photo-1.png"},
+                ]
+            },
+        }
+    ]
+
+    artifacts = extract_image_artifacts_from_tool_records(records)
+
+    assert len(artifacts) == 1
+    assert artifacts[0]["source"] == "searched"
+    assert artifacts[0]["url"] == "https://images.unsplash.com/photo-1.png"
+

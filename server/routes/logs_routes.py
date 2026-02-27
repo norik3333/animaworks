@@ -28,6 +28,19 @@ def _validate_filename(filename: str) -> None:
         raise HTTPException(status_code=400, detail="Invalid filename")
 
 
+def _validate_file_ref(file_ref: str) -> None:
+    """Validate relative log path or basename for safe resolution."""
+    if not file_ref or not file_ref.strip():
+        raise HTTPException(status_code=400, detail="Invalid file reference")
+    candidate = Path(file_ref)
+    if candidate.is_absolute():
+        raise HTTPException(status_code=400, detail="Invalid file reference")
+    if any(part in ("..", "") for part in candidate.parts):
+        raise HTTPException(status_code=400, detail="Invalid file reference")
+    if file_ref.startswith("."):
+        raise HTTPException(status_code=400, detail="Invalid file reference")
+
+
 def _collect_log_files() -> list[dict]:
     """Collect log files from known directories."""
     files: list[dict] = []
@@ -56,16 +69,47 @@ def _collect_log_files() -> list[dict]:
 
 
 def _resolve_log_path(filename: str) -> Path | None:
-    """Find a log file by name in known log directories."""
+    """Find a log file by relative path or filename in known log directories."""
+    ref = Path(filename)
+    matches: list[Path] = []
+
     for log_dir in _LOG_SEARCH_DIRS:
-        candidate = log_dir / filename
-        if candidate.exists() and candidate.is_file():
-            # Ensure the resolved path is within the log directory
+        root = log_dir.resolve()
+        if not log_dir.exists():
+            continue
+
+        # Explicit relative path (supports nested paths from list endpoint)
+        if len(ref.parts) > 1:
+            candidate = (log_dir / ref).resolve()
             try:
-                candidate.resolve().relative_to(log_dir.resolve())
+                candidate.relative_to(root)
             except ValueError:
-                return None
-            return candidate
+                continue
+            if candidate.exists() and candidate.is_file():
+                matches.append(candidate)
+            continue
+
+        # Backward-compatible basename resolution
+        top_level = (log_dir / filename).resolve()
+        try:
+            top_level.relative_to(root)
+        except ValueError:
+            top_level = None
+        if top_level and top_level.exists() and top_level.is_file():
+            matches.append(top_level)
+
+        for candidate in log_dir.rglob(filename):
+            resolved = candidate.resolve()
+            try:
+                resolved.relative_to(root)
+            except ValueError:
+                continue
+            if resolved.is_file():
+                matches.append(resolved)
+
+    if matches:
+        unique = {str(path): path for path in matches}
+        return max(unique.values(), key=lambda p: p.stat().st_mtime)
     return None
 
 
@@ -134,6 +178,38 @@ def create_logs_router() -> APIRouter:
 
         return {
             "filename": filename,
+            "total_lines": total_lines,
+            "offset": offset,
+            "limit": limit,
+            "lines": paginated,
+        }
+
+    @router.get("/system/logs/file/read")
+    async def read_log_by_ref(
+        request: Request,
+        file: str = Query(..., min_length=1),
+        offset: int = Query(default=0, ge=0),
+        limit: int = Query(default=200, ge=1, le=5000),
+    ):
+        """Read log file by basename or relative path from list endpoint."""
+        _validate_file_ref(file)
+        log_path = _resolve_log_path(file)
+        if log_path is None:
+            raise HTTPException(status_code=404, detail=f"Log file not found: {file}")
+
+        try:
+            all_lines = log_path.read_text(
+                encoding="utf-8", errors="replace"
+            ).splitlines()
+        except OSError as exc:
+            raise HTTPException(status_code=500, detail=f"Failed to read log: {exc}")
+
+        total_lines = len(all_lines)
+        paginated = all_lines[offset : offset + limit]
+
+        return {
+            "filename": log_path.name,
+            "path": file,
             "total_lines": total_lines,
             "offset": offset,
             "limit": limit,

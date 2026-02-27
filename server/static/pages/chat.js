@@ -24,7 +24,7 @@ let _intervals = [];
 let _boundListeners = [];
 let _historyState = {};  // Per-anima: { sessions, hasMore, nextBefore, loading }
 let _chatObserver = null;
-let _isChatStreaming = false;
+let _streamingContext = null; // { anima, thread } — 現在ストリーミング中のAnima+スレッド
 let _selectedThreadId = "default";
 let _threads = {};  // { [animaName]: [{ id, label, unread }] }
 let _activeThreadByAnima = {};  // { [animaName]: threadId }
@@ -32,6 +32,7 @@ let _animaLastAccess = {}; // { [animaName]: epoch_ms }
 const _HISTORY_PAGE_SIZE = 50;
 const _TOOL_RESULT_TRUNCATE = 500;
 const _THREAD_VISIBLE_NON_DEFAULT = 5;
+const _CHAT_POLL_INTERVAL_MS = 5000;
 let _imageInputManager = null;
 let _bustupUrl = null;
 let _pendingQueue = [];       // Array<{ text, images, displayImages }>
@@ -39,6 +40,11 @@ let _chatAbortController = null;
 let _chatUiStateSaveTimer = null;
 let _animaTabAvatarUrls = {}; // { [animaName]: string | null }
 let _animaTabAvatarLoading = {}; // { [animaName]: Promise<void> }
+let _chatPollingInFlight = false;
+
+function _chatInputMaxHeight() {
+  return window.matchMedia("(max-width: 768px)").matches ? 140 : 260;
+}
 
 // ── Chat Draft Persistence ───────────────────
 
@@ -311,8 +317,16 @@ export function render(container) {
             ></textarea>
             <div class="chat-input-actions">
               <button type="button" class="chat-attach-btn" id="chatPageAttachBtn" title="${t("chat.attach_image")}">+</button>
-              <button type="button" class="chat-queue-btn" id="chatPageQueueBtn" disabled title="${t("chat.queue_add")}">↓</button>
-              <button type="submit" class="chat-send-btn" id="chatPageSendBtn" disabled>↑</button>
+              <button type="button" class="chat-queue-btn" id="chatPageQueueBtn" disabled title="${t("chat.queue_add")}">
+                <svg class="chat-queue-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M12 5v14M5 12l7 7 7-7" />
+                </svg>
+              </button>
+              <button type="submit" class="chat-send-btn" id="chatPageSendBtn" disabled>
+                <svg class="chat-send-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M12 19V5M5 12l7-7 7 7" />
+                </svg>
+              </button>
             </div>
           </div>
           <input type="file" id="chatPageFileInput" accept="image/jpeg,image/png,image/gif,image/webp" multiple style="display:none" />
@@ -378,6 +392,8 @@ export function render(container) {
   // Auto-refresh activity
   const actInterval = setInterval(_loadActivity, 30000);
   _intervals.push(actInterval);
+  const chatInterval = setInterval(_pollSelectedChat, _CHAT_POLL_INTERVAL_MS);
+  _intervals.push(chatInterval);
 }
 
 export function destroy() {
@@ -493,7 +509,7 @@ function _bindEvents() {
     const el = _$("chatPageInput");
     if (el) {
       el.style.height = "auto";
-      el.style.height = Math.min(el.scrollHeight, 200) + "px";
+      el.style.height = Math.min(el.scrollHeight, _chatInputMaxHeight()) + "px";
       _saveDraft(_selectedAnima, el.value || "");
     }
     _updateSendButton();
@@ -579,7 +595,7 @@ async function _loadAnimas() {
     _restoreChatUiState(uiState);
     _renderAddConversationMenu();
     _renderAnimaTabs();
-    if (_animas.length > 0 && !_selectedAnima && !_isChatStreaming) {
+    if (_animas.length > 0 && !_selectedAnima && !_streamingContext) {
       const firstTab = _animaTabs[0]?.name;
       _openOrSelectAnima(firstTab || _animas[0].name);
     } else if (_selectedAnima) {
@@ -743,7 +759,7 @@ async function _selectAnima(name) {
   if (input) {
     input.value = _loadDraft(name);
     input.style.height = "auto";
-    input.style.height = Math.min(input.scrollHeight, 200) + "px";
+    input.style.height = Math.min(input.scrollHeight, _chatInputMaxHeight()) + "px";
   }
   _updateSendButton();
 
@@ -797,11 +813,9 @@ async function _selectAnima(name) {
   if (_activeRightTab === "history") secondaryPromises.push(_loadSessionList());
   await Promise.all(secondaryPromises);
 
-  // If anima is currently thinking/processing, resume stream after page return.
-  const selectedAnimaObj = _animas.find((p) => p.name === name);
-  if (selectedAnimaObj && (selectedAnimaObj.status === "thinking" || selectedAnimaObj.status === "processing")) {
-    _resumeActiveStream(name);
-  }
+  // Check StreamRegistry for an active stream (process status is always "running",
+  // "thinking" is only a transient WebSocket event that's lost on reload).
+  _resumeActiveStream(name);
   _scheduleSaveChatUiState();
 }
 
@@ -846,12 +860,13 @@ function _renderAnimaTabs() {
   }
   const html = _animaTabs.map((tab) => {
     const activeClass = tab.name === _selectedAnima ? " active" : "";
-    const star = tab.unreadStar ? '<span class="tab-star" aria-label="unread">★</span>' : "";
+    const streamingClass = _streamingContext?.anima === tab.name ? " is-streaming" : "";
+    const completedClass = tab.unreadStar ? " has-unread-complete" : "";
     const avatar = _buildAnimaTabAvatar(tab.name);
     const closeBtn = _animaTabs.length > 1
       ? ` <button type="button" class="anima-tab-close" data-anima="${escapeHtml(tab.name)}" title="タブを閉じる" aria-label="閉じる">&times;</button>`
       : "";
-    return `<span class="anima-tab-wrap"><button type="button" class="anima-tab${activeClass}" data-anima="${escapeHtml(tab.name)}">${avatar}<span class="anima-tab-name">${escapeHtml(tab.name)}</span>${star}</button>${closeBtn}</span>`;
+    return `<span class="anima-tab-wrap"><button type="button" class="anima-tab${activeClass}${streamingClass}${completedClass}" data-anima="${escapeHtml(tab.name)}">${avatar}<span class="anima-tab-name">${escapeHtml(tab.name)}</span></button>${closeBtn}</span>`;
   }).join("");
   container.innerHTML = html;
 
@@ -881,7 +896,7 @@ function _renderAnimaTabs() {
 }
 
 async function _resumeActiveStream(animaName) {
-  if (_isChatStreaming || _chatAbortController) return;
+  if (_streamingContext || _chatAbortController) return;
 
   try {
     const active = await fetchActiveStream(animaName);
@@ -907,9 +922,10 @@ async function _resumeActiveStream(animaName) {
     history.push(streamingMsg);
     _renderChat();
 
-    _isChatStreaming = true;
+    _streamingContext = { anima: animaName, thread: tid };
     _chatAbortController = new AbortController();
     _updateSendButton();
+    _renderAnimaTabs();
 
     const currentUser = localStorage.getItem("animaworks_user") || "human";
     const resumeBody = JSON.stringify({
@@ -971,9 +987,10 @@ async function _resumeActiveStream(animaName) {
       logger.error("Resume stream error", { anima: animaName, error: err.message });
     }
   } finally {
-    _isChatStreaming = false;
+    _streamingContext = null;
     _chatAbortController = null;
     _updateSendButton();
+    _renderAnimaTabs();
   }
 }
 
@@ -1270,7 +1287,7 @@ function _renderChat(scrollToBottom = true) {
         }
         let content = "";
         if (m.text) {
-          content = renderMarkdown(m.text);
+          content = renderMarkdown(m.text, _selectedAnima);
         } else if (m.streaming) {
           content = '<span class="cursor-blink"></span>';
         }
@@ -1323,7 +1340,7 @@ function _renderStreamingBubble(msg) {
   } else if (msg.afterHeartbeatRelay && !msg.text) {
     mainHtml = `<div class="heartbeat-relay-indicator"><span class="tool-spinner"></span>${t("chat.heartbeat_relay_done")}</div>`;
   } else if (msg.text) {
-    mainHtml = renderMarkdown(msg.text);
+    mainHtml = renderMarkdown(msg.text, _selectedAnima);
   } else {
     mainHtml = '<span class="cursor-blink"></span>';
   }
@@ -1380,7 +1397,7 @@ async function _loadOlderMessages() {
   if (!name) return;
   const hs = _historyState[name]?.[tid];
   if (!hs || !hs.hasMore || hs.loading) return;
-  if (_isChatStreaming) return;
+  if (_streamingContext?.anima === name && _streamingContext?.thread === tid) return;
 
   hs.loading = true;
   _renderChat(false);
@@ -1416,6 +1433,66 @@ async function _fetchConversationHistory(animaName, limit = _HISTORY_PAGE_SIZE, 
   return await api(url);
 }
 
+async function _pollSelectedChat() {
+  const name = _selectedAnima;
+  const tid = _selectedThreadId || "default";
+  if (!name || _chatPollingInFlight) return;
+
+  // Avoid interfering while currently streaming in this tab.
+  if (_streamingContext?.anima === name && _streamingContext?.thread === tid) return;
+  if (_chatAbortController) return;
+
+  _chatPollingInFlight = true;
+  try {
+    const [conv, sessionsData] = await Promise.all([
+      _fetchConversationHistory(name, _HISTORY_PAGE_SIZE, null, tid).catch(() => null),
+      api(`/api/animas/${encodeURIComponent(name)}/sessions`).catch(() => null),
+    ]);
+
+    if (sessionsData) {
+      const prevThreadLastTs = new Map(
+        (_threads[name] || []).map((t) => [t.id, _threadTimeValue(t.lastTs || "")]),
+      );
+      _mergeThreadsFromSessions(name, sessionsData);
+      // Mark other threads unread when timestamp advances.
+      for (const t of _threads[name] || []) {
+        if (!t?.id || t.id === tid) continue;
+        const prev = prevThreadLastTs.get(t.id) || 0;
+        const curr = _threadTimeValue(t.lastTs || "");
+        if (curr > prev) _setThreadUnread(name, t.id, true);
+      }
+      _refreshAnimaUnread(name);
+      _renderAnimaTabs();
+      _renderThreadTabs();
+    }
+
+    if (!conv || !Array.isArray(conv.sessions)) return;
+
+    if (!_historyState[name]) _historyState[name] = {};
+    const prev = _historyState[name][tid] || { sessions: [], hasMore: false, nextBefore: null, loading: false };
+    const prevSig = JSON.stringify(prev.sessions || []);
+    const nextSig = JSON.stringify(conv.sessions || []);
+    const changed = prevSig !== nextSig;
+
+    _historyState[name][tid] = {
+      sessions: conv.sessions,
+      hasMore: conv.has_more || false,
+      nextBefore: conv.next_before || null,
+      loading: false,
+    };
+
+    if (changed) {
+      const messagesEl = _$("chatPageMessages");
+      const shouldStickBottom = messagesEl
+        ? (messagesEl.scrollHeight - (messagesEl.scrollTop + messagesEl.clientHeight)) <= 80
+        : true;
+      _renderChat(shouldStickBottom);
+    }
+  } finally {
+    _chatPollingInFlight = false;
+  }
+}
+
 // ── History Message Rendering ─────────────────
 
 function _renderHistoryMessage(msg) {
@@ -1427,7 +1504,7 @@ function _renderHistoryMessage(msg) {
   }
 
   if (msg.role === "assistant") {
-    const content = msg.content ? renderMarkdown(msg.content) : "";
+    const content = msg.content ? renderMarkdown(msg.content, _selectedAnima) : "";
     const toolHtml = _renderToolCalls(msg.tool_calls);
     const imagesHtml = renderChatImages(msg.images, { animaName: _selectedAnima });
     return `<div class="chat-bubble assistant">${content}${imagesHtml}${toolHtml}${tsHtml}</div>`;
@@ -1552,6 +1629,10 @@ function _submitChat() {
   const msg = input.value.trim();
   const hasImages = _imageInputManager && _imageInputManager.getImageCount() > 0;
 
+  // 現在表示中のAnima+スレッドがストリーミング中かどうか
+  const _isChatStreaming = _streamingContext?.anima === _selectedAnima &&
+    _streamingContext?.thread === _selectedThreadId;
+
   // ── Not streaming ──
   if (!_isChatStreaming) {
     if (msg || hasImages) {
@@ -1644,9 +1725,10 @@ async function _sendChat(message, overrideImages = null) {
 
   const input = _$("chatPageInput");
   const sendBtn = _$("chatPageSendBtn");
-  _isChatStreaming = true;
+  _streamingContext = { anima: name, thread: tid };
   _chatAbortController = new AbortController();
   _updateSendButton();
+  _renderAnimaTabs();
   if (input) input.placeholder = t("chat.message_to", { name });
 
   if (!overrideImages) {
@@ -1777,7 +1859,7 @@ async function _sendChat(message, overrideImages = null) {
       _renderChat();
     }
   } finally {
-    _isChatStreaming = false;
+    _streamingContext = null;
     _chatAbortController = null;
     if (input) {
       input.placeholder = t("chat.message_to", { name });
@@ -1785,6 +1867,7 @@ async function _sendChat(message, overrideImages = null) {
       input.focus();
     }
     _updateSendButton();
+    _renderAnimaTabs();
 
     // Auto-send next queued message
     if (_pendingQueue.length > 0) {
@@ -1853,7 +1936,7 @@ function _showPendingIndicator() {
       const removed = _pendingQueue.splice(idx, 1)[0];
       if (removed) {
         const input = _$("chatPageInput");
-        if (input) { input.value = removed.text; input.style.height = "auto"; input.style.height = Math.min(input.scrollHeight, 200) + "px"; input.focus(); }
+        if (input) { input.value = removed.text; input.style.height = "auto"; input.style.height = Math.min(input.scrollHeight, _chatInputMaxHeight()) + "px"; input.focus(); }
       }
       _showPendingIndicator();
       _updateSendButton();
@@ -1866,11 +1949,42 @@ function _hidePendingIndicator() {
   if (bar) bar.style.display = "none";
 }
 
+const _SEND_BTN_ICONS = {
+  send: `
+    <svg class="chat-send-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M12 19V5M5 12l7-7 7 7" />
+    </svg>
+  `,
+  stop: `
+    <svg class="chat-send-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <rect x="5" y="5" width="14" height="14" rx="2.5" />
+    </svg>
+  `,
+  interrupt: `
+    <span class="chat-send-icon-group" aria-hidden="true">
+      <svg class="chat-send-icon chat-send-icon-square" viewBox="0 0 24 24" focusable="false">
+        <rect x="5" y="5" width="14" height="14" rx="2.5" />
+      </svg>
+      <svg class="chat-send-icon" viewBox="0 0 24 24" focusable="false">
+        <path d="M12 19V5M5 12l7-7 7 7" />
+      </svg>
+    </span>
+  `,
+};
+
+function _setSendButtonIcon(sendBtn, mode) {
+  sendBtn.innerHTML = _SEND_BTN_ICONS[mode] || _SEND_BTN_ICONS.send;
+}
+
 function _updateSendButton() {
   const sendBtn = _$("chatPageSendBtn");
   const queueBtn = _$("chatPageQueueBtn");
   const inputVal = _$("chatPageInput")?.value?.trim() || "";
   const hasInput = inputVal.length > 0;
+
+  // 現在表示中のAnima+スレッドがストリーミング中かどうか
+  const _isChatStreaming = _streamingContext?.anima === _selectedAnima &&
+    _streamingContext?.thread === _selectedThreadId;
 
   if (queueBtn) {
     queueBtn.disabled = !hasInput || !_selectedAnima;
@@ -1879,17 +1993,17 @@ function _updateSendButton() {
   if (!sendBtn) return;
   sendBtn.classList.remove("stop", "interrupt");
   if (!_isChatStreaming) {
-    sendBtn.textContent = (_pendingQueue.length > 0 || hasInput) ? "↑" : "↑";
+    _setSendButtonIcon(sendBtn, "send");
     sendBtn.disabled = !_selectedAnima || (!hasInput && _pendingQueue.length === 0);
   } else if (hasInput) {
-    sendBtn.textContent = "↑";
+    _setSendButtonIcon(sendBtn, "send");
     sendBtn.disabled = false;
   } else if (_pendingQueue.length > 0) {
-    sendBtn.textContent = "■↑";
+    _setSendButtonIcon(sendBtn, "interrupt");
     sendBtn.classList.add("interrupt");
     sendBtn.disabled = false;
   } else {
-    sendBtn.textContent = "■";
+    _setSendButtonIcon(sendBtn, "stop");
     sendBtn.classList.add("stop");
     sendBtn.disabled = false;
   }
@@ -2178,7 +2292,7 @@ async function _loadArchivedSession(sessionId) {
   try {
     const data = await api(`/api/animas/${encodeURIComponent(_selectedAnima)}/sessions/${encodeURIComponent(sessionId)}`);
     if (data.markdown) {
-      if (conv) conv.innerHTML = `<div class="history-markdown">${renderMarkdown(data.markdown)}</div>`;
+      if (conv) conv.innerHTML = `<div class="history-markdown">${renderMarkdown(data.markdown, _selectedAnima)}</div>`;
     } else if (data.data) {
       const d = data.data;
       let html = `<div class="history-session-meta">
@@ -2190,7 +2304,7 @@ async function _loadArchivedSession(sessionId) {
         html += `<div class="history-section"><div class="history-section-label">${t("chat.request_label")}</div><pre class="history-pre">${escapeHtml(d.original_prompt)}</pre></div>`;
       }
       if (d.accumulated_response) {
-        html += `<div class="history-section"><div class="history-section-label">${t("chat.response_label")}</div><div>${renderMarkdown(d.accumulated_response)}</div></div>`;
+        html += `<div class="history-section"><div class="history-section-label">${t("chat.response_label")}</div><div>${renderMarkdown(d.accumulated_response, _selectedAnima)}</div></div>`;
       }
       if (conv) conv.innerHTML = html;
     } else {
@@ -2225,7 +2339,7 @@ function _renderTranscriptDetail(data) {
       const ts = turn.timestamp ? timeStr(turn.timestamp) : "";
       const bubbleClass = turn.role === "assistant" ? "assistant" : "user";
       const roleLabel = turn.role === "human" ? t("chat.role_human") : turn.role;
-      const content = turn.role === "assistant" ? renderMarkdown(turn.content || "") : escapeHtml(turn.content || "");
+      const content = turn.role === "assistant" ? renderMarkdown(turn.content || "", _selectedAnima) : escapeHtml(turn.content || "");
       html += `
         <div class="history-turn">
           <div class="history-turn-meta">${ts} - ${escapeHtml(roleLabel)}</div>
@@ -2247,7 +2361,7 @@ async function _loadEpisode(date) {
 
   try {
     const data = await api(`/api/animas/${encodeURIComponent(_selectedAnima)}/episodes/${encodeURIComponent(date)}`);
-    if (conv) conv.innerHTML = `<div class="history-markdown">${renderMarkdown(data.content || t("chat.no_content"))}</div>`;
+    if (conv) conv.innerHTML = `<div class="history-markdown">${renderMarkdown(data.content || t("chat.no_content"), _selectedAnima)}</div>`;
   } catch {
     if (conv) conv.innerHTML = `<div class="loading-placeholder">${t("common.load_failed")}</div>`;
   }
@@ -2320,10 +2434,10 @@ function _buildVoiceChatCallbacks(animaName) {
 }
 
 function _updateVoiceAnima(animaName) {
-  updateVoiceUIAnima(animaName);
+  const wasActive = updateVoiceUIAnima(animaName);
   const chatInputForm = _$("chatPageForm") || document.querySelector(".chat-input-form");
   if (chatInputForm && animaName) {
-    initVoiceUI(chatInputForm, animaName, _buildVoiceChatCallbacks(animaName));
+    initVoiceUI(chatInputForm, animaName, _buildVoiceChatCallbacks(animaName), { autoConnect: wasActive });
   }
 }
 

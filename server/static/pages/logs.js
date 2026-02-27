@@ -110,9 +110,14 @@ async function _loadFileList() {
     if (Array.isArray(files) && files.length > 0) {
       let opts = `<option value="">${t("logs.file_select")}</option>`;
       for (const f of files) {
-        const name = typeof f === "string" ? f : (f.name || f.filename || "");
-        if (name) {
-          opts += `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`;
+        const nameRaw = typeof f === "string" ? f : (f.name || f.filename || "");
+        const pathRaw = typeof f === "object" && f !== null ? (f.path || "") : "";
+        const name = Array.isArray(nameRaw) ? String(nameRaw[0] || "") : String(nameRaw || "");
+        const path = Array.isArray(pathRaw) ? String(pathRaw[0] || "") : String(pathRaw || "");
+        const value = path || name;
+        const label = path || name;
+        if (value) {
+          opts += `<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`;
         }
       }
       select.innerHTML = opts;
@@ -133,7 +138,7 @@ async function _loadLogContent(filename) {
   content.textContent = t("common.loading");
 
   try {
-    const data = await api(`/api/system/logs/${encodeURIComponent(filename)}?offset=0&limit=200`);
+    const data = await api(`/api/system/logs/file/read?file=${encodeURIComponent(filename)}&offset=0&limit=200`);
     const lines = data.lines || data.content || [];
 
     if (Array.isArray(lines)) {

@@ -23,7 +23,7 @@ export function stripEmotionTag(text) {
  * Lightweight Markdown → HTML renderer.
  * Escapes HTML first, then applies safe transforms.
  */
-export function renderSimpleMarkdown(text) {
+export function renderSimpleMarkdown(text, animaName) {
   if (!text) return "";
 
   let html = escapeHtml(stripEmotionTag(text));
@@ -75,6 +75,19 @@ export function renderSimpleMarkdown(text) {
 
   // Italic: *...*
   html = html.replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, "<em>$1</em>");
+
+  // Images: ![alt](src) — resolve anima-relative paths
+  html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_m, alt, src) => {
+    let resolved = src;
+    if (animaName) {
+      if (src.startsWith("attachments/")) {
+        resolved = `/api/animas/${encodeURIComponent(animaName)}/attachments/${encodeURIComponent(src.slice("attachments/".length))}`;
+      } else if (src.startsWith("assets/")) {
+        resolved = `/api/animas/${encodeURIComponent(animaName)}/assets/${encodeURIComponent(src.slice("assets/".length))}`;
+      }
+    }
+    return `<img src="${resolved}" alt="${alt}" class="chat-attached-image" loading="lazy" onerror="this.onerror=null;this.classList.add('chat-attached-image-error');this.alt='Image unavailable';" />`;
+  });
 
   // Links: [text](url) — only allow http/https to prevent javascript: XSS
   html = html.replace(

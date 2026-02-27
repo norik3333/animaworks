@@ -601,6 +601,13 @@ html, body {
   color: #2563eb;
   text-decoration: underline;
 }
+.chat-bubble img {
+  max-width: 100%;
+  max-height: 320px;
+  border-radius: 8px;
+  object-fit: contain;
+  cursor: pointer;
+}
 
 .chat-bubble.assistant ul {
   margin: 4px 0;
@@ -1282,10 +1289,13 @@ html, body {
   border: 1px solid #ddd;
   border-radius: 12px;
   background: #fff;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: stretch;
   overflow: visible;
   transition: border-color 0.15s;
+  padding: 6px;
 }
 
 .ws-conv-input-area .chat-input-wrap:focus-within {
@@ -1293,17 +1303,18 @@ html, body {
 }
 
 .ws-conv-input {
-  flex: 1;
-  padding: 10px 14px 4px;
+  width: 100%;
+  padding: 10px 14px;
   border: none;
   background: transparent;
   color: #1a1a1a;
   font-family: inherit;
-  font-size: 0.9rem;
+  font-size: 0.95rem;
+  line-height: 1.5;
   resize: none;
   outline: none;
-  min-height: 36px;
-  max-height: 120px;
+  min-height: 84px;
+  max-height: 220px;
 }
 
 .ws-conv-input::placeholder {
@@ -1315,8 +1326,8 @@ html, body {
 }
 
 .ws-conv-send {
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   padding: 0;
   display: inline-flex;
   align-items: center;
@@ -1332,13 +1343,62 @@ html, body {
   flex-shrink: 0;
 }
 
-.chat-input-actions {
-  display: flex;
-  gap: 4px;
-  justify-content: flex-end;
+.chat-send-icon-group {
+  display: inline-flex;
   align-items: center;
-  padding: 2px 6px 4px;
-  min-height: 36px;
+  justify-content: center;
+  gap: 1px;
+  line-height: 0;
+  pointer-events: none;
+}
+
+.chat-send-icon {
+  width: 14px;
+  height: 14px;
+  display: block;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+  pointer-events: none;
+}
+
+.chat-send-icon rect {
+  fill: currentColor;
+  stroke: none;
+}
+
+.chat-send-icon-square {
+  width: 12px;
+  height: 12px;
+}
+
+.chat-input-actions {
+  display: grid;
+  grid-template-columns: repeat(2, 34px);
+  grid-auto-rows: 34px;
+  gap: 8px;
+  justify-content: center;
+  align-content: center;
+  padding: 0;
+  min-height: 0;
+}
+
+.ws-conv-input-area .voice-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  min-height: 34px;
+}
+
+.ws-conv-input-area .voice-mic-btn {
+  width: 34px;
+  height: 34px;
+  border-width: 1px;
 }
 
 .ws-conv-send:hover {
@@ -1467,8 +1527,8 @@ html, body {
 }
 
 .chat-queue-btn {
-  width: 28px;
-  height: 28px;
+  width: 34px;
+  height: 34px;
   padding: 0;
   display: inline-flex;
   align-items: center;
@@ -1482,6 +1542,18 @@ html, body {
   transition: all 0.15s;
   flex-shrink: 0;
   align-self: flex-end;
+}
+
+.chat-queue-icon {
+  width: 14px;
+  height: 14px;
+  display: block;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+  pointer-events: none;
 }
 
 .chat-queue-btn:hover:not(:disabled) {
@@ -2144,14 +2216,15 @@ html, body {
   /* Tap targets: minimum 40px */
   .chat-send-btn,
   .ws-conv-send {
-    width: 40px;
-    height: 40px;
+    width: 44px;
+    height: 44px;
+    min-height: 44px;
   }
 
   .chat-queue-btn,
   .chat-attach-btn {
-    width: 36px;
-    height: 36px;
+    width: 34px;
+    height: 34px;
   }
 
   .right-tab {
@@ -2190,7 +2263,7 @@ html, body {
 
   /* Conversation input: reduce max-height for mobile */
   .ws-conv-input {
-    max-height: 100px;
+    max-height: 140px;
     font-size: 16px;
   }
 
@@ -2540,8 +2613,8 @@ html, body {
 }
 
 .chat-attach-btn {
-  width: 28px;
-  height: 28px;
+  width: 34px;
+  height: 34px;
   border: 1px solid #ddd;
   border-radius: 50%;
   background: transparent;

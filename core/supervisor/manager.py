@@ -965,7 +965,10 @@ class ProcessSupervisor:
             try:
                 enable_3d = load_config().image_gen.enable_3d
             except Exception:
-                pass
+                logger.debug(
+                    "Failed to read image_gen.enable_3d from config, using default True",
+                    exc_info=True,
+                )
 
             incomplete = find_animas_with_missing_assets(
                 self.animas_dir, enable_3d=enable_3d,

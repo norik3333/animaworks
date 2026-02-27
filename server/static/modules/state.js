@@ -79,14 +79,37 @@ _markedRenderer.link = function (token) {
   const html = _origLinkRenderer(token);
   return html.replace(/^<a /, '<a target="_blank" rel="noopener noreferrer" ');
 };
+let _mdAnimaCtx = null;
+
+function _resolveAnimaSrc(src) {
+  if (!_mdAnimaCtx || !src) return src;
+  if (src.startsWith("attachments/")) {
+    const file = src.slice("attachments/".length);
+    return `/api/animas/${encodeURIComponent(_mdAnimaCtx)}/attachments/${encodeURIComponent(file)}`;
+  }
+  if (src.startsWith("assets/")) {
+    const file = src.slice("assets/".length);
+    return `/api/animas/${encodeURIComponent(_mdAnimaCtx)}/assets/${encodeURIComponent(file)}`;
+  }
+  return src;
+}
+
+_markedRenderer.image = function (token) {
+  const src = _resolveAnimaSrc(token.href || "");
+  const alt = escapeHtml(token.text || "Image");
+  return `<img src="${src}" alt="${alt}" class="chat-attached-image" loading="lazy" onerror="this.onerror=null;this.classList.add('chat-attached-image-error');this.alt='Image unavailable';" />`;
+};
 
 const _markedOptions = { breaks: true, renderer: _markedRenderer };
 
-export function renderMarkdown(text) {
+export function renderMarkdown(text, animaName) {
+  _mdAnimaCtx = animaName || null;
   try {
     return marked.parse(text, _markedOptions);
   } catch {
     return escapeHtml(text);
+  } finally {
+    _mdAnimaCtx = null;
   }
 }
 

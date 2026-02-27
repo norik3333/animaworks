@@ -23,6 +23,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -60,7 +61,6 @@ _EXPOSED_TOOL_NAMES: frozenset[str] = frozenset({
     "search_memory",
     "report_procedure_outcome",
     "report_knowledge_outcome",
-    "discover_tools",
     "disable_subordinate",
     "enable_subordinate",
     "skill",
@@ -112,16 +112,86 @@ def _coerce_integers(
     return arguments
 
 
-def _build_mcp_tools() -> list[Tool]:
+# Regex matching permission lines like "- chatwork: 全権限" or "- slack: 読み取りのみ"
+_PERMISSION_ALLOW_RE = re.compile(
+    r"[-*]?\s*(\w+)\s*:\s*(OK|yes|enabled|true|全権限|読み取り.*)\s*$",
+    re.IGNORECASE,
+)
+_PERMISSION_ALL_RE = re.compile(
+    r"[-*]?\s*all\s*:\s*(OK|yes|enabled|true)\s*$",
+    re.IGNORECASE,
+)
+_PERMISSION_DENY_RE = re.compile(
+    r"[-*]?\s*(\w+)\s*:\s*(no|deny|disabled|false)\s*$",
+    re.IGNORECASE,
+)
+
+
+def _load_permitted_categories(anima_dir: Path) -> set[str]:
+    """Parse permissions.md to extract permitted external tool categories.
+
+    Mirrors the logic of ``AgentCore._init_tool_registry()`` but operates
+    on the raw file without requiring MemoryManager.
+
+    Returns a set of permitted category names (module names from TOOL_MODULES).
+    """
+    from core.tools import TOOL_MODULES
+
+    all_tools = set(TOOL_MODULES.keys())
+    permissions_path = anima_dir / "permissions.md"
+    if not permissions_path.is_file():
+        return all_tools
+
+    try:
+        text = permissions_path.read_text(encoding="utf-8")
+    except OSError:
+        logger.debug("Cannot read permissions.md from %s", anima_dir)
+        return all_tools
+
+    if "外部ツール" not in text:
+        return all_tools
+
+    has_all_yes = False
+    allowed: list[str] = []
+    denied: list[str] = []
+
+    for line in text.splitlines():
+        stripped = line.strip()
+        if _PERMISSION_ALL_RE.match(stripped):
+            has_all_yes = True
+            continue
+        m_deny = _PERMISSION_DENY_RE.match(stripped)
+        if m_deny:
+            name = m_deny.group(1)
+            if name in all_tools:
+                denied.append(name)
+            continue
+        m_allow = _PERMISSION_ALLOW_RE.match(stripped)
+        if m_allow:
+            name = m_allow.group(1)
+            if name in all_tools:
+                allowed.append(name)
+
+    if has_all_yes:
+        return all_tools - set(denied)
+    if allowed:
+        return set(allowed)
+    return all_tools
+
+
+def _build_mcp_tools() -> tuple[list[Tool], frozenset[str]]:
     """Convert canonical AnimaWorks schemas to MCP Tool objects.
 
     Reads all relevant schema lists from ``core.tooling.schemas`` and
-    filters to the exposed tools.  The ``skill`` tool gets a dynamically
-    generated description that enumerates available skills.
+    filters to the exposed tools.  Additionally loads permitted external
+    tool schemas (chatwork, slack, etc.) from permissions.md.
+
+    Returns:
+        Tuple of (tool_list, exposed_name_set) where exposed_name_set
+        is the union of internal and external tool names.
     """
     from core.tooling.schemas import (
         CHANNEL_TOOLS,
-        DISCOVERY_TOOLS,
         KNOWLEDGE_TOOLS,
         MEMORY_TOOLS,
         NOTIFICATION_TOOLS,
@@ -138,10 +208,34 @@ def _build_mcp_tools() -> list[Tool]:
         *NOTIFICATION_TOOLS,
         *PROCEDURE_TOOLS,
         *KNOWLEDGE_TOOLS,
-        *DISCOVERY_TOOLS,
         *SUPERVISOR_TOOLS,
         *SKILL_TOOLS,
     ]
+
+    # Load permitted external tool schemas from permissions.md
+    external_schemas: list[dict[str, Any]] = []
+    anima_dir_env = os.environ.get("ANIMAWORKS_ANIMA_DIR", "")
+    if anima_dir_env:
+        anima_dir = Path(anima_dir_env).resolve()
+        if anima_dir.is_dir():
+            try:
+                from core.tooling.schemas import load_external_schemas_by_category
+
+                permitted = _load_permitted_categories(anima_dir)
+                if permitted:
+                    external_schemas = load_external_schemas_by_category(permitted)
+                    all_schemas.extend(external_schemas)
+                    logger.info(
+                        "Loaded %d external tool schemas for categories: %s",
+                        len(external_schemas),
+                        ", ".join(sorted(permitted)),
+                    )
+            except Exception:
+                logger.debug("External tool schema loading failed", exc_info=True)
+
+    # Build the dynamic exposed set: internal + external tool names
+    external_names = frozenset(s["name"] for s in external_schemas)
+    exposed = _EXPOSED_TOOL_NAMES | external_names
 
     # Apply DB description overrides
     from core.tooling.schemas import apply_db_descriptions
@@ -150,7 +244,7 @@ def _build_mcp_tools() -> list[Tool]:
 
     # Cache original schemas for type coercion lookup
     for schema in all_schemas:
-        if schema["name"] in _EXPOSED_TOOL_NAMES:
+        if schema["name"] in exposed:
             _TOOL_SCHEMAS[schema["name"]] = schema.get(
                 "parameters", {}
             )
@@ -161,7 +255,7 @@ def _build_mcp_tools() -> list[Tool]:
     tools: list[Tool] = []
     for schema in all_schemas:
         name = schema["name"]
-        if name not in _EXPOSED_TOOL_NAMES:
+        if name not in exposed:
             continue
         desc = schema.get("description", "")
         # Override skill tool description with dynamic content
@@ -177,13 +271,13 @@ def _build_mcp_tools() -> list[Tool]:
             )
         )
 
-    # Verify we found all expected tools
+    # Verify we found all expected internal tools
     found = {t.name for t in tools}
     missing = _EXPOSED_TOOL_NAMES - found
     if missing:
         logger.warning("MCP tool schemas missing for: %s", ", ".join(sorted(missing)))
 
-    return tools
+    return tools, exposed
 
 
 def _build_skill_description() -> str:
@@ -231,7 +325,9 @@ def _build_skill_description() -> str:
 # Build once at import time.  DB descriptions are baked in at this point;
 # WebUI edits to tool descriptions will not take effect until the MCP
 # subprocess is restarted (i.e. the parent Anima process restarts).
-MCP_TOOLS: list[Tool] = _build_mcp_tools()
+MCP_TOOLS: list[Tool]
+_EXPOSED_NAMES: frozenset[str]
+MCP_TOOLS, _EXPOSED_NAMES = _build_mcp_tools()
 
 # ── Lazy ToolHandler initialisation ──────────────────────
 
@@ -368,7 +464,7 @@ async def call_tool(name: str, arguments: dict[str, Any] | None) -> list[TextCon
     # The Agent SDK should only call tools from list_tools(), but
     # ToolHandler.handle() would fall through to external dispatch
     # for unrecognised names, so we gate here explicitly.
-    if name not in _EXPOSED_TOOL_NAMES:
+    if name not in _EXPOSED_NAMES:
         return [
             TextContent(
                 type="text",

@@ -24,7 +24,7 @@ import { streamChat, fetchActiveStream, fetchStreamProgress } from "../../shared
 import { SwipeHandler } from "../../modules/touch.js";
 import { createLogger } from "../../shared/logger.js";
 import { createImageInput, initLightbox, renderChatImages } from "../../shared/image-input.js";
-import { initVoiceUI, destroyVoiceUI } from "../../modules/voice-ui.js";
+import { initVoiceUI, destroyVoiceUI, updateVoiceUIAnima } from "../../modules/voice-ui.js";
 import { getIcon } from "../../shared/activity-types.js";
 import { initOrgDashboard, disposeOrgDashboard, updateAnimaStatus, addActivityItem } from "./org-dashboard.js";
 
@@ -375,7 +375,7 @@ async function openConversation(animaName) {
   if (!dom.convOverlay) return;
 
   _wsSaveDraft();
-  destroyVoiceUI();
+  const wasVoiceActive = updateVoiceUIAnima(animaName);
   setState({ conversationOpen: true, conversationAnima: animaName, activeThreadId: "default" });
 
   const { threads } = getState();
@@ -427,7 +427,7 @@ async function openConversation(animaName) {
   // Initialize voice input for conversation
   const convInputArea = document.querySelector(".ws-conv-input-area");
   if (convInputArea && animaName) {
-    initVoiceUI(convInputArea, animaName, _buildVoiceChatCallbacks(animaName));
+    initVoiceUI(convInputArea, animaName, _buildVoiceChatCallbacks(animaName), { autoConnect: wasVoiceActive });
   }
 }
 
@@ -783,7 +783,7 @@ function _renderHistoryMessage(msg) {
   }
 
   if (msg.role === "assistant") {
-    const content = msg.content ? renderSimpleMarkdown(msg.content) : "";
+    const content = msg.content ? renderSimpleMarkdown(msg.content, getState().conversationAnima) : "";
     const toolHtml = _renderToolCalls(msg.tool_calls);
     const imagesHtml = renderChatImages(msg.images, { animaName: getState().conversationAnima });
     return `<div class="chat-bubble assistant">${content}${imagesHtml}${toolHtml}${tsHtml}</div>`;
@@ -817,7 +817,7 @@ function renderConvBubble(msg) {
   }
   let content = "";
   if (msg.text) {
-    content = renderSimpleMarkdown(msg.text);
+    content = renderSimpleMarkdown(msg.text, getState().conversationAnima);
   } else if (msg.streaming) {
     content = '<span class="cursor-blink"></span>';
   }
@@ -1445,6 +1445,33 @@ function _wsHidePendingIndicator() {
   if (dom.convPending) dom.convPending.style.display = "none";
 }
 
+const _WS_SEND_BTN_ICONS = {
+  send: `
+    <svg class="chat-send-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M12 19V5M5 12l7-7 7 7" />
+    </svg>
+  `,
+  stop: `
+    <svg class="chat-send-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <rect x="5" y="5" width="14" height="14" rx="2.5" />
+    </svg>
+  `,
+  interrupt: `
+    <span class="chat-send-icon-group" aria-hidden="true">
+      <svg class="chat-send-icon chat-send-icon-square" viewBox="0 0 24 24" focusable="false">
+        <rect x="5" y="5" width="14" height="14" rx="2.5" />
+      </svg>
+      <svg class="chat-send-icon" viewBox="0 0 24 24" focusable="false">
+        <path d="M12 19V5M5 12l7-7 7 7" />
+      </svg>
+    </span>
+  `,
+};
+
+function _wsSetSendButtonIcon(sendBtn, mode) {
+  sendBtn.innerHTML = _WS_SEND_BTN_ICONS[mode] || _WS_SEND_BTN_ICONS.send;
+}
+
 function _wsUpdateSendButton(isStreaming) {
   const hasInput = (dom.convInput?.value?.trim() || "").length > 0;
 
@@ -1455,17 +1482,17 @@ function _wsUpdateSendButton(isStreaming) {
   if (!dom.convSend) return;
   dom.convSend.classList.remove("stop", "interrupt");
   if (!isStreaming) {
-    dom.convSend.textContent = (convPendingQueue.length > 0 || hasInput) ? "↑" : "↑";
+    _wsSetSendButtonIcon(dom.convSend, "send");
     dom.convSend.disabled = !hasInput && convPendingQueue.length === 0;
   } else if (hasInput) {
-    dom.convSend.textContent = "↑";
+    _wsSetSendButtonIcon(dom.convSend, "send");
     dom.convSend.disabled = false;
   } else if (convPendingQueue.length > 0) {
-    dom.convSend.textContent = "■↑";
+    _wsSetSendButtonIcon(dom.convSend, "interrupt");
     dom.convSend.classList.add("interrupt");
     dom.convSend.disabled = false;
   } else {
-    dom.convSend.textContent = "■";
+    _wsSetSendButtonIcon(dom.convSend, "stop");
     dom.convSend.classList.add("stop");
     dom.convSend.disabled = false;
   }
@@ -1521,7 +1548,7 @@ function updateStreamingBubble(msg) {
   } else if (msg.afterHeartbeatRelay && !msg.text) {
     mainHtml = '<div class="heartbeat-relay-indicator"><span class="tool-spinner"></span>応答を準備中...</div>';
   } else if (msg.text) {
-    mainHtml = renderSimpleMarkdown(msg.text);
+    mainHtml = renderSimpleMarkdown(msg.text, getState().conversationAnima);
   } else {
     mainHtml = '<span class="cursor-blink"></span>';
   }
@@ -2286,7 +2313,7 @@ async function startDashboard() {
   // Auto-resize conversation input + dynamic button update
   dom.convInput?.addEventListener("input", () => {
     dom.convInput.style.height = "auto";
-    const maxH = isMobileView() ? 100 : 120;
+    const maxH = isMobileView() ? 140 : 220;
     dom.convInput.style.height = Math.min(dom.convInput.scrollHeight, maxH) + "px";
     _wsSaveDraft();
     _wsUpdateSendButton(!!convStreamController);

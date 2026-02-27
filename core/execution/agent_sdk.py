@@ -55,13 +55,13 @@ __all__ = ["AgentSDKExecutor", "StreamDisconnectedError", "clear_session_ids"]
 # Each entry is (compiled_regex, human-readable reason).
 _BASH_BLOCKED_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"chatwork\s+send", re.IGNORECASE),
-     "Chatwork send via Bash is blocked; use the Chatwork tool instead"),
+     "Chatwork send via Bash is blocked; use the mcp__aw__chatwork_send tool instead"),
     (re.compile(r"chatwork_cli\.py\s+send", re.IGNORECASE),
-     "Chatwork CLI send via Bash is blocked; use the Chatwork tool instead"),
+     "Chatwork CLI send via Bash is blocked; use the mcp__aw__chatwork_send tool instead"),
     (re.compile(r"curl.*api\.chatwork\.com.*/messages", re.IGNORECASE),
-     "Direct Chatwork API post is blocked"),
+     "Direct Chatwork API post is blocked; use the mcp__aw__chatwork_send tool instead"),
     (re.compile(r"wget.*api\.chatwork\.com.*/messages", re.IGNORECASE),
-     "Direct Chatwork API post via wget is blocked"),
+     "Direct Chatwork API post via wget is blocked; use the mcp__aw__chatwork_send tool instead"),
 ]
 
 # ── Mode S security ──────────────────────────────────────────

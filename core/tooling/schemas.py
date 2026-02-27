@@ -1277,6 +1277,20 @@ def load_personal_tool_schemas(
     return schemas
 
 
+def load_external_schemas_by_category(
+    categories: set[str],
+) -> list[dict[str, Any]]:
+    """Load external tool schemas filtered by permitted categories.
+
+    *categories* is a set of tool module names (e.g. ``{"chatwork", "slack"}``).
+    Only schemas belonging to those modules are returned.
+    """
+    from core.tools import TOOL_MODULES
+
+    filtered_registry = [name for name in TOOL_MODULES if name in categories]
+    return load_external_schemas(filtered_registry)
+
+
 def load_all_tool_schemas(
     tool_registry: list[str] | None = None,
     personal_tools: dict[str, str] | None = None,

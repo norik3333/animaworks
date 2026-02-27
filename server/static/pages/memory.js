@@ -8,6 +8,39 @@ let _activeTab = "episodes";
 let _viewMode = "list"; // "list" | "content"
 let _container = null;
 let _animas = [];
+const _TAB_META = {
+  episodes: { icon: "📝", labelKey: "chat.memory_episodes" },
+  knowledge: { icon: "📘", labelKey: "chat.memory_knowledge" },
+  procedures: { icon: "📑", labelKey: "chat.memory_procedures" },
+};
+
+function _extractStatsCount(value) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (value && typeof value === "object") {
+    const count = value.count;
+    if (typeof count === "number" && Number.isFinite(count)) return count;
+  }
+  return 0;
+}
+
+function _tabLabel(tab, count = null) {
+  const meta = _TAB_META[tab];
+  if (!meta) return "";
+  const base = `${meta.icon} ${t(meta.labelKey)}`;
+  return count === null ? base : `${base} (${count})`;
+}
+
+function _setTabLabel(tab, count = null) {
+  const btn = _container?.querySelector(`.page-tab[data-tab="${tab}"]`);
+  if (!btn) return;
+  btn.textContent = _tabLabel(tab, count);
+}
+
+function _resetTabLabels() {
+  _setTabLabel("episodes", null);
+  _setTabLabel("knowledge", null);
+  _setTabLabel("procedures", null);
+}
 
 export function render(container) {
   _container = container;
@@ -28,12 +61,9 @@ export function render(container) {
     </div>
 
     <div class="page-tabs" style="margin-bottom:1rem;">
-      <button class="page-tab active" data-tab="episodes">${t("chat.memory_episodes")}</button>
-      <button class="page-tab" data-tab="knowledge">${t("chat.memory_knowledge")}</button>
-      <button class="page-tab" data-tab="procedures">${t("chat.memory_procedures")}</button>
-    </div>
-
-    <div class="card-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom:1.5rem;" id="memoryStatsBar">
+      <button class="page-tab active" data-tab="episodes">${_tabLabel("episodes")}</button>
+      <button class="page-tab" data-tab="knowledge">${_tabLabel("knowledge")}</button>
+      <button class="page-tab" data-tab="procedures">${_tabLabel("procedures")}</button>
     </div>
 
     <div class="card">
@@ -45,6 +75,7 @@ export function render(container) {
 
   _loadAnimaList();
   _bindEvents();
+  _resetTabLabels();
 }
 
 export function destroy() {
@@ -63,7 +94,7 @@ function _bindEvents() {
     select.addEventListener("change", (e) => {
       _selectedAnima = e.target.value || null;
       _viewMode = "list";
-      _loadStats();
+      _updateTabCounts();
       _loadFileList();
     });
   }
@@ -97,10 +128,9 @@ async function _loadAnimaList() {
   }
 }
 
-async function _loadStats() {
-  const bar = document.getElementById("memoryStatsBar");
-  if (!bar || !_selectedAnima) {
-    if (bar) bar.innerHTML = "";
+async function _updateTabCounts() {
+  if (!_selectedAnima) {
+    _resetTabLabels();
     return;
   }
 
@@ -109,9 +139,9 @@ async function _loadStats() {
   // Try memory stats endpoint first
   try {
     const stats = await api(`/api/animas/${encodeURIComponent(_selectedAnima)}/memory/stats`);
-    epCount = stats.episodes ?? 0;
-    knCount = stats.knowledge ?? 0;
-    prCount = stats.procedures ?? 0;
+    epCount = _extractStatsCount(stats.episodes);
+    knCount = _extractStatsCount(stats.knowledge);
+    prCount = _extractStatsCount(stats.procedures);
   } catch {
     // Fallback: count from file list endpoints
     try {
@@ -125,21 +155,9 @@ async function _loadStats() {
       prCount = (pr.files || []).length;
     } catch { /* ignore */ }
   }
-
-  bar.innerHTML = `
-    <div class="stat-card">
-      <div class="stat-label">${t("chat.memory_episodes")}</div>
-      <div class="stat-value">${epCount}</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">${t("chat.memory_knowledge")}</div>
-      <div class="stat-value">${knCount}</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">${t("chat.memory_procedures")}</div>
-      <div class="stat-value">${prCount}</div>
-    </div>
-  `;
+  _setTabLabel("episodes", epCount);
+  _setTabLabel("knowledge", knCount);
+  _setTabLabel("procedures", prCount);
 }
 
 async function _loadFileList() {

@@ -735,7 +735,10 @@ class PrimingEngine:
 
             # Personal skills (highest precedence)
             if self.skills_dir.is_dir():
-                for f in sorted(self.skills_dir.glob("*/SKILL.md")):
+                personal_skill_files = sorted(self.skills_dir.glob("*/SKILL.md"))
+                # Backward compatibility: legacy flat skills/*.md layout.
+                personal_skill_files.extend(sorted(self.skills_dir.glob("*.md")))
+                for f in personal_skill_files:
                     try:
                         meta = MemoryManager._extract_skill_meta(f, is_common=False)
                         if meta.name not in names:
@@ -747,7 +750,10 @@ class PrimingEngine:
             # Common skills
             common_dir = get_common_skills_dir()
             if common_dir.is_dir():
-                for f in sorted(common_dir.glob("*/SKILL.md")):
+                common_skill_files = sorted(common_dir.glob("*/SKILL.md"))
+                # Backward compatibility: legacy flat common_skills/*.md layout.
+                common_skill_files.extend(sorted(common_dir.glob("*.md")))
+                for f in common_skill_files:
                     try:
                         meta = MemoryManager._extract_skill_meta(f, is_common=True)
                         if meta.name not in names:

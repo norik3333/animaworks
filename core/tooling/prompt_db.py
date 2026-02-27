@@ -475,36 +475,25 @@ Sモードでは **Writeツール**（ネイティブ）を使って直接記憶
   - Primingのスキルヒントに表示された名前を `name` パラメータに指定する
   - 手順書に従って作業する前に、必ずこのツールで全文を確認すること
 
-### 外部ツール（Bash経由）
+### 外部ツール（MCP経由）
 
-AnimaWorks内部ツール（MCP `mcp__aw__*`）とは別に、外部サービス連携ツールが利用可能。
-外部ツールはBashから `animaworks-tool` コマンドで実行する。
+permissions.md で許可された外部サービス連携ツール（Chatwork, Slack, Gmail等）は
+MCPツール（`mcp__aw__*`）として直接利用可能。Bash経由の `animaworks-tool` は不要。
 
-#### 使い方の流れ
-1. `mcp__aw__discover_tools` を引数なしで呼び、利用可能なカテゴリを確認する
-2. カテゴリを指定して呼ぶと詳細が返る
-3. Bashで実行する: `animaworks-tool <ツール名> <サブコマンド> [引数...]`
-4. 詳細なヘルプ: `animaworks-tool <ツール名> --help`
-
-#### 例: Web検索を実行する
-1. `mcp__aw__discover_tools(category="web_search")` → 引数の詳細が返る
-2. Bashで実行:
-   ```
-   animaworks-tool web_search "AnimaWorks デプロイ手順" -n 5
-   ```
+#### 使い方
+`mcp__aw__chatwork_send`, `mcp__aw__slack_post` 等、許可されたツールが
+MCPツールリストに自動的に含まれる。通常のMCPツールと同じように直接呼び出すこと。
 
 #### 長時間ツールのバックグラウンド実行
-画像生成・ローカルLLM推論等の長時間ツールは直接実行するとロックが保持される。
-必ず `submit` で非同期実行すること:
+画像生成・ローカルLLM推論等の長時間ツールはBash経由で `submit` を使い非同期実行すること:
 ```
 animaworks-tool submit <ツール名> <サブコマンド> [引数...]
 ```
 完了時は `state/background_notifications/` に通知が書かれ、次回heartbeatで確認できる。
 
 #### 注意事項
-- MCPツール（`mcp__aw__*`）: タスク管理・記憶検索・通信等の内部機能。直接呼び出す
-- 外部ツール（`animaworks-tool`）: Slack・Gmail・GitHub等の外部サービス。Bash経由で実行
-- 使えるツールは `permissions.md` の `tool_categories` で許可されたもののみ
+- MCPツール（`mcp__aw__*`）: 内部機能も外部サービスも全てMCP経由で直接呼び出す
+- 使えるツールは `permissions.md` で許可されたもののみ
 """,
         "en": """\
 ## MCP Tools (mcp__aw__*)
@@ -544,35 +533,26 @@ Write important discoveries immediately; do not wait for consolidation.
   - Specify the name shown in Priming skill hints as the `name` parameter
   - Always fetch full content before following a procedure
 
-### External tools (via Bash)
+### External tools (via MCP)
 
-Alongside internal MCP tools (`mcp__aw__*`), external service tools are available via Bash and `animaworks-tool`.
+External service tools (Chatwork, Slack, Gmail, etc.) permitted in permissions.md
+are available as MCP tools (`mcp__aw__*`) directly. No need for Bash `animaworks-tool`.
 
-#### Usage flow
-1. Call `mcp__aw__discover_tools` with no args to see available categories
-2. Call with a category name for details
-3. Execute via Bash: `animaworks-tool <tool_name> <subcommand> [args...]`
-4. Help: `animaworks-tool <tool_name> --help`
-
-#### Example: Web search
-1. `mcp__aw__discover_tools(category="web_search")` → returns argument details
-2. Bash:
-   ```
-   animaworks-tool web_search "AnimaWorks deployment steps" -n 5
-   ```
+#### Usage
+Tools like `mcp__aw__chatwork_send`, `mcp__aw__slack_post` are automatically
+included in the MCP tool list. Call them directly like any other MCP tool.
 
 #### Background execution for long-running tools
 Image generation, local LLM inference, etc. hold the lock if run directly.
-Use `submit` for async execution:
+Use `submit` for async execution via Bash:
 ```
 animaworks-tool submit <tool_name> <subcommand> [args...]
 ```
 On completion, notifications go to `state/background_notifications/` for the next heartbeat.
 
 #### Notes
-- MCP tools (`mcp__aw__*`): Internal task/memory/communication. Call directly
-- External tools (`animaworks-tool`): Slack, Gmail, GitHub, etc. Run via Bash
-- Allowed tools are those permitted in `permissions.md` under `tool_categories`
+- MCP tools (`mcp__aw__*`): Both internal and external tools are called directly via MCP
+- Allowed tools are those permitted in `permissions.md`
 """,
     },
     "non_s": {
