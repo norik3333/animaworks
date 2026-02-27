@@ -281,6 +281,114 @@
   color: var(--aw-color-text-primary);
 }
 
+/* --- Desktop rail layout when sidebar is hidden --- */
+@media (min-width: 769px) {
+  body.sidebar-collapsed .chat-page-main {
+    display: grid;
+    grid-template-columns: 64px minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    min-height: 0;
+  }
+
+  body.sidebar-collapsed .chat-anima-tabs-header {
+    grid-column: 1;
+    grid-row: 1 / 4;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.35rem;
+    border-bottom: none;
+    border-right: 1px solid var(--border-color, #eee);
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  body.sidebar-collapsed .chat-anima-tabs-header .anima-tabs {
+    flex: 1;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  body.sidebar-collapsed .chat-anima-tabs-header .anima-tab-wrap {
+    width: 100%;
+    justify-content: center;
+  }
+
+  body.sidebar-collapsed .chat-anima-tabs-header .anima-tab {
+    width: 42px;
+    height: 42px;
+    padding: 0;
+    border-radius: 999px;
+    justify-content: center;
+    gap: 0;
+  }
+
+  body.sidebar-collapsed .chat-anima-tabs-header .anima-tab-name,
+  body.sidebar-collapsed .chat-anima-tabs-header .anima-tab-close {
+    display: none;
+  }
+
+  body.sidebar-collapsed .chat-anima-tabs-header .anima-tab-avatar {
+    width: 36px;
+    height: 36px;
+  }
+
+  body.sidebar-collapsed .chat-add-conversation {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+  }
+
+  body.sidebar-collapsed .chat-add-conversation-btn {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border-radius: 999px;
+    font-size: 0;
+    line-height: 0;
+  }
+
+  body.sidebar-collapsed .chat-add-conversation-btn::before {
+    content: "+";
+    font-size: 1.25rem;
+    line-height: 1;
+    color: var(--aw-color-text-primary);
+  }
+
+  body.sidebar-collapsed .chat-add-conversation-menu {
+    left: calc(100% + 8px);
+    right: auto;
+    top: auto;
+    bottom: 0;
+    width: min(360px, 56vw);
+  }
+
+  body.sidebar-collapsed .thread-tabs {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  body.sidebar-collapsed #chatPageMessages {
+    grid-column: 2;
+    grid-row: 2;
+    min-height: 0;
+  }
+
+  body.sidebar-collapsed #chatPageForm {
+    grid-column: 2;
+    grid-row: 3;
+  }
+}
+
 /* --- Thread Tabs --- */
 .thread-tabs {
   display: flex;

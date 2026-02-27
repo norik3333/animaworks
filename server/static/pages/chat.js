@@ -866,7 +866,7 @@ function _renderAnimaTabs() {
     const closeBtn = _animaTabs.length > 1
       ? ` <button type="button" class="anima-tab-close" data-anima="${escapeHtml(tab.name)}" title="タブを閉じる" aria-label="閉じる">&times;</button>`
       : "";
-    return `<span class="anima-tab-wrap"><button type="button" class="anima-tab${activeClass}${streamingClass}${completedClass}" data-anima="${escapeHtml(tab.name)}">${avatar}<span class="anima-tab-name">${escapeHtml(tab.name)}</span></button>${closeBtn}</span>`;
+    return `<span class="anima-tab-wrap"><button type="button" class="anima-tab${activeClass}${streamingClass}${completedClass}" data-anima="${escapeHtml(tab.name)}" title="${escapeHtml(tab.name)}" aria-label="${escapeHtml(tab.name)}">${avatar}<span class="anima-tab-name">${escapeHtml(tab.name)}</span></button>${closeBtn}</span>`;
   }).join("");
   container.innerHTML = html;
 
