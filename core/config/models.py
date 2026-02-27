@@ -191,6 +191,24 @@ class ExternalMessagingConfig(BaseModel):
     chatwork: ExternalMessagingChannelConfig = ExternalMessagingChannelConfig()
 
 
+class MediaProxyConfig(BaseModel):
+    """Configuration for external image proxy hardening."""
+
+    mode: Literal["allowlist", "open_with_scan"] = "open_with_scan"
+    allowed_domains: list[str] = [
+        "cdn.search.brave.com",
+        "images.unsplash.com",
+        "images.pexels.com",
+        "upload.wikimedia.org",
+    ]
+    max_bytes: int = 5 * 1024 * 1024
+    max_redirects: int = 3
+    timeout_connect_s: float = 5.0
+    timeout_read_s: float = 10.0
+    rate_limit_requests: int = 30
+    rate_limit_window_s: int = 60
+
+
 class ServerConfig(BaseModel):
     """Server runtime configuration."""
 
@@ -200,6 +218,7 @@ class ServerConfig(BaseModel):
     stream_checkpoint_enabled: bool = True  # save tool results during streaming
     stream_retry_max: int = 3  # max automatic retries on stream disconnect
     stream_retry_delay_s: float = 5.0  # delay between retries (seconds)
+    media_proxy: MediaProxyConfig = MediaProxyConfig()
 
     @model_validator(mode="after")
     def _validate_intervals(self) -> ServerConfig:

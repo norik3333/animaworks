@@ -33,14 +33,14 @@ description: >-
 
 ### searched画像のプロキシ制限
 
-外部URL画像はセキュリティのためプロキシ経由で配信される。許可ドメイン:
+外部URL画像はセキュリティのためプロキシ経由で配信される。ドメイン固定の許可リストではなく、以下の安全検査を通過した画像のみ表示される:
 
-- `cdn.search.brave.com`
-- `images.unsplash.com`
-- `images.pexels.com`
-- `upload.wikimedia.org`
-
-上記ドメイン外の画像URLはプロキシでブロックされる。
+- `https://` のみ（`http://` は拒否）
+- private/local/loopback/link-local 宛先は拒否
+- リダイレクト先も同じ検査を再適用
+- 画像実体（magic bytes）検証に失敗した場合は拒否
+- SVG (`image/svg+xml`) は拒否
+- サイズ上限・レート制限超過時はブロック
 
 ## 方法2: Markdown画像構文
 
@@ -96,6 +96,6 @@ agent-browser screenshot ~/.animaworks/animas/mei/attachments/page_screenshot.pn
 ## 注意事項
 
 - 他のAnimaのアセットパスは直接参照できない（権限外）
-- 外部URLの直リンクは非推奨。プロキシ許可ドメインのみ表示可能
+- 外部URLの直リンクは非推奨。安全検査でブロックされる場合がある
 - 画像生成ツール（generate_fullbody等）の結果は自動表示されるため、Markdown構文は不要
 - 1応答あたりの自動表示は最大5枚
