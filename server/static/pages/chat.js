@@ -2,7 +2,7 @@
 import { t } from "/shared/i18n.js";
 import { api } from "../modules/api.js";
 import { escapeHtml, renderMarkdown, renderSafeMarkdown, timeStr, smartTimestamp } from "../modules/state.js";
-import { streamChat } from "../shared/chat-stream.js";
+import { streamChat, fetchActiveStream, fetchStreamProgress } from "../shared/chat-stream.js";
 import { createLogger } from "../shared/logger.js";
 import { createImageInput, initLightbox, renderChatImages } from "../shared/image-input.js";
 import { initVoiceUI, updateVoiceUIAnima } from "../modules/voice-ui.js";
@@ -455,6 +455,94 @@ async function _selectAnima(name) {
   const secondaryPromises = [_updateAvatar(), _loadMemoryTab(), _loadActivity()];
   if (_activeRightTab === "history") secondaryPromises.push(_loadSessionList());
   await Promise.all(secondaryPromises);
+
+  // If anima is currently thinking/processing, resume stream after page return.
+  const selectedAnimaObj = _animas.find((p) => p.name === name);
+  if (selectedAnimaObj && (selectedAnimaObj.status === "thinking" || selectedAnimaObj.status === "processing")) {
+    _resumeActiveStream(name);
+  }
+}
+
+async function _resumeActiveStream(animaName) {
+  if (_isChatStreaming || _chatAbortController) return;
+
+  try {
+    const active = await fetchActiveStream(animaName);
+    if (!active || active.status !== "streaming") return;
+
+    const progress = await fetchStreamProgress(animaName, active.response_id);
+    if (!progress) return;
+
+    const tid = _selectedThreadId || "default";
+    if (!_chatHistories[animaName]) _chatHistories[animaName] = {};
+    if (!_chatHistories[animaName][tid]) _chatHistories[animaName][tid] = [];
+    const history = _chatHistories[animaName][tid];
+
+    const streamingMsg = {
+      role: "assistant",
+      text: progress.full_text || "",
+      streaming: true,
+      activeTool: progress.active_tool || null,
+      timestamp: new Date().toISOString(),
+      thinkingText: "",
+      thinking: false,
+    };
+    history.push(streamingMsg);
+    _renderChat();
+
+    _isChatStreaming = true;
+    _chatAbortController = new AbortController();
+    _updateSendButton();
+
+    const currentUser = localStorage.getItem("animaworks_user") || "human";
+    const resumeBody = JSON.stringify({
+      message: "",
+      from_person: currentUser,
+      resume: active.response_id,
+      last_event_id: progress.last_event_id || "",
+    });
+
+    await streamChat(animaName, resumeBody, _chatAbortController.signal, {
+      onTextDelta: (text) => {
+        streamingMsg.text += text;
+        _renderStreamingBubble(streamingMsg);
+      },
+      onToolStart: (toolName) => {
+        streamingMsg.activeTool = toolName;
+        _renderStreamingBubble(streamingMsg);
+      },
+      onToolEnd: () => {
+        streamingMsg.activeTool = null;
+        _renderStreamingBubble(streamingMsg);
+      },
+      onError: ({ message: errorMsg }) => {
+        streamingMsg.text += `\n${t("chat.error_prefix")} ${errorMsg}`;
+        streamingMsg.streaming = false;
+        _renderChat();
+      },
+      onDone: ({ summary }) => {
+        const text = summary || streamingMsg.text;
+        streamingMsg.text = text || t("chat.empty_response");
+        streamingMsg.streaming = false;
+        streamingMsg.activeTool = null;
+        _renderChat();
+      },
+    });
+
+    if (streamingMsg.streaming) {
+      streamingMsg.streaming = false;
+      if (!streamingMsg.text) streamingMsg.text = t("chat.empty_response");
+      _renderChat();
+    }
+  } catch (err) {
+    if (err.name !== "AbortError") {
+      logger.error("Resume stream error", { anima: animaName, error: err.message });
+    }
+  } finally {
+    _isChatStreaming = false;
+    _chatAbortController = null;
+    _updateSendButton();
+  }
 }
 
 // ── Thread Tabs ────────────────────────────
