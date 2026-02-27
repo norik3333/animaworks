@@ -55,9 +55,40 @@ class SlackSocketModeManager:
 
         @self._app.event("message")
         async def handle_message(event: dict, say) -> None:  # noqa: ARG001
-            # Skip message subtypes (edits, deletes, bot messages, etc.)
             if "subtype" in event:
                 return
+
+            # Thread-reply routing for call_human notifications
+            thread_ts = event.get("thread_ts")
+            if thread_ts:
+                try:
+                    from core.notification.reply_routing import (
+                        lookup_notification_mapping,
+                        sanitize_slack_reply,
+                    )
+
+                    mapping = lookup_notification_mapping(thread_ts)
+                    if mapping:
+                        target = mapping["anima"]
+                        text = sanitize_slack_reply(event.get("text", ""))
+                        if text:
+                            shared_dir = get_data_dir() / "shared"
+                            messenger = Messenger(shared_dir, target)
+                            messenger.receive_external(
+                                content=text,
+                                source="slack",
+                                source_message_id=event.get("ts", ""),
+                                external_user_id=event.get("user", ""),
+                                external_channel_id=event.get("channel", ""),
+                            )
+                            logger.info(
+                                "Thread reply routed: thread_ts=%s -> anima=%s",
+                                thread_ts,
+                                target,
+                            )
+                        return
+                except Exception:
+                    logger.debug("Reply routing lookup failed", exc_info=True)
 
             channel_id = event.get("channel", "")
             anima_name = anima_mapping.get(channel_id)
