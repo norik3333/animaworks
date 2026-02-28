@@ -25,10 +25,10 @@ _SHARED_MODULE = _STATIC / "shared" / "activity-types.js"
 _CONSUMER_FILES = [
     _STATIC / "pages" / "activity.js",
     _STATIC / "pages" / "home.js",
-    _STATIC / "pages" / "chat.js",
+    _STATIC / "pages" / "chat" / "ctx.js",
     _STATIC / "modules" / "activity.js",
     _STATIC / "workspace" / "modules" / "timeline.js",
-    _STATIC / "workspace" / "modules" / "app.js",
+    _STATIC / "workspace" / "modules" / "activity.js",
 ]
 
 
@@ -137,10 +137,10 @@ class TestConsumerFilesUseSharedFunctions:
     _FILES_USING_GET_ICON = [
         _STATIC / "pages" / "activity.js",
         _STATIC / "pages" / "home.js",
-        _STATIC / "pages" / "chat.js",
+        _STATIC / "pages" / "chat" / "activity-controller.js",
         _STATIC / "modules" / "activity.js",
         _STATIC / "workspace" / "modules" / "timeline.js",
-        _STATIC / "workspace" / "modules" / "app.js",
+        _STATIC / "workspace" / "modules" / "activity.js",
     ]
 
     @pytest.mark.parametrize("filepath", _FILES_USING_GET_ICON, ids=[p.name for p in _FILES_USING_GET_ICON])
@@ -159,7 +159,7 @@ class TestConsumerFilesUseSharedFunctions:
         assert "getDisplaySummary(" in content
 
     def test_chat_page_uses_get_display_summary(self) -> None:
-        content = (_STATIC / "pages" / "chat.js").read_text(encoding="utf-8")
+        content = (_STATIC / "pages" / "chat" / "activity-controller.js").read_text(encoding="utf-8")
         assert "getDisplaySummary(" in content
 
     def test_timeline_uses_normalize_event(self) -> None:
