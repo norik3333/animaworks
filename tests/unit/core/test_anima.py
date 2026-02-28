@@ -196,7 +196,7 @@ class TestProcessMessage:
         with patch("core.anima.AgentCore") as MockAgent, \
              patch("core.anima.MemoryManager") as MockMM, \
              patch("core.anima.Messenger"), \
-             patch("core.anima.ConversationMemory") as MockConv:
+             patch("core._anima_messaging.ConversationMemory") as MockConv:
             MockMM.return_value.read_model_config.return_value = MagicMock()
             MockConv.return_value.compress_if_needed = AsyncMock()
             MockConv.return_value.finalize_session = AsyncMock(return_value=False)
@@ -220,7 +220,7 @@ class TestProcessMessage:
         with patch("core.anima.AgentCore") as MockAgent, \
              patch("core.anima.MemoryManager") as MockMM, \
              patch("core.anima.Messenger"), \
-             patch("core.anima.ConversationMemory") as MockConv:
+             patch("core._anima_messaging.ConversationMemory") as MockConv:
             MockMM.return_value.read_model_config.return_value = MagicMock()
             MockConv.return_value.compress_if_needed = AsyncMock()
             MockConv.return_value.finalize_session = AsyncMock(return_value=False)
@@ -250,7 +250,7 @@ class TestProcessMessage:
         with patch("core.anima.AgentCore"), \
              patch("core.anima.MemoryManager") as MockMM, \
              patch("core.anima.Messenger"), \
-             patch("core.anima.ConversationMemory") as MockConv:
+             patch("core._anima_messaging.ConversationMemory") as MockConv:
             MockMM.return_value.read_model_config.return_value = MagicMock()
             MockConv.return_value.compress_if_needed = AsyncMock()
             MockConv.return_value.finalize_session = AsyncMock(return_value=False)
@@ -277,7 +277,7 @@ class TestRunHeartbeat:
         with patch("core.anima.AgentCore"), \
              patch("core.anima.MemoryManager") as MockMM, \
              patch("core.anima.Messenger") as MockMsg, \
-             patch("core.anima.load_prompt", return_value="prompt"):
+             patch("core._anima_heartbeat.load_prompt", return_value="prompt"):
             MockMM.return_value.read_model_config.return_value = MagicMock()
             MockMM.return_value.read_heartbeat_config.return_value = "checklist"
             MockMsg.return_value.has_unread.return_value = False
@@ -306,7 +306,7 @@ class TestRunCronTask:
         with patch("core.anima.AgentCore"), \
              patch("core.anima.MemoryManager") as MockMM, \
              patch("core.anima.Messenger"), \
-             patch("core.anima.load_prompt", return_value="cron prompt"):
+             patch("core._anima_heartbeat.load_prompt", return_value="cron prompt"):
             MockMM.return_value.read_model_config.return_value = MagicMock()
 
             from core.anima import DigitalAnima
@@ -331,8 +331,8 @@ class TestProcessGreet:
         with patch("core.anima.AgentCore") as MockAgent, \
              patch("core.anima.MemoryManager") as MockMM, \
              patch("core.anima.Messenger"), \
-             patch("core.anima.ConversationMemory") as MockConv, \
-             patch("core.anima.load_prompt", return_value="greet prompt"):
+             patch("core._anima_messaging.ConversationMemory") as MockConv, \
+             patch("core._anima_messaging.load_prompt", return_value="greet prompt"):
             MockMM.return_value.read_model_config.return_value = MagicMock()
             MockConv.return_value.append_turn = MagicMock()
             MockConv.return_value.save = MagicMock()
@@ -358,8 +358,8 @@ class TestProcessGreet:
         with patch("core.anima.AgentCore"), \
              patch("core.anima.MemoryManager") as MockMM, \
              patch("core.anima.Messenger"), \
-             patch("core.anima.ConversationMemory") as MockConv, \
-             patch("core.anima.load_prompt", return_value="greet prompt"):
+             patch("core._anima_messaging.ConversationMemory") as MockConv, \
+             patch("core._anima_messaging.load_prompt", return_value="greet prompt"):
             MockMM.return_value.read_model_config.return_value = MagicMock()
             MockConv.return_value.append_turn = MagicMock()
             MockConv.return_value.save = MagicMock()
@@ -389,8 +389,8 @@ class TestProcessGreet:
         with patch("core.anima.AgentCore"), \
              patch("core.anima.MemoryManager") as MockMM, \
              patch("core.anima.Messenger"), \
-             patch("core.anima.ConversationMemory") as MockConv, \
-             patch("core.anima.load_prompt", return_value="greet prompt"):
+             patch("core._anima_messaging.ConversationMemory") as MockConv, \
+             patch("core._anima_messaging.load_prompt", return_value="greet prompt"):
             MockMM.return_value.read_model_config.return_value = MagicMock()
             MockConv.return_value.append_turn = MagicMock()
             MockConv.return_value.save = MagicMock()
@@ -420,8 +420,8 @@ class TestProcessGreet:
         with patch("core.anima.AgentCore"), \
              patch("core.anima.MemoryManager") as MockMM, \
              patch("core.anima.Messenger"), \
-             patch("core.anima.ConversationMemory") as MockConv, \
-             patch("core.anima.load_prompt", return_value="greet prompt"):
+             patch("core._anima_messaging.ConversationMemory") as MockConv, \
+             patch("core._anima_messaging.load_prompt", return_value="greet prompt"):
             MockMM.return_value.read_model_config.return_value = MagicMock()
             MockConv.return_value.append_turn = MagicMock()
             MockConv.return_value.save = MagicMock()
@@ -451,8 +451,8 @@ class TestProcessGreet:
         with patch("core.anima.AgentCore"), \
              patch("core.anima.MemoryManager") as MockMM, \
              patch("core.anima.Messenger"), \
-             patch("core.anima.ConversationMemory") as MockConv, \
-             patch("core.anima.load_prompt", return_value="greet prompt"):
+             patch("core._anima_messaging.ConversationMemory") as MockConv, \
+             patch("core._anima_messaging.load_prompt", return_value="greet prompt"):
             MockMM.return_value.read_model_config.return_value = MagicMock()
             MockConv.return_value.append_turn = MagicMock()
             MockConv.return_value.save = MagicMock()
@@ -488,8 +488,8 @@ class TestProcessGreet:
         with patch("core.anima.AgentCore"), \
              patch("core.anima.MemoryManager") as MockMM, \
              patch("core.anima.Messenger"), \
-             patch("core.anima.ConversationMemory") as MockConv, \
-             patch("core.anima.load_prompt", return_value="greet prompt"):
+             patch("core._anima_messaging.ConversationMemory") as MockConv, \
+             patch("core._anima_messaging.load_prompt", return_value="greet prompt"):
             MockMM.return_value.read_model_config.return_value = MagicMock()
             MockConv.return_value.append_turn = MagicMock()
             MockConv.return_value.save = MagicMock()
@@ -512,7 +512,7 @@ class TestProcessGreet:
         with patch("core.anima.AgentCore"), \
              patch("core.anima.MemoryManager") as MockMM, \
              patch("core.anima.Messenger"), \
-             patch("core.anima.load_prompt", return_value="greet prompt"):
+             patch("core._anima_messaging.load_prompt", return_value="greet prompt"):
             MockMM.return_value.read_model_config.return_value = MagicMock()
 
             from core.anima import DigitalAnima
@@ -546,7 +546,7 @@ class TestProcessMessageConversationSave:
         with patch("core.anima.AgentCore") as MockAgent, \
              patch("core.anima.MemoryManager") as MockMM, \
              patch("core.anima.Messenger"), \
-             patch("core.anima.ConversationMemory") as MockConv:
+             patch("core._anima_messaging.ConversationMemory") as MockConv:
             MockMM.return_value.read_model_config.return_value = MagicMock()
             MockConv.return_value.compress_if_needed = AsyncMock()
             MockConv.return_value.finalize_session = AsyncMock(return_value=False)
@@ -589,7 +589,7 @@ class TestProcessMessageConversationSave:
         with patch("core.anima.AgentCore"), \
              patch("core.anima.MemoryManager") as MockMM, \
              patch("core.anima.Messenger"), \
-             patch("core.anima.ConversationMemory") as MockConv:
+             patch("core._anima_messaging.ConversationMemory") as MockConv:
             MockMM.return_value.read_model_config.return_value = MagicMock()
             MockConv.return_value.compress_if_needed = AsyncMock()
             MockConv.return_value.finalize_session = AsyncMock(return_value=False)
@@ -630,7 +630,7 @@ class TestProcessMessageConversationSave:
         with patch("core.anima.AgentCore"), \
              patch("core.anima.MemoryManager") as MockMM, \
              patch("core.anima.Messenger"), \
-             patch("core.anima.ConversationMemory") as MockConv:
+             patch("core._anima_messaging.ConversationMemory") as MockConv:
             MockMM.return_value.read_model_config.return_value = MagicMock()
             MockConv.return_value.compress_if_needed = AsyncMock()
             MockConv.return_value.finalize_session = AsyncMock(return_value=False)
@@ -672,7 +672,7 @@ class TestProcessMessageStreamConversationSave:
         with patch("core.anima.AgentCore"), \
              patch("core.anima.MemoryManager") as MockMM, \
              patch("core.anima.Messenger"), \
-             patch("core.anima.ConversationMemory") as MockConv:
+             patch("core._anima_messaging.ConversationMemory") as MockConv:
             MockMM.return_value.read_model_config.return_value = MagicMock()
             MockConv.return_value.compress_if_needed = AsyncMock()
             MockConv.return_value.finalize_session = AsyncMock(return_value=False)
@@ -720,7 +720,7 @@ class TestProcessMessageStreamConversationSave:
         with patch("core.anima.AgentCore"), \
              patch("core.anima.MemoryManager") as MockMM, \
              patch("core.anima.Messenger"), \
-             patch("core.anima.ConversationMemory") as MockConv:
+             patch("core._anima_messaging.ConversationMemory") as MockConv:
             MockMM.return_value.read_model_config.return_value = MagicMock()
             MockConv.return_value.compress_if_needed = AsyncMock()
             MockConv.return_value.finalize_session = AsyncMock(return_value=False)
@@ -767,7 +767,7 @@ class TestProcessMessageStreamConversationSave:
         with patch("core.anima.AgentCore"), \
              patch("core.anima.MemoryManager") as MockMM, \
              patch("core.anima.Messenger"), \
-             patch("core.anima.ConversationMemory") as MockConv:
+             patch("core._anima_messaging.ConversationMemory") as MockConv:
             MockMM.return_value.read_model_config.return_value = MagicMock()
             MockConv.return_value.compress_if_needed = AsyncMock()
             MockConv.return_value.finalize_session = AsyncMock(return_value=False)
@@ -807,7 +807,7 @@ class TestProcessMessageStreamConversationSave:
         with patch("core.anima.AgentCore"), \
              patch("core.anima.MemoryManager") as MockMM, \
              patch("core.anima.Messenger"), \
-             patch("core.anima.ConversationMemory") as MockConv:
+             patch("core._anima_messaging.ConversationMemory") as MockConv:
             MockMM.return_value.read_model_config.return_value = MagicMock()
             MockConv.return_value.compress_if_needed = AsyncMock()
             MockConv.return_value.finalize_session = AsyncMock(return_value=False)
@@ -860,8 +860,8 @@ class TestProcessGreetConversationSave:
         with patch("core.anima.AgentCore"), \
              patch("core.anima.MemoryManager") as MockMM, \
              patch("core.anima.Messenger"), \
-             patch("core.anima.ConversationMemory") as MockConv, \
-             patch("core.anima.load_prompt", return_value="greet prompt"):
+             patch("core._anima_messaging.ConversationMemory") as MockConv, \
+             patch("core._anima_messaging.load_prompt", return_value="greet prompt"):
             MockMM.return_value.read_model_config.return_value = MagicMock()
             MockConv.return_value.append_turn = MagicMock()
             MockConv.return_value.save = MagicMock()

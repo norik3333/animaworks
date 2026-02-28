@@ -35,8 +35,8 @@ pytestmark = pytest.mark.e2e
 def _make_digital_anima(anima_dir: Path, shared_dir: Path):
     """Create a DigitalAnima with AgentCore, ConversationMemory, and load_prompt mocked."""
     with patch("core.anima.AgentCore") as MockAgent, \
-         patch("core.anima.ConversationMemory") as MockConv, \
-         patch("core.anima.load_prompt", return_value="prompt"):
+         patch("core._anima_heartbeat.ConversationMemory") as MockConv, \
+         patch("core._anima_heartbeat.load_prompt", return_value="prompt"):
         MockConv.return_value.load.return_value = MagicMock(turns=[])
 
         from core.anima import DigitalAnima
@@ -156,8 +156,8 @@ class TestInboxProcessing:
         assert len(list(inbox_dir.glob("*.json"))) == 2
 
         with patch("core.anima.AgentCore") as MockAgent, \
-             patch("core.anima.ConversationMemory") as MockConv, \
-             patch("core.anima.load_prompt", return_value="prompt"):
+             patch("core._anima_heartbeat.ConversationMemory") as MockConv, \
+             patch("core._anima_heartbeat.load_prompt", return_value="prompt"):
             MockConv.return_value.load.return_value = MagicMock(turns=[])
 
             from core.anima import DigitalAnima
@@ -198,8 +198,8 @@ class TestInboxProcessing:
         )
 
         with patch("core.anima.AgentCore") as MockAgent, \
-             patch("core.anima.ConversationMemory") as MockConv, \
-             patch("core.anima.load_prompt", return_value="prompt"):
+             patch("core._anima_heartbeat.ConversationMemory") as MockConv, \
+             patch("core._anima_heartbeat.load_prompt", return_value="prompt"):
             MockConv.return_value.load.return_value = MagicMock(turns=[])
 
             from core.anima import DigitalAnima
@@ -337,8 +337,8 @@ class TestHeartbeatFailureWritesRecoveryNote:
         assert len(list(inbox_dir.glob("*.json"))) == 1
 
         with patch("core.anima.AgentCore") as MockAgent, \
-             patch("core.anima.ConversationMemory") as MockConv, \
-             patch("core.anima.load_prompt", return_value="prompt"):
+             patch("core._anima_heartbeat.ConversationMemory") as MockConv, \
+             patch("core._anima_heartbeat.load_prompt", return_value="prompt"):
             MockConv.return_value.load.return_value = MagicMock(turns=[])
 
             from core.anima import DigitalAnima

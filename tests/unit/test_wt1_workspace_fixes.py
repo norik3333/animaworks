@@ -87,8 +87,11 @@ class TestIssueA_WSEventMismatch:
         )
 
     def test_anima_py_dm_received_has_to_person(self) -> None:
-        """message_received (from_type=anima) log call in anima.py must include to_person=self.name."""
-        src = ANIMA_PY.read_text(encoding="utf-8")
+        """message_received (from_type=anima) log call in anima modules must include to_person=self.name."""
+        src = "\n".join(
+            p.read_text(encoding="utf-8")
+            for p in [ANIMA_PY, *(REPO_ROOT / "core").glob("_anima_*.py")]
+        )
         # Find the message_received log call with from_type: "anima"
         matches = re.findall(
             r'activity\.log\("message_received"[^)]+\)',

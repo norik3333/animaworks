@@ -134,8 +134,8 @@ class TestHeartbeatReflectionE2E:
         )
 
         with patch("core.anima.AgentCore") as MockAgent, \
-             patch("core.anima.ConversationMemory") as MockConv, \
-             patch("core.anima.load_prompt", return_value="prompt"):
+             patch("core._anima_heartbeat.ConversationMemory") as MockConv, \
+             patch("core._anima_heartbeat.load_prompt", return_value="prompt"):
             MockConv.return_value.load.return_value = MagicMock(turns=[])
 
             from core.anima import DigitalAnima
@@ -200,8 +200,8 @@ class TestHeartbeatReflectionE2E:
         assert len(short_reflection) < 50
 
         with patch("core.anima.AgentCore") as MockAgent, \
-             patch("core.anima.ConversationMemory") as MockConv, \
-             patch("core.anima.load_prompt", return_value="prompt"):
+             patch("core._anima_heartbeat.ConversationMemory") as MockConv, \
+             patch("core._anima_heartbeat.load_prompt", return_value="prompt"):
             MockConv.return_value.load.return_value = MagicMock(turns=[])
 
             from core.anima import DigitalAnima
@@ -258,8 +258,8 @@ class TestHeartbeatReflectionE2E:
         shared_dir = data_dir / "shared"
 
         with patch("core.anima.AgentCore") as MockAgent, \
-             patch("core.anima.ConversationMemory") as MockConv, \
-             patch("core.anima.load_prompt", return_value="prompt"):
+             patch("core._anima_heartbeat.ConversationMemory") as MockConv, \
+             patch("core._anima_heartbeat.load_prompt", return_value="prompt"):
             MockConv.return_value.load.return_value = MagicMock(turns=[])
 
             from core.anima import DigitalAnima
@@ -330,8 +330,8 @@ class TestLoadRecentReflections:
         )
 
         with patch("core.anima.AgentCore") as MockAgent, \
-             patch("core.anima.ConversationMemory") as MockConv, \
-             patch("core.anima.load_prompt", return_value="prompt"):
+             patch("core._anima_heartbeat.ConversationMemory") as MockConv, \
+             patch("core._anima_heartbeat.load_prompt", return_value="prompt"):
             MockConv.return_value.load.return_value = MagicMock(turns=[])
 
             from core.anima import DigitalAnima
@@ -360,8 +360,8 @@ class TestLoadRecentReflections:
         activity.log("heartbeat_end", summary="Normal heartbeat")
 
         with patch("core.anima.AgentCore") as MockAgent, \
-             patch("core.anima.ConversationMemory") as MockConv, \
-             patch("core.anima.load_prompt", return_value="prompt"):
+             patch("core._anima_heartbeat.ConversationMemory") as MockConv, \
+             patch("core._anima_heartbeat.load_prompt", return_value="prompt"):
             MockConv.return_value.load.return_value = MagicMock(turns=[])
 
             from core.anima import DigitalAnima
@@ -384,8 +384,8 @@ class TestLoadRecentReflections:
         assert not activity_dir.exists()
 
         with patch("core.anima.AgentCore") as MockAgent, \
-             patch("core.anima.ConversationMemory") as MockConv, \
-             patch("core.anima.load_prompt", return_value="prompt"):
+             patch("core._anima_heartbeat.ConversationMemory") as MockConv, \
+             patch("core._anima_heartbeat.load_prompt", return_value="prompt"):
             MockConv.return_value.load.return_value = MagicMock(turns=[])
 
             from core.anima import DigitalAnima
@@ -412,8 +412,8 @@ class TestLoadRecentReflections:
             )
 
         with patch("core.anima.AgentCore") as MockAgent, \
-             patch("core.anima.ConversationMemory") as MockConv, \
-             patch("core.anima.load_prompt", return_value="prompt"):
+             patch("core._anima_heartbeat.ConversationMemory") as MockConv, \
+             patch("core._anima_heartbeat.load_prompt", return_value="prompt"):
             MockConv.return_value.load.return_value = MagicMock(turns=[])
 
             from core.anima import DigitalAnima
@@ -459,8 +459,8 @@ class TestBuildHeartbeatPromptReflection:
             return "prompt"
 
         with patch("core.anima.AgentCore") as MockAgent, \
-             patch("core.anima.ConversationMemory") as MockConv, \
-             patch("core.anima.load_prompt", side_effect=_mock_load_prompt):
+             patch("core._anima_heartbeat.ConversationMemory") as MockConv, \
+             patch("core._anima_heartbeat.load_prompt", side_effect=_mock_load_prompt):
             MockConv.return_value.load.return_value = MagicMock(turns=[])
 
             from core.anima import DigitalAnima
@@ -481,8 +481,8 @@ class TestBuildHeartbeatPromptReflection:
         shared_dir = data_dir / "shared"
 
         with patch("core.anima.AgentCore") as MockAgent, \
-             patch("core.anima.ConversationMemory") as MockConv, \
-             patch("core.anima.load_prompt", return_value="prompt"):
+             patch("core._anima_heartbeat.ConversationMemory") as MockConv, \
+             patch("core._anima_heartbeat.load_prompt", return_value="prompt"):
             MockConv.return_value.load.return_value = MagicMock(turns=[])
 
             from core.anima import DigitalAnima

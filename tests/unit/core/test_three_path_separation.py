@@ -36,7 +36,7 @@ class TestThreeLockStructure:
         shared_dir = data_dir / "shared"
 
         with patch("core.anima.AgentCore"), \
-             patch("core.anima.ConversationMemory"):
+             patch("core._anima_messaging.ConversationMemory"):
             from core.anima import DigitalAnima
             dp = DigitalAnima(anima_dir, shared_dir)
             assert hasattr(dp, "_inbox_lock")
@@ -48,7 +48,7 @@ class TestThreeLockStructure:
         shared_dir = data_dir / "shared"
 
         with patch("core.anima.AgentCore"), \
-             patch("core.anima.ConversationMemory"):
+             patch("core._anima_messaging.ConversationMemory"):
             from core.anima import DigitalAnima
             dp = DigitalAnima(anima_dir, shared_dir)
             assert hasattr(dp, "_state_file_lock")
@@ -59,7 +59,7 @@ class TestThreeLockStructure:
         shared_dir = data_dir / "shared"
 
         with patch("core.anima.AgentCore"), \
-             patch("core.anima.ConversationMemory"):
+             patch("core._anima_messaging.ConversationMemory"):
             from core.anima import DigitalAnima
             dp = DigitalAnima(anima_dir, shared_dir)
             assert "inbox" in dp._status_slots
@@ -72,7 +72,7 @@ class TestThreeLockStructure:
         shared_dir = data_dir / "shared"
 
         with patch("core.anima.AgentCore"), \
-             patch("core.anima.ConversationMemory"):
+             patch("core._anima_messaging.ConversationMemory"):
             from core.anima import DigitalAnima
             dp = DigitalAnima(anima_dir, shared_dir)
 
@@ -89,7 +89,7 @@ class TestThreeLockStructure:
         shared_dir = data_dir / "shared"
 
         with patch("core.anima.AgentCore"), \
-             patch("core.anima.ConversationMemory"):
+             patch("core._anima_messaging.ConversationMemory"):
             from core.anima import DigitalAnima
             dp = DigitalAnima(anima_dir, shared_dir)
 
@@ -241,7 +241,7 @@ class TestCronLLMSession:
         shared_dir = data_dir / "shared"
 
         with patch("core.anima.AgentCore"), \
-             patch("core.anima.ConversationMemory") as MockConv:
+             patch("core._anima_heartbeat.ConversationMemory") as MockConv:
             MockConv.return_value.load.return_value = MagicMock(turns=[])
             from core.anima import DigitalAnima
             dp = DigitalAnima(anima_dir, shared_dir)
@@ -255,7 +255,7 @@ class TestCronLLMSession:
         shared_dir = data_dir / "shared"
 
         with patch("core.anima.AgentCore"), \
-             patch("core.anima.ConversationMemory") as MockConv:
+             patch("core._anima_heartbeat.ConversationMemory") as MockConv:
             MockConv.return_value.load.return_value = MagicMock(turns=[])
             from core.anima import DigitalAnima
             dp = DigitalAnima(anima_dir, shared_dir)
@@ -272,7 +272,7 @@ class TestCronLLMSession:
         shared_dir = data_dir / "shared"
 
         with patch("core.anima.AgentCore"), \
-             patch("core.anima.ConversationMemory") as MockConv:
+             patch("core._anima_heartbeat.ConversationMemory") as MockConv:
             MockConv.return_value.load.return_value = MagicMock(turns=[])
             from core.anima import DigitalAnima
             dp = DigitalAnima(anima_dir, shared_dir)
@@ -289,7 +289,7 @@ class TestCronLLMSession:
         recovery_path.write_text("前回のエラー情報", encoding="utf-8")
 
         with patch("core.anima.AgentCore"), \
-             patch("core.anima.ConversationMemory") as MockConv:
+             patch("core._anima_heartbeat.ConversationMemory") as MockConv:
             MockConv.return_value.load.return_value = MagicMock(turns=[])
             from core.anima import DigitalAnima
             dp = DigitalAnima(anima_dir, shared_dir)
@@ -308,8 +308,8 @@ class TestCronLLMSession:
             return "prompt"
 
         with patch("core.anima.AgentCore"), \
-             patch("core.anima.ConversationMemory") as MockConv, \
-             patch("core.anima.load_prompt", side_effect=_lp):
+             patch("core._anima_heartbeat.ConversationMemory") as MockConv, \
+             patch("core._anima_heartbeat.load_prompt", side_effect=_lp):
             MockConv.return_value.load.return_value = MagicMock(turns=[])
             from core.anima import DigitalAnima
             dp = DigitalAnima(anima_dir, shared_dir)
@@ -352,8 +352,8 @@ class TestHeartbeatPlanFocus:
         m.send("hb_plan", "Test message")
 
         with patch("core.anima.AgentCore"), \
-             patch("core.anima.ConversationMemory") as MockConv, \
-             patch("core.anima.load_prompt", return_value="prompt"):
+             patch("core._anima_heartbeat.ConversationMemory") as MockConv, \
+             patch("core._anima_heartbeat.load_prompt", return_value="prompt"):
             MockConv.return_value.load.return_value = MagicMock(turns=[])
             from core.anima import DigitalAnima
             dp = DigitalAnima(anima_dir, shared_dir)
@@ -387,8 +387,8 @@ class TestHeartbeatPlanFocus:
         assert len(list(inbox_dir.glob("*.json"))) == 1
 
         with patch("core.anima.AgentCore"), \
-             patch("core.anima.ConversationMemory") as MockConv, \
-             patch("core.anima.load_prompt", return_value="prompt"):
+             patch("core._anima_heartbeat.ConversationMemory") as MockConv, \
+             patch("core._anima_heartbeat.load_prompt", return_value="prompt"):
             MockConv.return_value.load.return_value = MagicMock(turns=[])
             from core.anima import DigitalAnima
             dp = DigitalAnima(anima_dir, shared_dir)
@@ -420,8 +420,8 @@ class TestProcessInboxMessage:
         shared_dir = data_dir / "shared"
 
         with patch("core.anima.AgentCore"), \
-             patch("core.anima.ConversationMemory") as MockConv, \
-             patch("core.anima.load_prompt", return_value="prompt"):
+             patch("core._anima_messaging.ConversationMemory") as MockConv, \
+             patch("core._anima_inbox.load_prompt", return_value="prompt"):
             MockConv.return_value.load.return_value = MagicMock(turns=[])
             from core.anima import DigitalAnima
             dp = DigitalAnima(anima_dir, shared_dir)
@@ -442,8 +442,8 @@ class TestProcessInboxMessage:
         assert len(list(inbox_dir.glob("*.json"))) == 1
 
         with patch("core.anima.AgentCore"), \
-             patch("core.anima.ConversationMemory") as MockConv, \
-             patch("core.anima.load_prompt", return_value="prompt"):
+             patch("core._anima_messaging.ConversationMemory") as MockConv, \
+             patch("core._anima_inbox.load_prompt", return_value="prompt"):
             MockConv.return_value.load.return_value = MagicMock(turns=[])
             from core.anima import DigitalAnima
             dp = DigitalAnima(anima_dir, shared_dir)
@@ -474,8 +474,8 @@ class TestProcessInboxMessage:
         m.send("inbox_lock", "Lock test")
 
         with patch("core.anima.AgentCore"), \
-             patch("core.anima.ConversationMemory") as MockConv, \
-             patch("core.anima.load_prompt", return_value="prompt"):
+             patch("core._anima_messaging.ConversationMemory") as MockConv, \
+             patch("core._anima_inbox.load_prompt", return_value="prompt"):
             MockConv.return_value.load.return_value = MagicMock(turns=[])
             from core.anima import DigitalAnima
             dp = DigitalAnima(anima_dir, shared_dir)
@@ -507,7 +507,7 @@ class TestPendingTaskExecutorLLM:
         shared_dir = data_dir / "shared"
 
         with patch("core.anima.AgentCore"), \
-             patch("core.anima.ConversationMemory"):
+             patch("core._anima_messaging.ConversationMemory"):
             from core.anima import DigitalAnima
             dp = DigitalAnima(anima_dir, shared_dir)
 
@@ -529,7 +529,7 @@ class TestPendingTaskExecutorLLM:
         shared_dir = data_dir / "shared"
 
         with patch("core.anima.AgentCore"), \
-             patch("core.anima.ConversationMemory"):
+             patch("core._anima_messaging.ConversationMemory"):
             from core.anima import DigitalAnima
             dp = DigitalAnima(anima_dir, shared_dir)
             dp.agent.background_manager = MagicMock()
@@ -555,7 +555,7 @@ class TestPendingTaskExecutorLLM:
         shared_dir = data_dir / "shared"
 
         with patch("core.anima.AgentCore"), \
-             patch("core.anima.ConversationMemory"):
+             patch("core._anima_messaging.ConversationMemory"):
             from core.anima import DigitalAnima
             dp = DigitalAnima(anima_dir, shared_dir)
 
@@ -591,7 +591,7 @@ class TestPrimaryStatusInbox:
         shared_dir = data_dir / "shared"
 
         with patch("core.anima.AgentCore"), \
-             patch("core.anima.ConversationMemory"):
+             patch("core._anima_messaging.ConversationMemory"):
             from core.anima import DigitalAnima
             dp = DigitalAnima(anima_dir, shared_dir)
 
@@ -605,7 +605,7 @@ class TestPrimaryStatusInbox:
         shared_dir = data_dir / "shared"
 
         with patch("core.anima.AgentCore"), \
-             patch("core.anima.ConversationMemory"):
+             patch("core._anima_messaging.ConversationMemory"):
             from core.anima import DigitalAnima
             dp = DigitalAnima(anima_dir, shared_dir)
 
@@ -618,7 +618,7 @@ class TestPrimaryStatusInbox:
         shared_dir = data_dir / "shared"
 
         with patch("core.anima.AgentCore"), \
-             patch("core.anima.ConversationMemory"):
+             patch("core._anima_messaging.ConversationMemory"):
             from core.anima import DigitalAnima
             dp = DigitalAnima(anima_dir, shared_dir)
 
@@ -638,7 +638,7 @@ class TestStateFileLock:
         shared_dir = data_dir / "shared"
 
         with patch("core.anima.AgentCore"), \
-             patch("core.anima.ConversationMemory"):
+             patch("core._anima_messaging.ConversationMemory"):
             from core.anima import DigitalAnima
             dp = DigitalAnima(anima_dir, shared_dir)
             dp.agent._tool_handler.set_state_file_lock.assert_called_once_with(
@@ -669,7 +669,7 @@ class TestPendingExecutorWake:
         shared_dir = data_dir / "shared"
 
         with patch("core.anima.AgentCore"), \
-             patch("core.anima.ConversationMemory"):
+             patch("core._anima_messaging.ConversationMemory"):
             from core.anima import DigitalAnima
             dp = DigitalAnima(anima_dir, shared_dir)
 
@@ -686,7 +686,7 @@ class TestPendingExecutorWake:
         shared_dir = data_dir / "shared"
 
         with patch("core.anima.AgentCore"), \
-             patch("core.anima.ConversationMemory"):
+             patch("core._anima_messaging.ConversationMemory"):
             from core.anima import DigitalAnima
             dp = DigitalAnima(anima_dir, shared_dir)
 
@@ -705,7 +705,7 @@ class TestPendingExecutorWake:
         shared_dir = data_dir / "shared"
 
         with patch("core.anima.AgentCore"), \
-             patch("core.anima.ConversationMemory"):
+             patch("core._anima_messaging.ConversationMemory"):
             from core.anima import DigitalAnima
             dp = DigitalAnima(anima_dir, shared_dir)
 

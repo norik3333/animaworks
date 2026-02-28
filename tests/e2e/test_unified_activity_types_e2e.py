@@ -62,8 +62,8 @@ class TestHeartbeatStartSummary:
         with patch("core.anima.AgentCore") as MockAgent, \
              patch("core.anima.MemoryManager") as MockMM, \
              patch("core.anima.Messenger") as MockMsger, \
-             patch("core.anima.ConversationMemory") as MockConvMem, \
-             patch("core.anima.StreamingJournal") as MockJournal:
+             patch("core._anima_heartbeat.ConversationMemory") as MockConvMem, \
+             patch("core._anima_heartbeat.StreamingJournal") as MockJournal:
 
             # Setup mocks
             MockMM.return_value.read_model_config.return_value = MagicMock()
@@ -135,7 +135,7 @@ class TestMessageReceivedSummary:
         with patch("core.anima.AgentCore") as MockAgent, \
              patch("core.anima.MemoryManager") as MockMM, \
              patch("core.anima.Messenger") as MockMsger, \
-             patch("core.anima.ConversationMemory") as MockConvMem:
+             patch("core._anima_messaging.ConversationMemory") as MockConvMem:
 
             MockMM.return_value.read_model_config.return_value = MagicMock()
             MockMsger.return_value.unread_count.return_value = 0
@@ -185,8 +185,8 @@ class TestDmReceivedSummary:
         with patch("core.anima.AgentCore") as MockAgent, \
              patch("core.anima.MemoryManager") as MockMM, \
              patch("core.anima.Messenger") as MockMsger, \
-             patch("core.anima.ConversationMemory") as MockConvMem, \
-             patch("core.anima.StreamingJournal") as MockJournal:
+             patch("core._anima_heartbeat.ConversationMemory") as MockConvMem, \
+             patch("core._anima_inbox.StreamingJournal") as MockJournal:
 
             MockMM.return_value.read_model_config.return_value = MagicMock()
             MockMM.return_value.read_heartbeat_config.return_value = "チェック項目"

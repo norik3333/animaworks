@@ -126,7 +126,7 @@ class TestProcessMessageStreamBootstrapGuard:
         })
 
         # Patch ConversationMemory to avoid file ops
-        with patch("core.anima.ConversationMemory") as mock_conv:
+        with patch("core._anima_messaging.ConversationMemory") as mock_conv:
             mock_conv_inst = MagicMock()
             mock_conv_inst.compress_if_needed = AsyncMock()
             mock_conv_inst.build_chat_prompt = MagicMock(return_value="prompt")

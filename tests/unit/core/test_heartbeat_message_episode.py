@@ -42,8 +42,8 @@ class TestHeartbeatMessageEpisodeRecording:
         with patch("core.anima.AgentCore"), \
              patch("core.anima.MemoryManager") as MockMM, \
              patch("core.anima.Messenger") as MockMsg, \
-             patch("core.anima.load_prompt", return_value="prompt"), \
-             patch("core.anima.ConversationMemory") as MockConv:
+             patch("core._anima_heartbeat.load_prompt", return_value="prompt"), \
+             patch("core._anima_heartbeat.ConversationMemory") as MockConv:
             MockMM.return_value.read_model_config.return_value = MagicMock()
             MockMM.return_value.read_heartbeat_config.return_value = "checklist"
             MockMM.return_value.append_episode = MagicMock()
@@ -95,8 +95,8 @@ class TestHeartbeatMessageEpisodeRecording:
         with patch("core.anima.AgentCore"), \
              patch("core.anima.MemoryManager") as MockMM, \
              patch("core.anima.Messenger") as MockMsg, \
-             patch("core.anima.load_prompt", return_value="prompt"), \
-             patch("core.anima.ConversationMemory") as MockConv:
+             patch("core._anima_heartbeat.load_prompt", return_value="prompt"), \
+             patch("core._anima_heartbeat.ConversationMemory") as MockConv:
             MockMM.return_value.read_model_config.return_value = MagicMock()
             MockMM.return_value.read_heartbeat_config.return_value = "checklist"
             MockMM.return_value.append_episode = MagicMock()
@@ -160,8 +160,8 @@ class TestHeartbeatMessageEpisodeRecording:
         with patch("core.anima.AgentCore"), \
              patch("core.anima.MemoryManager") as MockMM, \
              patch("core.anima.Messenger") as MockMsg, \
-             patch("core.anima.load_prompt", return_value="prompt"), \
-             patch("core.anima.ConversationMemory") as MockConv:
+             patch("core._anima_heartbeat.load_prompt", return_value="prompt"), \
+             patch("core._anima_heartbeat.ConversationMemory") as MockConv:
             MockMM.return_value.read_model_config.return_value = MagicMock()
             MockMM.return_value.read_heartbeat_config.return_value = "checklist"
             MockMM.return_value.append_episode = MagicMock()
@@ -222,8 +222,8 @@ class TestHeartbeatMessageEpisodeRecording:
         with patch("core.anima.AgentCore"), \
              patch("core.anima.MemoryManager") as MockMM, \
              patch("core.anima.Messenger") as MockMsg, \
-             patch("core.anima.load_prompt", return_value="prompt"), \
-             patch("core.anima.ConversationMemory") as MockConv:
+             patch("core._anima_heartbeat.load_prompt", return_value="prompt"), \
+             patch("core._anima_heartbeat.ConversationMemory") as MockConv:
             MockMM.return_value.read_model_config.return_value = MagicMock()
             MockMM.return_value.read_heartbeat_config.return_value = "checklist"
             MockMM.return_value.append_episode = MagicMock()
@@ -279,8 +279,8 @@ class TestHeartbeatMessageEpisodeRecording:
         with patch("core.anima.AgentCore"), \
              patch("core.anima.MemoryManager") as MockMM, \
              patch("core.anima.Messenger") as MockMsg, \
-             patch("core.anima.load_prompt", return_value="prompt"), \
-             patch("core.anima.ConversationMemory") as MockConv:
+             patch("core._anima_heartbeat.load_prompt", return_value="prompt"), \
+             patch("core._anima_heartbeat.ConversationMemory") as MockConv:
             MockMM.return_value.read_model_config.return_value = MagicMock()
             MockMM.return_value.read_heartbeat_config.return_value = "checklist"
             MockMM.return_value.append_episode = MagicMock()
@@ -343,8 +343,8 @@ class TestHeartbeatMessageEpisodeRecording:
         with patch("core.anima.AgentCore"), \
              patch("core.anima.MemoryManager") as MockMM, \
              patch("core.anima.Messenger") as MockMsg, \
-             patch("core.anima.load_prompt", return_value="prompt"), \
-             patch("core.anima.ConversationMemory") as MockConv:
+             patch("core._anima_heartbeat.load_prompt", return_value="prompt"), \
+             patch("core._anima_heartbeat.ConversationMemory") as MockConv:
             MockMM.return_value.read_model_config.return_value = MagicMock()
             MockMM.return_value.read_heartbeat_config.return_value = "checklist"
             MockMM.return_value.append_episode = MagicMock()
@@ -373,8 +373,8 @@ class TestHeartbeatMessageEpisodeRecording:
         with patch("core.anima.AgentCore"), \
              patch("core.anima.MemoryManager") as MockMM, \
              patch("core.anima.Messenger") as MockMsg, \
-             patch("core.anima.load_prompt", return_value="prompt"), \
-             patch("core.anima.ConversationMemory") as MockConv:
+             patch("core._anima_heartbeat.load_prompt", return_value="prompt"), \
+             patch("core._anima_heartbeat.ConversationMemory") as MockConv:
             MockMM.return_value.read_model_config.return_value = MagicMock()
             MockMM.return_value.read_heartbeat_config.return_value = "checklist"
             # Make append_episode raise an exception

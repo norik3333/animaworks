@@ -164,7 +164,7 @@ class TestDigitalAnimaRunBootstrap:
 
         dp.agent.run_cycle = mock_run_cycle
 
-        with patch("core.anima.ConversationMemory") as mock_conv_cls:
+        with patch("core._anima_messaging.ConversationMemory") as mock_conv_cls:
             mock_conv = MagicMock()
             mock_conv.build_chat_prompt = MagicMock(return_value="prompt")
             mock_conv_cls.return_value = mock_conv
@@ -187,7 +187,7 @@ class TestDigitalAnimaRunBootstrap:
             )
         )
 
-        with patch("core.anima.ConversationMemory") as mock_conv_cls:
+        with patch("core._anima_messaging.ConversationMemory") as mock_conv_cls:
             mock_conv = MagicMock()
             mock_conv.build_chat_prompt = MagicMock(return_value="prompt")
             mock_conv_cls.return_value = mock_conv
@@ -206,7 +206,7 @@ class TestDigitalAnimaRunBootstrap:
             side_effect=RuntimeError("LLM API error")
         )
 
-        with patch("core.anima.ConversationMemory") as mock_conv_cls:
+        with patch("core._anima_messaging.ConversationMemory") as mock_conv_cls:
             mock_conv = MagicMock()
             mock_conv.build_chat_prompt = MagicMock(return_value="prompt")
             mock_conv_cls.return_value = mock_conv

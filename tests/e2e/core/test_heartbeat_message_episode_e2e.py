@@ -31,8 +31,8 @@ class TestInboxMessageEpisodeE2E:
         mio_messenger.send("alice", "AWS監視タスクを追加しました。30分間隔で確認してください。")
 
         with patch("core.anima.AgentCore") as MockAgent, \
-             patch("core.anima.ConversationMemory") as MockConv, \
-             patch("core.anima.load_prompt", return_value="prompt"):
+             patch("core._anima_heartbeat.ConversationMemory") as MockConv, \
+             patch("core._anima_heartbeat.load_prompt", return_value="prompt"):
             MockConv.return_value.load.return_value = MagicMock(turns=[])
 
             from core.anima import DigitalAnima
@@ -75,8 +75,8 @@ class TestInboxMessageEpisodeE2E:
         assert len(list(inbox_dir.glob("*.json"))) == 1
 
         with patch("core.anima.AgentCore") as MockAgent, \
-             patch("core.anima.ConversationMemory") as MockConv, \
-             patch("core.anima.load_prompt", return_value="prompt"):
+             patch("core._anima_heartbeat.ConversationMemory") as MockConv, \
+             patch("core._anima_heartbeat.load_prompt", return_value="prompt"):
             MockConv.return_value.load.return_value = MagicMock(turns=[])
 
             from core.anima import DigitalAnima
@@ -140,8 +140,8 @@ class TestInboxMessageEpisodeE2E:
         ack_file.write_text(ack_msg.model_dump_json(), encoding="utf-8")
 
         with patch("core.anima.AgentCore") as MockAgent, \
-             patch("core.anima.ConversationMemory") as MockConv, \
-             patch("core.anima.load_prompt", return_value="prompt"):
+             patch("core._anima_heartbeat.ConversationMemory") as MockConv, \
+             patch("core._anima_heartbeat.load_prompt", return_value="prompt"):
             MockConv.return_value.load.return_value = MagicMock(turns=[])
 
             from core.anima import DigitalAnima
@@ -190,8 +190,8 @@ class TestInboxMessageEpisodeE2E:
         charlie_messenger.send("alice", "第三のタスク: パフォーマンス最適化")
 
         with patch("core.anima.AgentCore") as MockAgent, \
-             patch("core.anima.ConversationMemory") as MockConv, \
-             patch("core.anima.load_prompt", return_value="prompt"):
+             patch("core._anima_heartbeat.ConversationMemory") as MockConv, \
+             patch("core._anima_heartbeat.load_prompt", return_value="prompt"):
             MockConv.return_value.load.return_value = MagicMock(turns=[])
 
             from core.anima import DigitalAnima
@@ -238,8 +238,8 @@ class TestInboxMessageEpisodeE2E:
         mio_messenger.send("alice", "テストメッセージ")
 
         with patch("core.anima.AgentCore") as MockAgent, \
-             patch("core.anima.ConversationMemory") as MockConv, \
-             patch("core.anima.load_prompt", return_value="prompt"):
+             patch("core._anima_heartbeat.ConversationMemory") as MockConv, \
+             patch("core._anima_heartbeat.load_prompt", return_value="prompt"):
             MockConv.return_value.load.return_value = MagicMock(turns=[])
 
             from core.anima import DigitalAnima
@@ -280,8 +280,8 @@ class TestHeartbeatNoInboxProcessing:
         mio_messenger.send("alice", "テストメッセージ")
 
         with patch("core.anima.AgentCore") as MockAgent, \
-             patch("core.anima.ConversationMemory") as MockConv, \
-             patch("core.anima.load_prompt", return_value="prompt"):
+             patch("core._anima_heartbeat.ConversationMemory") as MockConv, \
+             patch("core._anima_heartbeat.load_prompt", return_value="prompt"):
             MockConv.return_value.load.return_value = MagicMock(turns=[])
 
             from core.anima import DigitalAnima

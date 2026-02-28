@@ -195,19 +195,27 @@ class TestWebSocketDefaultCase:
 # ── Backend Summary Tests ────────────────────────────────
 
 class TestBackendActivityLogSummary:
-    """Verify core/anima.py activity.log() calls include summary."""
+    """Verify anima modules' activity.log() calls include summary.
 
-    _ANIMA_PY = _WORKTREE / "core" / "anima.py"
+    DigitalAnima is split into Mixin sub-modules; search the facade
+    plus all core/_anima_*.py files.
+    """
+
+    _ANIMA_FILES = [_WORKTREE / "core" / "anima.py", *(_WORKTREE / "core").glob("_anima_*.py")]
+
+    @classmethod
+    def _read_all(cls) -> str:
+        return "\n".join(p.read_text(encoding="utf-8") for p in cls._ANIMA_FILES)
 
     def test_heartbeat_start_has_summary(self) -> None:
-        content = self._ANIMA_PY.read_text(encoding="utf-8")
+        content = self._read_all()
         pattern = r'activity\.log\("heartbeat_start",\s*summary=t\("anima\.heartbeat_start"\)\)'
         assert re.search(pattern, content), (
             "heartbeat_start activity.log() should include summary=t('anima.heartbeat_start')"
         )
 
     def test_message_received_has_summary(self) -> None:
-        content = self._ANIMA_PY.read_text(encoding="utf-8")
+        content = self._read_all()
         pattern = r'activity\.log\("message_received",\s*content=content,\s*summary=content\[:100\]'
         matches = re.findall(pattern, content)
         assert len(matches) == 2, (
@@ -215,7 +223,7 @@ class TestBackendActivityLogSummary:
         )
 
     def test_message_received_from_anima_has_summary(self) -> None:
-        content = self._ANIMA_PY.read_text(encoding="utf-8")
+        content = self._read_all()
         pattern = r'activity\.log\("message_received",\s*content=_m\.content,\s*summary=_m\.content\[:200\]'
         assert re.search(pattern, content), (
             "message_received (from anima) activity.log() should use full content and summary=_m.content[:200]"

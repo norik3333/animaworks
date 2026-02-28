@@ -179,17 +179,28 @@ class TestActivityLoggerUsageCount:
     """Verify that self._activity is used consistently across the codebase."""
 
     def test_anima_uses_self_activity_for_all_log_calls(self):
-        """All activity log calls in core/anima.py use self._activity."""
-        source_path = Path("core/anima.py")
-        source = source_path.read_text(encoding="utf-8")
+        """All activity log calls in anima modules use self._activity.
 
-        # Count self._activity.log calls
-        activity_calls = source.count("self._activity.log(")
-        assert activity_calls > 0, "Expected self._activity.log() calls in core/anima.py"
+        DigitalAnima is split into Mixin sub-modules; check the facade
+        plus all _anima_*.py mixin files.
+        """
+        anima_files = [
+            Path("core/anima.py"),
+            *Path("core").glob("_anima_*.py"),
+        ]
+        total_source = "\n".join(p.read_text(encoding="utf-8") for p in anima_files)
 
-        # Count self._activity.recent calls
-        recent_calls = source.count("self._activity.recent(")
-        assert recent_calls > 0, "Expected self._activity.recent() calls in core/anima.py"
+        activity_calls = total_source.count("self._activity.log(")
+        assert activity_calls > 0, (
+            f"Expected self._activity.log() calls in anima modules: "
+            f"{[str(p) for p in anima_files]}"
+        )
+
+        recent_calls = total_source.count("self._activity.recent(")
+        assert recent_calls > 0, (
+            f"Expected self._activity.recent() calls in anima modules: "
+            f"{[str(p) for p in anima_files]}"
+        )
 
     def test_handler_uses_self_activity_for_all_log_calls(self):
         """All activity log calls in core/tooling/handler.py use self._activity."""

@@ -34,7 +34,7 @@ class TestNotificationSentEventInStream:
         with patch("core.anima.AgentCore") as MockAgent, \
              patch("core.anima.MemoryManager") as MockMM, \
              patch("core.anima.Messenger"), \
-             patch("core.anima.ConversationMemory") as MockConv:
+             patch("core._anima_messaging.ConversationMemory") as MockConv:
             MockMM.return_value.read_model_config.return_value = MagicMock()
             MockConv.return_value.compress_if_needed = AsyncMock()
             MockConv.return_value.finalize_session = AsyncMock(return_value=False)
@@ -117,7 +117,7 @@ class TestNotificationSentEventInStream:
         with patch("core.anima.AgentCore"), \
              patch("core.anima.MemoryManager") as MockMM, \
              patch("core.anima.Messenger"), \
-             patch("core.anima.ConversationMemory") as MockConv:
+             patch("core._anima_messaging.ConversationMemory") as MockConv:
             MockMM.return_value.read_model_config.return_value = MagicMock()
             MockConv.return_value.compress_if_needed = AsyncMock()
             MockConv.return_value.finalize_session = AsyncMock(return_value=False)
@@ -286,7 +286,7 @@ class TestWebSocketNotificationQueueLifecycle:
         with patch("core.anima.AgentCore"), \
              patch("core.anima.MemoryManager") as MockMM, \
              patch("core.anima.Messenger"), \
-             patch("core.anima.ConversationMemory") as MockConv:
+             patch("core._anima_messaging.ConversationMemory") as MockConv:
             MockMM.return_value.read_model_config.return_value = MagicMock()
             MockConv.return_value.compress_if_needed = AsyncMock()
             MockConv.return_value.finalize_session = AsyncMock(return_value=False)

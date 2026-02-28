@@ -32,12 +32,17 @@ def _create_anima(anima_dir, shared_dir, **extra_patches):
     patcher_agent = patch("core.anima.AgentCore")
     patcher_mm = patch("core.anima.MemoryManager")
     patcher_msg = patch("core.anima.Messenger")
-    patcher_lp = patch("core.anima.load_prompt", side_effect=lambda name, **kw: f"<{name}>")
+    _lp_mock = MagicMock(side_effect=lambda name, **kw: f"<{name}>")
+    patcher_lp_hb = patch("core._anima_heartbeat.load_prompt", _lp_mock)
+    patcher_lp_inbox = patch("core._anima_inbox.load_prompt", _lp_mock)
+    patcher_lp_lc = patch("core._anima_lifecycle.load_prompt", _lp_mock)
 
     MockAgent = patcher_agent.start()
     MockMM = patcher_mm.start()
     MockMsg = patcher_msg.start()
-    MockLP = patcher_lp.start()
+    patcher_lp_hb.start()
+    patcher_lp_inbox.start()
+    patcher_lp_lc.start()
 
     MockMM.return_value.read_model_config.return_value = MagicMock()
     MockMM.return_value.read_heartbeat_config.return_value = "default checklist"
@@ -54,8 +59,8 @@ def _create_anima(anima_dir, shared_dir, **extra_patches):
         "agent": MockAgent,
         "memory_manager": MockMM,
         "messenger": MockMsg,
-        "load_prompt": MockLP,
-        "patchers": [patcher_agent, patcher_mm, patcher_msg, patcher_lp],
+        "load_prompt": _lp_mock,
+        "patchers": [patcher_agent, patcher_mm, patcher_msg, patcher_lp_hb, patcher_lp_inbox, patcher_lp_lc],
     }
     return dp, mocks
 
@@ -139,7 +144,7 @@ class TestBuildHeartbeatPrompt:
             dp._load_heartbeat_history = MagicMock(return_value="")
             dp.drain_background_notifications = MagicMock(return_value=[])
 
-            with patch("core.anima.ConversationMemory") as MockConv, \
+            with patch("core._anima_heartbeat.ConversationMemory") as MockConv, \
                  patch("core.config.models.load_config") as MockCfg:
                 MockConv.return_value.load.return_value = MagicMock(turns=[])
                 MockCfg.return_value.animas = {}
@@ -165,7 +170,7 @@ class TestBuildHeartbeatPrompt:
             dp._load_heartbeat_history = MagicMock(return_value="")
             dp.drain_background_notifications = MagicMock(return_value=[])
 
-            with patch("core.anima.ConversationMemory") as MockConv, \
+            with patch("core._anima_heartbeat.ConversationMemory") as MockConv, \
                  patch("core.config.models.load_config") as MockCfg:
                 MockConv.return_value.load.return_value = MagicMock(turns=[])
                 MockCfg.return_value.animas = {}
@@ -194,7 +199,7 @@ class TestBuildHeartbeatPrompt:
             dp._load_heartbeat_history = MagicMock(return_value="")
             dp.drain_background_notifications = MagicMock(return_value=[])
 
-            with patch("core.anima.ConversationMemory") as MockConv, \
+            with patch("core._anima_heartbeat.ConversationMemory") as MockConv, \
                  patch("core.config.models.load_config") as MockCfg:
                 MockConv.return_value.load.return_value = MagicMock(turns=[])
                 MockCfg.return_value.animas = {}
@@ -217,7 +222,7 @@ class TestBuildHeartbeatPrompt:
                 return_value=["Task A done", "Task B done"]
             )
 
-            with patch("core.anima.ConversationMemory") as MockConv, \
+            with patch("core._anima_heartbeat.ConversationMemory") as MockConv, \
                  patch("core.config.models.load_config") as MockCfg:
                 MockConv.return_value.load.return_value = MagicMock(turns=[])
                 MockCfg.return_value.animas = {}
@@ -240,7 +245,7 @@ class TestBuildHeartbeatPrompt:
             dp._load_heartbeat_history = MagicMock(return_value="")
             dp.drain_background_notifications = MagicMock(return_value=[])
 
-            with patch("core.anima.ConversationMemory") as MockConv, \
+            with patch("core._anima_heartbeat.ConversationMemory") as MockConv, \
                  patch("core.config.models.load_config") as MockCfg:
                 MockConv.return_value.load.return_value = MagicMock(turns=[])
                 MockCfg.return_value.animas = {}
@@ -261,7 +266,7 @@ class TestBuildHeartbeatPrompt:
             dp._load_heartbeat_history = MagicMock(return_value="- 10:00: checked email")
             dp.drain_background_notifications = MagicMock(return_value=[])
 
-            with patch("core.anima.ConversationMemory") as MockConv, \
+            with patch("core._anima_heartbeat.ConversationMemory") as MockConv, \
                  patch("core.config.models.load_config") as MockCfg:
                 MockConv.return_value.load.return_value = MagicMock(turns=[])
                 MockCfg.return_value.animas = {}
@@ -283,7 +288,7 @@ class TestBuildHeartbeatPrompt:
             dp._load_heartbeat_history = MagicMock(return_value="")
             dp.drain_background_notifications = MagicMock(return_value=[])
 
-            with patch("core.anima.ConversationMemory") as MockConv, \
+            with patch("core._anima_heartbeat.ConversationMemory") as MockConv, \
                  patch("core.config.models.load_config") as MockCfg:
                 MockConv.return_value.load.return_value = MagicMock(turns=[])
                 MockCfg.return_value.animas = {}
@@ -308,7 +313,7 @@ class TestBuildHeartbeatPrompt:
             mock_turn.role = "human"
             mock_turn.content = "What's the status?"
 
-            with patch("core.anima.ConversationMemory") as MockConv, \
+            with patch("core._anima_heartbeat.ConversationMemory") as MockConv, \
                  patch("core.config.models.load_config") as MockCfg:
                 MockConv.return_value.load.return_value = MagicMock(
                     turns=[mock_turn]
@@ -331,7 +336,7 @@ class TestBuildHeartbeatPrompt:
             dp._load_heartbeat_history = MagicMock(return_value="")
             dp.drain_background_notifications = MagicMock(return_value=[])
 
-            with patch("core.anima.ConversationMemory") as MockConv, \
+            with patch("core._anima_heartbeat.ConversationMemory") as MockConv, \
                  patch("core.config.models.load_config") as MockCfg:
                 MockConv.return_value.load.return_value = MagicMock(turns=[])
                 MockCfg.return_value.animas = {}
@@ -352,7 +357,7 @@ class TestBuildHeartbeatPrompt:
             dp._load_heartbeat_history = MagicMock(return_value="")
             dp.drain_background_notifications = MagicMock(return_value=[])
 
-            with patch("core.anima.ConversationMemory", side_effect=RuntimeError("conv error")), \
+            with patch("core._anima_heartbeat.ConversationMemory", side_effect=RuntimeError("conv error")), \
                  patch("core.config.models.load_config") as MockCfg:
                 MockCfg.return_value.animas = {}
 
@@ -376,7 +381,7 @@ class TestBuildHeartbeatPrompt:
             sub_config = MagicMock()
             sub_config.supervisor = "alice"
 
-            with patch("core.anima.ConversationMemory") as MockConv, \
+            with patch("core._anima_heartbeat.ConversationMemory") as MockConv, \
                  patch("core.config.models.load_config") as MockCfg:
                 MockConv.return_value.load.return_value = MagicMock(turns=[])
                 MockCfg.return_value.animas = {"bob": sub_config, "charlie": sub_config}
@@ -397,7 +402,7 @@ class TestBuildHeartbeatPrompt:
             dp._load_heartbeat_history = MagicMock(return_value="")
             dp.drain_background_notifications = MagicMock(return_value=[])
 
-            with patch("core.anima.ConversationMemory") as MockConv, \
+            with patch("core._anima_heartbeat.ConversationMemory") as MockConv, \
                  patch("core.config.models.load_config") as MockCfg:
                 MockConv.return_value.load.return_value = MagicMock(turns=[])
                 MockCfg.return_value.animas = {}
@@ -418,7 +423,7 @@ class TestBuildHeartbeatPrompt:
             dp._load_heartbeat_history = MagicMock(return_value="")
             dp.drain_background_notifications = MagicMock(return_value=[])
 
-            with patch("core.anima.ConversationMemory") as MockConv, \
+            with patch("core._anima_heartbeat.ConversationMemory") as MockConv, \
                  patch("core.config.models.load_config", side_effect=RuntimeError("config error")):
                 MockConv.return_value.load.return_value = MagicMock(turns=[])
 
@@ -440,7 +445,7 @@ class TestBuildHeartbeatPrompt:
             dp._load_heartbeat_history = MagicMock(return_value="")
             dp.drain_background_notifications = MagicMock(return_value=[])
 
-            with patch("core.anima.ConversationMemory") as MockConv, \
+            with patch("core._anima_heartbeat.ConversationMemory") as MockConv, \
                  patch("core.config.models.load_config") as MockCfg:
                 MockConv.return_value.load.return_value = MagicMock(turns=[])
                 MockCfg.return_value.animas = {}
@@ -652,9 +657,9 @@ class TestExecuteHeartbeatCycle:
 
             dp.agent.run_cycle_streaming = mock_stream
 
-            with patch("core.anima.StreamingJournal") as MockSJ, \
+            with patch("core._anima_heartbeat.StreamingJournal") as MockSJ, \
                  patch("core.anima.ActivityLogger"), \
-                 patch("core.anima.ConversationMemory") as MockConv:
+                 patch("core._anima_heartbeat.ConversationMemory") as MockConv:
                 MockConv.return_value.finalize_if_session_ended = AsyncMock()
                 dp.memory.append_episode = MagicMock()
 
@@ -686,9 +691,9 @@ class TestExecuteHeartbeatCycle:
 
             dp.agent.run_cycle_streaming = mock_stream
 
-            with patch("core.anima.StreamingJournal") as MockSJ, \
+            with patch("core._anima_heartbeat.StreamingJournal") as MockSJ, \
                  patch("core.anima.ActivityLogger"), \
-                 patch("core.anima.ConversationMemory") as MockConv:
+                 patch("core._anima_heartbeat.ConversationMemory") as MockConv:
                 MockConv.return_value.finalize_if_session_ended = AsyncMock()
                 dp.memory.append_episode = MagicMock()
 
@@ -725,9 +730,9 @@ class TestExecuteHeartbeatCycle:
 
             dp.agent.run_cycle_streaming = mock_stream
 
-            with patch("core.anima.StreamingJournal") as MockSJ, \
+            with patch("core._anima_heartbeat.StreamingJournal") as MockSJ, \
                  patch("core.anima.ActivityLogger"), \
-                 patch("core.anima.ConversationMemory") as MockConv:
+                 patch("core._anima_heartbeat.ConversationMemory") as MockConv:
                 MockConv.return_value.finalize_if_session_ended = AsyncMock()
                 dp.memory.append_episode = MagicMock()
 
@@ -759,9 +764,9 @@ class TestExecuteHeartbeatCycle:
 
             dp.agent.run_cycle_streaming = mock_stream
 
-            with patch("core.anima.StreamingJournal") as MockSJ, \
+            with patch("core._anima_heartbeat.StreamingJournal") as MockSJ, \
                  patch("core.anima.ActivityLogger"), \
-                 patch("core.anima.ConversationMemory") as MockConv:
+                 patch("core._anima_heartbeat.ConversationMemory") as MockConv:
                 MockConv.return_value.finalize_if_session_ended = AsyncMock()
                 dp.memory.append_episode = MagicMock()
 
@@ -795,9 +800,9 @@ class TestExecuteHeartbeatCycle:
 
             dp.agent.run_cycle_streaming = mock_stream
 
-            with patch("core.anima.StreamingJournal") as MockSJ, \
+            with patch("core._anima_heartbeat.StreamingJournal") as MockSJ, \
                  patch("core.anima.ActivityLogger"), \
-                 patch("core.anima.ConversationMemory") as MockConv:
+                 patch("core._anima_heartbeat.ConversationMemory") as MockConv:
                 MockConv.return_value.finalize_if_session_ended = AsyncMock()
                 dp.memory.append_episode = MagicMock()
 
@@ -833,9 +838,9 @@ class TestExecuteHeartbeatCycle:
 
             dp.agent.run_cycle_streaming = mock_stream
 
-            with patch("core.anima.StreamingJournal") as MockSJ, \
+            with patch("core._anima_heartbeat.StreamingJournal") as MockSJ, \
                  patch("core.anima.ActivityLogger"), \
-                 patch("core.anima.ConversationMemory") as MockConv:
+                 patch("core._anima_heartbeat.ConversationMemory") as MockConv:
                 MockConv.return_value.finalize_if_session_ended = AsyncMock()
                 dp.memory.append_episode = MagicMock()
 
@@ -868,9 +873,9 @@ class TestExecuteHeartbeatCycle:
 
             dp.agent.run_cycle_streaming = mock_stream
 
-            with patch("core.anima.StreamingJournal") as MockSJ, \
+            with patch("core._anima_heartbeat.StreamingJournal") as MockSJ, \
                  patch("core.anima.ActivityLogger"), \
-                 patch("core.anima.ConversationMemory") as MockConv:
+                 patch("core._anima_heartbeat.ConversationMemory") as MockConv:
                 MockConv.return_value.finalize_if_session_ended = AsyncMock()
                 dp.memory.append_episode = MagicMock()
 
