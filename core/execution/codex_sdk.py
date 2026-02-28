@@ -25,7 +25,7 @@ import logging
 import os
 import sys
 from collections.abc import AsyncGenerator
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
@@ -178,6 +178,34 @@ def _usage_to_dict(usage: Any) -> dict[str, int]:
         if val is not None:
             d[key] = int(val)
     return d
+
+
+@dataclass
+class CodexResultMessage:
+    """Adapter providing the ``num_turns`` / ``session_id`` interface
+    expected by ``AgentCore`` session-chaining logic."""
+
+    num_turns: int = 0
+    session_id: str = ""
+    usage: dict[str, int] | None = None
+
+
+def _wrap_result_message(
+    turn: Any,
+    thread: Any | None = None,
+) -> CodexResultMessage:
+    """Wrap a Codex turn/event into a ``CodexResultMessage``."""
+    usage_raw = getattr(turn, "usage", None)
+    usage = _usage_to_dict(usage_raw) if usage_raw else None
+    num_turns = getattr(turn, "num_turns", 0) or 0
+    session_id = ""
+    if thread:
+        session_id = _get_thread_id(thread) or ""
+    return CodexResultMessage(
+        num_turns=num_turns,
+        session_id=session_id,
+        usage=usage,
+    )
 
 
 # ── Executor ─────────────────────────────────────────────────
@@ -414,7 +442,7 @@ class CodexSDKExecutor(BaseExecutor):
         replied_to = self._read_replied_to_file()
         return ExecutionResult(
             text=response_text,
-            result_message=turn,
+            result_message=_wrap_result_message(turn, thread),
             replied_to_from_transcript=replied_to,
             tool_call_records=tool_records,
         )
@@ -492,7 +520,7 @@ class CodexSDKExecutor(BaseExecutor):
                             "tool_name": tool_name,
                         }
                 elif etype == "turn.completed":
-                    turn_result = event
+                    turn_result = _wrap_result_message(event, thread)
                     usage = getattr(event, "usage", None)
                     if usage:
                         tracker.update(
