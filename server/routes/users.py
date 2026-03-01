@@ -234,8 +234,12 @@ def create_users_router() -> APIRouter:
 
         save_auth(auth_config)
 
-        # Create session so user stays logged in after mode upgrade
+        # Revoke all existing sessions for this user
+        revoke_all_sessions(caller.username)
+
+        # Create session so user stays logged in after mode upgrade or password change
         if need_session:
+            auth_config = load_auth()
             token = create_session(auth_config, user.username)
             save_auth(auth_config)
             response = JSONResponse({"status": "ok"})

@@ -61,6 +61,20 @@ _BLOCKED_CMD_PATTERNS: list[tuple[re.Pattern[str], str]] = [
      "World-writable chmod is blocked"),
     (re.compile(r"\bshutdown\b|\breboot\b|\binit\s+[06]\b"),
      "System shutdown/reboot is blocked"),
+    (re.compile(r"(?:^|[|;&]\s*)nc\b"),
+     "nc (netcat) is blocked for security"),
+    (re.compile(r"(?:^|[|;&]\s*)ncat\b"),
+     "ncat is blocked for security"),
+    (re.compile(r"(?:^|[|;&]\s*)socat\b"),
+     "socat is blocked for security"),
+    (re.compile(r"(?:^|[|;&]\s*)telnet\b"),
+     "telnet is blocked for security"),
+    (re.compile(r"curl\s+.*-[dFT]\b"),
+     "curl data upload (-d/-F/-T) is blocked for security"),
+    (re.compile(r"curl\s+.*--data\b"),
+     "curl --data is blocked for security"),
+    (re.compile(r"wget\s+.*--post\b"),
+     "wget --post is blocked for security"),
 ]
 
 _NEEDS_SHELL_RE = re.compile(r"\||\&\&|\|\||>>?|<<?")

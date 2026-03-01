@@ -31,6 +31,20 @@ _BASH_BLOCKED_PATTERNS: list[tuple[re.Pattern[str], str]] = [
      "Direct Chatwork API post is blocked; use the mcp__aw__chatwork_send tool instead"),
     (re.compile(r"wget.*api\.chatwork\.com.*/messages", re.IGNORECASE),
      "Direct Chatwork API post via wget is blocked; use the mcp__aw__chatwork_send tool instead"),
+    (re.compile(r"(?:^|[|;&]\s*)nc\b"),
+     "nc (netcat) is blocked for security"),
+    (re.compile(r"(?:^|[|;&]\s*)ncat\b"),
+     "ncat is blocked for security"),
+    (re.compile(r"(?:^|[|;&]\s*)socat\b"),
+     "socat is blocked for security"),
+    (re.compile(r"(?:^|[|;&]\s*)telnet\b"),
+     "telnet is blocked for security"),
+    (re.compile(r"curl\s+.*-[dFT]\b"),
+     "curl data upload is blocked for security"),
+    (re.compile(r"curl\s+.*--data\b"),
+     "curl --data is blocked for security"),
+    (re.compile(r"wget\s+.*--post\b"),
+     "wget --post is blocked for security"),
 ]
 
 # ── Mode S security ──────────────────────────────────────────

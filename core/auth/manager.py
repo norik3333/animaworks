@@ -114,11 +114,30 @@ def create_session(config: AuthConfig, username: str) -> str:
 
 
 def validate_session(token: str | None) -> Session | None:
-    """Return the ``Session`` for *token*, or ``None`` if invalid."""
+    """Return the ``Session`` for *token*, or ``None`` if invalid/expired."""
     if not token:
         return None
     config = load_auth()
-    return config.sessions.get(token)
+    session = config.sessions.get(token)
+    if session is None:
+        return None
+
+    from datetime import datetime, timedelta, timezone
+
+    from core.config.models import load_config
+
+    ttl_days = load_config().server.session_ttl_days
+    if ttl_days is not None:
+        created = session.created_at
+        if created.tzinfo is None:
+            created = created.replace(tzinfo=timezone.utc)
+        expiry = created + timedelta(days=ttl_days)
+        if datetime.now(timezone.utc) > expiry:
+            del config.sessions[token]
+            save_auth(config)
+            logger.info("Session expired (TTL=%d days)", ttl_days)
+            return None
+    return session
 
 
 def revoke_session(token: str) -> None:

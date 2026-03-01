@@ -212,6 +212,7 @@ class MediaProxyConfig(BaseModel):
 class ServerConfig(BaseModel):
     """Server runtime configuration."""
 
+    session_ttl_days: int | None = 7  # None = unlimited
     ipc_stream_timeout: int = 60  # per-chunk timeout in seconds
     keepalive_interval: int = 30  # keep-alive emission interval in seconds
     max_streaming_duration: int = 1800  # max streaming duration before hang (seconds)
