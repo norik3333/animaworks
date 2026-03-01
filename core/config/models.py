@@ -144,6 +144,7 @@ class ConsolidationConfig(BaseModel):
 class ImageGenConfig(BaseModel):
     """Configuration for image generation and style consistency."""
 
+    image_style: Literal["anime", "realistic"] = "realistic"
     style_reference: str | None = None  # Path to organization-wide style reference image
     style_prefix: str = ""  # Common style tags prepended to character prompt
     style_suffix: str = ""  # Common style tags appended to character prompt

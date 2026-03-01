@@ -395,6 +395,9 @@ def create_app(animas_dir: Path, shared_dir: Path) -> FastAPI:
 
         # Localhost trust: skip auth for verified local connections
         if auth_config.trust_localhost and _is_safe_localhost_request(request):
+            # Set owner as authenticated user so /api/auth/me and other routes work
+            if auth_config.owner:
+                request.state.user = auth_config.owner
             return await call_next(request)
 
         # Skip whitelisted paths

@@ -19,6 +19,8 @@ import time
 from pathlib import Path
 from typing import Any, cast
 
+from typing import Literal
+
 from core.exceptions import AnimaWorksError  # noqa: F401
 from core.i18n import t
 from core.paths import load_prompt
@@ -36,6 +38,11 @@ REQUIRED_ASSETS: dict[str, str] = {
     "avatar_chibi": "avatar_chibi.png",
     "model_chibi": "avatar_chibi.glb",
     "model_rigged": "avatar_chibi_rigged.glb",
+}
+
+REALISTIC_REQUIRED_ASSETS: dict[str, str] = {
+    "avatar_fullbody_realistic": "avatar_fullbody_realistic.png",
+    "avatar_bustup_realistic": "avatar_bustup_realistic.png",
 }
 
 _3D_ASSET_KEYS = frozenset({"model_chibi", "model_rigged"})
@@ -103,16 +110,32 @@ def _get_lock(anima_name: str) -> asyncio.Lock:
 # ── Asset checking ────────────────────────────────────────────────
 
 
+def _required_assets_for_style(
+    image_style: Literal["anime", "realistic"],
+    enable_3d: bool = True,
+) -> dict[str, str]:
+    """Return the required assets map for the given style."""
+    if image_style == "realistic":
+        return dict(REALISTIC_REQUIRED_ASSETS)
+    assets = dict(REQUIRED_ASSETS)
+    if not enable_3d:
+        for k in _3D_ASSET_KEYS:
+            assets.pop(k, None)
+    return assets
+
+
 def check_anima_assets(
     anima_dir: Path,
     *,
     enable_3d: bool = True,
+    image_style: Literal["anime", "realistic"] = "realistic",
 ) -> dict[str, Any]:
     """Check an anima's asset completeness using metadata logic.
 
     Args:
         anima_dir: Path to the anima's runtime directory.
         enable_3d: Whether 3D assets are required.
+        image_style: Which style's assets to check.
 
     Returns a dict with:
       - ``complete`` (bool): True if all required assets exist.
@@ -126,9 +149,8 @@ def check_anima_assets(
     missing: list[str] = []
     present: list[str] = []
 
-    for key, filename in REQUIRED_ASSETS.items():
-        if not enable_3d and key in _3D_ASSET_KEYS:
-            continue
+    required = _required_assets_for_style(image_style, enable_3d)
+    for key, filename in required.items():
         path = assets_dir / filename
         if has_dir and path.exists() and path.is_file():
             present.append(key)
@@ -147,6 +169,7 @@ def find_animas_with_missing_assets(
     animas_dir: Path,
     *,
     enable_3d: bool = True,
+    image_style: Literal["anime", "realistic"] = "realistic",
 ) -> list[tuple[str, dict[str, Any]]]:
     """Scan all anima directories and return those with incomplete assets.
 
@@ -161,7 +184,9 @@ def find_animas_with_missing_assets(
             continue
         if not (anima_dir / "identity.md").exists():
             continue
-        result = check_anima_assets(anima_dir, enable_3d=enable_3d)
+        result = check_anima_assets(
+            anima_dir, enable_3d=enable_3d, image_style=image_style,
+        )
         if not result["complete"]:
             results.append((anima_dir.name, result))
 
@@ -176,6 +201,7 @@ async def reconcile_anima_assets(
     *,
     prompt: str | None = None,
     enable_3d: bool = True,
+    image_style: Literal["anime", "realistic"] = "realistic",
 ) -> dict[str, Any]:
     """Generate missing assets for a single anima (non-blocking).
 
@@ -188,6 +214,7 @@ async def reconcile_anima_assets(
         prompt: Character prompt for image generation.  If ``None``,
             attempts to extract from identity.md.
         enable_3d: Whether to include 3D model generation steps.
+        image_style: Which image style to generate assets for.
 
     Returns:
         Dict with generation results or skip reason.
@@ -211,14 +238,16 @@ async def reconcile_anima_assets(
         return {"anima": anima_name, "skipped": True, "reason": "locked"}
 
     async with lock:
-        # Re-check after acquiring lock — another task may have generated
-        check = check_anima_assets(anima_dir, enable_3d=enable_3d)
+        check = check_anima_assets(
+            anima_dir, enable_3d=enable_3d, image_style=image_style,
+        )
         if check["complete"]:
             logger.debug("Assets complete for %s (post-lock check)", anima_name)
             return {"anima": anima_name, "skipped": True, "reason": "complete"}
 
         logger.info(
-            "Generating missing assets for %s (missing: %s)",
+            "Generating missing %s assets for %s (missing: %s)",
+            image_style,
             anima_name,
             check["missing"],
         )
@@ -235,15 +264,16 @@ async def reconcile_anima_assets(
                 "reason": "no_prompt",
             }
 
-        # Determine which pipeline steps to run based on missing assets
         steps: list[str] | None = None
-        if not enable_3d:
+        if image_style == "anime" and not enable_3d:
             steps = ["fullbody", "bustup", "chibi"]
 
         try:
+            from core.config.models import ImageGenConfig
             from core.tools.image_gen import ImageGenPipeline
 
-            pipeline = ImageGenPipeline(anima_dir)
+            image_config = ImageGenConfig(image_style=image_style, enable_3d=enable_3d)
+            pipeline = ImageGenPipeline(anima_dir, config=image_config)
             loop = asyncio.get_running_loop()
             result = await loop.run_in_executor(
                 None,
@@ -290,6 +320,7 @@ async def reconcile_all_assets(
     *,
     ws_manager: Any | None = None,
     enable_3d: bool = True,
+    image_style: Literal["anime", "realistic"] = "realistic",
 ) -> list[dict[str, Any]]:
     """Check all animas and generate missing assets sequentially.
 
@@ -297,18 +328,22 @@ async def reconcile_all_assets(
         animas_dir: Root animas directory.
         ws_manager: Optional WebSocketManager for broadcasting updates.
         enable_3d: Whether to include 3D model generation.
+        image_style: Which image style to generate assets for.
 
     Returns:
         List of per-anima result dicts.
     """
-    incomplete = find_animas_with_missing_assets(animas_dir, enable_3d=enable_3d)
+    incomplete = find_animas_with_missing_assets(
+        animas_dir, enable_3d=enable_3d, image_style=image_style,
+    )
     if not incomplete:
         logger.debug("All animas have complete assets")
         return []
 
     logger.info(
-        "Asset reconciliation: %d anima(s) with missing assets: %s",
+        "Asset reconciliation: %d anima(s) with missing %s assets: %s",
         len(incomplete),
+        image_style,
         [name for name, _ in incomplete],
     )
 
@@ -316,7 +351,7 @@ async def reconcile_all_assets(
     for anima_name, _check in incomplete:
         anima_dir = animas_dir / anima_name
         result = await reconcile_anima_assets(
-            anima_dir, enable_3d=enable_3d,
+            anima_dir, enable_3d=enable_3d, image_style=image_style,
         )
         results.append(result)
 

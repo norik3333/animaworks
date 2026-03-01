@@ -36,6 +36,9 @@ __all__ = [
     "_CHIBI_PROMPT",
     "_EXPRESSION_PROMPTS",
     "_EXPRESSION_GUIDANCE",
+    "_REALISTIC_BUSTUP_PROMPT",
+    "_REALISTIC_EXPRESSION_PROMPTS",
+    "_REALISTIC_EXPRESSION_GUIDANCE",
     "_DEFAULT_ANIMATIONS",
     "_HTTP_TIMEOUT",
     "_DOWNLOAD_TIMEOUT",
@@ -165,6 +168,89 @@ _EXPRESSION_GUIDANCE: dict[str, float] = {
 
 assert set(_EXPRESSION_GUIDANCE.keys()) == _VALID_EXPRESSION_NAMES, (
     f"Expression guidance mismatch: {set(_EXPRESSION_GUIDANCE.keys())} != {_VALID_EXPRESSION_NAMES}"
+)
+
+# ── Realistic (photographic) prompts ──────────────────────
+
+_REALISTIC_BUSTUP_PROMPT = (
+    "Generate a portrait of the same person from the chest up. "
+    "Same outfit, same colors, same features. "
+    "Professional studio photograph, soft natural lighting, "
+    "shallow depth of field, looking at viewer."
+)
+
+_REALISTIC_EXPRESSION_PROMPTS: dict[str, str] = {
+    "neutral": (
+        "The person with a calm relaxed expression, looking at viewer. "
+        "Soft eyes, natural closed mouth, relaxed eyebrows. "
+        "Arms at sides in a natural posture. "
+        "Bust-up portrait, professional photograph, soft studio lighting. "
+        "Same person identity, outfit, and hairstyle."
+    ),
+    "smile": (
+        "Change the person's expression to a bright genuine smile. "
+        "Eyes slightly narrowed with crow's feet, "
+        "rosy cheeks, warm and cheerful expression. "
+        "Head tilted slightly to one side, hands relaxed naturally. "
+        "Bust-up portrait, professional photograph, soft studio lighting. "
+        "Same person identity, outfit, and hairstyle."
+    ),
+    "laugh": (
+        "Change the person's expression to joyful laughing. "
+        "Eyes squeezed with laugh lines, mouth open showing teeth, raised cheeks. "
+        "Head tilted back with amusement, one hand near mouth. "
+        "Bust-up portrait, professional photograph, soft studio lighting. "
+        "Same person identity, outfit, and hairstyle."
+    ),
+    "troubled": (
+        "Change the person's expression to worried and concerned. "
+        "Eyebrows furrowed and pinched together, slight frown, anxious eyes. "
+        "Both hands clasped together in front of chest, shoulders raised tensely. "
+        "Bust-up portrait, professional photograph, soft studio lighting. "
+        "Same person identity, outfit, and hairstyle."
+    ),
+    "surprised": (
+        "Change the person's expression to shocked surprise. "
+        "Eyes wide open, eyebrows raised very high, "
+        "mouth dropped open. "
+        "Both hands raised up near face, leaning back slightly. "
+        "Bust-up portrait, professional photograph, soft studio lighting. "
+        "Same person identity, outfit, and hairstyle."
+    ),
+    "thinking": (
+        "Change the person's expression to deep contemplation. "
+        "Looking slightly upward, one eye slightly narrowed, thoughtful furrowed brow. "
+        "One hand on chin in a classic thinking pose, slight pout. "
+        "Bust-up portrait, professional photograph, soft studio lighting. "
+        "Same person identity, outfit, and hairstyle."
+    ),
+    "embarrassed": (
+        "Change the person's expression to visibly embarrassed. "
+        "Red blush across cheeks, eyes averted to the side. "
+        "Both hands covering cheeks or fidgeting nervously. "
+        "Bust-up portrait, professional photograph, soft studio lighting. "
+        "Same person identity, outfit, and hairstyle."
+    ),
+}
+
+assert set(_REALISTIC_EXPRESSION_PROMPTS.keys()) == _VALID_EXPRESSION_NAMES, (
+    f"Realistic expression prompts mismatch: "
+    f"{set(_REALISTIC_EXPRESSION_PROMPTS.keys())} != {_VALID_EXPRESSION_NAMES}"
+)
+
+_REALISTIC_EXPRESSION_GUIDANCE: dict[str, float] = {
+    "neutral": 4.0,
+    "smile": 4.5,
+    "laugh": 4.5,
+    "troubled": 5.0,
+    "surprised": 4.5,
+    "thinking": 4.5,
+    "embarrassed": 5.0,
+}
+
+assert set(_REALISTIC_EXPRESSION_GUIDANCE.keys()) == _VALID_EXPRESSION_NAMES, (
+    f"Realistic expression guidance mismatch: "
+    f"{set(_REALISTIC_EXPRESSION_GUIDANCE.keys())} != {_VALID_EXPRESSION_NAMES}"
 )
 
 # Default animation presets for office digital animas
