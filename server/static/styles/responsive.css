@@ -319,6 +319,7 @@ body.sidebar-collapsed .sidebar-collapse-btn {
   }
 
   .chat-anima-tabs-header .anima-tabs {
+    flex: none;
     min-height: 0;
   }
 
@@ -387,30 +388,62 @@ body.sidebar-collapsed .sidebar-collapse-btn {
     white-space: nowrap;
   }
 
-  /* --- Chat mobile improvements --- */
+  /* --- Chat input: distribute buttons left/right of textarea --- */
   .chat-input-form {
     padding: 8px;
   }
 
-  .chat-input-actions {
+  .chat-input-wrap {
     display: flex;
-    flex-direction: row;
-    align-items: center;
-    gap: 6px;
+    align-items: flex-end;
+    gap: 4px;
   }
 
-  .chat-send-btn,
+  .chat-input {
+    flex: 1;
+    min-width: 0;
+    max-height: 140px;
+  }
+
+  .chat-input-actions {
+    display: contents;
+  }
+
   .chat-attach-btn {
-    width: 34px;
-    height: 34px;
+    order: -1;
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+  }
+
+  .chat-send-btn {
+    order: 2;
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
   }
 
   .chat-queue-btn {
     display: none;
   }
 
-  .chat-input {
-    max-height: 140px;
+  .chat-input-actions .voice-controls {
+    order: 1;
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    min-height: 32px;
+    margin-right: 0;
+  }
+
+  .chat-input-actions .voice-mic-btn {
+    width: 32px;
+    height: 32px;
+  }
+
+  .chat-input-actions .voice-mic-btn svg {
+    width: 16px;
+    height: 16px;
   }
 
   .chat-bubble {
