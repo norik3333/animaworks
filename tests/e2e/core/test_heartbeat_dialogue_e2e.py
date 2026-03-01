@@ -129,7 +129,7 @@ class TestCrossContextFlow:
         activity.log("heartbeat_end", summary="Checked Slack, found 3 unread messages")
 
         log_dir = anima_dir / "activity_log"
-        today_file = log_dir / f"{date.today().isoformat()}.jsonl"
+        today_file = log_dir / f"{now_jst().strftime('%Y-%m-%d')}.jsonl"
         assert today_file.exists()
 
         content = today_file.read_text(encoding="utf-8").strip()
@@ -151,7 +151,7 @@ class TestCrossContextFlow:
                 "type": "heartbeat_end",
                 "summary": f"HB action {i}",
             }, ensure_ascii=False))
-        (activity_dir / f"{date.today().isoformat()}.jsonl").write_text(
+        (activity_dir / f"{now_jst().strftime('%Y-%m-%d')}.jsonl").write_text(
             "\n".join(entries) + "\n", encoding="utf-8",
         )
 

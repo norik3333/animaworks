@@ -10,7 +10,6 @@ with correct summary fields, using real ActivityLogger on disk.
 from __future__ import annotations
 
 import json
-from datetime import date
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -18,6 +17,7 @@ import pytest
 
 from core.memory.activity import ActivityLogger, ActivityEntry
 from core.messenger import InboxItem
+from core.time_utils import now_jst
 from core.schemas import CycleResult
 from core.tooling.handler import active_session_type
 
@@ -27,7 +27,7 @@ from core.tooling.handler import active_session_type
 def _read_activity_entries(anima_dir: Path) -> list[dict]:
     """Read all JSONL entries from today's activity log."""
     log_dir = anima_dir / "activity_log"
-    today_file = log_dir / f"{date.today().isoformat()}.jsonl"
+    today_file = log_dir / f"{now_jst().strftime('%Y-%m-%d')}.jsonl"
     if not today_file.exists():
         return []
     entries = []

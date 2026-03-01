@@ -20,6 +20,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from core.memory.reconsolidation import ReconsolidationEngine
+from core.time_utils import now_jst
 
 
 # ── Fixtures ────────────────────────────────────────────────
@@ -445,10 +446,9 @@ class TestActivityLogEvent:
 
         # Check the activity log file
         import json
-        from datetime import date
 
         log_dir = anima_dir / "activity_log"
-        today_file = log_dir / f"{date.today().isoformat()}.jsonl"
+        today_file = log_dir / f"{now_jst().strftime('%Y-%m-%d')}.jsonl"
         assert today_file.exists()
 
         entries = [
@@ -485,10 +485,9 @@ class TestActivityLogEvent:
             await engine.apply_reconsolidation([proc_path], "test-model")
 
         import json
-        from datetime import date
 
         log_dir = anima_dir / "activity_log"
-        today_file = log_dir / f"{date.today().isoformat()}.jsonl"
+        today_file = log_dir / f"{now_jst().strftime('%Y-%m-%d')}.jsonl"
         if today_file.exists():
             entries = [
                 json.loads(line)
