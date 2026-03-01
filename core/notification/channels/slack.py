@@ -87,14 +87,22 @@ class SlackChannel(NotificationChannel):
         if not channel:
             return "slack: ERROR - channel not configured for bot token mode"
 
-        text = self._build_text(subject, body, priority, anima_name)
+        # When username override is active, omit "(from X)" from text body
+        text = self._build_text(subject, body, priority, "" if anima_name else "")
+
+        payload: dict[str, Any] = {"channel": channel, "text": text}
+        if anima_name:
+            payload["username"] = anima_name
+            icon_template = self._config.get("icon_url_template", "")
+            if icon_template:
+                payload["icon_url"] = icon_template.format(name=anima_name)
 
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 resp = await client.post(
                     "https://slack.com/api/chat.postMessage",
                     headers={"Authorization": f"Bearer {bot_token}"},
-                    json={"channel": channel, "text": text},
+                    json=payload,
                 )
                 resp.raise_for_status()
                 data = resp.json()

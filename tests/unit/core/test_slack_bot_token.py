@@ -133,6 +133,107 @@ class TestBotTokenMode:
         assert "[URGENT]" in text
 
 
+class TestUsernameOverride:
+    """Tests for per-Anima username/icon_url override."""
+
+    @pytest.mark.asyncio
+    async def test_username_set_when_anima_name_provided(self):
+        """When anima_name is given, payload includes username override."""
+        ch = _make_channel({"bot_token": "xoxb-test", "channel": "C123"})
+
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {"ok": True}
+        mock_resp.raise_for_status = MagicMock()
+
+        with patch("httpx.AsyncClient") as mock_client_cls:
+            mock_client = AsyncMock()
+            mock_client.post.return_value = mock_resp
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
+            mock_client_cls.return_value = mock_client
+
+            await ch.send("Report", "All good", anima_name="sakura")
+
+        payload = mock_client.post.call_args[1]["json"]
+        assert payload["username"] == "sakura"
+        # "(from sakura)" should NOT appear in text when username override is active
+        assert "(from sakura)" not in payload["text"]
+
+    @pytest.mark.asyncio
+    async def test_no_username_when_anima_name_empty(self):
+        """When anima_name is empty, no username override in payload."""
+        ch = _make_channel({"bot_token": "xoxb-test", "channel": "C123"})
+
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {"ok": True}
+        mock_resp.raise_for_status = MagicMock()
+
+        with patch("httpx.AsyncClient") as mock_client_cls:
+            mock_client = AsyncMock()
+            mock_client.post.return_value = mock_resp
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
+            mock_client_cls.return_value = mock_client
+
+            await ch.send("Report", "All good")
+
+        payload = mock_client.post.call_args[1]["json"]
+        assert "username" not in payload
+        assert "icon_url" not in payload
+
+    @pytest.mark.asyncio
+    async def test_icon_url_from_template(self):
+        """When icon_url_template is configured, icon_url is set in payload."""
+        ch = _make_channel({
+            "bot_token": "xoxb-test",
+            "channel": "C123",
+            "icon_url_template": "https://cdn.example.com/{name}/icon.png",
+        })
+
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {"ok": True}
+        mock_resp.raise_for_status = MagicMock()
+
+        with patch("httpx.AsyncClient") as mock_client_cls:
+            mock_client = AsyncMock()
+            mock_client.post.return_value = mock_resp
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
+            mock_client_cls.return_value = mock_client
+
+            await ch.send("Report", "Body", anima_name="mei")
+
+        payload = mock_client.post.call_args[1]["json"]
+        assert payload["username"] == "mei"
+        assert payload["icon_url"] == "https://cdn.example.com/mei/icon.png"
+
+    @pytest.mark.asyncio
+    async def test_no_icon_url_without_template(self):
+        """When no icon_url_template, no icon_url in payload."""
+        ch = _make_channel({"bot_token": "xoxb-test", "channel": "C123"})
+
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {"ok": True}
+        mock_resp.raise_for_status = MagicMock()
+
+        with patch("httpx.AsyncClient") as mock_client_cls:
+            mock_client = AsyncMock()
+            mock_client.post.return_value = mock_resp
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
+            mock_client_cls.return_value = mock_client
+
+            await ch.send("Report", "Body", anima_name="rin")
+
+        payload = mock_client.post.call_args[1]["json"]
+        assert payload["username"] == "rin"
+        assert "icon_url" not in payload
+
+
 class TestWebhookFallback:
     """Tests for webhook mode fallback."""
 
