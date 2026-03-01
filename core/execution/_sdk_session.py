@@ -75,14 +75,16 @@ def _cleanup_prompt_files(files: list[Path]) -> None:
 
 # ── Session ID persistence ───────────────────────────────────
 
-def _session_file(session_type: str) -> str:
+def _session_file(session_type: str, thread_id: str = "default") -> str:
     """Return the session file name for the given session type."""
+    if thread_id != "default":
+        return f"current_session_{session_type}_{thread_id}.json"
     return f"current_session_{session_type}.json"
 
 
-def _load_session_id(anima_dir: Path, session_type: str = "chat") -> str | None:
+def _load_session_id(anima_dir: Path, session_type: str = "chat", thread_id: str = "default") -> str | None:
     """Load persisted session ID for SDK session resume."""
-    path = anima_dir / "state" / _session_file(session_type)
+    path = anima_dir / "state" / _session_file(session_type, thread_id)
     if not path.exists():
         return None
     try:
@@ -93,9 +95,9 @@ def _load_session_id(anima_dir: Path, session_type: str = "chat") -> str | None:
         return None
 
 
-def _save_session_id(anima_dir: Path, session_id: str, session_type: str = "chat") -> None:
+def _save_session_id(anima_dir: Path, session_id: str, session_type: str = "chat", thread_id: str = "default") -> None:
     """Persist session ID for future SDK session resume."""
-    path = anima_dir / "state" / _session_file(session_type)
+    path = anima_dir / "state" / _session_file(session_type, thread_id)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps({
         "session_id": session_id,
@@ -103,20 +105,20 @@ def _save_session_id(anima_dir: Path, session_id: str, session_type: str = "chat
     }, ensure_ascii=False), encoding="utf-8")
 
 
-def _clear_session_id(anima_dir: Path, session_type: str = "chat") -> None:
+def _clear_session_id(anima_dir: Path, session_type: str = "chat", thread_id: str = "default") -> None:
     """Clear persisted session ID (e.g., after resume failure)."""
-    path = anima_dir / "state" / _session_file(session_type)
+    path = anima_dir / "state" / _session_file(session_type, thread_id)
     if path.exists():
         path.unlink(missing_ok=True)
 
 
-def clear_session_ids(anima_dir: Path) -> None:
+def clear_session_ids(anima_dir: Path, thread_id: str = "default") -> None:
     """Clear all session IDs for an anima (chat and heartbeat).
 
     Public wrapper for use by streaming_handler.py on done=False disconnection.
     """
     for session_type in ("chat", "heartbeat"):
-        _clear_session_id(anima_dir, session_type)
+        _clear_session_id(anima_dir, session_type, thread_id)
 
 
 # ── SDK query input construction ─────────────────────────────

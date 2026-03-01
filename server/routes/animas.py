@@ -7,6 +7,7 @@ import asyncio
 import json
 import logging
 from pathlib import Path
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
@@ -340,8 +341,13 @@ def create_animas_router() -> APIRouter:
         }
 
     @router.post("/animas/{name}/interrupt")
-    async def interrupt_anima(name: str, request: Request):
-        """Interrupt the current LLM session without stopping the process."""
+    async def interrupt_anima(name: str, request: Request, thread_id: str | None = None):
+        """Interrupt the current LLM session without stopping the process.
+
+        Query params:
+            thread_id: If provided, only interrupt the specific thread.
+                If omitted, interrupt all active threads.
+        """
         supervisor = request.app.state.supervisor
         anima_names = request.app.state.anima_names
 
@@ -352,10 +358,13 @@ def create_animas_router() -> APIRouter:
             return {"status": "not_running", "name": name}
 
         try:
+            params: dict[str, Any] = {}
+            if thread_id:
+                params["thread_id"] = thread_id
             result = await supervisor.send_request(
                 anima_name=name,
                 method="interrupt",
-                params={},
+                params=params,
                 timeout=10.0,
             )
             return result

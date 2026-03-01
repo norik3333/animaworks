@@ -71,15 +71,20 @@ class ShortTermMemory:
           └── archive/            # Completed / superseded states
     """
 
-    def __init__(self, anima_dir: Path, session_type: str = "chat") -> None:
+    def __init__(self, anima_dir: Path, session_type: str = "chat", thread_id: str = "default") -> None:
         self.anima_dir = anima_dir
         self._session_type = session_type
-        self.shortterm_dir = anima_dir / "shortterm" / session_type
+        self._thread_id = thread_id
+        base = anima_dir / "shortterm" / session_type
+        if thread_id != "default":
+            self.shortterm_dir = base / thread_id
+        else:
+            self.shortterm_dir = base
         self.shortterm_dir.mkdir(parents=True, exist_ok=True)
         self._archive_dir = self.shortterm_dir / "archive"
 
         # Migrate legacy files from shortterm/ to shortterm/chat/
-        if session_type == "chat":
+        if session_type == "chat" and thread_id == "default":
             self._migrate_legacy_files()
 
     # ── Query ───────────────────────────────────────────────

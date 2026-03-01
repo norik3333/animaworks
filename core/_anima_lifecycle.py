@@ -31,7 +31,8 @@ class LifecycleMixin:
         self,
         cascade_suppressed_senders: set[str] | None = None,
     ) -> CycleResult:
-        self._interrupt_event.clear()
+        self._get_interrupt_event("_background").clear()
+        self.agent.set_interrupt_event(self._get_interrupt_event("_background"))
         logger.info("[%s] run_heartbeat START", self.name)
         try:
             async with self._background_lock:
@@ -243,7 +244,8 @@ class LifecycleMixin:
             description: Task description/instruction.
             command_output: Optional stdout from a preceding command cron.
         """
-        self._interrupt_event.clear()
+        self._get_interrupt_event("_background").clear()
+        self.agent.set_interrupt_event(self._get_interrupt_event("_background"))
         logger.info("[%s] run_cron_task START task=%s", self.name, task_name)
         from core.tooling.handler import active_session_type
         try:

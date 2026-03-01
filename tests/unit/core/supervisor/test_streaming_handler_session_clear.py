@@ -65,7 +65,7 @@ class TestSessionClearOnDoneFalse:
 
         clear_calls: list[tuple] = []
 
-        def fake_clear_session_id(anima_dir: Path, session_type: str) -> None:
+        def fake_clear_session_id(anima_dir: Path, session_type: str, thread_id: str = "default") -> None:
             clear_calls.append((anima_dir, session_type))
 
         with (
@@ -184,7 +184,7 @@ class TestSessionClearOnTimeoutError:
 
         clear_calls: list[tuple] = []
 
-        def fake_clear_session_id(anima_dir: Path, session_type: str) -> None:
+        def fake_clear_session_id(anima_dir: Path, session_type: str, thread_id: str = "default") -> None:
             clear_calls.append((anima_dir, session_type))
 
         with (
@@ -252,7 +252,7 @@ class TestSessionClearOnException:
 
         clear_calls: list[tuple] = []
 
-        def fake_clear_session_id(anima_dir: Path, session_type: str) -> None:
+        def fake_clear_session_id(anima_dir: Path, session_type: str, thread_id: str = "default") -> None:
             clear_calls.append((anima_dir, session_type))
 
         with (
@@ -354,7 +354,7 @@ class TestNoSessionClearOnSuccess:
 
         clear_calls: list[tuple] = []
 
-        def fake_clear_session_id(anima_dir: Path, session_type: str) -> None:
+        def fake_clear_session_id(anima_dir: Path, session_type: str, thread_id: str = "default") -> None:
             clear_calls.append((anima_dir, session_type))
 
         with (

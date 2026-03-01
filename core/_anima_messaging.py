@@ -59,8 +59,8 @@ class MessagingMixin:
         from core.tooling.handler import active_session_type
         try:
             async with self._get_thread_lock("default"):
-                self._status_slots["conversation"] = "bootstrapping"
-                self._task_slots["conversation"] = "Initial bootstrap"
+                self._status_slots["conversation:default"] = "bootstrapping"
+                self._task_slots["conversation:default"] = "Initial bootstrap"
                 _session_token = self.agent._tool_handler.set_active_session_type("chat")
                 self.agent._tool_handler.set_session_origin(ORIGIN_SYSTEM)
 
@@ -86,8 +86,8 @@ class MessagingMixin:
                     raise
                 finally:
                     active_session_type.reset(_session_token)
-                    self._status_slots["conversation"] = "idle"
-                    self._task_slots["conversation"] = ""
+                    self._status_slots["conversation:default"] = "idle"
+                    self._task_slots["conversation:default"] = ""
         finally:
             self._notify_lock_released()
 
@@ -102,7 +102,8 @@ class MessagingMixin:
         include_cycle_result: bool = False,
     ) -> str | dict[str, Any]:
         self._validate_thread_id(thread_id)
-        self._interrupt_event.clear()
+        self._get_interrupt_event(thread_id).clear()
+        self.agent.set_interrupt_event(self._get_interrupt_event(thread_id))
         logger.info(
             "[%s] process_message WAITING from=%s content_len=%d images=%d",
             self.name, from_person, len(content), len(images or []),
@@ -114,8 +115,9 @@ class MessagingMixin:
                     "[%s] process_message START (lock acquired) from=%s",
                     self.name, from_person,
                 )
-                self._status_slots["conversation"] = "thinking"
-                self._task_slots["conversation"] = f"Responding to {from_person}"
+                _conv_key = f"conversation:{thread_id}"
+                self._status_slots[_conv_key] = "thinking"
+                self._task_slots[_conv_key] = f"Responding to {from_person}"
                 _session_token = self.agent._tool_handler.set_active_session_type("chat")
                 self.agent._tool_handler.set_session_origin(ORIGIN_HUMAN)
 
@@ -161,6 +163,7 @@ class MessagingMixin:
                         message_intent=intent,
                         images=images,
                         prior_messages=prior_messages,
+                        thread_id=thread_id,
                     )
                     self._last_activity = now_jst()
 
@@ -210,8 +213,8 @@ class MessagingMixin:
                     raise
                 finally:
                     active_session_type.reset(_session_token)
-                    self._status_slots["conversation"] = "idle"
-                    self._task_slots["conversation"] = ""
+                    self._status_slots[_conv_key] = "idle"
+                    self._task_slots[_conv_key] = ""
         finally:
             self._notify_lock_released()
 
@@ -231,7 +234,8 @@ class MessagingMixin:
         an immediate "initializing" message instead of waiting.
         """
         self._validate_thread_id(thread_id)
-        self._interrupt_event.clear()
+        self._get_interrupt_event(thread_id).clear()
+        self.agent.set_interrupt_event(self._get_interrupt_event(thread_id))
         # ── Bootstrap guard: return immediately if bootstrap is running ──
         if self.needs_bootstrap and self._get_thread_lock(thread_id).locked():
             logger.info(
@@ -255,8 +259,9 @@ class MessagingMixin:
                     "[%s] process_message_stream START (lock acquired) from=%s",
                     self.name, from_person,
                 )
-                self._status_slots["conversation"] = "thinking"
-                self._task_slots["conversation"] = f"Responding to {from_person}"
+                _conv_key = f"conversation:{thread_id}"
+                self._status_slots[_conv_key] = "thinking"
+                self._task_slots[_conv_key] = f"Responding to {from_person}"
                 _session_token = self.agent._tool_handler.set_active_session_type("chat")
                 self.agent._tool_handler.set_session_origin(ORIGIN_HUMAN)
 
@@ -315,6 +320,7 @@ class MessagingMixin:
                         message_intent=intent,
                         images=images,
                         prior_messages=prior_messages,
+                        thread_id=thread_id,
                     ):
                         if chunk.get("type") == "text_delta":
                             delta_text = chunk.get("text", "")
@@ -410,8 +416,8 @@ class MessagingMixin:
                         active_session_type.reset(_session_token)
                     except ValueError:
                         pass
-                    self._status_slots["conversation"] = "idle"
-                    self._task_slots["conversation"] = ""
+                    self._status_slots[_conv_key] = "idle"
+                    self._task_slots[_conv_key] = ""
         finally:
             self._notify_lock_released()
 
@@ -443,8 +449,8 @@ class MessagingMixin:
         logger.info("[%s] process_greet START", self.name)
         from core.tooling.handler import active_session_type
         async with self._get_thread_lock("default"):
-            prev_status = self._status_slots.get("conversation", "idle")
-            prev_task = self._task_slots.get("conversation", "")
+            prev_status = self._status_slots.get("conversation:default", "idle")
+            prev_task = self._task_slots.get("conversation:default", "")
             _session_token = self.agent._tool_handler.set_active_session_type("chat")
 
             # Build greet prompt with current state (use primary to include background)
@@ -454,8 +460,8 @@ class MessagingMixin:
                 "greet", status=status_text, current_task=task_text,
             )
 
-            self._status_slots["conversation"] = "greeting"
-            self._task_slots["conversation"] = "Greeting user"
+            self._status_slots["conversation:default"] = "greeting"
+            self._task_slots["conversation:default"] = "Greeting user"
 
             conv_memory = ConversationMemory(self.anima_dir, self.model_config)
 
@@ -514,5 +520,5 @@ class MessagingMixin:
                 raise
             finally:
                 active_session_type.reset(_session_token)
-                self._status_slots["conversation"] = prev_status
-                self._task_slots["conversation"] = prev_task
+                self._status_slots["conversation:default"] = prev_status
+                self._task_slots["conversation:default"] = prev_task

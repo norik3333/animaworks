@@ -48,10 +48,8 @@ class TestDigitalAnimaInit:
 
             assert dp.name == "alice"
             assert dp.anima_dir == anima_dir
-            assert dp._status_slots["conversation"] == "idle"
             assert dp._status_slots["inbox"] == "idle"
             assert dp._status_slots["background"] == "idle"
-            assert dp._task_slots["conversation"] == ""
             assert dp._task_slots["inbox"] == ""
             assert dp._task_slots["background"] == ""
             assert dp._last_heartbeat is None
@@ -211,7 +209,7 @@ class TestProcessMessage:
 
             result = await dp.process_message("Hi", from_person="human")
             assert result == "Hello!"
-            assert dp._status_slots["conversation"] == "idle"
+            assert dp._status_slots.get("conversation:default", "idle") == "idle"
 
     async def test_status_transitions(self, data_dir, make_anima):
         anima_dir = make_anima("alice")
@@ -235,13 +233,13 @@ class TestProcessMessage:
             observed_statuses = []
 
             async def mock_run_cycle(prompt, trigger="manual", **kwargs):
-                observed_statuses.append(dp._status_slots["conversation"])
+                observed_statuses.append(dp._status_slots.get("conversation:default", "idle"))
                 return _make_cycle_result()
 
             dp.agent.run_cycle = mock_run_cycle
             await dp.process_message("test")
             assert "thinking" in observed_statuses
-            assert dp._status_slots["conversation"] == "idle"
+            assert dp._status_slots.get("conversation:default", "idle") == "idle"
 
     async def test_exception_resets_status(self, data_dir, make_anima):
         anima_dir = make_anima("alice")
@@ -263,7 +261,7 @@ class TestProcessMessage:
 
             with pytest.raises(RuntimeError):
                 await dp.process_message("test")
-            assert dp._status_slots["conversation"] == "idle"
+            assert dp._status_slots.get("conversation:default", "idle") == "idle"
 
 
 # ── run_heartbeat ─────────────────────────────────────────
@@ -462,13 +460,13 @@ class TestProcessGreet:
             _wire_session_type(dp)
 
             # Set pre-existing status (conversation slot)
-            dp._status_slots["conversation"] = "working"
-            dp._task_slots["conversation"] = "Report generation"
+            dp._status_slots["conversation:default"] = "working"
+            dp._task_slots["conversation:default"] = "Report generation"
 
             observed_statuses = []
 
             async def mock_run_cycle(prompt, trigger="manual", **kwargs):
-                observed_statuses.append(dp._status_slots["conversation"])
+                observed_statuses.append(dp._status_slots.get("conversation:default", "idle"))
                 return _make_cycle_result(summary="Hello!")
 
             dp.agent.run_cycle = mock_run_cycle
@@ -478,8 +476,8 @@ class TestProcessGreet:
             # During greet, status should be "greeting"
             assert "greeting" in observed_statuses
             # After greet, status should be restored
-            assert dp._status_slots["conversation"] == "working"
-            assert dp._task_slots["conversation"] == "Report generation"
+            assert dp._status_slots["conversation:default"] == "working"
+            assert dp._task_slots["conversation:default"] == "Report generation"
 
     async def test_greet_emotion_fallback(self, data_dir, make_anima):
         anima_dir = make_anima("alice")
@@ -518,16 +516,16 @@ class TestProcessGreet:
             from core.anima import DigitalAnima
             dp = DigitalAnima(anima_dir, shared_dir)
             _wire_session_type(dp)
-            dp._status_slots["conversation"] = "working"
-            dp._task_slots["conversation"] = "Some task"
+            dp._status_slots["conversation:default"] = "working"
+            dp._task_slots["conversation:default"] = "Some task"
             dp.agent.run_cycle = AsyncMock(side_effect=RuntimeError("fail"))
 
             with pytest.raises(RuntimeError):
                 await dp.process_greet()
 
             # Status should be restored even after exception
-            assert dp._status_slots["conversation"] == "working"
-            assert dp._task_slots["conversation"] == "Some task"
+            assert dp._status_slots["conversation:default"] == "working"
+            assert dp._task_slots["conversation:default"] == "Some task"
 
 
 # ── Conversation data-loss fix tests ─────────────────────

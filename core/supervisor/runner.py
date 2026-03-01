@@ -566,7 +566,8 @@ class AnimaRunner:
         """Handle interrupt request — cancel current LLM session."""
         if not self.anima:
             raise RuntimeError("Anima not initialized")
-        return await self.anima.interrupt()
+        thread_id = params.get("thread_id")
+        return await self.anima.interrupt(thread_id=thread_id)
 
     # ── Cleanup ───────────────────────────────────────────────────
 

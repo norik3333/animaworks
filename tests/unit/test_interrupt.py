@@ -68,7 +68,7 @@ class TestBaseExecutorInterrupt:
 # ── DigitalAnima interrupt ───────────────────────────────
 
 class TestDigitalAnimaInterrupt:
-    """Test DigitalAnima.interrupt() and _interrupt_event lifecycle."""
+    """Test DigitalAnima.interrupt() and _interrupt_events lifecycle."""
 
     @pytest.fixture
     def anima_dir(self, tmp_path):
@@ -108,7 +108,7 @@ class TestDigitalAnimaInterrupt:
     async def test_interrupt_sets_event(
         self, mock_messenger_cls, mock_mm_cls, mock_agent_cls, anima_dir, shared_dir
     ):
-        """interrupt() should set the _interrupt_event."""
+        """interrupt() should set all _interrupt_events."""
         mock_mm_cls.return_value.read_model_config.return_value = MagicMock()
         mock_agent_cls.return_value = MagicMock()
         mock_agent_cls.return_value.set_on_message_sent = MagicMock()
@@ -120,9 +120,10 @@ class TestDigitalAnimaInterrupt:
         from core.anima import DigitalAnima
         anima = DigitalAnima(anima_dir, shared_dir)
 
-        assert not anima._interrupt_event.is_set()
+        evt = anima._get_interrupt_event("default")
+        assert not evt.is_set()
         result = await anima.interrupt()
-        assert anima._interrupt_event.is_set()
+        assert evt.is_set()
         assert result["status"] == "interrupted"
 
     @patch("core.anima.AgentCore")
@@ -131,7 +132,7 @@ class TestDigitalAnimaInterrupt:
     async def test_interrupt_event_cleared_on_process_message(
         self, mock_messenger_cls, mock_mm_cls, mock_agent_cls, anima_dir, shared_dir
     ):
-        """process_message should clear the interrupt event."""
+        """process_message should clear the interrupt event for the thread."""
         mock_mm_cls.return_value.read_model_config.return_value = MagicMock()
         mock_agent = MagicMock()
         mock_agent.set_on_message_sent = MagicMock()
@@ -151,9 +152,9 @@ class TestDigitalAnimaInterrupt:
         from core.anima import DigitalAnima
         anima = DigitalAnima(anima_dir, shared_dir)
 
-        # Set the event
-        anima._interrupt_event.set()
-        assert anima._interrupt_event.is_set()
+        evt = anima._get_interrupt_event("default")
+        evt.set()
+        assert evt.is_set()
 
         # process_message should clear it (even though it may fail due to mocking,
         # the clear() happens at the very start)
@@ -162,7 +163,7 @@ class TestDigitalAnimaInterrupt:
         except Exception:
             pass
 
-        assert not anima._interrupt_event.is_set()
+        assert not evt.is_set()
 
 
 # ── AgentCore interrupt_event propagation ────────────────

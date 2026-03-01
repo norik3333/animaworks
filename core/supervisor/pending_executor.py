@@ -206,8 +206,9 @@ class PendingTaskExecutor:
         the task_exec.md template. Only task description and tools
         are provided — no memory, no org context.
         """
-        if self._anima and hasattr(self._anima, "_interrupt_event"):
-            self._anima._interrupt_event.clear()
+        if self._anima and hasattr(self._anima, "_get_interrupt_event"):
+            self._anima._get_interrupt_event("_background").clear()
+            self._anima.agent.set_interrupt_event(self._anima._get_interrupt_event("_background"))
         task_id = task_desc.get("task_id", "unknown")
         title = task_desc.get("title", "Untitled task")
         description = task_desc.get("description", "")

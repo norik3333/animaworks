@@ -97,7 +97,7 @@ class TestRetryFreshSession:
         # Track _clear_session_id calls
         clear_calls: list[tuple[Path, str]] = []
 
-        def _spy_clear(anima_dir_arg, session_type):
+        def _spy_clear(anima_dir_arg, session_type, thread_id="default"):
             clear_calls.append((anima_dir_arg, session_type))
 
         # The executor will: first call → StreamDisconnectedError,
@@ -222,7 +222,7 @@ class TestRetryFreshSession:
 
         clear_calls: list[tuple[Path, str]] = []
 
-        def _spy_clear(anima_dir_arg, session_type):
+        def _spy_clear(anima_dir_arg, session_type, thread_id="default"):
             clear_calls.append((anima_dir_arg, session_type))
 
         call_count = [0]

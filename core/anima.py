@@ -86,11 +86,10 @@ class DigitalAnima(
         self.memory = MemoryManager(anima_dir)
         self.model_config = self.memory.read_model_config()
         self.messenger = Messenger(shared_dir, self.name)
-        self._interrupt_event = asyncio.Event()
+        self._interrupt_events: dict[str, asyncio.Event] = {}
         self.agent = AgentCore(
             anima_dir, self.memory, self.model_config, self.messenger
         )
-        self.agent.set_interrupt_event(self._interrupt_event)
 
         # 3-lock structure: conversation (human chat) / inbox (Anima-to-Anima MSG) / background (HB/cron/TaskExec)
         self._conversation_locks: dict[str, asyncio.Lock] = {}
@@ -100,8 +99,8 @@ class DigitalAnima(
         self._cron_idle.set()  # initially idle (no cron running)
         self._state_file_lock = threading.Lock()  # protects current_task.md / pending.md
         self.agent._tool_handler.set_state_file_lock(self._state_file_lock)
-        self._status_slots: dict[str, str] = {"conversation": "idle", "inbox": "idle", "background": "idle"}
-        self._task_slots: dict[str, str] = {"conversation": "", "inbox": "", "background": ""}
+        self._status_slots: dict[str, str] = {"inbox": "idle", "background": "idle"}
+        self._task_slots: dict[str, str] = {"inbox": "", "background": ""}
         self._last_heartbeat: datetime | None = None
         self._last_activity: datetime | None = None
         self._on_lock_released: Callable[[], None] | None = None
@@ -137,6 +136,14 @@ class DigitalAnima(
                         break
             self._conversation_locks[thread_id] = asyncio.Lock()
         return self._conversation_locks[thread_id]
+
+    # ── Per-thread interrupt event management ──────────────────
+
+    def _get_interrupt_event(self, thread_id: str = "default") -> asyncio.Event:
+        """Get or create a per-thread interrupt event."""
+        if thread_id not in self._interrupt_events:
+            self._interrupt_events[thread_id] = asyncio.Event()
+        return self._interrupt_events[thread_id]
 
     # ── Config / Callbacks ──────────────────────────────────────
 
@@ -175,10 +182,22 @@ class DigitalAnima(
 
         return notifications
 
-    async def interrupt(self) -> dict[str, Any]:
-        """Interrupt the current LLM session without killing the process."""
-        logger.info("Interrupt requested for anima '%s'", self.name)
-        self._interrupt_event.set()
+    async def interrupt(self, thread_id: str | None = None) -> dict[str, Any]:
+        """Interrupt LLM session(s) without killing the process.
+
+        Args:
+            thread_id: If provided, only interrupt the specific thread.
+                If None, interrupt all active threads (CLI compat).
+        """
+        if thread_id:
+            logger.info("Interrupt requested for anima '%s' thread=%s", self.name, thread_id)
+            evt = self._interrupt_events.get(thread_id)
+            if evt:
+                evt.set()
+        else:
+            logger.info("Interrupt requested for anima '%s' (all threads)", self.name)
+            for evt in self._interrupt_events.values():
+                evt.set()
         return {"status": "interrupted", "name": self.name}
 
     def reload_config(self) -> dict[str, Any]:
@@ -299,10 +318,10 @@ class DigitalAnima(
 
     @property
     def primary_status(self) -> str:
-        """Primary status: conversation > inbox > background."""
-        conv = self._status_slots.get("conversation", "idle")
-        if conv != "idle":
-            return conv
+        """Primary status: any conversation:* > inbox > background."""
+        for key, val in self._status_slots.items():
+            if key.startswith("conversation:") and val != "idle":
+                return val
         inbox = self._status_slots.get("inbox", "idle")
         if inbox != "idle":
             return inbox
@@ -310,10 +329,10 @@ class DigitalAnima(
 
     @property
     def primary_task(self) -> str:
-        """Primary task: conversation > inbox > background."""
-        conv = self._task_slots.get("conversation", "")
-        if conv:
-            return conv
+        """Primary task: any conversation:* > inbox > background."""
+        for key, val in self._task_slots.items():
+            if key.startswith("conversation:") and val:
+                return val
         inbox = self._task_slots.get("inbox", "")
         if inbox:
             return inbox

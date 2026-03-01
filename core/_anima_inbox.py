@@ -65,7 +65,8 @@ class InboxMixin:
         Separated from heartbeat to provide instant response to inter-Anima
         messages without triggering the full heartbeat observation cycle.
         """
-        self._interrupt_event.clear()
+        self._get_interrupt_event("_inbox").clear()
+        self.agent.set_interrupt_event(self._get_interrupt_event("_inbox"))
         logger.info("[%s] process_inbox_message START", self.name)
         try:
             # Wait for any running cron task to finish before processing inbox.

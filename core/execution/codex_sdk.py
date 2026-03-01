@@ -77,33 +77,36 @@ def _escape_toml_string(value: str) -> str:
 
 # ── Session (thread) ID persistence ──────────────────────────
 
-def _thread_id_path(anima_dir: Path, session_type: str) -> Path:
-    return anima_dir / "shortterm" / session_type / "codex_thread_id.txt"
+def _thread_id_path(anima_dir: Path, session_type: str, chat_thread_id: str = "default") -> Path:
+    base = anima_dir / "shortterm" / session_type
+    if chat_thread_id != "default":
+        return base / chat_thread_id / "codex_thread_id.txt"
+    return base / "codex_thread_id.txt"
 
 
-def _save_thread_id(anima_dir: Path, thread_id: str, session_type: str) -> None:
-    p = _thread_id_path(anima_dir, session_type)
+def _save_thread_id(anima_dir: Path, thread_id: str, session_type: str, chat_thread_id: str = "default") -> None:
+    p = _thread_id_path(anima_dir, session_type, chat_thread_id)
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(thread_id, encoding="utf-8")
 
 
-def _load_thread_id(anima_dir: Path, session_type: str) -> str | None:
-    p = _thread_id_path(anima_dir, session_type)
+def _load_thread_id(anima_dir: Path, session_type: str, chat_thread_id: str = "default") -> str | None:
+    p = _thread_id_path(anima_dir, session_type, chat_thread_id)
     if p.is_file():
         tid = p.read_text(encoding="utf-8").strip()
         return tid or None
     return None
 
 
-def _clear_thread_id(anima_dir: Path, session_type: str) -> None:
-    p = _thread_id_path(anima_dir, session_type)
+def _clear_thread_id(anima_dir: Path, session_type: str, chat_thread_id: str = "default") -> None:
+    p = _thread_id_path(anima_dir, session_type, chat_thread_id)
     p.unlink(missing_ok=True)
 
 
-def clear_codex_thread_ids(anima_dir: Path) -> None:
+def clear_codex_thread_ids(anima_dir: Path, chat_thread_id: str = "default") -> None:
     """Clear all persisted Codex thread IDs (both chat and heartbeat)."""
     for st in ("chat", "heartbeat"):
-        _clear_thread_id(anima_dir, st)
+        _clear_thread_id(anima_dir, st, chat_thread_id)
 
 
 # ── Helpers ──────────────────────────────────────────────────

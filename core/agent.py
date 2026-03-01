@@ -64,6 +64,8 @@ class AgentCore(
       - B  (basic):                    ``AssistedExecutor``
     """
 
+    _MAX_AGENT_LOCKS = 20
+
     def __init__(
         self,
         anima_dir: Path,
@@ -79,7 +81,7 @@ class AgentCore(
         self._tool_registry = self._init_tool_registry()
         self._personal_tools = self._discover_personal_tools()
         self._sdk_available = self._check_sdk()
-        self._agent_lock = asyncio.Lock()
+        self._agent_locks: dict[str, asyncio.Lock] = {}
 
         # Build human notifier for top-level animas
         human_notifier = self._build_human_notifier()
@@ -118,6 +120,17 @@ class AgentCore(
         self._interrupt_event = event
         if hasattr(self._executor, "_interrupt_event"):
             self._executor._interrupt_event = event
+
+    def _get_agent_lock(self, thread_id: str = "default") -> asyncio.Lock:
+        """Get or create a per-thread agent lock with LRU eviction."""
+        if thread_id not in self._agent_locks:
+            if len(self._agent_locks) >= self._MAX_AGENT_LOCKS:
+                for k in list(self._agent_locks):
+                    if not self._agent_locks[k].locked():
+                        del self._agent_locks[k]
+                        break
+            self._agent_locks[thread_id] = asyncio.Lock()
+        return self._agent_locks[thread_id]
 
     def set_on_message_sent(self, fn: Callable[[str, str, str], None]) -> None:
         """Inject a callback invoked after a send_message tool call."""

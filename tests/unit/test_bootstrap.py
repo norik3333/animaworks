@@ -154,7 +154,7 @@ class TestDigitalAnimaRunBootstrap:
 
         async def mock_run_cycle(prompt, trigger=""):
             # Capture status while inside the cycle
-            observed_statuses.append(dp._status_slots["conversation"])
+            observed_statuses.append(dp._status_slots.get("conversation:default", "idle"))
             return CycleResult(
                 trigger=trigger,
                 action="completed",
@@ -194,7 +194,7 @@ class TestDigitalAnimaRunBootstrap:
 
             result = await dp.run_bootstrap()
 
-        assert dp._status_slots["conversation"] == "idle"
+        assert dp._status_slots.get("conversation:default", "idle") == "idle"
         assert result.action == "completed"
 
     @pytest.mark.asyncio
@@ -214,8 +214,8 @@ class TestDigitalAnimaRunBootstrap:
             with pytest.raises(RuntimeError, match="LLM API error"):
                 await dp.run_bootstrap()
 
-        assert dp._status_slots["conversation"] == "idle"
-        assert dp._task_slots["conversation"] == ""
+        assert dp._status_slots.get("conversation:default", "idle") == "idle"
+        assert dp._task_slots.get("conversation:default", "") == ""
 
 
 # ════════════════════════════════════════════════════════════════════

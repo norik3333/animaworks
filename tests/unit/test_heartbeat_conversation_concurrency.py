@@ -112,23 +112,24 @@ class TestStatusSlots:
     """Verify status slot system works correctly."""
 
     def test_initial_status_idle(self, anima: "DigitalAnima") -> None:
-        """All status slots should start as idle."""
-        assert anima._status_slots == {"conversation": "idle", "inbox": "idle", "background": "idle"}
-        assert anima._task_slots == {"conversation": "", "inbox": "", "background": ""}
+        """Status slots should start with inbox and background as idle."""
+        assert anima._status_slots["inbox"] == "idle"
+        assert anima._status_slots["background"] == "idle"
+        assert anima._task_slots["inbox"] == ""
+        assert anima._task_slots["background"] == ""
 
     def test_primary_status_conversation_priority(
         self, anima: "DigitalAnima",
     ) -> None:
         """primary_status should prefer conversation over background."""
-        anima._status_slots["conversation"] = "thinking"
+        anima._status_slots["conversation:default"] = "thinking"
         anima._status_slots["background"] = "checking"
         assert anima.primary_status == "thinking"
 
     def test_primary_status_background_fallback(
         self, anima: "DigitalAnima",
     ) -> None:
-        """primary_status should return background when conversation is idle."""
-        anima._status_slots["conversation"] = "idle"
+        """primary_status should return background when no conversation is active."""
         anima._status_slots["background"] = "checking"
         assert anima.primary_status == "checking"
 

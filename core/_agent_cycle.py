@@ -43,6 +43,7 @@ class CycleMixin:
         prior_messages: list[dict[str, Any]] | None = None,
         message_intent: str = "",
         max_turns_override: int | None = None,
+        thread_id: str = "default",
     ) -> CycleResult:
         """Run one agent cycle with autonomous memory search.
 
@@ -56,7 +57,7 @@ class CycleMixin:
         externalized to short-term memory and automatically continued.
         S and C modes rely on the SDK's built-in context management.
         """
-        async with self._agent_lock:
+        async with self._get_agent_lock(thread_id):
             return await self._run_cycle_inner(
                 prompt,
                 trigger,
@@ -64,6 +65,7 @@ class CycleMixin:
                 prior_messages=prior_messages,
                 message_intent=message_intent,
                 max_turns_override=max_turns_override,
+                thread_id=thread_id,
             )
 
     async def _run_cycle_inner(
@@ -74,6 +76,7 @@ class CycleMixin:
         prior_messages: list[dict[str, Any]] | None = None,
         message_intent: str = "",
         max_turns_override: int | None = None,
+        thread_id: str = "default",
     ) -> CycleResult:
         start = time.monotonic()
         mode = self._resolve_execution_mode()
@@ -101,7 +104,7 @@ class CycleMixin:
             prompt_tier=_prompt_tier,
         )
 
-        shortterm = ShortTermMemory(self.anima_dir)
+        shortterm = ShortTermMemory(self.anima_dir, thread_id=thread_id)
         tracker = ContextTracker(
             model=self.model_config.model,
             threshold=self.model_config.context_threshold,
@@ -416,6 +419,7 @@ class CycleMixin:
         prior_messages: list[dict[str, Any]] | None = None,
         message_intent: str = "",
         max_turns_override: int | None = None,
+        thread_id: str = "default",
     ) -> AsyncGenerator[dict, None]:
         """Streaming version of run_cycle.
 
@@ -431,7 +435,7 @@ class CycleMixin:
 
         # Non-streaming executors: fall back to blocking execution
         if not self._executor.supports_streaming:
-            async with self._agent_lock:
+            async with self._get_agent_lock(thread_id):
                 cycle = await self._run_cycle_inner(
                     prompt,
                     trigger,
@@ -439,6 +443,7 @@ class CycleMixin:
                     prior_messages=prior_messages,
                     message_intent=message_intent,
                     max_turns_override=max_turns_override,
+                    thread_id=thread_id,
                 )
             yield {"type": "text_delta", "text": cycle.summary}
             yield {
@@ -466,7 +471,7 @@ class CycleMixin:
             prompt_tier=_prompt_tier_s,
         )
 
-        shortterm = ShortTermMemory(self.anima_dir)
+        shortterm = ShortTermMemory(self.anima_dir, thread_id=thread_id)
         tracker = ContextTracker(
             model=self.model_config.model,
             threshold=self.model_config.context_threshold,
@@ -515,13 +520,14 @@ class CycleMixin:
         )
         if use_fallback:
             logger.warning("Streaming fallback: using blocking S Fallback for oversized prompt")
-            async with self._agent_lock:
+            async with self._get_agent_lock(thread_id):
                 cycle = await self._run_cycle_inner(
                     prompt,
                     trigger,
                     message_intent=message_intent,
                     images=images,
                     max_turns_override=max_turns_override,
+                    thread_id=thread_id,
                 )
             yield {"type": "text_delta", "text": cycle.summary}
             yield {

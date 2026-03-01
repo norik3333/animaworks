@@ -246,12 +246,11 @@ export class ChatSessionManager extends EventTarget {
   async sendChat(anima, thread, text, options = {}) {
     const { images = [], displayImages = [], callbacks = {}, onFinally } = options;
 
-    if (this.isStreamingForAnima(anima)) {
+    const session = this.getSession(anima, thread);
+    if (session.isStreaming) {
       this.enqueue(anima, thread, { text, images, displayImages });
       return { streamingMsg: null, success: false, queued: true };
     }
-
-    const session = this.getSession(anima, thread);
     const streamId = session.nextStreamId();
     const sendTs = new Date().toISOString();
 
@@ -308,10 +307,9 @@ export class ChatSessionManager extends EventTarget {
    * @returns {Promise<{ streamingMsg, success }>}
    */
   async resumeStream(anima, thread, options = {}) {
-    if (this.isStreamingForAnima(anima)) return { streamingMsg: null, success: false };
-
     const { callbacks = {}, onProgress, onFinally } = options;
     const session = this.getSession(anima, thread);
+    if (session.isStreaming) return { streamingMsg: null, success: false };
 
     try {
       const active = await this.#config.fetchActiveStream(anima);

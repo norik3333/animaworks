@@ -63,7 +63,6 @@ class TestThreeLockStructure:
             from core.anima import DigitalAnima
             dp = DigitalAnima(anima_dir, shared_dir)
             assert "inbox" in dp._status_slots
-            assert "conversation" in dp._status_slots
             assert "background" in dp._status_slots
 
     async def test_inbox_and_conversation_concurrent(self, data_dir, make_anima):
@@ -612,7 +611,7 @@ class TestPrimaryStatusInbox:
             dp = DigitalAnima(anima_dir, shared_dir)
 
             dp._status_slots["inbox"] = "processing"
-            dp._status_slots["conversation"] = "chatting"
+            dp._status_slots["conversation:default"] = "chatting"
             assert dp.primary_status == "chatting"
 
     def test_inbox_task_shows_in_primary_task(self, data_dir, make_anima):
