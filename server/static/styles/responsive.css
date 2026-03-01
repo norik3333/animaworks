@@ -313,20 +313,100 @@ body.sidebar-collapsed .sidebar-collapse-btn {
     font-size: 0.8rem;
   }
 
+  /* --- Anima tabs: collapsible dropdown on mobile --- */
+  .chat-anima-tabs-header {
+    position: relative;
+  }
+
+  .chat-anima-tabs-header .anima-tabs {
+    min-height: 0;
+  }
+
+  .chat-anima-tabs-header .anima-tab-wrap {
+    display: none;
+  }
+
+  .chat-anima-tabs-header .anima-tab-wrap:has(.anima-tab.active) {
+    display: inline-flex;
+  }
+
+  .chat-anima-tabs-header .anima-tab.active::after {
+    content: "▼";
+    font-size: 0.55rem;
+    margin-left: 0.3rem;
+    opacity: 0.5;
+  }
+
+  .chat-anima-tabs-header.anima-tabs-expanded .anima-tabs {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    background: var(--aw-color-bg-primary);
+    border: 1px solid var(--aw-color-border-light);
+    border-radius: 0 0 8px 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    padding: 6px;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .chat-anima-tabs-header.anima-tabs-expanded .anima-tab-wrap {
+    display: inline-flex;
+  }
+
+  .chat-anima-tabs-header.anima-tabs-expanded .anima-tab.active::after {
+    content: "▲";
+  }
+
+  .anima-tab-avatar {
+    width: 28px;
+    height: 28px;
+  }
+
+  /* --- Thread tabs: horizontal scroll on mobile --- */
+  .thread-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .thread-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .thread-tab-wrap,
+  .thread-tab-new,
+  .thread-more-wrap {
+    flex-shrink: 0;
+  }
+
+  .thread-tab {
+    white-space: nowrap;
+  }
+
   /* --- Chat mobile improvements --- */
   .chat-input-form {
     padding: 8px;
   }
 
-  .chat-send-btn {
+  .chat-input-actions {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .chat-send-btn,
+  .chat-attach-btn {
     width: 34px;
     height: 34px;
   }
 
-  .chat-queue-btn,
-  .chat-attach-btn {
-    width: 34px;
-    height: 34px;
+  .chat-queue-btn {
+    display: none;
   }
 
   .chat-input {

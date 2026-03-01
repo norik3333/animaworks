@@ -120,9 +120,16 @@ export function createAnimaController(ctx) {
         const anima = e.currentTarget?.dataset?.anima;
         if (!anima) return;
         if (anima === state.selectedAnima) {
+          const header = container.closest(".chat-anima-tabs-header");
+          if (header && window.matchMedia("(max-width: 768px)").matches) {
+            header.classList.toggle("anima-tabs-expanded");
+            return;
+          }
           ctx.controllers.avatar.showBustupOverlay();
           return;
         }
+        const header = container.closest(".chat-anima-tabs-header");
+        if (header) header.classList.remove("anima-tabs-expanded");
         openOrSelectAnima(anima);
       });
     });
@@ -135,7 +142,17 @@ export function createAnimaController(ctx) {
     });
   }
 
+  // Close mobile anima dropdown when clicking outside
+  document.addEventListener("click", e => {
+    const header = document.querySelector(".chat-anima-tabs-header");
+    if (header && header.classList.contains("anima-tabs-expanded") && !header.contains(e.target)) {
+      header.classList.remove("anima-tabs-expanded");
+    }
+  });
+
   async function selectAnima(name) {
+    const header = document.querySelector(".chat-anima-tabs-header");
+    if (header) header.classList.remove("anima-tabs-expanded");
     const gen = ++_selectGen;
     const prevAnima = state.selectedAnima;
     const currentInput = $("chatPageInput");
