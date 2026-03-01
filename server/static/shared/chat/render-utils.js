@@ -31,7 +31,10 @@ export function renderHistoryMessage(msg, opts) {
     const content = msg.content ? renderMarkdown(msg.content, opts.animaName) : "";
     const toolHtml = renderToolCalls(msg.tool_calls, { escapeHtml, truncateLen: truncLen });
     const imagesHtml = renderImages(msg.images, { animaName: opts.animaName });
-    return `<div class="chat-bubble assistant">${content}${imagesHtml}${toolHtml}${tsHtml}</div>`;
+    const toLabel = msg.to_person
+      ? `<div style="font-size:0.72rem; opacity:0.7; margin-bottom:2px;">→ ${escapeHtml(msg.to_person)}</div>`
+      : "";
+    return `<div class="chat-bubble assistant">${toLabel}${content}${imagesHtml}${toolHtml}${tsHtml}</div>`;
   }
 
   const fromLabel = msg.from_person && msg.from_person !== "human"

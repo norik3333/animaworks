@@ -31,7 +31,7 @@ class ConversationMixin:
     """Mixin providing conversation view methods for ActivityLogger."""
 
     _CONVERSATION_TYPES = {
-        "message_received", "response_sent",
+        "message_received", "message_sent", "response_sent",
         "tool_use", "tool_result",
         "heartbeat_start", "heartbeat_end",
         "cron_executed",
@@ -198,6 +198,17 @@ class ConversationMixin:
                     "role": "human",
                     "content": e.content,
                     "from_person": e.from_person,
+                    "tool_calls": [],
+                })
+
+            elif e.type == "message_sent":
+                self._flush_tool_calls(messages, pending_tool_calls)
+                messages.append({
+                    "ts": e.ts,
+                    "role": "assistant",
+                    "content": e.content,
+                    "from_person": "",
+                    "to_person": e.to_person,
                     "tool_calls": [],
                 })
 

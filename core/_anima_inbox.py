@@ -177,6 +177,17 @@ class InboxMixin:
 
                     self._last_activity = now_jst()
 
+                    # Record inbox response as response_sent so it appears
+                    # in the conversation view alongside message_received.
+                    if accumulated_text.strip():
+                        self._activity.log(
+                            "response_sent",
+                            content=accumulated_text[:2000],
+                            to_person=senders_str,
+                            channel="inbox",
+                            meta={"trigger": "inbox"},
+                        )
+
                     # Archive processed messages
                     await self._archive_processed_messages(
                         inbox_result.inbox_items,
