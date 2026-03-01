@@ -6,7 +6,7 @@
   width: 220px;
   min-width: 220px;
   background: var(--aw-color-sidebar-bg);
-  color: var(--aw-color-bg-primary);
+  color: var(--aw-color-sidebar-text);
   display: flex;
   flex-direction: column;
   overflow-y: auto;
@@ -65,8 +65,8 @@
 }
 
 .nav-item.active {
-  background: rgba(37, 99, 235, 0.15);
-  color: var(--aw-color-bg-primary);
+  background: var(--aw-color-sidebar-active-bg, rgba(37, 99, 235, 0.15));
+  color: var(--aw-color-sidebar-active-text);
   border-left-color: var(--aw-color-accent);
 }
 
