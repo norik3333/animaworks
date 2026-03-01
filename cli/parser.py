@@ -94,12 +94,20 @@ def cli_main() -> None:
     p_start = sub.add_parser("start", help="Start the AnimaWorks server")
     p_start.add_argument("--host", default="0.0.0.0")
     p_start.add_argument("--port", type=int, default=18500)
+    p_start.add_argument(
+        "--foreground", "-f", action="store_true",
+        help="Run in foreground with log output (default: daemonize)",
+    )
     p_start.set_defaults(func=_lazy_start)
 
     # ── Serve (alias) ─────────────────────────────────────
     p_serve = sub.add_parser("serve", help="Start the server (alias for start)")
     p_serve.add_argument("--host", default="0.0.0.0")
     p_serve.add_argument("--port", type=int, default=18500)
+    p_serve.add_argument(
+        "--foreground", "-f", action="store_true",
+        help="Run in foreground with log output (default: daemonize)",
+    )
     p_serve.set_defaults(func=_lazy_serve)
 
     # ── Stop ──────────────────────────────────────────────
@@ -120,6 +128,10 @@ def cli_main() -> None:
     p_restart = sub.add_parser("restart", help="Restart the server (stop then start)")
     p_restart.add_argument("--host", default="0.0.0.0")
     p_restart.add_argument("--port", type=int, default=18500)
+    p_restart.add_argument(
+        "--foreground", "-f", action="store_true",
+        help="Run in foreground with log output (default: daemonize)",
+    )
     p_restart.set_defaults(func=_lazy_restart)
 
     # ── Gateway (deprecated) ──────────────────────────────

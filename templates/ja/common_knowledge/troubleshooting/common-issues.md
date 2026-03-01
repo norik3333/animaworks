@@ -22,6 +22,8 @@
 2. サーバーが停止している
 3. 相手がハートビート間隔の合間にいる（次の起動まで未読のまま）
 4. 送信処理自体がエラーで失敗していた
+5. `intent` が未指定または不正（report / delegation / question のみ許可）
+6. セッション内DM制限超過（同一宛先へ2回目、または3人目への送信）
 
 ### 対処手順
 
@@ -33,6 +35,7 @@
      search_memory(query="組織", scope="common_knowledge")
      ```
      または `read_memory_file(path="common_knowledge/organization/structure.md")` で組織の全Anima名を確認
+   - **注意**: チャット中に人間宛てに送る場合は `send_message` を使わず、直接テキストで返答すること（人間には届く）。人間への連絡は `call_human` を使用
 
 2. **サーバーの稼働状況を確認する**
    - 自分が動作している時点でサーバーは稼働中のはず
@@ -52,16 +55,20 @@
 
 ```
 # 名前を間違えていた場合
-send_message(to="Sakura", content="...")   # OK
-send_message(to="sakura", content="...")   # 名前が異なればエラーになる可能性あり
+send_message(to="Sakura", content="...", intent="report")   # OK
+send_message(to="sakura", content="...", intent="report")  # 名前が異なればエラーになる可能性あり
 
-# スレッドで返信する場合
+# DM は intent 必須（report / delegation / question のみ）
+# 1セッションあたり最大2人まで、同一宛先へは1回のみ
 send_message(
     to="sakura",
     content="了解しました。作業を開始します。",
-    reply_to="msg-abc123",      # 元メッセージのID
-    thread_id="thread-xyz789"   # スレッドID
+    intent="report",           # 必須: report / delegation / question
+    reply_to="msg-abc123",     # 任意: 元メッセージのID
+    thread_id="thread-xyz789"  # 任意: スレッドID
 )
+
+# 確認・お礼・お知らせのみのDMは不可 → post_channel（Board）を使用
 ```
 
 ---
@@ -113,12 +120,13 @@ send_message(
    ```
    send_message(
        to="上司の名前",
-       content="【ブロック報告】\nタスク: XXXの実装\nブロック原因: YYYのAPI権限が不足\n発生: 2026-02-15 10:00\n試行: permissions.mdを確認したが該当設定なし\n依頼: API権限の追加をお願いします"
+       content="【ブロック報告】\nタスク: XXXの実装\nブロック原因: YYYのAPI権限が不足\n発生: 2026-02-15 10:00\n試行: permissions.mdを確認したが該当設定なし\n依頼: API権限の追加をお願いします",
+       intent="report"
    )
    ```
 
 5. **ブロック中でも進められる作業がないか確認する**
-   - `state/pending.md` に他のタスクがないか確認する
+   - `state/pending.md` およびタスクキュー（`list_tasks`）に他のタスクがないか確認する
    - ブロックされていない別のタスクに着手する
 
 ---
@@ -184,6 +192,7 @@ send_message(
    - 共有知識（`common_knowledge/`）に関連ガイドがないか確認する
    - 上司や同僚に知見がないか問い合わせる
    - 作業完了後は MUST で記憶として記録する（次回のために）
+   - 古い・重複した記憶は `archive_memory_file` で archive/ に退避できる（削除ではなく移動）
 
 ### 検索スコープ一覧
 
@@ -215,18 +224,19 @@ send_message(
 
 1. **自分の権限を確認する**
    ```
-   read_memory_file(path="permissions.md")
+   check_permissions()
    ```
-   - `permissions.md` には以下が記載されている:
-     - 読み取り可能なディレクトリ
-     - 書き込み可能なディレクトリ
-     - 実行可能なコマンドのホワイトリスト
-     - 使用可能な外部ツールのカテゴリ
+   - 利用可能な内部ツール・外部ツール・ファイルアクセス・制限事項が一覧で返る
+   - 詳細は `read_memory_file(path="permissions.md")` で確認可能
+   - `permissions.md` の主なセクション:
+     - 「ファイル操作」「読める場所」: 読み取り可能なパス
+     - 「コマンド実行」「実行できるコマンド」: 実行可能なコマンドのホワイトリスト
+     - 「実行できないコマンド」: ブロック対象コマンド
+     - 外部ツール: permissions.md で許可されたカテゴリが有効化される
 
 2. **許可されている操作か確認する**
-   - 読み取り: `read_paths` に列挙されたパスのみ読める
-   - 書き込み: `write_paths` に列挙されたパスのみ書ける
-   - コマンド: `allowed_commands` に列挙されたコマンドのみ実行できる
+   - 自分の anima_dir 内は読み書き可能。共有ディレクトリ・部下の管理ファイル等は `check_permissions` で確認
+   - コマンド: 「実行できるコマンド」に列挙されたコマンドのみ実行可能
 
 3. **権限が必要な場合の対応**
    - その操作が本当に必要か再検討する
@@ -235,7 +245,8 @@ send_message(
    ```
    send_message(
        to="上司の名前",
-       content="【権限追加依頼】\n目的: XXXの作業のため\n必要な権限: /path/to/dir の読み取り\n理由: YYYの情報を参照する必要があるため"
+       content="【権限追加依頼】\n目的: XXXの作業のため\n必要な権限: /path/to/dir の読み取り\n理由: YYYの情報を参照する必要があるため",
+       intent="question"
    )
    ```
 
@@ -272,23 +283,25 @@ send_message(
    ```
    discover_tools(category="slack")
    ```
-   - 有効化すると、そのカテゴリのツールが使えるようになる
+   - 有効化すると、そのカテゴリのツールが動的に追加される（A-mode）
+   - permissions.md で許可されたカテゴリのみ有効化可能
 
 3. **権限を確認する**
    ```
-   read_memory_file(path="permissions.md")
+   check_permissions()
    ```
-   - `tool_categories` セクションに利用可能なカテゴリが記載されている
-   - 記載されていないカテゴリは使用できない
+   - `external_tools.enabled` に現在有効なカテゴリ、`available_but_not_enabled` に許可済みだが未有効のカテゴリが返る
+   - permissions.md で許可されていないカテゴリは使用できない
 
 4. **カテゴリが許可されていない場合**
    - 上司に利用許可を依頼する
    - 依頼時は「なぜそのツールが必要か」を明記すること
 
-5. **S-mode の場合の確認方法**
+5. **S-mode（Claude Agent SDK）の場合**
    - MCP ツール（`mcp__aw__*`）は自動的に利用可能。見つからない場合はプロセス再起動が必要
-   - 外部ツールは Bash 経由: `animaworks-tool <ツール名> --help` で利用可否を確認
-   - `mcp__aw__discover_tools` でカテゴリ確認 → Bash で `animaworks-tool <name> <subcmd>` で実行
+   - 外部ツールは permissions.md で許可されていれば MCP 経由で直接利用可能（例: `mcp__aw__slack_post`）
+   - 長時間ツール（画像生成、ローカルLLM等）は `animaworks-tool submit` で非同期実行
+   - `mcp__aw__discover_tools` でカテゴリ確認 → 有効化後は MCP ツールとして呼び出し
 
 6. **ツールがエラーを返す場合**
    - エラーメッセージを正確に記録する
@@ -316,14 +329,15 @@ send_message(
 ### 対処手順
 
 1. **作業状態を短期記憶に保存する**（MUST）
-   - 現在の作業状態を `shortterm/` に書き出す:
+   - 現在の作業状態を `shortterm/` に書き出す（チャットセッション時は `shortterm/chat/`）:
    ```
    write_memory_file(
-       path="shortterm/session_state.md",
+       path="shortterm/chat/session_state.md",
        content="## 作業状態\n\n### 実行中のタスク\n- XXXの実装（50%完了）\n\n### 次のステップ\n1. YYYを完了する\n2. ZZZをテストする\n\n### 重要な中間結果\n- AAAの調査結果: BBB\n- CCCの設定値: DDD",
        mode="overwrite"
    )
    ```
+   - ハートビートセッション時は `shortterm/heartbeat/session_state.md` を使用
 
 2. **`state/current_task.md` を更新する**（MUST）
    ```
@@ -346,7 +360,7 @@ send_message(
 
 4. **セッション継続を待つ**
    - システムが自動的に新しいセッションを開始する
-   - 新セッションでは `shortterm/` の内容がコンテキストに含まれる
+   - 新セッションでは `shortterm/chat/`（または `shortterm/heartbeat/`）の内容がコンテキストに含まれる
    - `state/current_task.md` を読み直して作業を再開する
 
 ### 予防策
@@ -362,20 +376,21 @@ send_message(
 ### 症状
 
 - `send_message` や `post_channel` を実行したらエラーが返された
-- 「Global outbound limit reached」というメッセージが表示された
+- `GlobalOutboundLimitExceeded: 1時間あたりの送信上限（30通）に到達しています...` 等のメッセージが表示された
 
 ### 原因
 
-- 1時間あたり30通、または1日あたり100通の送信上限に達した
-- 同一チャネルへの連続投稿がクールダウン期間内だった
+- 1時間あたり30通、または24時間あたり100通の送信上限に達した（config.json `heartbeat.max_messages_per_hour` / `max_messages_per_day`）
+- 同一チャネルへの連続投稿がクールダウン期間内だった（デフォルト300秒）
 
 ### 対処手順
 
-1. **エラーメッセージを確認する**: 時間制限か日制限かを特定する
+1. **エラーメッセージを確認する**: 時間制限か24時間制限かを特定する
 2. **送信履歴を振り返る**: 不要な送信がなかったか確認する
-3. **待機する**: 時間制限なら次の1時間枠まで、日制限なら翌日まで待つ
-4. **緊急連絡**: `call_human` は制限対象外なので、人間への連絡は引き続き可能
-5. **送信を統合する**: 複数の報告を1通にまとめる
+3. **待機する**: 時間制限なら次の1時間枠まで、24時間制限なら翌日まで待つ
+4. **送信内容を記録する**: このターンでは `send_message` を使わず、送信したい内容を `state/current_task.md` に記録し、次のセッションで送信する
+5. **緊急連絡**: `call_human` は制限対象外なので、人間への連絡は引き続き可能
+6. **送信を統合する**: 複数の報告を1通にまとめる
 
 詳細は `communication/sending-limits.md` を参照。
 
@@ -423,16 +438,16 @@ send_message(
 
 コンテキストウィンドウが小さいモデルを使用している場合、システムプロンプトが段階的に縮小される（Tiered System Prompt）。
 
-| ティア | コンテキストサイズ | 省略される情報 |
-|--------|------------------|--------------|
-| T1 (FULL) | 128k+ | なし（全情報を表示） |
-| T2 (STANDARD) | 32k〜128k | 蒸留知識・Priming バジェット縮小 |
-| T3 (LIGHT) | 16k〜32k | bootstrap, vision, specialty, 蒸留知識, 記憶ガイド 省略 |
-| T4 (MINIMAL) | 16k 未満 | permissions, Priming, org, messaging, emotion も省略 |
+| ティア | コンテキストウィンドウ | 省略される情報 |
+|--------|----------------------|--------------|
+| T1 (FULL) | 128k+ トークン | なし（全情報を表示） |
+| T2 (STANDARD) | 32k〜128k トークン | 蒸留知識・Priming バジェット縮小 |
+| T3 (LIGHT) | 16k〜32k トークン | bootstrap, vision, specialty, 蒸留知識, 記憶ガイド 省略 |
+| T4 (MINIMAL) | 16k 未満 トークン | permissions, Priming, org, messaging, emotion も省略 |
 
 ### 対処手順
 
-1. **自分のモデルを確認する**: `status.json` のモデル名でコンテキストサイズを推定する
+1. **自分のモデルを確認する**: `status.json` のモデル名でコンテキストウィンドウを推定する（config.json `model_context_windows` でオーバーライド可能）
 2. **必要な情報は自分で検索する**: 省略された情報は `search_memory` や `read_memory_file` で明示的に取得する
 3. **上司に相談する**: モデルの変更が必要な場合は上司に依頼する
 
@@ -444,7 +459,7 @@ send_message(
 
 - **原因**: パスの指定ミス、ファイルが存在しない
 - **対処**: `list_directory` でディレクトリ内容を確認してからパスを指定する
-- **注意**: 相対パスと絶対パスの使い分けに注意。`read_memory_file` は Anima ディレクトリからの相対パス、`read_file` は絶対パスを使用する
+- **注意**: `read_memory_file` は Anima ディレクトリからの相対パス（例: `knowledge/xxx.md`, `common_knowledge/organization/structure.md`）。`read_file` は絶対パスを使用する
 
 ### コマンドがタイムアウトする
 

@@ -1,56 +1,100 @@
 # Task Management
 
-Reference for how Digital Anima receives, tracks, and completes tasks.
-Use when unsure how to proceed with tasks.
+Operational reference for how Digital Anima receives, tracks, and completes tasks.
+Search and refer to this when unsure how to proceed with tasks.
 
-## Task Management Structure
+## Basic Task Management Structure
 
-Task state lives in `state/` and the task queue.
+Task state is managed by files in the `state/` directory and the task queue.
 
 | Resource | Role |
 |----------|------|
-| `state/current_task.md` | Current task (one at a time) |
+| `state/current_task.md` | Current task being worked on (one at a time) |
 | `state/pending.md` | Manual backlog (free-form) |
-| `state/pending/` directory | LLM tasks written by Heartbeat (JSON). TaskExec path picks them up and runs them |
-| Task queue (`add_task`) | Persistent task queue for human/Anima requests |
+| `state/pending/` directory | LLM tasks written by Heartbeat (JSON format). TaskExec path automatically picks them up and runs them |
+| `state/task_queue.jsonl` | Persistent task queue (append-only JSONL). Tracks requests from humans and Anima |
 
-`state/current_task.md` MUST always reflect the latest state. Update it when the task changes.
+`state/current_task.md` MUST always reflect the latest state. Update it whenever the task state changes.
 
 ### Three-Path Execution Model
 
-AnimaWorks runs tasks across three paths:
+In AnimaWorks, tasks are processed across three independent paths:
 
 | Path | Trigger | Role | Scope |
 |------|---------|------|-------|
-| **Inbox** | DM received | Handle and reply to Anima messages | Immediate, lightweight replies only |
-| **Heartbeat** | Scheduled | Observe and plan (Observe → Plan → Reflect) | Observe and plan only. Write execution to `pending/` |
-| **TaskExec** | Task appears in `pending/` | Run LLM tasks | Full execution (including tools) |
+| **Inbox** | DM received | Process and reply to inter-Anima messages | Immediate, lightweight replies only |
+| **Heartbeat** | Scheduled check | Situation assessment and planning (Observe → Plan → Reflect) | Observation and judgment only. Writes execution to `pending/` |
+| **TaskExec** | Task appears in `pending/` | Execute LLM tasks | Full execution (including tool use) |
 
-Heartbeat does **not** execute. It writes tasks to `state/pending/` as JSON and delegates execution to the TaskExec path.
+Heartbeat does **not** execute. When it finds a task that needs execution, it writes it out as a JSON file to `state/pending/` and delegates to the TaskExec path.
 
-### Task Queue (add_task tool)
+### Task Queue (add_task / update_task / list_tasks)
 
-Use `add_task` to add tasks to the persistent queue.
-Queued tasks appear summarized in the system prompt Priming section.
+The persistent task queue is recorded in `state/task_queue.jsonl` in append-only JSONL format.
+Use `add_task` to register tasks, `update_task` to update status, and `list_tasks` to retrieve the list.
+Tasks registered in the queue are displayed in summarized form in the system prompt Priming section.
+
+#### add_task
 
 ```
-add_task(title="Report creation", description="Create monthly sales report", priority="high", source="human")
+add_task(source="human", original_instruction="Create the monthly sales report and submit it to hinata", assignee="your own name", summary="Monthly report creation", deadline="1d")
+```
+
+| Parameter | Required | Description |
+|-----------|----------|--------------|
+| `source` | MUST | `human` (request from human) / `anima` (delegation from Anima) |
+| `original_instruction` | MUST | Original instruction text (include quoted text when delegating) |
+| `assignee` | MUST | Assignee name (your own name or delegated Anima name) |
+| `summary` | SHOULD | One-line task summary (defaults to first 100 chars of original_instruction if omitted) |
+| `deadline` | MUST | Deadline. Relative format `30m` / `2h` / `1d` or ISO8601 |
+| `relay_chain` | MAY | Delegation chain (e.g. `["taka", "sakura"]`) |
+
+- When receiving instructions from a human, always record with `add_task` and specify `source="human"` (MUST)
+- Tasks with `source: human` must be processed with highest priority (MUST)
+- Queued tasks are reviewed by Heartbeat; when starting work, update to `in_progress` with `update_task`
+
+#### update_task
+
+Updates task status. Set to `done` when complete, `cancelled` when aborted.
+
+```
+update_task(task_id="abc123def456", status="in_progress")
+update_task(task_id="abc123def456", status="done", summary="Report creation completed")
 ```
 
 | Parameter | Required | Description |
 |-----------|----------|-------------|
-| `title` | MUST | Short task title |
-| `description` | SHOULD | Detailed description |
-| `priority` | MAY | `urgent` / `high` / `medium` / `low` (default: `medium`) |
-| `source` | MAY | `human` or `anima` |
+| `task_id` | MUST | Task ID (returned when add_task was called) |
+| `status` | MUST | `pending` / `in_progress` / `done` / `cancelled` / `blocked` |
+| `summary` | MAY | Updated summary |
 
-- Tasks with `source: human` are highest priority (MUST)
-- Heartbeat reviews queued tasks and picks them up in priority order
+#### list_tasks
+
+Retrieves the task queue list. Can filter by status.
+
+```
+list_tasks()                    # All tasks
+list_tasks(status="pending")    # Pending only
+list_tasks(status="in_progress") # In progress only
+```
+
+#### Task Queue States and Markers
+
+| State | Meaning |
+|-------|---------|
+| `pending` | Not started |
+| `in_progress` | In progress |
+| `done` | Completed |
+| `cancelled` | Cancelled |
+| `blocked` | Blocked |
+| `delegated` | Delegated (tracking for tasks delegated to subordinates via delegate_task) |
+
+In Priming display, tasks not updated for 30+ minutes get the ⚠️ STALE marker; overdue tasks get the 🔴 OVERDUE marker.
 
 ## Using current_task.md
 
 `current_task.md` records the task you are currently working on.
-Keep only one task here (MUST). If you have several, put only the top-priority one.
+Record only one task (MUST). Even with multiple parallel tasks, write only the top-priority one here.
 
 ### Format
 
@@ -60,35 +104,36 @@ task: Slack integration test
 assigned_by: hinata
 started: 2026-02-15 10:00
 context: |
-  Hinata's request: Run Slack API connectivity test and verify posting to #general.
-  Report results when done.
+  Hinata's request: Run Slack API connectivity test and verify that posting to #general works.
+  Report results when the test is complete.
 blockers: None
 ```
 
-### Fields
+### Field Descriptions
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `status` | MUST | Task status (see state transitions below) |
-| `task` | MUST | One-line summary |
-| `assigned_by` | SHOULD | Who assigned. Use `self` for self-assigned |
-| `started` | SHOULD | When started |
-| `context` | SHOULD | Details and background |
-| `blockers` | SHOULD | Blockers, or "None" |
+| `status` | MUST | Task state (see state transitions below) |
+| `task` | MUST | Concise task description (one line) |
+| `assigned_by` | SHOULD | Who assigned the task. Use `self` for self-assigned |
+| `started` | SHOULD | Start date/time |
+| `context` | SHOULD | Task details and background |
+| `blockers` | SHOULD | Blockers if any; otherwise `None` |
 
 ### Idle State
 
-When there is no task:
+When there is no task, record:
 
 ```markdown
 status: idle
 ```
 
-`idle` means you are waiting for the next task. Heartbeat seeing `idle` needs no action (`HEARTBEAT_OK`).
+`idle` is a normal state meaning you are waiting for the next task.
+When Heartbeat sees `idle`, no action is required (`HEARTBEAT_OK`).
 
 ## Using pending.md
 
-`pending.md` is the backlog of tasks not yet started.
+`pending.md` manages the backlog of tasks not yet started.
 Order by priority (SHOULD).
 
 ### Format
@@ -96,42 +141,42 @@ Order by priority (SHOULD).
 ```markdown
 # Pending Tasks
 
-## [HIGH] Gmail notification template
+## [HIGH] Gmail notification template creation
 assigned_by: hinata
 received: 2026-02-15 11:00
 deadline: 2026-02-16 EOD
 notes: |
-  Auto-notify for new clients.
+  Auto-notification email for new clients.
   Create 3 template drafts and submit to hinata.
 
 ## [MEDIUM] Knowledge base cleanup
 assigned_by: self
 received: 2026-02-14 09:00
 notes: |
-  Add tags to knowledge/ files for better search.
+  Add tags to files under knowledge/ to improve search efficiency.
 
-## [LOW] Weekly report format improvement
+## [LOW] Weekly report format improvement proposal
 assigned_by: hinata
 received: 2026-02-13 15:00
 notes: |
-  Review current format and propose improvements.
+  Review current report format and summarize improvement proposals.
   Not urgent.
 ```
 
 ### Priority Labels
 
-| Label | Meaning | When to start |
-|-------|---------|---------------|
-| `[URGENT]` | Critical | Stop everything and start immediately (MUST) |
-| `[HIGH]` | High | Start same day |
-| `[MEDIUM]` | Medium | Start this week |
-| `[LOW]` | Low | When time allows |
+| Label | Meaning | Guideline |
+|-------|---------|-----------|
+| `[URGENT]` | Urgent | Start immediately, prioritizing over all other tasks (MUST) |
+| `[HIGH]` | High | Should start same day |
+| `[MEDIUM]` | Medium | Should start this week |
+| `[LOW]` | Low | Start when time allows |
 
-Unlabeled tasks are treated as `[MEDIUM]` (SHOULD).
+Tasks without a specified priority are treated as `[MEDIUM]` (SHOULD).
 
 ## Task State Transitions
 
-Tasks move through these states. Always update `current_task.md` when the state changes (MUST).
+Tasks transition through the following states. Always update current_task.md when the state changes (MUST).
 
 ```
 received → in-progress → completed
@@ -143,66 +188,66 @@ received → in-progress → completed
 
 | State | Meaning | Where to record |
 |-------|---------|-----------------|
-| `received` | Received but not started | pending.md |
-| `in-progress` | In progress | current_task.md |
-| `completed` | Done | Back to idle + log in episodes/ |
-| `blocked` | Blocked by blocker | current_task.md with blockers |
-| `cancelled` | Cancelled | Back to idle + log in episodes/ |
+| `received` | Task received but not started | pending.md |
+| `in-progress` | Currently working on it | current_task.md |
+| `completed` | Completed | Return to idle + log in episodes/ |
+| `blocked` | Blocked by blocker | current_task.md with blockers noted |
+| `cancelled` | Cancelled | Return to idle + log in episodes/ |
 
 ### Transition Steps
 
 **received → in-progress (start)**:
-1. Remove task from pending.md
+1. Remove the task from pending.md
 2. Write current_task.md with `status: in-progress`
 3. Log "task started" in episodes/ (SHOULD)
 
 **in-progress → completed**:
 1. Set current_task.md to `status: idle`
-2. Log "task completed" and summary in episodes/ (MUST)
-3. Report to assignee (MUST if assigned_by is someone else)
-4. If there is a next task in pending.md, move the top priority to current_task.md
+2. Log "task completed" and result summary in episodes/ (MUST)
+3. Report results to the assigner (MUST if assigned_by is someone else)
+4. If there is a next task in pending.md, move the top-priority one to current_task.md
 
 **in-progress → blocked**:
-1. Set current_task.md `status` to `blocked`
-2. Fill `blockers` with the reason (MUST)
-3. Take action to unblock (see blocked-task flow)
-4. If another task in pending.md is unblocked, consider starting it (MAY)
+1. Change current_task.md `status` to `blocked`
+2. Document the specific block reason in the `blockers` field (MUST)
+3. Take action to resolve the block (see blocked-task flow below)
+4. If there is a next-priority task in pending.md, consider starting it in parallel (MAY)
 
-## Managing Multiple Tasks
+## Managing Multiple Tasks by Priority
 
-When several tasks exist:
+When multiple tasks exist, use these criteria:
 
-1. **URGENT first**: Drop current work and start `[URGENT]` if one appears (MUST)
-2. **Supervisor tasks first**: Supervisor requests have higher priority (SHOULD)
-3. **By deadline**: Earlier deadlines first (SHOULD)
-4. **FIFO**: Same priority/deadline → process in received order (MAY)
+1. **URGENT is top priority**: When an `[URGENT]` task arrives, start it even if it means interrupting the current task (MUST)
+2. **Supervisor tasks first**: Instructions from supervisor take priority over other tasks at the same level (SHOULD)
+3. **By deadline**: Start tasks with earlier deadlines first (SHOULD)
+4. **FIFO**: Same priority and deadline → process in received order (MAY)
 
 ### When Interrupting a Task
 
-If a higher-priority task interrupts:
+When a higher-priority task interrupts:
 
 1. Note current progress in current_task.md (MUST)
-2. Move current task back to pending.md (with progress notes)
+2. Move the current task back to pending.md (with state and progress notes)
 3. Write the new task in current_task.md
 
-When moving back to pending.md:
+Format when moving back to pending.md:
 
 ```markdown
 ## [HIGH] Slack integration test (interrupted)
 assigned_by: hinata
 received: 2026-02-15 10:00
 progress: |
-  API test done. Interrupted during channel post test.
-  Remaining: post test to #general, error handling check
+  API connectivity test completed. Interrupted during channel post test.
+  Remaining: post test to #general, error handling verification
 ```
 
 ## Handling Blocked Tasks
 
-When a task is blocked:
+When a task is blocked, follow these steps.
 
 ### Step 1: Identify and Record the Blocker
 
-Document the cause in `blockers` in current_task.md (MUST).
+Document the specific cause in `blockers` in current_task.md (MUST).
 
 ```markdown
 status: blocked
@@ -210,36 +255,38 @@ task: AWS S3 bucket setup
 blockers: |
   AWS credentials not configured.
   config.json has no aws credential.
-  Need hinata to configure.
+  Need to request configuration from hinata.
 ```
 
 ### Step 2: Take Action to Unblock
 
+Take action according to the block cause:
+
 | Cause | Action |
 |-------|--------|
-| Missing info | Ask assignee for clarification (SHOULD) |
-| Insufficient permissions | Ask supervisor for permission (SHOULD) |
-| External dependency | Tell assignee you are waiting (SHOULD) |
-| Technical issue | Search knowledge/ and procedures/ for solutions. If none, report |
+| Missing information | Send a question message to the assigner (SHOULD) |
+| Insufficient permissions | Request permission addition from supervisor (SHOULD) |
+| External dependency | Report to assigner that you are waiting (SHOULD) |
+| Technical issue | Search knowledge/ and procedures/ for solutions. If none found, report |
 
 ### Step 3: Switch to Another Task
 
-If unblocking will take time, you MAY work on the next task in pending.md.
-Move the blocked task to pending.md and keep the blocker reason.
+If unblocking will take time, you MAY start the next task in pending.md.
+Move the blocked task to pending.md and keep the block reason.
 
 ```markdown
 ## [HIGH] AWS S3 bucket setup (blocked)
 assigned_by: hinata
 received: 2026-02-15 10:00
-blocked_reason: AWS credentials missing. Asked hinata (2026-02-15 11:00)
+blocked_reason: AWS credentials not configured. Requested from hinata (2026-02-15 11:00)
 ```
 
 ### Step 4: Resume After Unblock
 
-When unblocked (e.g. message confirms):
+When the block is resolved (e.g. notified by message):
 1. Take the task from pending.md
-2. Re-evaluate priority and decide whether to put it in current_task.md
-3. If yes, set `status: in-progress` and resume
+2. Re-evaluate priority and decide whether to move it to current_task.md
+3. If starting, change to `status: in-progress` and resume work
 
 ## Task File Templates
 
@@ -254,7 +301,7 @@ status: idle
 ```markdown
 status: in-progress
 task: {task_name}
-assigned_by: {assignee or self}
+assigned_by: {assigner_name or self}
 started: {YYYY-MM-DD HH:MM}
 context: |
   {task details and background}
@@ -266,13 +313,13 @@ blockers: None
 ```markdown
 status: blocked
 task: {task_name}
-assigned_by: {assignee or self}
+assigned_by: {assigner_name or self}
 started: {YYYY-MM-DD HH:MM}
 context: |
   {task details and background}
 blockers: |
-  {blocker description}
-  {actions taken to unblock}
+  {specific block reason}
+  {actions taken toward resolution}
 ```
 
 ### pending.md — Backlog
@@ -281,7 +328,7 @@ blockers: |
 # Pending Tasks
 
 ## [{priority}] {task_name}
-assigned_by: {assignee}
+assigned_by: {assigner_name}
 received: {YYYY-MM-DD HH:MM}
 deadline: {YYYY-MM-DD or none}
 notes: |
@@ -301,44 +348,58 @@ Confirmed slack: yes in permissions.md.
 
 ## 11:30 Task completed: Slack integration test
 
-Slack API test done. #general post test succeeded.
-Reported to hinata.
+Slack API connectivity test completed. Post test to #general succeeded.
+Results reported to hinata.
 
 [IMPORTANT] Slack API rate limit: max 1 message per minute.
 Leave gaps when sending in bursts.
 ```
 
-Use `[IMPORTANT]` for key learnings (SHOULD). These are prioritized during Heartbeat and consolidation.
+Use `[IMPORTANT]` for key learnings (SHOULD). These are prioritized during Heartbeat and memory consolidation.
 
 ## Task Delegation (delegate_task)
 
-Anima with subordinates (supervisors) can delegate tasks with the `delegate_task` tool.
+Anima with subordinates (supervisors) can delegate tasks to subordinates using the `delegate_task` tool.
 
 ### How delegate_task Works
 
-1. Task is added to subordinate’s task queue (source="anima")
-2. DM is sent to subordinate (intent="delegation")
+1. Task is added to subordinate's task queue (source="anima")
+2. DM is automatically sent to subordinate (intent="delegation")
 3. Tracking entry is created in your queue (status="delegated")
 
 ### Usage
 
 ```
-delegate_task(name="dave", instruction="Run API test and report results", deadline="2026-02-20", summary="API test")
+delegate_task(name="dave", instruction="Run API test and report results", deadline="2d", summary="API test")
 ```
+
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `name` | MUST | Name of the direct subordinate Anima to delegate to |
+| `instruction` | MUST | Task instruction content |
+| `deadline` | MUST | Deadline. Relative format `30m` / `2h` / `1d` or ISO8601 |
+| `summary` | MAY | One-line task summary |
 
 ### Tracking Delegated Tasks
 
-Use `task_tracker` to see progress:
+Use the `task_tracker` tool to check progress of delegated tasks.
+It cross-references the latest status from the subordinate's task_queue.jsonl.
 
 ```
-task_tracker()                    # Active delegated tasks
-task_tracker(status="all")        # All including completed
-task_tracker(status="completed")  # Completed only
+task_tracker()                     # Active delegated tasks (default)
+task_tracker(status="all")         # All including completed
+task_tracker(status="completed")   # Completed only
 ```
+
+| status | Meaning |
+|--------|---------|
+| `active` | In progress (other than done/cancelled). Default |
+| `all` | All tasks |
+| `completed` | Completed only (done/cancelled) |
 
 ### Receiving a Delegated Task
 
-1. Receive delegation DM
-2. Task is added to your queue
-3. Clarify with delegator if needed (SHOULD)
-4. Report results when done (MUST)
+1. Receive delegation message via DM
+2. Task is automatically registered in your task queue
+3. Review the content; if unclear, ask the delegator (SHOULD)
+4. Report results to the delegator when done (MUST)

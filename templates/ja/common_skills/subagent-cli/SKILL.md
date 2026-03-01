@@ -1,17 +1,31 @@
 ---
 name: subagent-cli
 description: >-
-  外部AIエージェントCLI(codex exec, cursor-agent -p)をサブエージェントとして
+  外部AIエージェントCLI(codex exec, cursor-agent -p)をBash経由でサブエージェントとして
   非対話モードで実行するスキル。複雑なコーディングタスク・コードレビュー・
   マルチファイル変更を委譲する際の実行手順・オプション・出力処理を提供する。
+  Mode S/A/BでBash権限がある場合に適用。Mode C(codex/*)の場合はフレームワークが
+  Codexを直接実行するためcodex execの呼び出しは不要。
   「サブエージェント」「codex」「cursor-agent」「コード書いて」「実装して」
   「コードレビュー」「リファクタリング」
 ---
 
 # subagent-cli
 
-外部AIエージェントCLIをサブプロセスとして実行し、複雑なコーディングタスクを委譲する。
+外部AIエージェントCLIをBash経由でサブプロセスとして実行し、複雑なコーディングタスクを委譲する。
 自分のアイデンティティ・判断・記憶は維持したまま、実行能力を拡張するための「パワーツール」として使う。
+
+## フレームワーク実行モードとの関係
+
+このスキルは **Bash ツールが利用可能な場合** にのみ適用される。
+
+| モード | 実装 | Bash | このスキルの適用 |
+|--------|------|------|------------------|
+| **Mode S** | `agent_sdk.py` (Claude Agent SDK) | デフォルトで利用可能 | 適用される。Read/Write/Edit/Bash/Grep/Glob/WebFetch/WebSearch が利用可能 |
+| **Mode A/B** | LiteLLM + tool_use / 1ショット | permissions.md で許可時のみ | Bash 許可があれば適用 |
+| **Mode C** | `codex_sdk.py` (Codex SDK) | Codex CLI のツールセットに依存 | **codex exec は不要** — フレームワークが Codex を直接実行。cursor-agent / claude -p は Bash 経由で呼べる（Bash が利用可能な場合） |
+
+**重要**: Mode C (codex/* モデル) の Anima は、フレームワークが Codex SDK 経由で Codex CLI を直接実行する。この場合、自分で `codex exec` を Bash から呼ぶ必要はない。cursor-agent や claude -p を使いたい場合のみ、このスキルの該当セクションを参照する。
 
 ## ツール選択の優先順位
 
@@ -45,11 +59,15 @@ description: >-
 
 ## 1. codex exec（推奨）
 
+**適用条件**: Mode S または Mode A/B（Bash 許可）のとき。Mode C の場合はフレームワークが Codex を実行するため、このセクションは不要。
+
 ### 基本構文
 
 ```bash
 codex exec --full-auto -C /path/to/workspace "プロンプト"
 ```
+
+作業ディレクトリ `-C` には対象プロジェクトのパスを指定する。メインプロジェクトが対象の場合は `$ANIMAWORKS_PROJECT_DIR` が利用可能な場合がある（Mode S の Bash 実行環境で設定される）。
 
 ### 重要オプション
 
@@ -97,6 +115,8 @@ codex exec --full-auto --ephemeral -C /home/main/dev/myproject \
 ---
 
 ## 2. cursor-agent -p（代替）
+
+**適用条件**: Mode S または Mode A/B（Bash 許可）。Mode C でも Bash が利用可能な場合は適用可能。
 
 ### 基本構文
 
@@ -146,6 +166,8 @@ cursor-agent -p --trust --force \
 ---
 
 ## 3. claude -p（フォールバック）
+
+**適用条件**: Mode S または Mode A/B（Bash 許可）。Mode C でも Bash が利用可能な場合は適用可能。
 
 codex/cursor-agentで対応できないときのみ使用。APIコストが高い。
 
@@ -327,3 +349,4 @@ nohup timeout 30m codex exec --full-auto --ephemeral -C /path \
 - 実行結果は自分のepisodes/に記録し、学んだパターンはknowledge/に蓄積すること
 - 実行には5分〜20分以上かかる。必ずバックグラウンドで実行し、timeout を設定すること
 - git管理されたリポジトリで作業すること（変更の追跡・取り消しが容易）
+- Mode S では Bash 実行時に `ANIMAWORKS_ANIMA_DIR` と `ANIMAWORKS_PROJECT_DIR` が環境変数として設定される

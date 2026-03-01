@@ -900,6 +900,19 @@ def build_system_prompt(
             if _ar:
                 parts.append(_ar)
 
+    # c_response_requirement: Codex models need explicit text-output guidance
+    # because model_instructions_file replaces the CLI's built-in preamble
+    # prompt.  Only injected for chat / inbox (not background / task).
+    if execution_mode == "c" and not is_background_auto and not is_task:
+        parts.append(
+            "## 応答要件\n"
+            "あなたはユーザーとの対話において、**必ずテキストで応答**してください。\n"
+            "ツール呼び出しを行った場合でも、その結果の要約やユーザーへの返答を\n"
+            "テキストメッセージとして出力してください。\n"
+            "挨拶・質問・雑談などの会話メッセージには、ツール呼び出しの前後に\n"
+            "自然なテキスト応答を必ず含めてください。"
+        )
+
     # ── Final assembly ────────────────────────────────────────
     prompt = "\n\n---\n\n".join(parts)
     logger.debug(

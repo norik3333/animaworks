@@ -1,19 +1,42 @@
 ---
 name: subordinate-management
 description: >-
-  Skill for process management: pausing and resuming subordinate Anima.
+  Process management for subordinate Anima: pause, resume, model change, restart,
+  task delegation, and status confirmation.
   "pause", "stop", "resume", "wake", "disable", "enable",
-  "pause", "resume", "process management", "stop subordinate"
+  "change model", "restart", "delegate task", "check subordinate status",
+  "pause", "resume", "process management", "stop subordinate", "dashboard"
 ---
 
-# Skill: Subordinate Pause and Resume Management
+# Skill: Subordinate Management (Supervisor Tools)
+
+Supervisor tools automatically enabled for Anima that have subordinates. Manages pause, resume, model change, and restart of direct subordinates; status confirmation across all subordinates; and task delegation with progress tracking.
 
 ## Available Tools
 
+### Direct Subordinates Only
+
 | Tool | Purpose |
 |------|---------|
-| `disable_subordinate` | Pause subordinate (stop process + prevent auto-resume) |
+| `disable_subordinate` | Pause subordinate (status.json `enabled: false` → process stop + prevent auto-resume) |
 | `enable_subordinate` | Resume paused subordinate |
+| `set_subordinate_model` | Change subordinate's LLM model (updates status.json; requires `restart_subordinate` to take effect) |
+| `restart_subordinate` | Restart subordinate process (Reconciliation restarts within ~30 seconds) |
+| `delegate_task` | Delegate task to direct subordinate (queue add + DM send + tracking entry on your side) |
+
+### All Subordinates (Including Grandchildren)
+
+| Tool | Purpose |
+|------|---------|
+| `org_dashboard` | Tree view of process status, last activity, current task, and task count for all subordinates |
+| `ping_subordinate` | Liveness check for subordinates (`name` omitted = all at once, specified = single) |
+| `read_subordinate_state` | Read subordinate's `current_task.md` and `pending.md` |
+
+### Delegated Task Tracking
+
+| Tool | Purpose |
+|------|---------|
+| `task_tracker` | Track progress of tasks delegated via `delegate_task` from the subordinate's queue (`status`: all / active / completed) |
 
 ## Important: disable_subordinate vs send_message
 
@@ -22,27 +45,44 @@ description: >-
 
 ## Usage
 
-### Pausing Multiple Subordinates
+### Pause and Resume
 
-Call `disable_subordinate` for each one:
+When pausing multiple subordinates, call `disable_subordinate` for each one:
 
 ```
 disable_subordinate(name="hinata", reason="Temporary pause due to reduced workload")
 disable_subordinate(name="natsume", reason="Temporary pause due to reduced workload")
-```
-
-### Pausing All but One Subordinate
-
-Pause everyone except the one to keep, using `disable_subordinate` for each.
-
-### Resuming Paused Subordinates
-
-```
 enable_subordinate(name="hinata")
+```
+
+### Model Change and Restart
+
+Model changes are saved to status.json, but `restart_subordinate` is required to apply them to the running process:
+
+```
+set_subordinate_model(name="hinata", model="claude-sonnet-4-6", reason="Load balancing")
+restart_subordinate(name="hinata", reason="Apply model change")
+```
+
+### Status Confirmation
+
+```
+org_dashboard()                    # Dashboard for all subordinates
+ping_subordinate()                 # Liveness check for all subordinates
+ping_subordinate(name="hinata")    # Liveness check for single subordinate
+read_subordinate_state(name="hinata")  # Current task and pending task content
+```
+
+### Task Delegation
+
+```
+delegate_task(name="hinata", instruction="Summarize weekly report", deadline="1d", summary="Weekly report creation")
+task_tracker(status="active")      # Check progress of delegated tasks
 ```
 
 ## Permissions
 
-- Only **your direct subordinates** can be operated
-- Subordinates of subordinates (grandchildren) cannot be operated directly. Ask their supervisor
-- You cannot pause yourself
+- **Direct subordinates only**: disable, enable, set_subordinate_model, restart_subordinate, delegate_task
+- **All subordinates (recursive)**: org_dashboard, ping_subordinate, read_subordinate_state
+- You cannot pause, resume, change model, or delegate to subordinates of subordinates (grandchildren). Ask their supervisor
+- You cannot operate on yourself

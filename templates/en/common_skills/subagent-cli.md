@@ -2,16 +2,30 @@
 name: subagent-cli
 description: >-
   Skill for running external AI agent CLIs (codex exec, cursor-agent -p) as subagents
-  in non-interactive mode. Provides execution procedure, options, and output handling
-  when delegating complex coding tasks, code review, or multi-file changes.
+  via Bash in non-interactive mode. Provides execution procedure, options, and output
+  handling when delegating complex coding tasks, code review, or multi-file changes.
+  Applies when Bash permission is available in Mode S/A/B. In Mode C (codex/*), the
+  framework runs Codex directly, so calling codex exec is unnecessary.
   "subagent", "codex", "cursor-agent", "write code", "implement",
   "code review", "refactoring"
 ---
 
 # subagent-cli
 
-Run external AI agent CLIs as subprocesses to delegate complex coding tasks.
+Run external AI agent CLIs as subprocesses via Bash to delegate complex coding tasks.
 Use as a "power tool" to extend execution capability while keeping your identity, judgment, and memory.
+
+## Relationship with Framework Execution Modes
+
+This skill applies **only when the Bash tool is available**.
+
+| Mode | Implementation | Bash | Skill Applicability |
+|------|----------------|------|---------------------|
+| **Mode S** | `agent_sdk.py` (Claude Agent SDK) | Available by default | Applies. Read/Write/Edit/Bash/Grep/Glob/WebFetch/WebSearch available |
+| **Mode A/B** | LiteLLM + tool_use / 1-shot | Only when permitted in permissions.md | Applies if Bash is permitted |
+| **Mode C** | `codex_sdk.py` (Codex SDK) | Depends on Codex CLI toolset | **codex exec not needed** — Framework runs Codex directly. cursor-agent / claude -p can be invoked via Bash (when Bash is available) |
+
+**Important**: Anima in Mode C (codex/* model) have the framework run Codex CLI directly via Codex SDK. In this case, you do not need to call `codex exec` from Bash yourself. Refer to the relevant section of this skill only when you want to use cursor-agent or claude -p.
 
 ## Tool Selection Priority
 
@@ -45,11 +59,15 @@ Use as a "power tool" to extend execution capability while keeping your identity
 
 ## 1. codex exec (Recommended)
 
+**Applicability**: Mode S or Mode A/B (with Bash permission). Not needed in Mode C — the framework runs Codex directly.
+
 ### Basic Syntax
 
 ```bash
 codex exec --full-auto -C /path/to/workspace "prompt"
 ```
+
+Specify the project path for working directory `-C`. For the main project, `$ANIMAWORKS_PROJECT_DIR` may be available (set in Mode S Bash execution environment).
 
 ### Key Options
 
@@ -97,6 +115,8 @@ codex exec --full-auto --ephemeral -C /home/main/dev/myproject \
 ---
 
 ## 2. cursor-agent -p (Alternative)
+
+**Applicability**: Mode S or Mode A/B (with Bash permission). Also applies in Mode C when Bash is available.
 
 ### Basic Syntax
 
@@ -146,6 +166,8 @@ cursor-agent -p --trust --force \
 ---
 
 ## 3. claude -p (Fallback)
+
+**Applicability**: Mode S or Mode A/B (with Bash permission). Also applies in Mode C when Bash is available.
 
 Use only when codex/cursor-agent cannot handle the task. API cost is high.
 
@@ -327,3 +349,4 @@ Periodically check process status; when done, read the result and record in epis
 - Record execution results in your episodes/ and accumulate patterns in knowledge/
 - Runs take 5–20+ minutes. Always run in background and set timeout
 - Work in git-tracked repositories (easier tracking and rollback)
+- In Mode S, `ANIMAWORKS_ANIMA_DIR` and `ANIMAWORKS_PROJECT_DIR` are set as environment variables when Bash runs

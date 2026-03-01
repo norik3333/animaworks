@@ -4,7 +4,7 @@
 
 Define an organization. Feed it work. Watch it run autonomously.
 
-AnimaWorks is not a multi-agent framework. It is a system for defining persistent, autonomous organizations made of LLM agents. Each agent communicates through encapsulated messages, maintains its own memory and identity, and is assigned the right model for the right role — from local models to frontier APIs.
+AnimaWorks is not a multi-agent framework. It is a system for defining persistent, autonomous organizations made of LLM agents. Each agent communicates through encapsulated messages, maintains its own memory and identity, and is assigned the right model for the right role — from local models to cloud APIs.
 
 **[日本語版](vision.ja.md)**
 
@@ -13,13 +13,13 @@ AnimaWorks is not a multi-agent framework. It is a system for defining persisten
 **Imperfect individuals collaborating through structure outperform any single omniscient actor.**
 **And with memory, even the humblest agent can grow beyond its limits.**
 
-There's a popular approach to AI: give one model all the context, fill the window to the brim, and let it handle everything. AnimaWorks takes the opposite path.
+There's an approach that gives AI everything to know and everything to handle — filling the context window to its limit and entrusting it all to a single model. AnimaWorks chooses the opposite path.
 
 We design AI as *imperfect individuals* and make them collaborate as an organization. Human organizations work precisely because each member has a limited perspective and partial memory, makes decisions within their expertise, and communicates imperfect information in their own words. If everyone knew everything, there would be no reason to organize.
 
 ### The Genius and the Underdog, Each in Their Place
 
-In AnimaWorks, no single model carries the entire load. Claude Opus — the most capable — serves as the engineer or manager, handling complex reasoning and architecture decisions. Haiku leverages its speed for research and information gathering. A local Ollama model quietly handles log monitoring and routine operations, day in and day out.
+In AnimaWorks, no single model carries the entire load. Claude Opus and Sonnet handle complex reasoning as engineers or managers. GPT-4o and Gemini handle information gathering and general-purpose tasks. Local models (vLLM, Ollama) quietly handle log monitoring and routine operations, day in and day out.
 
 The genius has their work. But an organization doesn't run on genius alone. It needs the steady hand who shows up every day and handles the unglamorous tasks without complaint. AnimaWorks treats the capability gap between models not as a deficiency, but as **raw material for organizational design**.
 
@@ -43,10 +43,10 @@ No one can know everything. That constraint is what forces each Anima to rely on
 
 Rather than cramming information into the context window, AnimaWorks handles memory using the same mechanisms as the human brain.
 
-- **Recall**: When a message arrives, relevant memories surface automatically (priming)
-- **Learning**: Experiences are recorded as episodes; frequently referenced knowledge gets reinforced (long-term potentiation)
-- **Forgetting**: Unused memories gradually fade and eventually disappear (synaptic downscaling)
-- **Consolidation**: Daily experiences are distilled into generalized knowledge (episodic → semantic memory)
+- **Recall**: When a message arrives, relevant memories surface automatically across multiple channels (sender profile, recent activity, related knowledge, skills, task queue) — priming
+- **Learning**: Experiences are recorded as episodes; frequently referenced knowledge gets reinforced. Procedural memory is auto-generated from resolved issues
+- **Forgetting**: Unused memories gradually fade and eventually disappear. A three-stage process (synaptic downscaling → neurogenesis reorganization → complete forgetting) actively curates memory
+- **Consolidation**: Daily experiences are distilled into generalized knowledge (episodic → semantic memory). Procedural memory improves through reconsolidation when failures accumulate
 
 What matters is not the size of working memory, but the quality of judgment. A clear mind that recalls only what's needed makes better decisions.
 
@@ -54,9 +54,10 @@ What matters is not the size of working memory, but the quality of judgment. A c
 
 Imperfect individuals have limits on their own. But as an organization, they transcend those limits.
 
-- **Hierarchy**: Directives and reports flow through supervisor–subordinate relationships
+- **Process isolation**: Each Anima runs as an independent child process, monitored and restarted as needed. This avoids single points of failure and yields a robust organization
+- **Hierarchy**: Directives and reports flow through supervisor–subordinate relationships. Task delegation is tracked via messages and a persistent queue
 - **Communication**: All coordination happens through asynchronous messaging. No shared memory, no direct references
-- **Autonomy**: Each Anima acts on its own schedule through heartbeats and cron, guided by its own values
+- **Autonomy**: Each Anima acts on its own schedule through heartbeats and cron, guided by its own values. Heavy execution is separated from planning and handled by a dedicated task-execution path
 - **Culture**: The organization's vision and each Anima's identity form the foundation for every decision
 
 ## Why This Design

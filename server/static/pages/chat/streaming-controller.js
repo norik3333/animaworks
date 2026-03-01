@@ -283,6 +283,18 @@ export function createStreamingController(ctx) {
         onToolStart: toolName => { if (!streamingMsg.streaming) return; logger.debug(`onToolStart: ${toolName}`); streamingMsg.activeTool = toolName; renderBubble(); },
         onToolEnd: () => { if (!streamingMsg.streaming) return; logger.debug("onToolEnd"); streamingMsg.activeTool = null; renderBubble(); },
         onChainStart: () => { logger.debug("onChainStart"); },
+        onCompressionStart: () => {
+          if (!streamingMsg.streaming) return;
+          logger.debug("onCompressionStart");
+          streamingMsg.compressing = true;
+          renderBubble();
+        },
+        onCompressionEnd: () => {
+          if (!streamingMsg.streaming) return;
+          logger.debug("onCompressionEnd");
+          streamingMsg.compressing = false;
+          renderBubble();
+        },
         onHeartbeatRelayStart: ({ message: msg }) => {
           if (!streamingMsg.streaming) return;
           logger.debug(`onHeartbeatRelayStart: ${msg}`);

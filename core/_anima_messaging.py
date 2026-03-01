@@ -262,7 +262,10 @@ class MessagingMixin:
 
                 # Build history-aware prompt via conversation memory
                 conv_memory = ConversationMemory(self.anima_dir, self.model_config, thread_id=thread_id)
-                await conv_memory.compress_if_needed()
+                if conv_memory.needs_compression():
+                    yield {"type": "compression_start"}
+                    await conv_memory.compress_if_needed()
+                    yield {"type": "compression_end"}
 
                 # Determine prompt and history strategy per execution mode
                 mode = self.agent.execution_mode

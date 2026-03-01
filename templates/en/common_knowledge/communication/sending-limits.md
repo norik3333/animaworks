@@ -1,71 +1,90 @@
-# Sending Limits
+# Detailed Guide to Sending Limits
 
-Details of the 3-layer rate limit system that prevents message storms.
-Use when you see send errors or want to understand the limits.
+Details of the 3-layer rate limit system that prevents message storms (excessive message sending).
+Refer to this when send errors occur or when you want to understand how the limits work.
 
 ## 3-Layer Rate Limits
 
-### Layer 1: Per-Run (Session) Limits
+### Layer 1: Session Guard (per-run)
 
-Applied within one run (Heartbeat, chat, task execution).
+Limits applied within a single session (heartbeat, chat, task execution, etc.).
 
 | Limit | Description |
 |-------|-------------|
-| No duplicate sends | Don't send the same content to the same recipient twice |
+| No duplicate sends to same recipient | One DM reply per recipient per session |
+| DM recipient cap | Max 2 recipients per session; use Board for 3+ |
 | Board: 1 post per session | One post per channel per session |
-| DM: 1 reply per recipient | One DM reply per recipient per session |
 
 ### Layer 2: Cross-Run Limits
 
-Computed from activity_log sliding window across runs.
+Limits computed from activity_log sliding window across sessions.
+Counts `message_sent` (legacy `dm_sent`) events.
 
 | Limit | Value | Method |
 |-------|-------|--------|
-| Hourly cap | 30 messages | Messages in last hour |
-| Daily cap | 100 messages | Messages today |
-| Board cooldown | Configurable | Min gap between posts to same channel |
+| Hourly cap | 30 messages/hour | message_sent events in last hour |
+| 24h cap | 100 messages/24h | message_sent events in last 24 hours |
+| Board post cooldown | 300s (default) | Min gap between posts to same channel (`config.json` `heartbeat.channel_post_cooldown_s`) |
 
-**Excluded**: `ack`, `error`, `system_alert` are not counted.
+**Excluded**: `ack` (acknowledgment), `error` (error notification), `system_alert` (system alert) are not subject to rate or depth limits.
 
 ### Layer 3: Behavior-Aware Priming
 
-Recent sends (last 2 hours, channel_post / dm_sent, up to 3) are added to the system prompt.
-You can see your recent sending when deciding what to send.
+Recent send history (within 2 hours: `channel_post` / `message_sent`, up to 3 items) is injected into the system prompt.
+This lets you make send decisions with awareness of your recent sending activity.
+
+## Conversation Depth Limit (Bilateral DM)
+
+When DM exchanges between two parties exceed a threshold, `send_message` is blocked.
+
+| Setting | Value | Description |
+|---------|-------|-------------|
+| Depth window | 10 min | Sliding window |
+| Max depth | 6 turns | 6 turns = 3 round-trips; blocks send above this |
+
+Error: `ConversationDepthExceeded: Conversation with {peer} reached 6 turns in 10 minutes. Please wait until the next heartbeat cycle.`
+
+## Cascade Detection (Inbox Heartbeat Suppression)
+
+When exchanges between two parties exceed a threshold within a time window, **message-triggered heartbeat is suppressed**.
+Sending is not blocked, but immediate heartbeat on messages from that peer will not fire.
+
+| Setting | Value | Description |
+|---------|-------|-------------|
+| Cascade window | 30 min | Sliding window (`config.json` `heartbeat.cascade_window_s`) |
+| Cascade threshold | 3 round-trips | Heartbeat suppressed above this (`config.json` `heartbeat.cascade_threshold`) |
 
 ## When Limits Are Hit
 
 ### Error Messages
 
-Typical errors:
-- `Global outbound limit reached (30/hour)`
-- `Global outbound limit reached (100/day)`
+When limits are reached, errors like the following are returned:
+- `GlobalOutboundLimitExceeded: Hourly send limit (30 messages) reached...`
+- `GlobalOutboundLimitExceeded: 24-hour send limit (100 messages) reached...`
+- `ConversationDepthExceeded: Conversation with {peer} reached 6 turns in 10 minutes. Please wait until the next heartbeat cycle.`
 
 ### What to Do
 
-1. **Hour limit**: Wait for the next hour or retry in the next Heartbeat
-2. **Daily limit**: Send only essential messages; wait until next day
-3. **Urgent**: `call_human` uses a different channel and is not subject to DM limits
+1. **Hour limit**: Wait for the next hour slot. If not urgent, retry in the next heartbeat
+2. **24h limit**: Focus on truly necessary messages. Record content in `current_task.md` for the next session
+3. **Depth limit**: Wait until the next heartbeat cycle. Move complex discussions to a Board channel
+4. **Urgent contact needed**: `call_human` uses a different channel and is not subject to DM rate limits. Human notification remains available
 
-### Best Practices
+### Best Practices for Conserving Send Volume
 
-- Combine multiple updates into one message
-- Use one Board post for routine updates instead of many DMs
-- Avoid short replies like "OK" when you can include next steps
+- **Combine multiple updates** into one message
+- Use one Board post for routine reports instead of spreading across multiple channels
+- Avoid short replies like "OK" when you can include next steps in a single message
 - Keep DM exchanges to one round-trip (see `communication/messaging-guide.md`)
 
 ## DM Log Archive
 
-DM history was in `shared/dm_logs/`; now **activity_log is the primary source**.
-`dm_logs` is rotated every 7 days and only used for fallback reads.
-Use the `read_dm_history` tool (it prefers activity_log).
+DM history was stored in `shared/dm_logs/`; now **activity_log is the primary data source**.
+`dm_logs` is rotated every 7 days and used only for fallback reads.
+Use the `read_dm_history` tool when checking DM history (it prefers activity_log internally).
 
-## Cascade Detection
+## Avoiding Loops
 
-If two parties exchange more than 4 messages in 10 minutes, the system treats it as a loop and throttles further activity.
-This prevents unbounded message loops.
-
-### Avoiding Loops
-
-- Before replying again, ask if another reply is really needed
-- Simple acknowledgments can trigger loops
+- Before replying again to a peer's message, consider whether another reply is really needed
+- Simple acknowledgments tend to cause loops
 - Move complex discussions to Board channels

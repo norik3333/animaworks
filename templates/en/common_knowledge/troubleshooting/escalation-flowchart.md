@@ -1,84 +1,91 @@
 # Escalation Flowchart
 
-Flowchart for deciding whether to fix a problem yourself or escalate.
-Use when unsure; skip when the fix is clearly within your scope.
+A flowchart for deciding whether to "solve it yourself" or "consult/report to someone" when a problem occurs.
+
+Refer to this document when unsure how to proceed. This flowchart is unnecessary for problems you can clearly solve yourself.
 
 ---
 
-## Decision Flow
+## Decision Flowchart
 
-When something goes wrong, follow these steps in order.
+When a problem occurs, follow these steps in order.
 
-### Step 1: Classify the Problem
+### Step 1: Identify the Problem Type
 
-Assign one type:
+Classify the problem into one of the following:
 
 | Type | Description | Examples |
 |------|-------------|----------|
-| **A. Technical** | Tools or system behavior | Tool errors, permission denied, missing files |
-| **B. Operational** | How to proceed or decide | Unclear spec, priority, blockers |
-| **C. Interpersonal** | Coordination with other Anima | No reply, conflicting instructions, unclear owner |
-| **D. Urgent** | Needs immediate action | Data at risk, security concern |
+| **A. Technical** | Issues related to tools or system behavior | Tool errors, permission denied, missing files |
+| **B. Operational** | Issues related to how to proceed with tasks or decisions | Unclear spec, priority judgment, blockers |
+| **C. Interpersonal** | Issues related to coordination with other Anima | No reply, conflicting instructions, unclear owner |
+| **D. Urgent** | Problems requiring immediate action | Data loss risk, security concern |
 
 ### Step 2: Assess Urgency
 
 | Urgency | Criteria | Action |
 |---------|----------|--------|
-| **High** | Data loss or security risk if ignored | MUST: Report to supervisor immediately |
-| **High** | Other Anima’s work completely blocked | MUST: Report to supervisor immediately |
-| **Medium** | Your work blocked but you can do other tasks | SHOULD: Report to supervisor within 1 hour |
-| **Low** | Slower but work can continue | MAY: Report in next Heartbeat |
+| **High** | Data loss or security risk if left unaddressed | MUST: Report to supervisor immediately |
+| **High** | Other Anima's work is completely blocked | MUST: Report to supervisor immediately |
+| **Medium** | Your work is blocked but you can work on other tasks | SHOULD: Report to supervisor within 1 hour |
+| **Low** | Work efficiency drops but progress is possible | MAY: Report at next Heartbeat |
 
-**If urgency is High** → Go to Step 5 (Escalate).
+**If urgency is "High"** → Proceed to Step 5 (Escalate immediately)
 
 ### Step 3: Try to Solve It Yourself
 
-Go through these steps. Stop when it’s resolved.
+Try self-resolution using the following steps. Stop when resolved at any step.
 
 1. **Search memory**
    ```
    search_memory(query="keywords related to the problem", scope="all")
    ```
-   - Look for similar past problems
-   - Check procedures/ for steps
+   - Check if you've experienced the same problem before
+   - Check procedures/ for handling methods
 
-2. **Search common_knowledge**
+2. **Search common knowledge**
    ```
-   search_memory(query="keywords", scope="common_knowledge")
+   search_memory(query="keywords related to the problem", scope="common_knowledge")
    ```
-   - Check `troubleshooting/common-issues.md`
+   - Check if `troubleshooting/common-issues.md` has a matching problem
 
-3. **Try alternatives**
-   - Other approaches?
-   - If permission issue: other paths or tools?
+3. **Consider alternative approaches**
+   - Think about alternative means to achieve the goal
+   - If permission denied: try another path; if tool error: try another tool
 
-4. **Timebox self-resolution**
-   - Technical: Escalate if not fixed in ~15 min
-   - Operational: Escalate if you’re unsure (avoid bad decisions)
-   - Interpersonal: One retry, then escalate
+4. **Time limit for self-resolution**
+   - Technical: Escalate if not resolved within 15 minutes
+   - Operational: Escalate immediately when unsure (avoid wrong decisions)
+   - Interpersonal: Escalate after one retry
 
-### Step 4: Choose Escalation Target
+### Step 4: Determine Escalation Target
 
-| Problem type | First contact | If that doesn’t help |
-|--------------|----------------|---------------------|
-| **A. Technical** | Peer (same speciality if applicable) | Supervisor |
+| Problem type | First contact | If that doesn't help |
+|--------------|---------------|----------------------|
+| **A. Technical** | Peer (when same specialty applies) | Supervisor |
 | **B. Operational** | Supervisor | — |
-| **C. Interpersonal** | Supervisor (mediation) | — |
-| **D. Urgent** | Supervisor | — |
+| **C. Interpersonal** | Supervisor (request mediation) | — |
+| **D. Urgent** | Supervisor (immediately) | — |
 
 **Guidelines:**
-- Peer: Same supervisor and relevant speciality
-- Supervisor (MUST): Decision needed, other departments involved, or high urgency
-- Other departments: Do not contact directly (MUST go via supervisor)
+- Peer consultation is OK when: same supervisor and problem relates to their specialty
+- MUST report to supervisor when: business decision needed, other departments involved, or high urgency
+- Do NOT contact other departments' Anima directly (MUST go via supervisor)
 
-### Step 5: Escalate
+### Step 5: Execute Escalation
 
-Include these in your report (MUST):
+Include the following elements in your report message (MUST):
 
 1. **Situation**: What is happening
-2. **Cause**: Likely cause (or "Investigating")
-3. **Actions**: What you tried
-4. **Request**: What you need (decision, permission, mediation, etc.)
+2. **Cause**: What you think is the cause (or "Investigating" if unknown)
+3. **Actions**: What you tried yourself
+4. **Request**: What you need from the supervisor (decision, permission grant, mediation, etc.)
+
+**send_message constraints (implementation compliance)**:
+- `intent` is REQUIRED: one of `report`, `delegation`, or `question`
+- Max 2 recipients per run; no second message to the same recipient
+- For 3+ recipients, use Board (post_channel)
+- For high urgency requiring immediate human action, consider `call_human` (subject, body, priority)
 
 ---
 
@@ -89,20 +96,21 @@ Include these in your report (MUST):
 ```
 send_message(
     to="supervisor_name",
-    content="""[Blocked]
+    content="""[Blocked Report]
 
 ■ Situation
 Task "Monthly report creation" is blocked.
 
 ■ Cause
-No read permission for /data/sales/ where sales data lives.
+No read permission for /data/sales/ where sales data is stored.
 
 ■ Tried
 - Checked permissions.md → /data/sales/ not allowed
-- Searched for other data sources → none
+- Searched for alternative data sources → none found
 
 ■ Request
-Please grant read access to /data/sales/."""
+Please add read permission for /data/sales/.""",
+    intent="report"
 )
 ```
 
@@ -111,20 +119,21 @@ Please grant read access to /data/sales/."""
 ```
 send_message(
     to="supervisor_name",
-    content="""[Decision needed]
+    content="""[Decision Request]
 
 ■ Situation
-Task "Customer support flow improvement" has two approaches.
+Task "Customer support flow improvement" has two possible approaches.
 
 ■ Options
-A: Incremental changes (effort: low, risk: low, impact: medium)
-B: Full redesign (effort: high, risk: medium, impact: high)
+A: Incremental changes to existing flow (effort: low, risk: low, impact: medium)
+B: Full flow redesign (effort: high, risk: medium, impact: high)
 
-■ Recommendation
-Recommend A. Reason: Current flow has limited issues; incremental change is enough.
+■ My recommendation
+Recommend A. Reason: Current flow issues are limited; incremental changes are sufficient.
 
 ■ Request
-Please decide the approach."""
+Please decide the approach.""",
+    intent="question"
 )
 ```
 
@@ -133,131 +142,147 @@ Please decide the approach."""
 ```
 send_message(
     to="peer_name",
-    content="""[Technical question]
+    content="""[Technical Question]
 
 Hitting Slack API rate limit.
 
 ■ Situation
 - Trying to send 100+ messages in batch
-- Getting 429 Too Many Requests around 50
+- Getting 429 Too Many Requests around the 50th message
 
 ■ Question
-Do you have experience with Slack API rate limits?
-Considering spacing out batches but unsure of a good interval."""
+Do you have experience with Slack API rate limit workarounds?
+Considering spacing out batch processing but unsure of appropriate interval.""",
+    intent="question"
 )
 ```
 
 ### Template 4: Urgent Report
 
+For high urgency requiring immediate human action, also use `call_human`.
+
 ```
 send_message(
     to="supervisor_name",
-    content="""[URGENT]
+    content="""[Urgent Report]
 
 ■ Situation
-Auth errors keep coming from external API (XXX service).
+Auth errors continue from external API (XXX service).
 
 ■ Impact
-- YYY task fully blocked
-- ZZZ task may also be affected (same API)
+- YYY task fully stopped
+- ZZZ task also uses same API; may be affected
 
 ■ Tried
 - Retried 3 times → all failed
-- Cannot validate API key myself
+- Cannot verify API key validity myself
 
 ■ Request
-Please check API key and investigate impact."""
+Please verify API key and investigate impact scope.""",
+    intent="report"
+)
+```
+
+When immediate human notification is needed:
+```
+call_human(
+    subject="[URGENT] External API auth errors continue",
+    body="Auth errors continue from XXX service. YYY task stopped. Please verify API key.",
+    priority="urgent"
 )
 ```
 
 ---
 
-## Example Scenarios
+## Common Escalation Scenarios
 
 ### Scenario 1: Unclear Instructions
 
-**Situation**: Supervisor said "create a report" but period, format, and recipient are unclear.
+**Situation**: Supervisor said "create a report" but target period, format, and recipient are unclear.
 
-**Good response**:
-1. List what you can infer
-2. Ask specific questions
-
-```
-send_message(
-    to="supervisor_name",
-    content="""About the report, need to confirm:
-
-1. Period: This month?
-2. Format: Same Markdown as last time?
-3. Location: Save in knowledge/?
-
-If this is correct, I'll proceed."""
-)
-```
-
-**Bad**:
-- Proceeding without clarifying
-- Replying only "Instructions unclear" without questions
-
-### Scenario 2: Conflicting Instructions
-
-**Situation**: Supervisor said "prioritize A" but another Anima said "do B first."
-
-**Good response**:
-1. Prioritize your supervisor (MUST)
-2. Report the situation to your supervisor
+**Correct response**:
+1. Organize what you can infer
+2. Ask specific questions about unclear points
 
 ```
 send_message(
     to="supervisor_name",
-    content="""[Priority check]
+    content="""Regarding the report creation, need to confirm:
 
-Currently on task A per your instruction.
-XXX asked me to prioritize task B.
-I'll keep task A as priority unless you say otherwise.
+1. Target period: This month?
+2. Format: Same Markdown format as last time?
+3. Recipient: Save in knowledge/?
 
-Task B details: YYY (from XXX)"""
+If the above is correct, I'll proceed.""",
+    intent="question"
 )
 ```
 
-### Scenario 3: Repeated Errors
+**Do NOT**:
+- Proceed with your own interpretation without confirming
+- Reply only "Instructions unclear" (without specific questions)
+- Omit `intent` in send_message (one of `report` / `delegation` / `question` is required)
 
-**Situation**: Chatwork API send failed 3 times.
+### Scenario 2: Conflicting Instructions from Multiple Supervisors
 
-**Good response**:
-1. Log errors
-2. Escalate after 3 failed retries
-3. Start another unblocked task
+**Situation**: Direct supervisor said "prioritize A" but another Anima asked "do B first."
+
+**Correct response**:
+1. Prioritize direct supervisor's instruction (MUST)
+2. Report the situation to your direct supervisor
 
 ```
-# Log
+send_message(
+    to="direct_supervisor_name",
+    content="""[Priority Confirmation]
+
+Currently working on task A per your instruction, but XXX asked me to prioritize task B.
+I'll prioritize task A as instructed unless you say otherwise.
+
+Task B details: YYY (request from XXX)""",
+    intent="question"
+)
+```
+
+### Scenario 3: Repeated Errors During Work
+
+**Situation**: Chatwork API message send failed 3 times in a row.
+
+**Correct response**:
+1. Record error details
+2. Escalate if not resolved after 3 retries
+3. Start other unblocked tasks
+
+```
+# Record errors
 write_memory_file(
     path="state/current_task.md",
-    content="## Blocked\n\nChatwork API errors\n- 10:00 - 500 Internal Server Error\n- 10:05 - 500 Internal Server Error\n- 10:10 - 500 Internal Server Error\n\nReported to supervisor. Working on other tasks.",
+    content="## Blocked\n\nChatwork API repeated errors\n- 1st: 10:00 - 500 Internal Server Error\n- 2nd: 10:05 - 500 Internal Server Error\n- 3rd: 10:10 - 500 Internal Server Error\n\nReported to supervisor. Working on other tasks.",
     mode="overwrite"
 )
 
-# Report
+# Report to supervisor
 send_message(
     to="supervisor_name",
-    content="[Blocked] Chatwork API returned 500 three times in a row. Possible external outage. Waiting for recovery while working on other tasks."
+    content="[Blocked Report] Chatwork API returned 500 three times in a row. Possible external outage. Waiting for recovery while working on other tasks.",
+    intent="report"
 )
 ```
 
-### Scenario 4: Found Problem Outside Your Scope
+### Scenario 4: Found Problem Outside Your Responsibility
 
-**Situation**: You found inconsistency in data managed by another Anima.
+**Situation**: Found inconsistency in data managed by another Anima during your work.
 
-**Good response**:
+**Correct response**:
 1. Record the finding
-2. Report to your supervisor (do not contact other department directly)
+2. Report to your direct supervisor (do NOT contact other department's Anima directly)
 
 ```
 send_message(
     to="supervisor_name",
-    content="""[Info share]
+    content="""[Info Share]
 
-Found an inconsistency during my work. Not my area but sharing.
+Found the following inconsistency during my work. Not my responsibility but sharing.
 
 ■ Finding
 /data/reports/monthly.md total and /data/sales/summary.md don't match.
@@ -265,29 +290,30 @@ Found an inconsistency during my work. Not my area but sharing.
 - summary.md: 1,234,000
 
 ■ Context
-Noticed while creating monthly report.
+Noticed while referencing data during monthly report creation.
 
-Not sure if action is needed. Up to you."""
+Whether to act is up to you.""",
+    intent="report"
 )
 ```
 
 ---
 
-## Escalation Checklist
+## Checklist When Unsure
 
 Escalate (MUST) if any applies:
 
-- [ ] A wrong decision could have serious impact
+- [ ] A wrong decision could have irreversible impact
 - [ ] Action needed is outside your permissions
-- [ ] Other departments are affected
-- [ ] No solution found in 15+ min
-- [ ] Same issue happened 2+ times
-- [ ] It involves security or data safety
+- [ ] Other departments' Anima are affected
+- [ ] No solution found in 15+ minutes
+- [ ] Same problem occurred 2+ times
+- [ ] Involves security or data safety
 
 You may (MAY) try to solve it yourself if:
 
-- [ ] You’ve solved a similar issue before
-- [ ] procedures/ has steps for it
-- [ ] common_knowledge/ has guidance
-- [ ] It stays within your permissions
+- [ ] You've solved a similar problem before
+- [ ] procedures/ has handling steps
+- [ ] common_knowledge/ has a solution
+- [ ] Stays within your permissions
 - [ ] Failure would have limited impact

@@ -66,6 +66,33 @@ class StreamingMixin:
         llm_kwargs = self._build_llm_kwargs()
         max_iterations = max_turns_override or self._model_config.max_turns
 
+        # Inject synthetic thinking_blocks into prior assistant messages
+        # that have tool_calls but no thinking_blocks.  Without this,
+        # LiteLLM drops the thinking param for the entire session because
+        # the Anthropic API requires thinking_blocks on every assistant
+        # turn with tool_use when extended thinking is enabled.
+        _thinking_enabled = (
+            llm_kwargs.get("thinking") or llm_kwargs.get("reasoning_effort")
+        )
+        if _thinking_enabled:
+            _patched = 0
+            for msg in messages:
+                if (
+                    msg.get("role") == "assistant"
+                    and msg.get("tool_calls")
+                    and not msg.get("thinking_blocks")
+                ):
+                    msg["thinking_blocks"] = [
+                        {"type": "thinking", "thinking": "(resumed session)"},
+                    ]
+                    _patched += 1
+            if _patched:
+                logger.info(
+                    "A stream: injected synthetic thinking_blocks into "
+                    "%d prior assistant message(s)",
+                    _patched,
+                )
+
         async with stream_error_boundary(
             all_response_text, executor_name="A-stream",
         ):
@@ -208,6 +235,17 @@ class StreamingMixin:
                                 _iter_thinking_blocks = getattr(
                                     _msg_obj, "thinking_blocks", None,
                                 )
+                    # Fallback: build from reasoning_parts when response_uptil_now
+                    # doesn't provide thinking_blocks (e.g. Bedrock streaming).
+                    # Prevents LiteLLM from dropping thinking param on next turn.
+                    if _iter_thinking_blocks is None and _reasoning_parts:
+                        _iter_thinking_blocks = [
+                            {"type": "thinking", "thinking": "".join(_reasoning_parts)},
+                        ]
+                        logger.debug(
+                            "A stream: built thinking_blocks from reasoning_parts (%d chars)",
+                            sum(len(p) for p in _reasoning_parts),
+                        )
 
                 # Post-stream diagnostics
                 if not iter_text_parts and not tool_calls_acc:

@@ -1,14 +1,27 @@
 ---
 name: tool-creator
 description: >-
-  Meta-skill for creating AnimaWorks Python tool modules (core/tools/) with correct interfaces.
-  Provides procedure for ExternalToolDispatcher integration, API key management,
-  ToolHandler registration, and permissions.md allowance.
+  Meta-skill for creating AnimaWorks Python tool modules with correct interfaces.
+  Provides procedure for personal tools (animas/{name}/tools/), shared tools (common_tools/),
+  ExternalToolDispatcher integration, API key management via get_credential,
+  and permissions.md allowance configuration.
   Use when developing custom tools for Web API integration or external service integration.
   "create tool", "toolify", "new tool", "custom tool", "Python tool"
 ---
 
 # tool-creator
+
+## Overview
+
+AnimaWorks tools are categorized into three types:
+
+| Type | Location | Discovery |
+|------|----------|-----------|
+| **Core tools** | `core/tools/*.py` | TOOL_MODULES (fixed at startup) |
+| **Shared tools** | `~/.animaworks/common_tools/*.py` | discover_common_tools() |
+| **Personal tools** | `{anima_dir}/tools/*.py` | discover_personal_tools() |
+
+Personal and shared tools are auto-discovered by `ExternalToolDispatcher` and can be hot-reloaded via `refresh_tools`. ToolHandler checks the tool creation permission in permissions.md when writing to `tools/*.py` with `write_memory_file`.
 
 ## Procedure
 
@@ -20,7 +33,7 @@ description: >-
 
 ### Step 2: Create the Module File
 
-Create a Python file following this template.
+Create a Python file following the template below.
 
 #### Single-Schema Tool (Simple)
 
@@ -118,7 +131,9 @@ class MyAPIClient:
 
     def __init__(self) -> None:
         from core.tools._base import get_credential
-        self._api_key = get_credential("myapi", "myapi_tool", env_var="MYAPI_KEY")
+        self._api_key = get_credential(
+            "myapi", "myapi_tool", env_var="MYAPI_KEY",
+        )
 
     def query(self, query: str, limit: int = 10) -> list[dict]:
         import httpx
@@ -157,14 +172,18 @@ def dispatch(name: str, args: dict[str, Any]) -> Any:
 
 ### Step 3: Save the File
 
-Save as a personal tool:
+Save as a personal tool (path in `write_memory_file` is relative to anima_dir):
+
 ```
-write_memory_file("tools/my_tool.py", <code>)
+write_memory_file(path="tools/my_tool.py", content=<code>)
 ```
+
+Writing to `tools/` requires **personal tool** permission in the "Tool creation" section of permissions.md.
 
 ### Step 4: Enable the Tool
 
 After saving, call `refresh_tools` for hot reload:
+
 ```
 refresh_tools()
 ```
@@ -174,21 +193,22 @@ The tool becomes available immediately without restarting the session.
 ### Step 5: Share (Optional)
 
 To let other Anima use it, share the tool:
+
 ```
 share_tool(tool_name="my_tool")
 ```
 
-This copies it to `common_tools/` and makes it available to all Anima.
+This copies it to `~/.animaworks/common_tools/` and makes it available to all Anima. Sharing requires **shared tool** permission in permissions.md.
 
 ## Required Interface
 
 | Function | Required | Description |
 |----------|----------|-------------|
-| `get_tool_schemas()` | ✅ Required | Return tool schema list |
-| `dispatch(name, args)` | 🔵 Recommended | Dispatch by schema name |
+| `get_tool_schemas()` | ✅ Required | Return list of tool schemas. Must include `name`, `description`, `input_schema` (or `parameters`) |
+| `dispatch(name, args)` | 🔵 Recommended | Dispatch by schema name. ExternalToolDispatcher prefers this |
 | Function with same name as schema | 🟡 Alternative | Can be used instead of `dispatch()` |
-| `cli_main(argv)` | ⚪ Optional | For standalone CLI execution |
-| `get_cli_guide()` | ⚪ Optional | CLI guide for agents |
+| `cli_main(argv)` | ⚪ Optional | For standalone execution via `animaworks-tool <tool_name>` |
+| `EXECUTION_PROFILE` | ⚪ Optional | For long-running tools. Enables background submission via `animaworks-tool submit` |
 
 ## Schema Definition Conventions
 
@@ -196,7 +216,7 @@ This copies it to `common_tools/` and makes it available to all Anima.
 {
     "name": "tool_action_name",       # snake_case, prefix with tool name
     "description": "1-2 sentence description",  # Used by LLM for tool selection
-    "input_schema": {                  # JSON Schema
+    "input_schema": {                  # JSON Schema format (parameters also accepted, normalized)
         "type": "object",
         "properties": { ... },
         "required": [ ... ],
@@ -204,24 +224,49 @@ This copies it to `common_tools/` and makes it available to all Anima.
 }
 ```
 
+## Credential Retrieval (get_credential)
+
+Obtain API keys etc. via `get_credential()`. Never hardcode.
+
+```python
+from core.tools._base import get_credential
+
+api_key = get_credential(
+    credential_name="myapi",   # Key in config.json credentials
+    tool_name="myapi_tool",   # For error messages
+    key_name="api_key",       # Default. Can specify other keys in keys
+    env_var="MYAPI_KEY",      # Fallback environment variable
+)
+```
+
+**Resolution order**: config.json → shared/credentials.json → environment variable. ToolConfigError if none found.
+
+## Tool Creation Permission in permissions.md
+
+Add the following to permissions.md for tool creation and sharing:
+
+```markdown
+## Tool creation
+- Personal tools: yes
+- Shared tools: yes
+```
+
+`OK`, `enabled`, or `true` are also valid instead of `yes`.
+
 ## Validation Checklist
 
 - [ ] Filename: snake_case, `.py` extension (e.g., `my_tool.py`)
 - [ ] `from __future__ import annotations` at top of file
 - [ ] `get_tool_schemas()` exists and returns a list
-- [ ] Schema has `name`, `description`, `input_schema`
+- [ ] Schema has `name`, `description`, `input_schema` (or `parameters`)
 - [ ] `dispatch()` or same-name function exists
 - [ ] Handler exists for all schemas
-- [ ] Appropriate exceptions on error
+- [ ] Appropriate exceptions raised on error
 - [ ] Timeout set for external APIs
 
 ## Security Guidelines
 
 1. **Credentials**: Obtain via `get_credential()`. Never hardcode
-   ```python
-   from core.tools._base import get_credential
-   api_key = get_credential("service_name", "tool_name", env_var="ENV_VAR_NAME")
-   ```
 
 2. **Access control**: Do not access other Anima's directories
 
@@ -234,6 +279,8 @@ This copies it to `common_tools/` and makes it available to all Anima.
 ## Notes
 
 - Tools are Python code, different from Skills (Markdown procedure documents)
-- Tool creation requires "tool creation: yes" in permissions.md
-- Created tools are discovered on the next `refresh_tools` call or session start
+- Tool creation requires **personal tools: yes** in the "Tool creation" section of permissions.md
+- Sharing tools requires **shared tools: yes** permission
+- Created tools are discovered immediately on `refresh_tools` call (hot reload)
 - Schema names must be globally unique (no conflict with other tools)
+- Personal or shared tools with the same name as core tools are shadowed and skipped

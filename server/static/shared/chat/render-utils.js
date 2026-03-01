@@ -211,13 +211,17 @@ export function renderLiveBubble(msg, opts) {
     content = '<span class="cursor-blink"></span>';
   }
 
+  const compLabel = labels.compressing || "会話履歴を圧縮中...";
+  const compressionHtml = msg.compressing
+    ? `<div class="compression-indicator"><span class="tool-spinner"></span>${compLabel}</div>`
+    : "";
   const toolLabel = labels.toolRunning || ((tool) => `${tool} を実行中...`);
   const toolHtml = msg.activeTool
     ? `<div class="tool-indicator"><span class="tool-spinner"></span>${typeof toolLabel === "function" ? toolLabel(msg.activeTool) : toolLabel}</div>`
     : "";
   const imagesHtml = renderImages(msg.images, { animaName: opts.animaName });
 
-  return `<div class="chat-bubble assistant${streamClass}"${streamIdAttr}>${thinkingHtml}${content}${imagesHtml}${toolHtml}${tsHtml}</div>`;
+  return `<div class="chat-bubble assistant${streamClass}"${streamIdAttr}>${thinkingHtml}${content}${imagesHtml}${compressionHtml}${toolHtml}${tsHtml}</div>`;
 }
 
 /**
@@ -250,6 +254,10 @@ export function renderStreamingBubbleInner(msg, opts) {
   }
 
   let html = `${thinkingHtml}${mainHtml}`;
+  if (msg.compressing) {
+    const compLabel = labels.compressing || "会話履歴を圧縮中...";
+    html += `<div class="compression-indicator"><span class="tool-spinner"></span>${compLabel}</div>`;
+  }
   if (msg.activeTool) {
     const toolLabel = labels.toolRunning || ((tool) => `${tool} を実行中...`);
     html += `<div class="tool-indicator"><span class="tool-spinner"></span>${typeof toolLabel === "function" ? toolLabel(msg.activeTool) : toolLabel}</div>`;

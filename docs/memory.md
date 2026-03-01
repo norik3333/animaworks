@@ -3,7 +3,7 @@
 **[日本語版](memory.ja.md)**
 
 > Created: 2026-02-14
-> Updated: 2026-02-23
+> Updated: 2026-03-01
 > Related: [vision.md](vision.md), [spec.md](spec.md), [implemented/20260214_priming-layer_design.md](implemented/20260214_priming-layer_design.md)
 > Research: [AI Agent Memory Architecture Survey](research/20260212_AI_Agent記憶アーキテクチャ調査.md) Section 10
 
@@ -13,7 +13,7 @@
 
 The AnimaWorks memory system is designed based on **human brain memory mechanisms**.
 
-The human brain has distinct memory systems -- "working memory," "episodic memory," "semantic memory," and "procedural memory" -- each processed in different brain regions. Memory recall operates through two pathways: "automatic recall (priming)" and "intentional recall." Memory consolidation follows a three-stage automatic process: "immediate encoding," "sleep-time consolidation," and "long-term integration."
+The human brain has distinct memory systems—"working memory," "episodic memory," "semantic memory," and "procedural memory"—each processed in different brain regions. Memory recall operates through two pathways: "automatic recall (priming)" and "intentional recall." Memory consolidation follows a three-stage automatic process: "immediate encoding," "sleep-time consolidation," and "long-term integration."
 
 AnimaWorks faithfully reproduces these mechanisms. The agent (LLM) is a "thinking person," not a "manager of its own brain." The framework handles memory infrastructure management, performing encoding and consolidation by invoking a separate LLM in the background via one-shot calls (independent of the agent's own LLM session).
 
@@ -24,7 +24,7 @@ AnimaWorks faithfully reproduces these mechanisms. The agent (LLM) is a "thinkin
 | Human Memory | Brain Region | AnimaWorks Implementation | Characteristics |
 |---|---|---|---|
 | **Working Memory** | Prefrontal cortex | LLM context window | Capacity-limited. Temporary holding of "what is currently being thought about." A spotlight on activated long-term memory |
-| **Episodic Memory** | Hippocampus -> Neocortex | `episodes/` | "What happened when." Stored chronologically as daily logs. Automatically recorded by the framework at conversation end |
+| **Episodic Memory** | Hippocampus → Neocortex | `episodes/` | "What happened when." Stored chronologically as daily logs. Automatically recorded by the framework at conversation end |
 | **Semantic Memory** | Temporal lobe cortex | `knowledge/` | "What is known." Lessons, policies, and knowledge decontextualized from episodes. Extracted from episodes during daily consolidation |
 | **Procedural Memory** | Basal ganglia, Cerebellum | `procedures/`, `skills/` | "How to do it." Work procedures, skills, workflows |
 | **Interpersonal Memory** | Fusiform gyrus, Temporal pole | `shared/users/` | "Who is this person." User profiles shared across all Animas |
@@ -50,7 +50,7 @@ Memories are not truncated and injected into prompts but stored in a file-system
 ├── knowledge/       Semantic memory (learned knowledge, lessons, policies)
 ├── procedures/      Procedural memory (work procedures)
 ├── skills/          Skill memory (individual skills)
-├── shortterm/       Short-term memory (session state, streaming journal)
+├── shortterm/       Short-term memory (session state, streaming journal; chat/heartbeat separated)
 └── state/           Persistent portion of working memory (current task, short-term state)
 ```
 
@@ -71,22 +71,22 @@ Memories are not truncated and injected into prompts but stored in a file-system
 │  └──────┬──────┘  └─────┬──────┘  └──────────────┘  │
 │         │               │                             │
 │    Intentional      Automatic                         │
-│    Search           Recall Results                    │
+│    Search           Recall Results                     │
 │    (search_memory)  (Priming)                         │
 └─────────┬──────────────┬──────────────────────────────┘
           │              │
     ┌─────┴──────┐  ┌───┴──────────────────┐
     │ Prefrontal  │  │  Priming Layer       │
-    │ Cortex      │  │  =Automatic Recall   │
-    │ =Intentional│  │  Framework-automated │
-    │  Search     │  │                      │
-    │ Agent calls │  │                      │
-    │ tool        │  │                      │
+    │ Cortex       │  │  =Automatic Recall   │
+    │ =Intentional │  │  Framework-automated │
+    │  Search      │  │                      │
+    │ Agent calls  │  │                      │
+    │ tool         │  │                      │
     └─────┬──────┘  └───┬──────────────────┘
           │              │
           │    ┌─────────┴────────────────┐
           │    │  Spreading Activation     │
-          │    │  Vector similarity +      │
+          │    │  Vector similarity +       │
           │    │  temporal decay           │
           │    │  -> Auto-activation of    │
           │    │     related memories      │
@@ -96,10 +96,10 @@ Memories are not truncated and injected into prompts but stored in a file-system
 │                Long-term Memory (Hippocampus + Cortex)   │
 │                                                          │
 │  ┌───────────────────────────────────────────────┐      │
-│  │  Unified Activity Log  activity_log/           │      │
-│  │  = JSONL chronological record of all           │      │
-│  │    interactions                                │      │
-│  │  Source for Priming "Recent Activity" channel  │      │
+│  │  Unified Activity Log  activity_log/         │      │
+│  │  = JSONL chronological record of all         │      │
+│  │    interactions                               │      │
+│  │  Source for Priming "Recent Activity" channel │      │
 │  └───────────────────────────────────────────────┘      │
 │                                                          │
 │  ┌────────────┐  ┌────────────┐  ┌────────────────┐    │
@@ -114,51 +114,49 @@ Memories are not truncated and injected into prompts but stored in a file-system
 │  └────────────┘  └────────────┘  └────────────────┘    │
 │                                                          │
 │  ┌────────────────────────────────────────────────┐     │
-│  │  Shared Memory  shared/                         │     │
-│  │  users/           Interpersonal memory          │     │
-│  │                   (user profiles)               │     │
-│  │  resolutions.jsonl Resolution registry          │     │
-│  │                   (cross-organizational)        │     │
+│  │  Shared Memory  shared/                       │     │
+│  │  users/           Interpersonal memory         │     │
+│  │                   (user profiles)              │     │
+│  │  resolutions.jsonl Resolution registry         │     │
+│  │                   (cross-organizational)       │     │
 │  └────────────────────────────────────────────────┘     │
 │                                                          │
 │  ┌────────────────────────────────────────────────┐     │
-│  │  Streaming Journal  shortterm/                  │     │
+│  │  Streaming Journal  shortterm/                 │     │
 │  │  = WAL (Write-Ahead Log). Crash-resilient      │     │
 │  │  Incrementally persists text during streaming   │     │
 │  │  output                                        │     │
 │  └────────────────────────────────────────────────┘     │
 │                                                          │
-│  -- Memory Consolidation (Framework-automated) --        │
+│  -- Memory Consolidation (Anima-led + Framework post-processing) -- │
 │                                                          │
-│  [Immediate] Session boundary detection -> diff          │
-│              summary -> episodes/                        │
-│              + auto state update + resolution propagation │
-│  [Daily]    Midnight cron -> episodes/ -> procedural     │
-│              classification & distillation               │
-│              -> NLI+LLM validation -> knowledge/ write   │
-│              -> reconsolidation -> contradiction          │
-│              detection & resolution                      │
-│  [Weekly]   Weekly cron -> knowledge/ merge +            │
-│              episodes/ compression                       │
-│              + weekly pattern distillation + full         │
-│              knowledge contradiction scan                │
-│  [Monthly]  Monthly cron -> complete forgetting          │
-│              (knowledge + episodes + procedures)         │
-│              + archive cleanup                           │
+│  [Immediate] Session boundary detection -> diff summary  │
+│              -> episodes/                                │
+│              + auto state update + resolution propagation│
+│  [Daily]     Midnight cron -> Anima.run_consolidation("daily") │
+│              (tools for knowledge extraction, procedure   │
+│               creation, contradiction resolution)       │
+│              -> Post-processing: Synaptic Downscaling    │
+│              -> Post-processing: RAG index rebuild       │
+│  [Weekly]    Weekly cron -> Anima.run_consolidation("weekly") │
+│              -> Post-processing: Neurogenesis reorganization │
+│              -> Post-processing: RAG index rebuild       │
+│  [Monthly]   Monthly cron -> Complete forgetting         │
+│              + archive/procedure_versions/ cleanup       │
 │                                                          │
 │  -- Forgetting (Synaptic Homeostasis) --                 │
 │                                                          │
-│  [Daily]    Synaptic Downscaling: knowledge(90d)        │
-│             + procedures(180d or low utility)            │
-│             -> low-activity mark                         │
-│  [Weekly]   Neurogenesis Reorganization: LLM merge of   │
-│             low-activity + similar chunks                │
-│  [Monthly]  Complete Forgetting: low-activity 60d+ ->   │
-│             archive & delete                            │
-│             + archive/procedure_versions/ cleanup        │
+│  [Daily]     Synaptic Downscaling: knowledge(90d)       │
+│              + procedures(180d or low utility)            │
+│              -> low-activity mark                        │
+│  [Weekly]    Neurogenesis Reorganization: LLM merge of  │
+│              low-activity + similar chunks               │
+│  [Monthly]   Complete Forgetting: low-activity 90d+      │
+│              + access_count≤2 -> archive & delete        │
+│              + archive/procedure_versions/ cleanup       │
 │                                                          │
 │  * Agent's only write path: intentional memorization     │
-│    (write_memory_file)                                   │
+│    (write_memory_file)                                    │
 └──────────────────────────────────────────────────────────┘
 ```
 
@@ -168,31 +166,32 @@ Memories are not truncated and injected into prompts but stored in a file-system
 
 Human memory recall is not a single process but consists of two stages: **automatic recall** and **intentional recall**. AnimaWorks implements both.
 
-### Automatic Recall -- Priming Layer
+### Automatic Recall — Priming Layer
 
-**Neuroscience basis**: When perceptual stimuli are received, the auto-associative network in the hippocampal CA3 region automatically performs pattern completion. This is unconscious, fast (250-500ms), and unsuppressible.
+**Neuroscience basis**: When perceptual stimuli are received, the auto-associative network in the hippocampal CA3 region automatically performs pattern completion. This is unconscious, fast (250–500ms), and unsuppressible.
 
 **AnimaWorks implementation**: When a message is received, the framework automatically searches for related memories and injects them into the context before the agent starts. From the agent's perspective, relevant memories are "already recalled" when the conversation begins.
 
 ```
 Message received -> Context extraction -> Priming search -> Context assembly -> Agent execution
-                   (sender, keywords)   (5 channels       (within token      (memories already
-                                         in parallel)       budget)            present)
+                   (sender, keywords)   (6 channels      (within token      (memories already
+                                         in parallel)     budget)            present)
 ```
 
-Five search channels (`core/memory/priming.py`):
+Six search channels (`core/memory/priming.py`):
 
 | Channel | Target | Budget | Method | Brain Analog |
 |---|---|---|---|---|
 | **A: Sender Profile** | shared/users/ | 500 tokens | Exact-match lookup | Automatic recall upon seeing a face |
 | **B: Recent Activity** | activity_log/ | 1300 tokens | Chronological retrieval from ActivityLogger | Short-to-recent memory. "What happened recently" |
 | **C: Related Knowledge** | knowledge/ | 700 tokens | Dense vector similarity search (RAG) | Associative recall via spreading activation |
-| **D: Skill/Procedure Match** | skills/, procedures/, common_skills/ | 200 tokens | Description-based matching | List recall of "what I can do" and "how to do it" |
+| **D: Skill/Procedure Match** | skills/, procedures/, common_skills/ | 200 tokens | Description-based 3-stage matching | Returns **names only** of "what I can do" and "how to do it" (max 5 items) |
 | **E: Pending Tasks** | state/task_queue.jsonl | 300 tokens | TaskQueueManager formatting | "What I need to do." Outstanding tasks and deadlines |
+| **Recent Outbound** | activity_log/ | Last 2 hours, max 3 items | channel_post, message_sent events | Recent send history (behavior awareness for outbound rate limiting) |
 
 Channel B consolidates the legacy `episodes/` date-filtered retrieval and shared channel reads into a unified retrieval from the `ActivityLogger` unified activity log. When the activity log is empty, it falls back to the legacy format (episodes/ + channels/).
 
-Channel D searches `procedures/` in addition to `skills/`. A 3-stage matching approach (bracket keywords, lexical matching, RAG vector search) enhances procedural memory recall accuracy (see the "Procedural Memory Lifecycle" section for details).
+Channel D searches `procedures/` in addition to `skills/`. A 3-stage matching approach (bracket keywords, lexical matching, RAG vector search) enhances procedural memory recall accuracy. Returns **skill names only**; full content is not injected (details are loaded on-demand via the `skill` tool when the agent needs them). Skipped for heartbeat/cron triggers.
 
 Channel E injects pending task entries from the persistent task queue into the priming context, ensuring Animas remain aware of outstanding work during heartbeat and conversation cycles.
 
@@ -205,7 +204,7 @@ Dynamic budget allocation by message type:
 | request | 3000 | Requests/instructions (broad memory search) |
 | heartbeat | 200 | Periodic patrol (minimal memory reference) |
 
-### Intentional Recall -- search_memory Tool
+### Intentional Recall — search_memory Tool
 
 **Neuroscience basis**: The prefrontal cortex (PFC) monitors the output of automatic recall and executes strategic searches when it is insufficient. This is conscious and slow.
 
@@ -271,7 +270,7 @@ version: 1
 | `created_at` | ISO8601 | Creation datetime |
 | `updated_at` | ISO8601 | Last updated datetime |
 | `source_episodes` | int | Number of source episodes extracted from |
-| `confidence` | float | Confidence score (NLI+LLM validation result). 0.0-1.0 |
+| `confidence` | float | Confidence score (NLI+LLM validation result). 0.0–1.0 |
 | `auto_consolidated` | bool | Whether generated by automatic consolidation |
 | `version` | int | Version number (incremented on each reconsolidation) |
 | `superseded_by` | str | New file that superseded this knowledge (on contradiction resolution) |
@@ -281,7 +280,7 @@ version: 1
 
 ```yaml
 ---
-description: 手順の説明
+description: Procedure description
 confidence: 0.5
 success_count: 0
 failure_count: 0
@@ -309,7 +308,10 @@ protected: false
 
 ## Memory Consolidation: Three-Stage Automatic Process
 
-The human brain performs memory consolidation as an unconscious automatic process. AnimaWorks similarly **performs all consolidation automatically on the framework side**. The framework invokes a separate LLM via one-shot calls in the background to execute conversation summarization (immediate encoding) and pattern extraction (daily consolidation). The agent itself is not involved in this process.
+The human brain performs memory consolidation as an unconscious automatic process. AnimaWorks implements this through a combination of **Anima-led consolidation** and **framework post-processing**.
+
+- **Anima-led**: The Anima uses tools (search_memory, read_memory_file, write_memory_file, archive_memory_file) within `run_consolidation()` to autonomously perform episode summarization, knowledge extraction, contradiction resolution, and procedure creation
+- **Framework post-processing**: Synaptic downscaling (metadata database), RAG index rebuild, and monthly forgetting are executed automatically by the framework
 
 ```
 Waking (during conversation)              Sleeping (non-conversation)
@@ -320,86 +322,58 @@ Waking (during conversation)              Sleeping (non-conversation)
      │  (10min idle or heartbeat)              │
      ▼                                         ▼
  [Immediate Encoding]                     [Daily Consolidation]
- Diff summary -> episodes/                episodes/ -> procedural
- + auto state update                       classification
- + resolution propagation                  -> procedural distillation
- Hippocampal 1-shot recording               -> procedures/
-                                           -> LLM knowledge extraction
-                                           -> NLI+LLM validation
-                                           -> knowledge/ write
-                                           -> RAG index update
-                                           -> Synaptic Downscaling
-                                           -> reconsolidation ->
-                                              contradiction detection
-                                              & resolution
-                                           NREM sleep consolidation
+ Diff summary -> episodes/                 Anima.run_consolidation("daily")
+ + auto state update                       (tools for knowledge extraction,
+ + resolution propagation                   procedure creation, contradiction
+ Hippocampal 1-shot recording               resolution)
+                                           -> Post-processing: Synaptic Downscaling
+                                           -> Post-processing: RAG index rebuild
                                                 │
                                            Weekly cron
                                                 │
                                                 ▼
                                            [Weekly Integration]
-                                           knowledge/ dedup & merge
-                                           episodes/ compression
-                                           Weekly pattern distillation
-                                           Full knowledge contradiction
-                                             scan
-                                           Neocortical long-term
-                                             integration
+                                           Anima.run_consolidation("weekly")
+                                           -> Post-processing: Neurogenesis reorganization
+                                           -> Post-processing: RAG index rebuild
                                                 │
                                            Monthly cron
                                                 │
                                                 ▼
                                            [Monthly Forgetting]
-                                           Complete forgetting
-                                             (knowledge + episodes
-                                              + procedures)
-                                           archive/procedure_versions/
-                                             cleanup
+                                           ForgettingEngine.complete_forgetting()
+                                           archive/procedure_versions/ cleanup
 ```
 
-### Daily Consolidation Pipeline (日次固定化)
+### Daily Consolidation Flow
 
-> Implementation: `core/memory/consolidation.py` -- `daily_consolidate()`
+> Implementation: `core/_anima_lifecycle.py` — `run_consolidation()`, `core/memory/consolidation.py` — `ConsolidationEngine`
 
-```
-daily_consolidate()
-├── Legacy migration (auto-convert files without frontmatter)
-├── Episode collection
-├── Procedural content classification (classify episodes into knowledge/procedural portions)
-├── Procedural auto-distillation (auto-extract procedures/ from procedural episodes)
-├── LLM knowledge extraction (extract knowledge candidates from semantic episodes)
-├── Code fence sanitization
-├── NLI+LLM validation (hallucination elimination)
-├── knowledge/ write (with YAML frontmatter)
-├── RAG index update
-├── Synaptic Downscaling (mark low-activity chunks, including procedures)
-├── Prediction-error-based reconsolidation (contradiction detection & update between existing memories and new episodes)
-└── Contradiction detection & resolution (supersede/merge/coexist decisions among new/updated knowledge)
-```
+1. **Preprocessing** (ConsolidationEngine): Episode collection, resolved event collection, activity log summarization injected into `consolidation_instruction` prompt
+2. **Anima execution**: Anima updates knowledge/, creates/updates procedures/, and performs contradiction detection and resolution via tools
+3. **Post-processing**: `ForgettingEngine.synaptic_downscaling()` (low-activity marking in metadata database), `ConsolidationEngine._rebuild_rag_index()`
 
-### Weekly Integration Pipeline (週次統合)
+### Weekly Integration Flow
 
-- `knowledge/` deduplication and merge (archived to `archive/merged/`)
-- `episodes/` compression
-- Weekly pattern distillation (detect recurring patterns from `activity_log/` and formalize into `procedures/`)
-- Full `knowledge/` contradiction scan (comprehensive detection of contradictions missed by daily runs)
+1. **Anima execution**: `run_consolidation("weekly")` performs integration according to `weekly_consolidation_instruction`
+2. **Post-processing**: `ForgettingEngine.neurogenesis_reorganization()`, RAG index rebuild
 
-### Monthly Forgetting Pipeline (月次忘却)
+### Monthly Forgetting Pipeline
 
-- Complete forgetting (`knowledge/` + `episodes/` + `procedures/`)
-- `archive/procedure_versions/` cleanup (retain only the 5 most recent versions per procedure file)
+- `ForgettingEngine.complete_forgetting()` (knowledge + episodes + procedures)
+- `archive/procedure_versions/` cleanup (retain only the 5 most recent versions per procedure)
 
 ### Consolidation Stages Summary
 
 | Stage | Brain Process | AnimaWorks Implementation | Responsible | Frequency |
 |---|---|---|---|---|
 | **Immediate Encoding** | Hippocampal fast 1-shot encoding | Session boundary detection (10min idle or heartbeat) -> diff summary -> episodes/ auto-recording + auto state update + resolution propagation | Framework (bg LLM call) | At session boundary |
-| **Daily Consolidation** (日次固定化) | NREM sleep slow-wave-spindle-ripple cascade | Midnight cron -> procedural classification & distillation -> LLM knowledge extraction -> NLI+LLM validation -> knowledge/ write -> reconsolidation -> contradiction detection & resolution | Framework (bg LLM call) | Every midnight |
-| **Weekly Integration** (週次統合) | Neocortical long-term integration, synaptic downscaling | Weekly cron -> knowledge/ merge + episodes/ compression + weekly pattern distillation + full knowledge contradiction scan | Framework (bg LLM call) | Weekly |
-| **Monthly Forgetting** (月次忘却) | Sub-threshold synapse elimination | Monthly cron -> complete forgetting (knowledge + episodes + procedures) + archive cleanup | Framework (bg cron) | Monthly |
+| **Daily Consolidation** | NREM sleep slow-wave-spindle-ripple cascade | Midnight cron -> Anima.run_consolidation("daily") (tools for knowledge extraction, procedure creation, contradiction resolution) -> Post-processing: Synaptic Downscaling + RAG rebuild | Anima + Framework post-processing | Every midnight |
+| **Weekly Integration** | Neocortical long-term integration, synaptic downscaling | Weekly cron -> Anima.run_consolidation("weekly") -> Post-processing: Neurogenesis reorganization + RAG rebuild | Anima + Framework post-processing | Weekly |
+| **Monthly Forgetting** | Sub-threshold synapse elimination | Monthly cron -> ForgettingEngine.complete_forgetting() + archive cleanup | Framework (bg cron) | Monthly |
 | **Intentional Memorization** | Prefrontal cortex elaborative encoding | Direct write via write_memory_file | Agent | On demand |
 
-The only write path remaining for the agent is **intentional memorization** (write_memory_file). This corresponds to a human consciously taking notes. All other encoding, consolidation, and integration is performed automatically by the framework.
+The only write path remaining for the agent is **intentional memorization** (write_memory_file). This corresponds to a human consciously taking notes. Daily and weekly consolidation/integration is performed autonomously by the Anima via tools; synaptic downscaling, RAG rebuild, and monthly forgetting are executed automatically by the framework.
 
 ### Immediate Encoding Details: Session-Boundary-Based Diff Summarization
 
@@ -429,9 +403,9 @@ Resolution information propagates across 3 layers, reflecting changes in both th
 
 ## Knowledge Validation: NLI+LLM Cascade
 
-> Implementation: `core/memory/validation.py` -- `KnowledgeValidator` class
+> Implementation: `core/memory/validation.py` — `KnowledgeValidator` class
 
-Knowledge candidates extracted by LLM during daily consolidation may contain hallucinations (fabrication of information not present in the original episodes) if written directly. To eliminate this, **cascade verification using an NLI (Natural Language Inference) model and LLM** is performed.
+Knowledge candidates extracted by LLM may contain hallucinations (fabrication of information not present in the original episodes) if written directly. **Cascade verification using an NLI (Natural Language Inference) model and LLM** eliminates this. In Anima-led daily consolidation, the Anima writes directly to knowledge/ via tools, so this pipeline is used in alternative paths (e.g., batch processing, legacy pipeline).
 
 ### NLI Model
 
@@ -463,9 +437,9 @@ When NLI produces a high-confidence judgment, the LLM call is skipped to optimiz
 
 ## Knowledge Contradiction Detection and Resolution
 
-> Implementation: `core/memory/contradiction.py` -- `ContradictionDetector` class
+> Implementation: `core/memory/contradiction.py` — `ContradictionDetector` class
 
-Contradictions can arise among knowledge files accumulated in `knowledge/` (e.g., "Person A is responsible for X" vs. "Person A is responsible for Y"). AnimaWorks detects contradictions using the NLI+LLM cascade and automatically resolves them with three resolution strategies.
+Contradictions can arise among knowledge files accumulated in `knowledge/` (e.g., "Person A is responsible for X" vs. "Person A is responsible for Y"). In Anima-led consolidation, the Anima detects and resolves contradictions via tools according to `consolidation_instruction`. `ContradictionDetector` is available as a utility for automatic detection and resolution via NLI+LLM cascade.
 
 ### Contradiction Detection Flow
 
@@ -506,24 +480,19 @@ Newly created/updated knowledge file
 
 ## Procedural Memory Lifecycle
 
-> Implementation: `core/memory/distillation.py` -- `ProceduralDistiller`, `core/memory/reconsolidation.py` -- `ReconsolidationEngine`
+> Implementation: `core/memory/distillation.py` — `ProceduralDistiller`, `core/memory/reconsolidation.py` — `ReconsolidationEngine`
 
 Procedural memory (`procedures/`) holds "how to do it" knowledge, corresponding to the basal ganglia and cerebellum in the brain. While semantic memory (knowledge/) statically holds "what is known," procedural memory is dynamically reinforced and revised through repeated execution and result feedback.
 
-### Auto-Distillation: Extracting Procedures from Episodes
+### Procedure Creation
 
-**Daily distillation** (within `daily_consolidate()`):
+**Anima-led** (within `run_consolidation()`):
 
-1. **Procedural content classification**: Classify episodes as procedural or semantic using 12 regex patterns (e.g., "procedure," "setup method," "command," "workflow")
-2. **LLM procedure extraction**: LLM generates structured procedure documents from episodes classified as procedural
-3. **RAG deduplication check**: Skip new creation if an existing procedure with similarity >= 0.85 exists (prevents procedure proliferation)
-4. **procedures/ write**: Saved with YAML frontmatter. `auto_distilled: true`, `confidence: 0.4`
+According to `consolidation_instruction` prompt instructions, the Anima creates and updates procedures in procedures/ directly via `write_memory_file`. Lessons and procedures derived from resolved events are also recorded here.
 
-**Weekly pattern distillation** (within the weekly integration pipeline):
+**ReconsolidationEngine** (alternative path):
 
-1. Analyze one week's worth of activity from `activity_log/`
-2. Detect recurring patterns (e.g., the same procedure executed multiple times)
-3. LLM distills patterns into procedure documents and saves to `procedures/`
+`create_procedures_from_resolved()` scans `issue_resolved` events and generates procedure documents via `ProceduralDistiller`. Not invoked in the main daily consolidation flow; available for batch processing, etc.
 
 ### 3-Stage Matching (Skill Injection)
 
@@ -542,7 +511,7 @@ Stage 1 has highest priority; Stage 3 is the fallback. This enables procedure re
 Procedural memory confidence is dynamically updated through execution result feedback:
 
 | Tracking Method | Description |
-|---|---|
+|---|---|---|
 | **report_procedure_outcome tool** | Agent explicitly reports success/failure via tool call |
 | **Framework auto-tracking** | For procedures injected during a session, success/failure is automatically determined at session boundary |
 
@@ -556,11 +525,11 @@ Initial values (at auto-distillation): `confidence: 0.4`, `success_count: 0`, `f
 
 ### Prediction-Error-Based Reconsolidation
 
-> Implementation: `core/memory/reconsolidation.py` -- `ReconsolidationEngine`
+> Implementation: `core/memory/reconsolidation.py` — `ReconsolidationEngine`
 
 **Neuroscience basis**: Nader et al. (2000) reconsolidation theory. Recalled memories become destabilized and are reconsolidated after being integrated with new information. Prediction error (the gap between expectation and reality) serves as the trigger for reconsolidation.
 
-**AnimaWorks implementation**: When new episodes contradict existing `knowledge/` or `procedures/`, NLI detects the contradiction and LLM performs analysis and updates.
+**AnimaWorks implementation**: In Anima-led consolidation, the Anima executes via tools according to `consolidation_instruction` instructions for "cross-checking with existing knowledge" and "archiving contradictory knowledge if found." `ReconsolidationEngine` is available as a utility for automatic reconsolidation via NLI+LLM in alternative paths. Below is the ReconsolidationEngine processing flow:
 
 ```
 New episode
@@ -596,7 +565,7 @@ The human brain actively "forgets" as well as "remembers." AnimaWorks implements
 Waking (during conversation)                Sleeping (non-conversation)
 ────────────────────────                    ──────────────────────────
 
- Conversation/Search -> access_count++       Midnight cron
+ Conversation/Search -> access_count++      Midnight cron
      │                                           │
      ▼                                           ▼
  [Access Recording]                         [Daily Downscaling]
@@ -619,8 +588,8 @@ Waking (during conversation)                Sleeping (non-conversation)
                                                  │
                                                  ▼
                                             [Complete Forgetting]
-                                            Low-activity 60d+ unaccessed
-                                            -> archive & delete
+                                            Low-activity 90d+ unaccessed
+                                            + access_count≤2 -> archive & delete
                                             knowledge + episodes +
                                             procedures
                                             archive/procedure_versions/
@@ -629,9 +598,9 @@ Waking (during conversation)                Sleeping (non-conversation)
 
 | Stage | Brain Process | AnimaWorks Implementation | Frequency |
 |---|---|---|---|
-| **Daily Downscaling** (日次ダウンスケーリング) | NREM sleep synaptic downscaling | knowledge: 90d+ unaccessed -> low-activity mark. procedures: 180d+ unused or utility<0.3 + failure>=3 -> low-activity mark | Daily cron |
-| **Neurogenesis Reorganization** (神経新生的再編) | Memory circuit reorganization via neurogenesis in the hippocampal dentate gyrus | LLM merges similar pairs of low-activity chunks | Weekly cron |
-| **Complete Forgetting** (完全忘却) | Sub-threshold synapse elimination | Delete vector index for low-activity 60d+ unaccessed entries; archive source files (knowledge + episodes + procedures) | Monthly cron |
+| **Daily Downscaling** | NREM sleep synaptic downscaling | knowledge: 90d+ unaccessed -> low-activity mark. procedures: 180d+ unused or utility<0.3+failure>=3 -> low-activity mark | Daily cron |
+| **Neurogenesis Reorganization** | Memory circuit reorganization via neurogenesis in the hippocampal dentate gyrus | LLM merges similar pairs of low-activity chunks | Weekly cron |
+| **Complete Forgetting** | Sub-threshold synapse elimination | Delete vector index for low-activity 90d+ unaccessed + access_count≤2; archive source files (knowledge + episodes + procedures) | Monthly cron |
 
 ### knowledge/ Forgetting Thresholds
 
@@ -646,7 +615,7 @@ procedures/ has more lenient thresholds than knowledge/ (procedural memory is mo
 
 | Condition | Value | Description |
 |---|---|---|
-| Unused period | 180 days | 180 days since last use (2x that of knowledge) |
+| Unused period | 180 days | 180 days since last use (2× that of knowledge) |
 | Usage count | < 3 | Low usage frequency |
 | Immediate mark condition | utility < 0.3 AND failure_count >= 3 | Repeatedly failed low-utility procedures are immediately marked as low-activity |
 
@@ -655,7 +624,7 @@ procedures/ has more lenient thresholds than knowledge/ (procedural memory is mo
 | Target | Protection Condition | Reason |
 |---|---|---|
 | `skills/` | Always protected | Origin point for description-based matching. Deleting them severs the recall pathway |
-| `shared/users/` | Always protected | Interpersonal memory protection |
+| `shared/users/` (memory_type: shared_users) | Always protected | Interpersonal memory protection |
 | `[IMPORTANT]` tagged | Always protected | Forgetting resistance through elaborative encoding |
 | `procedures/` (version >= 3) | Conditionally protected | Mature procedures that have undergone 3+ reconsolidations |
 | `procedures/` (protected: true) | Conditionally protected | Manual protection via frontmatter |
@@ -669,7 +638,7 @@ The monthly forgetting pipeline organizes old versions accumulated in `archive/p
 
 ## Unified Activity Log
 
-> Implementation: `core/memory/activity.py` -- `ActivityLogger` class
+> Implementation: `core/memory/activity.py` — `ActivityLogger` class
 
 A unified logging infrastructure that records all interactions in a single JSONL chronological timeline. This consolidates records that were previously scattered across transcript, dm_log, heartbeat_history, etc. into a single source, serving as the sole data source for the Priming Layer's "Recent Activity" channel (Channel B).
 
@@ -686,19 +655,18 @@ One file per date. Written append-only; each line is a single JSON entry.
 ```json
 {"ts":"2026-02-17T14:30:00","type":"message_received","content":"...","from":"user","channel":"chat"}
 {"ts":"2026-02-17T14:30:05","type":"response_sent","content":"...","to":"user","channel":"chat"}
-{"ts":"2026-02-17T15:00:00","type":"tool_use","tool":"web_search","summary":"検索実行"}
+{"ts":"2026-02-17T15:00:00","type":"tool_use","tool":"web_search","summary":"Search executed"}
 ```
 
-Empty fields are omitted. `from`/`to` are sender/recipient names, `channel` is the channel name, `tool` is the tool name, and `via` is the notification channel (for human_notify events).
+Empty fields are omitted. `from`/`to` are sender/recipient names (internally `from_person`/`to_person`), `channel` is the channel name, `tool` is the tool name, `via` is the notification channel (for human_notify events), and `meta` is arbitrary metadata (`from_type`, etc.).
 
 ### Event Type Reference
 
 | Event Type | ASCII Label | Description |
 |---|---|---|
-| `message_received` | `MSG<` | Message received from user |
-| `response_sent` | `MSG>` | Response sent by Anima |
-| `dm_sent` | `DM>` | Direct message sent to another Anima |
-| `dm_received` | `DM<` | Direct message received from another Anima |
+| `message_received` | `MSG<` | Message received (human or Anima; distinguished by `meta.from_type`) |
+| `response_sent` | `RESP>` | Response sent by Anima (conversation response to human) |
+| `message_sent` | `MSG>` | DM sent (direct message to another Anima; renamed from `dm_sent`) |
 | `channel_post` | `CH.W` | Post to shared channel |
 | `channel_read` | `CH.R` | Read from shared channel |
 | `human_notify` | `NTFY` | Notification to human (via call_human) |
@@ -709,12 +677,16 @@ Empty fields are omitted. `from`/`to` are sender/recipient names, `channel` is t
 | `memory_write` | `MEM` | Write to memory file |
 | `error` | `ERR` | Error occurred |
 | `issue_resolved` | `RSLV` | Issue resolved (auto-recorded from auto state update) |
+| `task_created` | `TSK+` | Task created |
+| `task_updated` | `TSK~` | Task updated |
+
+Backward-compatible aliases: `dm_sent` -> `message_sent`, `dm_received` -> `message_received` (auto-converted on read)
 
 ### Priming Integration
 
 The `ActivityLogger.format_for_priming()` method formats retrieved entries within the token budget (default 1300 tokens; minimum 400 tokens guaranteed during heartbeat).
 
-**ASCII labeling**: Each event type is displayed with a 2-4 character ASCII label (`MSG<`, `DM>`, `HB`, etc.). The legacy emoji icons (`📨`, `💓`, etc.) consumed 2-3 tokens each, whereas ASCII labels are stably recognized at 1 token.
+**ASCII labeling**: Each event type is displayed with a 2–4 character ASCII label (`MSG<`, `DM>`, `HB`, etc.). The legacy emoji icons (`📨`, `💓`, etc.) consumed 2–3 tokens each, whereas ASCII labels are stably recognized at 1 token.
 
 **Topic grouping**: Related entries are grouped for compact display.
 
@@ -731,15 +703,17 @@ The `ActivityLogger.format_for_priming()` method formats retrieved entries withi
 
 ## Streaming Journal
 
-> Implementation: `core/memory/streaming_journal.py` -- `StreamingJournal` class
+> Implementation: `core/memory/streaming_journal.py` — `StreamingJournal` class
 
 A Write-Ahead Log (WAL) that incrementally writes text chunks to disk during LLM streaming response output. Even if a hard process crash occurs (SIGKILL, OOM, etc.), text loss is limited to approximately the last 1 second.
 
 ### Storage Location
 
 ```
-{anima_dir}/shortterm/streaming_journal.jsonl
+{anima_dir}/shortterm/streaming_journal_{session_type}.jsonl
 ```
+
+Files are separated by session type (`chat` / `heartbeat`). Chat and Heartbeat operate with independent locks, so separate files avoid concurrent writes. When thread_id is specified: `shortterm/{session_type}/{thread_id}/streaming_journal.jsonl`. Legacy: `streaming_journal.jsonl` (chat only; auto-renamed during migration)
 
 ### WAL Lifecycle
 
@@ -753,7 +727,7 @@ Abnormal flow (crash):
   Next startup: recover() -> restored as JournalRecovery -> journal file deleted
 ```
 
-- **open()**: Creates a new journal file and writes the `start` event (trigger, sender, session ID)
+- **open()**: If an orphaned journal exists, recover it first and persist to episodes. Then create a new journal file and write the `start` event (trigger, sender, session ID)
 - **write_text()**: Appends text fragments to the buffer. Flushes when buffer conditions are met
 - **write_tool_start() / write_tool_end()**: Records tool execution start/end
 - **finalize()**: Writes the `done` event, closes the file, and deletes it (normal completion)
@@ -770,28 +744,28 @@ When either condition is met, the buffer contents are written as a `text` event 
 
 ### Recovery
 
-On next startup, `StreamingJournal.has_orphan()` checks for orphaned journals, and `recover()` restores the following information:
+`StreamingJournal.has_orphan(anima_dir, session_type)` checks for orphaned journals, and `recover(anima_dir, session_type, thread_id)` restores the following information:
 
 - Recovered text (concatenation of all `text` events)
 - Tool call records (with start/completion status)
 - Session information (trigger, sender, start time)
 - Completion flag (presence/absence of the `done` event)
 
-Broken JSONL lines (partial writes at crash time) are skipped.
+Broken JSONL lines (partial writes at crash time) are skipped. After recovery, `_persist_recovery()` persists to `episodes/recovered_{timestamp}.md` and the journal file is deleted.
 
 ---
 
 ## Design Principles
 
-1. **Dual stores are essential** -- Both episodic memory (raw records) and semantic memory (distilled knowledge) must be maintained
-2. **Recall uses dual pathways** -- Implement both automatic recall (priming) and intentional recall (tool invocation)
-3. **Memory infrastructure is the framework's responsibility** -- Encoding, consolidation, and integration are performed automatically by the framework via background LLM one-shot calls. The agent (Anima's primary LLM) does not manage memory infrastructure
-4. **Consolidation runs daily** -- The brain's NREM sleep occurs every night. Two-stage daily consolidation + weekly integration is the minimum requirement
-5. **Context is a first-class search dimension** -- Rich metadata is attached at memory storage time; during retrieval, priority is given based on relevance to the current context
-6. **Working memory capacity limitation is a design feature** -- The context window limit is not a bug but a feature. It selectively retains only the most relevant information
-7. **Active forgetting maintains system health** -- Memory does not only accumulate; actively pruning low-activity memories maintains search accuracy (signal-to-noise ratio)
-8. **Procedural memory is strengthened through use** -- Procedure confidence is dynamically updated via success/failure feedback. Procedures that have repeatedly succeeded gain greater forgetting resistance
-9. **Contradictions are detected and resolved** -- Knowledge contradictions are not left unaddressed; they are automatically detected and resolved via the NLI+LLM cascade
+1. **Dual stores are essential** — Both episodic memory (raw records) and semantic memory (distilled knowledge) must be maintained
+2. **Recall uses dual pathways** — Implement both automatic recall (priming) and intentional recall (tool invocation)
+3. **Memory infrastructure is the framework's responsibility** — Encoding, consolidation, and integration are performed automatically by the framework via background LLM one-shot calls. The agent (Anima's primary LLM) does not manage memory infrastructure
+4. **Consolidation runs daily** — The brain's NREM sleep occurs every night. Two-stage daily consolidation + weekly integration is the minimum requirement
+5. **Context is a first-class search dimension** — Rich metadata is attached at memory storage time; during retrieval, priority is given based on relevance to the current context
+6. **Working memory capacity limitation is a design feature** — The context window limit is not a bug but a feature. It selectively retains only the most relevant information
+7. **Active forgetting maintains system health** — Memory does not only accumulate; actively pruning low-activity memories maintains search accuracy (signal-to-noise ratio)
+8. **Procedural memory is strengthened through use** — Procedure confidence is dynamically updated via success/failure feedback. Procedures that have repeatedly succeeded gain greater forgetting resistance
+9. **Contradictions are detected and resolved** — Knowledge contradictions are not left unaddressed; they are automatically detected and resolved via the NLI+LLM cascade
 
 ---
 
@@ -801,48 +775,50 @@ The memory subsystem is implemented as a set of specialized modules under `core/
 
 | Module | Class / Role | Description |
 |---|---|---|
-| `manager.py` | `MemoryManager` | Top-level memory facade. Coordinates file-based memory operations, skill matching, and RAG search |
+| `manager.py` | `MemoryManager` | Memory facade. Coordinates file-based memory operations, skill matching, and RAG search |
 | `conversation.py` | `ConversationMemory` | Conversation history with rolling LLM compression and structured message building |
-| `shortterm.py` | `ShortTermMemory` | Session state externalization for context continuity across chained sessions |
-| `priming.py` | `PrimingEngine` | 5-channel automatic memory recall injected into the system prompt before agent execution |
+| `shortterm.py` | `ShortTermMemory` | Session state externalization. Stores session_state.md/json in `shortterm/{session_type}/` (chat/heartbeat separated) |
+| `priming.py` | `PrimingEngine` | 6-channel automatic memory recall (A–E + Recent Outbound) injected into system prompt before agent execution |
 | `activity.py` | `ActivityLogger` | Unified append-only JSONL timeline recording all Anima interactions |
-| `consolidation.py` | Daily/weekly consolidation | Episode-to-knowledge extraction with NLI+LLM validation pipeline |
-| `forgetting.py` | 3-stage active forgetting | Synaptic downscaling, neurogenesis reorganization, and complete forgetting |
-| `streaming_journal.py` | `StreamingJournal` | WAL-based crash-resilient persistence of streaming LLM output |
+| `consolidation.py` | `ConsolidationEngine` | Preprocessing (episode, resolved event, activity collection), post-processing (RAG rebuild), legacy migration |
+| `forgetting.py` | `ForgettingEngine` | 3-stage active forgetting (synaptic downscaling, neurogenesis reorganization, complete forgetting) |
+| `streaming_journal.py` | `StreamingJournal` | WAL-based crash-resilient persistence of streaming LLM output. `streaming_journal_{session_type}.jsonl` |
 | `task_queue.py` | `TaskQueueManager` | Persistent structured task queue with JSONL append-only log and staleness detection |
-| `distillation.py` | `ProceduralDistiller` | Episodic memory classification and procedural knowledge auto-distillation |
+| `distillation.py` | `ProceduralDistiller` | Episodic memory classification and procedural knowledge auto-distillation (used by ReconsolidationEngine) |
+| `reconsolidation.py` | `ReconsolidationEngine` | Prediction-error-based reconsolidation, issue_resolved->procedure conversion (create_procedures_from_resolved) |
 | `resolution_tracker.py` | `ResolutionTracker` | Cross-Anima issue resolution tracking via shared/resolutions.jsonl |
 | `cron_logger.py` | `CronLogger` | Cron task execution log recorder and reader under state/cron_logs/ |
-| `skill_metadata.py` | Skill matching functions | NFKC normalization, bracket/comma keyword extraction, and description-based skill matching |
-| `validation.py` | `KnowledgeValidator` | NLI + LLM cascade validation preventing hallucination in consolidated knowledge |
-| `dedup.py` | Message deduplication | Resolved-topic detection, same-sender consolidation, and rate limiting for heartbeat |
+| `skill_metadata.py` | Skill matching functions | NFKC normalization, bracket/comma keyword extraction, description-based skill matching |
+| `validation.py` | `KnowledgeValidator` | NLI+LLM cascade validation (legacy/alternative path) |
+| `contradiction.py` | `ContradictionDetector` | Knowledge contradiction detection and resolution (NLI+LLM; in Anima-led consolidation, Anima executes via tools) |
+| `dedup.py` | Message deduplication | Resolved-topic detection, same-sender consolidation, rate limiting for heartbeat |
 | `frontmatter.py` | `FrontmatterService` | YAML frontmatter read/write for knowledge and procedure files |
 | `rag_search.py` | `RAGMemorySearch` | RAG vector search and indexer management wrapper |
-| `rag/indexer.py` | Chunking and embedding | Markdown-section chunking, embedding generation, and incremental indexing |
-| `rag/retriever.py` | Vector search | Dense vector similarity retrieval from ChromaDB |
-| `rag/graph.py` | Graph spreading activation | NetworkX + Personalized PageRank for multi-hop associative propagation |
-| `rag/store.py` | ChromaDB store | ChromaDB collection management |
-| `rag/singleton.py` | Singleton management | Ensures single embedding model instance across the process |
-| `rag/watcher.py` | File change watcher | Monitors memory files for incremental re-indexing |
+| `rag/indexer.py` | `MemoryIndexer` | Markdown section chunking, embedding generation, incremental indexing |
+| `rag/retriever.py` | `MemoryRetriever` | Dense vector similarity search |
+| `rag/graph.py` | `KnowledgeGraph` | NetworkX + Personalized PageRank for multi-hop associative propagation |
+| `rag/store.py` | `ChromaVectorStore`, `VectorStore` | ChromaDB collection management |
+| `rag/singleton.py` | Singleton management | Ensures single embedding model and vector store per process |
+| `rag/watcher.py` | `FileWatcher` | Monitors memory files for incremental re-indexing |
 
 ---
 
 ## Related Documents
 
-- [vision.md](vision.md) -- Foundational philosophy of Digital Anima
-- [spec.md](spec.md) -- Requirements specification (basic design of archive-based memory)
-- [features.md](features.md) -- Feature list (includes memory system implementation history)
-- [implemented/20260214_priming-layer_design.md](implemented/20260214_priming-layer_design.md) -- Priming layer implementation plan (includes RAG design and consolidation architecture)
-- [implemented/20260218_unified-activity-log-implemented-20260218.md](implemented/20260218_unified-activity-log-implemented-20260218.md) -- Unified activity log design document
-- [implemented/20260218_streaming-journal-implemented-20260218.md](implemented/20260218_streaming-journal-implemented-20260218.md) -- Streaming journal design document
-- [implemented/20260218_activity-log-spec-compliance-fixes-implemented-20260218.md](implemented/20260218_activity-log-spec-compliance-fixes-implemented-20260218.md) -- Activity log spec compliance fixes
-- [implemented/20260218_priming-format-redesign_implemented-20260218.md](implemented/20260218_priming-format-redesign_implemented-20260218.md) -- Priming format redesign (ASCII labeling, topic grouping, pointer references)
-- [implemented/20260218_episode-dedup-state-autoupdate-resolution-propagation.md](implemented/20260218_episode-dedup-state-autoupdate-resolution-propagation.md) -- Episode deduplication, auto state update, and resolution propagation mechanism
-- [implemented/20260218_memory-system-enhancement-checklist-20260218.md](implemented/20260218_memory-system-enhancement-checklist-20260218.md) -- Memory system enhancement checklist
-- [implemented/20260218_consolidation-validation-pipeline-20260218.md](implemented/20260218_consolidation-validation-pipeline-20260218.md) -- Daily consolidation validation pipeline
-- [implemented/20260218_knowledge-contradiction-detection-resolution-20260218.md](implemented/20260218_knowledge-contradiction-detection-resolution-20260218.md) -- Knowledge contradiction detection and resolution
-- [implemented/20260218_procedural-memory-foundation-20260218.md](implemented/20260218_procedural-memory-foundation-20260218.md) -- Procedural memory foundation (YAML frontmatter, 3-stage matching)
-- [implemented/20260218_procedural-memory-auto-distillation-20260218.md](implemented/20260218_procedural-memory-auto-distillation-20260218.md) -- Procedural memory auto-distillation
-- [implemented/20260218_procedural-memory-reconsolidation-20260218.md](implemented/20260218_procedural-memory-reconsolidation-20260218.md) -- Prediction-error-based reconsolidation
-- [implemented/20260218_procedural-memory-utility-forgetting-20260218.md](implemented/20260218_procedural-memory-utility-forgetting-20260218.md) -- Procedural memory utility-based forgetting
-- [AI Agent Memory Architecture Survey](research/20260212_AI_Agent記憶アーキテクチャ調査.md) -- Neuroscience survey and prior research review
+- [vision.md](vision.md) — Foundational philosophy of Digital Anima
+- [spec.md](spec.md) — Requirements specification (basic design of archive-based memory)
+- [features.md](features.md) — Feature list (includes memory system implementation history)
+- [implemented/20260214_priming-layer_design.md](implemented/20260214_priming-layer_design.md) — Priming layer implementation plan (includes RAG design and consolidation architecture)
+- [implemented/20260218_unified-activity-log-implemented-20260218.md](implemented/20260218_unified-activity-log-implemented-20260218.md) — Unified activity log design document
+- [implemented/20260218_streaming-journal-implemented-20260218.md](implemented/20260218_streaming-journal-implemented-20260218.md) — Streaming journal design document
+- [implemented/20260218_activity-log-spec-compliance-fixes-implemented-20260218.md](implemented/20260218_activity-log-spec-compliance-fixes-implemented-20260218.md) — Activity log spec compliance fixes
+- [implemented/20260218_priming-format-redesign_implemented-20260218.md](implemented/20260218_priming-format-redesign_implemented-20260218.md) — Priming format redesign (ASCII labeling, topic grouping, pointer references)
+- [implemented/20260218_episode-dedup-state-autoupdate-resolution-propagation.md](implemented/20260218_episode-dedup-state-autoupdate-resolution-propagation.md) — Episode deduplication, auto state update, and resolution propagation mechanism
+- [implemented/20260218_memory-system-enhancement-checklist-20260218.md](implemented/20260218_memory-system-enhancement-checklist-20260218.md) — Memory system enhancement checklist
+- [implemented/20260218_consolidation-validation-pipeline-20260218.md](implemented/20260218_consolidation-validation-pipeline-20260218.md) — Daily consolidation validation pipeline
+- [implemented/20260218_knowledge-contradiction-detection-resolution-20260218.md](implemented/20260218_knowledge-contradiction-detection-resolution-20260218.md) — Knowledge contradiction detection and resolution
+- [implemented/20260218_procedural-memory-foundation-20260218.md](implemented/20260218_procedural-memory-foundation-20260218.md) — Procedural memory foundation (YAML frontmatter, 3-stage matching)
+- [implemented/20260218_procedural-memory-auto-distillation-20260218.md](implemented/20260218_procedural-memory-auto-distillation-20260218.md) — Procedural memory auto-distillation
+- [implemented/20260218_procedural-memory-reconsolidation-20260218.md](implemented/20260218_procedural-memory-reconsolidation-20260218.md) — Prediction-error-based reconsolidation
+- [implemented/20260218_procedural-memory-utility-forgetting-20260218.md](implemented/20260218_procedural-memory-utility-forgetting-20260218.md) — Procedural memory utility-based forgetting
+- [AI Agent Memory Architecture Survey](research/20260212_AI_Agent記憶アーキテクチャ調査.md) — Neuroscience survey and prior research review

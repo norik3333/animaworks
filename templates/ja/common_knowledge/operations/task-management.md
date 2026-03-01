@@ -12,7 +12,7 @@ Digital Anima がタスクを受け取り、追跡し、完了させるための
 | `state/current_task.md` | 今取り組んでいるタスク（1つ） |
 | `state/pending.md` | 手動メモ用のバックログ（自由形式） |
 | `state/pending/` ディレクトリ | Heartbeat が書き出した LLM タスク（JSON 形式）。TaskExec パスが自動取得・実行する |
-| タスクキュー（`add_task`） | 永続タスクキュー。人間やAnimaからの依頼を追跡する |
+| `state/task_queue.jsonl` | 永続タスクキュー（append-only JSONL）。人間やAnimaからの依頼を追跡する |
 
 `state/current_task.md` は常に最新の状態を保たなければならない（MUST）。
 タスク状態が変わるたびに更新すること。
@@ -29,24 +29,68 @@ AnimaWorks ではタスクが3つの独立パスで処理される:
 
 Heartbeat は **実行しない**。実行が必要なタスクを発見したら `state/pending/` に JSON ファイルとして書き出し、TaskExec パスに委譲する。
 
-### タスクキュー（add_task ツール）
+### タスクキュー（add_task / update_task / list_tasks）
 
-`add_task` ツールで永続タスクキューにタスクを登録できる。
+永続タスクキューは `state/task_queue.jsonl` に append-only JSONL 形式で記録される。
+`add_task` でタスクを登録し、`update_task` でステータスを更新、`list_tasks` で一覧取得する。
 キューに登録されたタスクはシステムプロンプトの Priming セクションに要約表示される。
 
+#### add_task
+
 ```
-add_task(title="レポート作成", description="月次売上レポートを作成する", priority="high", source="human")
+add_task(source="human", original_instruction="月次売上レポートを作成し、hinataに提出してください", assignee="自分自身の名前", summary="月次レポート作成", deadline="1d")
 ```
 
 | パラメータ | 必須 | 説明 |
 |-----------|------|------|
-| `title` | MUST | タスクの簡潔なタイトル |
-| `description` | SHOULD | 詳細な説明 |
-| `priority` | MAY | `urgent` / `high` / `medium` / `low`（デフォルト: `medium`） |
-| `source` | MAY | `human`（人間からの依頼）/ `anima`（Animaからの委譲） |
+| `source` | MUST | `human`（人間からの依頼）/ `anima`（Animaからの委譲） |
+| `original_instruction` | MUST | 元の指示文（委任時は原文引用を含める） |
+| `assignee` | MUST | 担当者名（自分自身または委任先のAnima名） |
+| `summary` | SHOULD | タスクの1行要約（省略時は original_instruction の先頭100文字） |
+| `deadline` | MUST | 期限。相対形式 `30m` / `2h` / `1d` または ISO8601 |
+| `relay_chain` | MAY | 委任経路（例: `["taka", "sakura"]`） |
 
+- 人間からの指示を受けたら、必ず `add_task` で `source="human"` を指定して記録する（MUST）
 - `source: human` のタスクは最優先で処理する（MUST）
-- キューのタスクは Heartbeat で確認され、優先順に着手される
+- キューのタスクは Heartbeat で確認され、着手時に `update_task` で `in_progress` に更新する
+
+#### update_task
+
+タスクのステータスを更新する。完了時は `done`、中断時は `cancelled` に設定する。
+
+```
+update_task(task_id="abc123def456", status="in_progress")
+update_task(task_id="abc123def456", status="done", summary="レポート作成完了")
+```
+
+| パラメータ | 必須 | 説明 |
+|-----------|------|------|
+| `task_id` | MUST | タスクID（add_task 時に返されたID） |
+| `status` | MUST | `pending` / `in_progress` / `done` / `cancelled` / `blocked` |
+| `summary` | MAY | 更新後の要約 |
+
+#### list_tasks
+
+タスクキューの一覧を取得する。ステータスでフィルタリング可能。
+
+```
+list_tasks()                    # 全件
+list_tasks(status="pending")    # 未着手のみ
+list_tasks(status="in_progress") # 進行中のみ
+```
+
+#### タスクキューの状態とマーカー
+
+| 状態 | 意味 |
+|------|------|
+| `pending` | 未着手 |
+| `in_progress` | 作業中 |
+| `done` | 完了 |
+| `cancelled` | 取り消し |
+| `blocked` | ブロック中 |
+| `delegated` | 委譲済み（delegate_task で部下に委譲した追跡用） |
+
+Priming 表示では、30分以上更新されていないタスクに ⚠️ STALE、期限超過タスクに 🔴 OVERDUE マーカーが付く。
 
 ## current_task.md の使い方
 
@@ -329,18 +373,32 @@ Slack API 接続テスト完了。#general への投稿テストも成功。
 ### 使い方
 
 ```
-delegate_task(name="dave", instruction="API テストを実施して結果を報告してください", deadline="2026-02-20", summary="API テスト")
+delegate_task(name="dave", instruction="API テストを実施して結果を報告してください", deadline="2d", summary="API テスト")
 ```
+
+| パラメータ | 必須 | 説明 |
+|-----------|------|------|
+| `name` | MUST | 委譲先の直属部下のAnima名 |
+| `instruction` | MUST | タスクの指示内容 |
+| `deadline` | MUST | 期限。相対形式 `30m` / `2h` / `1d` または ISO8601 |
+| `summary` | MAY | タスクの1行要約 |
 
 ### 委譲タスクの追跡
 
-`task_tracker` ツールで委譲したタスクの進捗を確認できる:
+`task_tracker` ツールで委譲したタスクの進捗を確認できる。
+部下側の task_queue.jsonl から最新ステータスを突き合わせて返す。
 
 ```
-task_tracker()                    # アクティブな委譲タスク一覧
-task_tracker(status="all")        # 完了済み含む全タスク
-task_tracker(status="completed")  # 完了済みのみ
+task_tracker()                     # アクティブな委譲タスク一覧（デフォルト）
+task_tracker(status="all")         # 完了済み含む全タスク
+task_tracker(status="completed")   # 完了済みのみ
 ```
+
+| status | 意味 |
+|--------|------|
+| `active` | 進行中（done/cancelled 以外）。デフォルト |
+| `all` | 全件 |
+| `completed` | 完了済み（done/cancelled）のみ |
 
 ### 委譲を受けた側の対応
 

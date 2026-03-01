@@ -223,6 +223,16 @@ async function _processStream(res, callbacks, setResponseId, setLastEventId, sig
             callbacks.onChainStart?.();
             break;
 
+          case "compression_start":
+            logger.info(`[SSE-FE] EVENT compression_start id=${id}`);
+            callbacks.onCompressionStart?.();
+            break;
+
+          case "compression_end":
+            logger.info(`[SSE-FE] EVENT compression_end id=${id}`);
+            callbacks.onCompressionEnd?.();
+            break;
+
           case "heartbeat_relay_start":
             logger.info(`[SSE-FE] EVENT heartbeat_relay_start msg=${data.message || ""} id=${id}`);
             callbacks.onHeartbeatRelayStart?.({ message: data.message || "" });

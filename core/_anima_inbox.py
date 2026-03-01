@@ -11,7 +11,7 @@ references are resolved at runtime via MRO when mixed into ``DigitalAnima``.
 
 import json
 import logging
-import time
+
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -31,13 +31,6 @@ from core.i18n import t
 from core.schemas import CycleResult
 
 logger = logging.getLogger("animaworks.anima")
-
-# Maximum time (seconds) an unreplied message stays in inbox before
-# force-archival.  Prevents re-processing storms when replied_to tracking
-# fails (e.g. agent replies via board post instead of DM).
-# With a typical heartbeat interval of 5 min, a message gets ~2 chances
-# to be replied to before force-archival.
-_STALE_MESSAGE_TIMEOUT_SEC = 600
 
 _SOURCE_TO_ORIGIN: dict[str, str] = {
     "slack": ORIGIN_EXTERNAL_PLATFORM,
@@ -422,62 +415,24 @@ class InboxMixin:
         senders: set[str],
         replied_to: set[str],
     ) -> None:
-        """Archive replied-to messages; force-archive stale unreplied messages.
+        """Archive all inbox messages after successful LLM cycle.
 
-        Messages from unreplied senders stay in inbox for the next
-        heartbeat cycle.
+        Once the LLM has completed processing, all messages are archived
+        unconditionally.  The LLM already decided whether to reply,
+        delegate, or take no action — re-presenting the same messages
+        would only produce duplicate ``message_received`` log entries.
         """
+        total_archived = self.messenger.archive_paths(inbox_items)
+
         unreplied = senders - replied_to
-
-        items_to_archive = [
-            item for item in inbox_items
-            if item.msg.from_person in replied_to
-            or item.msg.from_person not in senders  # system msgs
-        ]
-        items_to_keep = [
-            item for item in inbox_items
-            if item not in items_to_archive
-        ]
-
-        # Safety: force-archive messages that have been sitting
-        # in inbox longer than _STALE_MESSAGE_TIMEOUT_SEC to
-        # prevent re-processing storms even if replied_to
-        # tracking fails.
-        if items_to_keep:
-            now = time.time()
-            stale: list[InboxItem] = []
-            for item in items_to_keep:
-                try:
-                    mtime = item.path.stat().st_mtime
-                    if (now - mtime) > _STALE_MESSAGE_TIMEOUT_SEC:
-                        stale.append(item)
-                except FileNotFoundError:
-                    continue  # already archived/deleted
-            if stale:
-                logger.warning(
-                    "[%s] Force-archiving %d stale unreplied "
-                    "messages (>%ds old)",
-                    self.name, len(stale),
-                    _STALE_MESSAGE_TIMEOUT_SEC,
-                )
-                items_to_archive.extend(stale)
-                items_to_keep = [
-                    i for i in items_to_keep if i not in stale
-                ]
-
-        if unreplied and items_to_keep:
-            logger.warning(
-                "[%s] Unreplied messages from %s will remain "
-                "in inbox for next heartbeat cycle",
-                self.name, ", ".join(unreplied),
+        if unreplied:
+            logger.info(
+                "[%s] Archived %d messages "
+                "(unreplied senders: %s — processed, no retry)",
+                self.name, total_archived, ", ".join(unreplied),
             )
-
-        total_archived = self.messenger.archive_paths(
-            items_to_archive
-        )
-        logger.info(
-            "[%s] Archived %d/%d messages "
-            "(kept %d unreplied in inbox)",
-            self.name, total_archived, len(inbox_items),
-            len(items_to_keep),
-        )
+        else:
+            logger.info(
+                "[%s] Archived %d/%d messages",
+                self.name, total_archived, len(inbox_items),
+            )

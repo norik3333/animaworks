@@ -46,6 +46,8 @@ function _drainQueue() {
 
 function _baseCallbacks(streamingMsg) {
   return {
+    onCompressionStart: () => { streamingMsg.compressing = true; updateStreamingBubble(streamingMsg); },
+    onCompressionEnd: () => { streamingMsg.compressing = false; updateStreamingBubble(streamingMsg); },
     onToolStart: (n) => { streamingMsg.activeTool = n; setExpression("thinking"); updateStreamingBubble(streamingMsg); },
     onToolEnd: () => { streamingMsg.activeTool = null; setExpression("neutral"); updateStreamingBubble(streamingMsg); },
     onThinkingStart: () => { streamingMsg.thinkingText = ""; streamingMsg.thinking = true; updateStreamingBubble(streamingMsg); },

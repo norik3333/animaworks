@@ -401,12 +401,18 @@ call_human統合、組織構成プロンプト注入等。
 
 ## 17. セキュリティ
 
-記憶書き込みセキュリティ、ライセンス等。
+自律エージェント向けの多層防御セキュリティモデル。全体概要は **[セキュリティアーキテクチャ](security.md)** を参照。
 
 - **ライセンス戦略設計書** (2026-02-14) — Apache-2.0 ライセンス戦略
   [設計](implemented/20260214_licensing-strategy_design.md)
 - **メモリ書き込みセキュリティ: 全実行モードの保護ファイル・パストラバーサル対策** (2026-02-15) — 記憶書き込みのセキュリティ強化
   [設計](implemented/20260215_memory-write-security-20260216.md) | [Review](implemented/20260216_review_memory-write-security_approved-20260216.md)
+- **コマンドインジェクション修正** (2026-02-28) — パイプ経由インタープリタ実行・改行インジェクション防止
+  [設計](implemented/20260228_security-command-injection-fix.md)
+- **パストラバーサル修正** (2026-02-28) — common_knowledge・create_animaのパス検証
+  [設計](implemented/20260228_security-path-traversal-fix.md)
+- **来歴・信頼境界システム** (2026-02-28) — 5フェーズの信頼ラベリング、オリジンチェーン伝播、RAG来歴追跡
+  [Phase 1](implemented/20260228_provenance-1-foundation.md) | [Phase 2](implemented/20260228_provenance-2-input-boundary.md) | [Phase 3](implemented/20260228_provenance-3-propagation.md) | [Phase 4](implemented/20260228_provenance-4-rag-provenance.md) | [Phase 5](implemented/20260228_provenance-5-mode-s-trust.md)
 
 ---
 

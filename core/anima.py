@@ -47,7 +47,7 @@ from core._anima_lifecycle import LifecycleMixin
 
 # ── Re-exports for backward compatibility ───────────────────────
 # Tests and other modules import these symbols from ``core.anima``.
-from core._anima_inbox import _STALE_MESSAGE_TIMEOUT_SEC, InboxResult  # noqa: F401
+from core._anima_inbox import InboxResult  # noqa: F401
 from core._anima_heartbeat import (  # noqa: F401
     _RE_REFLECTION,
     _MIN_REFLECTION_LENGTH,

@@ -168,6 +168,18 @@ def _extract_tool_records(items: list[Any]) -> list[ToolCallRecord]:
     return records
 
 
+def _synthesise_fallback(tool_records: list[ToolCallRecord]) -> str:
+    """Build a short fallback text when the model produced no text output."""
+    names = [r.tool_name for r in tool_records[:5]]
+    suffix = ", …" if len(tool_records) > 5 else ""
+    fallback = f"(completed {len(tool_records)} tool call(s): {', '.join(names)}{suffix})"
+    logger.warning(
+        "Codex SDK produced no text output; synthesised fallback "
+        "(tools=%d)", len(tool_records),
+    )
+    return fallback
+
+
 def _usage_to_dict(usage: Any) -> dict[str, int]:
     """Normalise a Codex usage object (or dict) to a plain dict."""
     if isinstance(usage, dict):
@@ -295,6 +307,21 @@ class CodexSDKExecutor(BaseExecutor):
             target.symlink_to(default_auth)
             logger.info("Symlinked auth.json → %s", default_auth)
 
+    # Injected via config.toml ``developer_instructions`` so the Codex
+    # model always produces a visible text response, even when it only
+    # performed tool calls internally.  ``model_instructions_file``
+    # replaces the Codex CLI's built-in system prompt (which contains its
+    # own "preamble messages" guidance), so we must re-introduce the
+    # requirement explicitly.
+    _CODEX_DEVELOPER_INSTRUCTIONS: str = (
+        "IMPORTANT: You MUST always provide a text response to the user. "
+        "After performing any tool calls, write a concise text message "
+        "summarising what you did or responding to the user's message. "
+        "Never end a turn with only tool operations and no text output. "
+        "For conversational messages (greetings, questions, casual chat), "
+        "respond naturally in text before or after any tool use."
+    )
+
     def _write_codex_config(self, system_prompt: str) -> None:
         """Write CODEX_HOME config.toml and model instructions file.
 
@@ -319,6 +346,9 @@ class CodexSDKExecutor(BaseExecutor):
         config_toml = (
             f'model = "{esc(bare_model)}"\n'
             f'model_instructions_file = "{esc(str(instructions_file))}"\n'
+            f'developer_instructions = "{esc(self._CODEX_DEVELOPER_INSTRUCTIONS)}"\n'
+            f'personality = "friendly"\n'
+            f'model_verbosity = "high"\n'
             f'sandbox_mode = "workspace-write"\n'
             f'approval_policy = "never"\n'
             f"\n"
@@ -433,6 +463,9 @@ class CodexSDKExecutor(BaseExecutor):
         response_text = getattr(turn, "final_response", "") or ""
         items = getattr(turn, "items", []) or []
         tool_records = _extract_tool_records(items)
+
+        if not response_text and tool_records:
+            response_text = _synthesise_fallback(tool_records)
 
         if tracker:
             usage = getattr(turn, "usage", None)
@@ -584,7 +617,10 @@ class CodexSDKExecutor(BaseExecutor):
                     partial_text=partial,
                 ) from e
 
-        full_text = "\n".join(response_text_parts) or "(no response)"
+        full_text = "\n".join(response_text_parts)
+        if not full_text and all_tool_records:
+            full_text = _synthesise_fallback(all_tool_records)
+
         replied_to = self._read_replied_to_file()
         yield {
             "type": "done",

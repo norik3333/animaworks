@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import time
 from dataclasses import fields
 from datetime import datetime
 from pathlib import Path
@@ -914,8 +913,8 @@ class TestArchiveProcessedMessages:
         finally:
             _stop_patches(mocks)
 
-    async def test_some_unreplied_kept_in_inbox(self, data_dir, make_anima):
-        """Unreplied senders' messages are kept in inbox."""
+    async def test_unreplied_also_archived(self, data_dir, make_anima):
+        """After successful LLM cycle, unreplied messages are also archived."""
         anima_dir = make_anima("alice")
         shared_dir = data_dir / "shared"
         dp, mocks = _create_anima(anima_dir, shared_dir)
@@ -926,80 +925,35 @@ class TestArchiveProcessedMessages:
             senders = {"bob", "eve"}
             replied_to = {"bob"}  # Only replied to bob
 
-            dp.messenger.archive_paths = MagicMock(return_value=1)
+            dp.messenger.archive_paths = MagicMock(return_value=2)
 
             await dp._archive_processed_messages(inbox_items, senders, replied_to)
 
             dp.messenger.archive_paths.assert_called_once()
             archived_items = dp.messenger.archive_paths.call_args[0][0]
-            # Only bob's message should be archived
-            archived_senders = {item.msg.from_person for item in archived_items}
-            assert "bob" in archived_senders
-            assert "eve" not in archived_senders
+            assert len(archived_items) == 2
         finally:
             _stop_patches(mocks)
 
-    async def test_stale_messages_force_archived(self, data_dir, make_anima):
-        """Messages older than _STALE_MESSAGE_TIMEOUT_SEC are force-archived."""
+    async def test_no_replies_still_archived(self, data_dir, make_anima):
+        """After successful LLM cycle, messages are archived even with no replies."""
         anima_dir = make_anima("alice")
         shared_dir = data_dir / "shared"
-
-        # Create a real file with old mtime for the stale message
-        inbox_dir = shared_dir / "inbox" / "alice"
-        inbox_dir.mkdir(parents=True, exist_ok=True)
-        stale_file = inbox_dir / "stale_msg.json"
-        stale_file.write_text("{}", encoding="utf-8")
-
         dp, mocks = _create_anima(anima_dir, shared_dir)
         try:
-            item_eve = _make_inbox_item("eve", "old msg from eve", stale_file)
-            inbox_items = [item_eve]
-            senders = {"eve"}
-            replied_to = set()  # Nobody replied to
-
-            dp.messenger.archive_paths = MagicMock(return_value=1)
-
-            # Make the file appear old (> 600 seconds)
-            import os
-            old_time = time.time() - 700
-            os.utime(stale_file, (old_time, old_time))
-
-            await dp._archive_processed_messages(inbox_items, senders, replied_to)
-
-            dp.messenger.archive_paths.assert_called_once()
-            archived_items = dp.messenger.archive_paths.call_args[0][0]
-            # Eve's stale message should be force-archived
-            assert len(archived_items) == 1
-            assert archived_items[0].msg.from_person == "eve"
-        finally:
-            _stop_patches(mocks)
-
-    async def test_non_stale_unreplied_kept(self, data_dir, make_anima):
-        """Non-stale unreplied messages remain in inbox."""
-        anima_dir = make_anima("alice")
-        shared_dir = data_dir / "shared"
-
-        inbox_dir = shared_dir / "inbox" / "alice"
-        inbox_dir.mkdir(parents=True, exist_ok=True)
-        fresh_file = inbox_dir / "fresh_msg.json"
-        fresh_file.write_text("{}", encoding="utf-8")
-
-        dp, mocks = _create_anima(anima_dir, shared_dir)
-        try:
-            item_eve = _make_inbox_item("eve", "recent msg", fresh_file)
+            item_eve = _make_inbox_item("eve", "report from eve")
             inbox_items = [item_eve]
             senders = {"eve"}
             replied_to = set()
 
-            dp.messenger.archive_paths = MagicMock(return_value=0)
+            dp.messenger.archive_paths = MagicMock(return_value=1)
 
-            # File is fresh (just created), so it won't be stale
             await dp._archive_processed_messages(inbox_items, senders, replied_to)
 
             dp.messenger.archive_paths.assert_called_once()
             archived_items = dp.messenger.archive_paths.call_args[0][0]
-            # Eve's message should NOT be archived (not stale)
-            assert len(archived_items) == 0
+            assert len(archived_items) == 1
+            assert archived_items[0].msg.from_person == "eve"
         finally:
             _stop_patches(mocks)
 

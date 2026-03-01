@@ -229,6 +229,27 @@ All communication flows through async messaging. Each Anima runs as an isolated 
 
 ---
 
+## Security
+
+Autonomous agents with tool access need serious guardrails. AnimaWorks implements defense-in-depth across 10 layers:
+
+| Layer | What It Does |
+|-------|-------------|
+| **Trust Boundary Labeling** | Every piece of external data (web search, Slack, email) is tagged `untrusted` — the model is instructed to never follow directives from untrusted sources |
+| **5-Layer Command Security** | Shell injection detection → hardcoded blocklist → per-agent denied commands → per-agent allowlist → path traversal check |
+| **File Sandboxing** | Each agent is confined to its own directory. Critical files (`permissions.md`, `identity.md`) are immutable to the agent |
+| **Process Isolation** | One OS process per agent, communicating via Unix Domain Sockets — not TCP |
+| **3-Layer Rate Limiting** | Per-session dedup → 30/hour + 100/day persistent limits → self-awareness via prompt injection of recent sends |
+| **Cascade Prevention** | Max 6 turns between any agent pair in 10 minutes. Inbox cooldowns and deferred processing |
+| **Auth & Sessions** | Argon2id hashing, 48-byte random tokens, max 10 sessions, 0600 file permissions |
+| **Webhook Verification** | HMAC-SHA256 for Slack (with replay protection) and Chatwork |
+| **SSRF Mitigation** | Media proxy blocks private IPs, enforces HTTPS, validates content types, checks DNS resolution |
+| **Outbound Routing** | Unknown recipients fail-closed. No arbitrary external sends without explicit config |
+
+Read the full details: **[Security Architecture](docs/security.md)**
+
+---
+
 <details>
 <summary><strong>CLI Reference (Advanced)</strong></summary>
 
@@ -336,6 +357,7 @@ animaworks/
 | Document | Description |
 |----------|-------------|
 | [Design Philosophy](docs/vision.md) | Core principles and vision |
+| [Security Architecture](docs/security.md) | Defense-in-depth security model |
 | [Memory System](docs/memory.md) | Memory architecture specification |
 | [Brain Mapping](docs/brain-mapping.md) | Architecture mapped to neuroscience |
 | [Feature Index](docs/features.md) | Comprehensive feature list |

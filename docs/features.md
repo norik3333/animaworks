@@ -401,12 +401,18 @@ Test fixes, 500 error root cause analysis, and more.
 
 ## 17. Security
 
-Memory write security, licensing, and more.
+Defense-in-depth security model for autonomous agents. See **[Security Architecture](security.md)** for the full overview.
 
 - **Licensing Strategy Design** (2026-02-14) — Apache-2.0 licensing strategy
   [Design](implemented/20260214_licensing-strategy_design.md)
 - **Memory Write Security: Protected Files and Path Traversal Prevention Across All Execution Modes** (2026-02-15) — Security hardening for memory writes
   [Design](implemented/20260215_memory-write-security-20260216.md) | [Review](implemented/20260216_review_memory-write-security_approved-20260216.md)
+- **Command Injection Fix** (2026-02-28) — Pipe-to-interpreter and newline injection prevention
+  [Design](implemented/20260228_security-command-injection-fix.md)
+- **Path Traversal Fix** (2026-02-28) — common_knowledge and create_anima path validation
+  [Design](implemented/20260228_security-path-traversal-fix.md)
+- **Provenance & Trust Boundary System** (2026-02-28) — 5-phase trust labeling, origin chain propagation, RAG provenance tracking
+  [Phase 1](implemented/20260228_provenance-1-foundation.md) | [Phase 2](implemented/20260228_provenance-2-input-boundary.md) | [Phase 3](implemented/20260228_provenance-3-propagation.md) | [Phase 4](implemented/20260228_provenance-4-rag-provenance.md) | [Phase 5](implemented/20260228_provenance-5-mode-s-trust.md)
 
 ---
 

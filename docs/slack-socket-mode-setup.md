@@ -10,7 +10,7 @@ It requires no public URL and works on servers behind NAT.
 ```
 [Slack] ←WebSocket→ [SlackSocketModeManager] → Messenger.receive_external() → [Anima inbox]
                               ↑
-                     Auto-started in server/app.py lifespan
+                     Started in background within server/app.py lifespan
                      Controlled by config.json external_messaging.slack
 ```
 
@@ -23,19 +23,22 @@ It requires no public URL and works on servers behind NAT.
 
 Configure your app at https://api.slack.com/apps.
 
-### Enabling Socket Mode
+### Enabling Socket Mode (only when mode=socket)
 
 1. Select "Socket Mode" from the left menu
 2. Turn on "Enable Socket Mode"
 3. Generate an App-Level Token (scope: `connections:write`)
 4. Save the generated `xapp-...` token
 
+This step is not required for Webhook mode (`mode: "webhook"`).
+
 ### Event Subscriptions
 
 1. Select "Event Subscriptions" from the left menu
 2. Turn on "Enable Events"
-3. No Request URL is needed (because Socket Mode is used)
-4. Add the following under "Subscribe to bot events":
+3. **Socket Mode**: No Request URL is needed
+4. **Webhook mode**: Set Request URL to `https://your-server/api/webhooks/slack/events` (signature verification challenge is handled automatically)
+5. Add the following under "Subscribe to bot events":
 
 | Event | Description |
 |-------|-------------|
@@ -82,6 +85,8 @@ Run `/invite @BotName` in each channel where you want to receive messages.
 
 ## 2. Credential Configuration (AnimaWorks Side)
 
+Credentials are resolved in the following priority order: `config.json` → `shared/credentials.json` → environment variables.
+
 Set the following keys in `~/.animaworks/shared/credentials.json`:
 
 ```json
@@ -94,9 +99,9 @@ Set the following keys in `~/.animaworks/shared/credentials.json`:
 | Key | Prefix | Purpose |
 |-----|--------|---------|
 | `SLACK_BOT_TOKEN` | `xoxb-` | Slack API calls (sending messages, retrieving info) |
-| `SLACK_APP_TOKEN` | `xapp-` | Establishing the Socket Mode WebSocket connection |
+| `SLACK_APP_TOKEN` | `xapp-` | Establishing the Socket Mode WebSocket connection (only when mode=socket) |
 
-You can also use the environment variables `SLACK_BOT_TOKEN` and `SLACK_APP_TOKEN` (credentials.json takes precedence).
+Environment variables can also be used. Credentials can also be configured in the `credentials` section of `config.json`. `SLACK_APP_TOKEN` is not required for Webhook mode.
 
 ## 3. config.json Configuration
 
@@ -132,8 +137,28 @@ Right-click a channel name in Slack, select "View channel details", and find the
 
 | Mode | Connection Direction | Public URL | Use Case |
 |------|---------------------|------------|----------|
-| `socket` | Server to Slack (WebSocket) | Not required | Servers behind NAT (recommended) |
-| `webhook` | Slack to Server (HTTP POST) | Required | Public-facing servers |
+| `socket` | Server → Slack (WebSocket) | Not required | Servers behind NAT (recommended) |
+| `webhook` | Slack → Server (HTTP POST) | Required | Public-facing servers |
+
+### Additional Webhook Mode Configuration
+
+When `mode: "webhook"`, the following is required:
+
+1. **Request URL**: Set `https://your-server/api/webhooks/slack/events` in Event Subscriptions of the Slack App
+2. **Signature verification token**: Set `SLACK_SIGNING_SECRET` in `shared/credentials.json` or as an environment variable
+
+```json
+{
+  "SLACK_BOT_TOKEN": "xoxb-...",
+  "SLACK_SIGNING_SECRET": "Signing Secret from Slack Admin Console"
+}
+```
+
+| Key | Purpose |
+|-----|---------|
+| `SLACK_SIGNING_SECRET` | Webhook request signature verification (prevents replay attacks) |
+
+The Signing Secret can be found in the Slack App admin console under "Basic Information" → "App Credentials".
 
 ## 4. Restart the Server
 
@@ -147,30 +172,34 @@ If the following appears in the startup log, the connection was successful:
 INFO  animaworks.slack_socket: Slack Socket Mode connected
 ```
 
-When disabled:
+When disabled, or when `mode: "webhook"`:
 
 ```
 INFO  animaworks.slack_socket: Slack Socket Mode is disabled
 ```
 
+In Webhook mode, Socket Mode does not start; events are received via the HTTP endpoint `/api/webhooks/slack/events`.
+
 ## Message Flow
 
 1. A Slack user sends a message in a mapped channel
-2. Slack sends the event via WebSocket to `SlackSocketModeManager`
-3. `anima_mapping` resolves the channel ID to an Anima name
-4. `Messenger.receive_external()` places the message at `~/.animaworks/shared/inbox/{anima_name}/{msg_id}.json`
-5. The Anima processes the inbox on its next run cycle (heartbeat/cron/manual)
+2. Slack sends the event via WebSocket (Socket Mode) or HTTP POST (Webhook)
+3. **call_human thread reply**: If the message is a thread reply and mapped via `route_thread_reply`, it is routed to the original Anima's inbox that sent the notification (`core/notification/reply_routing.py`)
+4. Otherwise: Resolve channel ID → Anima name via `anima_mapping`
+5. `Messenger.receive_external()` places the message at `~/.animaworks/shared/inbox/{anima_name}/{msg_id}.json`
+6. The Anima processes the inbox on its next run cycle (heartbeat/cron/manual)
 
 ## Related Files
 
 | File | Role |
 |------|------|
-| `server/slack_socket.py` | SlackSocketModeManager implementation |
-| `server/app.py:171-179` | Start/stop within lifespan |
-| `core/messenger.py:150-175` | `receive_external()` -- inbox placement |
-| `core/config/models.py:160-172` | `ExternalMessagingChannelConfig` model |
-| `server/routes/webhooks.py:64-113` | Webhook endpoint (when mode=webhook) |
-| `core/tools/slack.py` | Polling-based tools (send/messages/unreplied -- coexists with Socket Mode) |
+| `server/slack_socket.py` | SlackSocketModeManager implementation (Socket Mode) |
+| `server/app.py:141-150, 245-246` | Start/stop within lifespan |
+| `server/routes/webhooks.py:64-127` | Webhook endpoint (`/api/webhooks/slack/events`, when mode=webhook) |
+| `core/messenger.py` | `receive_external()` — inbox placement |
+| `core/notification/reply_routing.py` | call_human thread reply routing to Anima |
+| `core/config/models.py:177-192` | `ExternalMessagingChannelConfig` / `ExternalMessagingConfig` model |
+| `core/tools/slack.py` | Polling-based tools (send/messages/unreplied — coexists) |
 
 ## Troubleshooting
 
@@ -184,7 +213,13 @@ INFO  animaworks.slack_socket: Slack Socket Mode is disabled
 
 - Verify that the channel IDs in `anima_mapping` are correct
 - Confirm that the Bot has been invited to the target channel
-- Check the server logs for `"No anima mapping for channel"` messages
+- Check the server logs for `"No anima mapping for channel"` (Socket Mode) or `"No anima mapping for Slack channel"` (Webhook)
+
+### Webhook Mode Signature Error (400 Invalid signature)
+
+- Verify that `SLACK_SIGNING_SECRET` is configured
+- Confirm it matches the Signing Secret in "Basic Information" → "App Credentials" of the Slack App admin console
+- Check the server logs for `"SLACK_SIGNING_SECRET not configured"`
 
 ### Reconnection
 

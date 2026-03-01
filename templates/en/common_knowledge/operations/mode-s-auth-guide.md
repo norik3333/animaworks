@@ -1,18 +1,27 @@
-# Mode S (Agent SDK) Authentication Guide
+# Mode S (Agent SDK) Authentication Mode Configuration Guide
 
-How to configure the authentication method per Anima for Mode S (Claude Agent SDK).
-The authentication mode is auto-detected from the credential configuration.
+How to switch the authentication method used by Mode S (Claude Agent SDK) per Anima.
+Authentication mode is specified by the explicit **`mode_s_auth`** setting (not auto-detected from credential).
 
 ## Authentication Modes
 
-| Mode | Condition | Connection | Use case |
-|------|-----------|-----------|----------|
-| **API Direct** | credential has `api_key` | Anthropic API | Smoothest streaming. Consumes API credits |
-| **Bedrock** | credential `keys` has `aws_access_key_id` | AWS Bedrock | AWS integration / VPC-only access |
-| **Vertex AI** | credential `keys` has `vertex_project` | Google Vertex AI | GCP integration |
-| **Max plan** | None of the above (default) | Anthropic Max plan | Subscription auth. No API credits needed |
+| Mode | mode_s_auth value | Connection | Use case |
+|------|-------------------|------------|----------|
+| **API Direct** | `"api"` | Anthropic API | Fastest streaming. Consumes API credits |
+| **Bedrock** | `"bedrock"` | AWS Bedrock | AWS integration / use within VPC |
+| **Vertex AI** | `"vertex"` | Google Vertex AI | GCP integration |
+| **Max plan** | `"max"` or unset | Anthropic Max plan | Subscription auth. No API credits needed |
 
-Detection is evaluated top-to-bottom. If `api_key` is present, API Direct mode is always selected.
+When `mode_s_auth` is unset (`null` or omitted), Max plan is used.
+
+## Resolution Priority
+
+`mode_s_auth` is resolved in this order:
+
+1. **status.json** (per-Anima) — highest priority
+2. **config.json anima_defaults** — global default
+
+It is not auto-detected from credential content. You must set `mode_s_auth` explicitly.
 
 ## Configuration
 
@@ -37,9 +46,12 @@ Connect directly to Anthropic API. Provides the smoothest streaming experience.
 ```json
 {
   "model": "claude-sonnet-4-6",
-  "credential": "anthropic"
+  "credential": "anthropic",
+  "mode_s_auth": "api"
 }
 ```
+
+If `mode_s_auth` is `"api"` but the credential has no `api_key`, it falls back to Max plan.
 
 ### 2. Bedrock Mode
 
@@ -67,9 +79,13 @@ Connect via AWS Bedrock.
 ```json
 {
   "model": "claude-sonnet-4-6",
-  "credential": "bedrock"
+  "credential": "bedrock",
+  "execution_mode": "S",
+  "mode_s_auth": "bedrock"
 }
 ```
+
+For Bedrock in Mode S, both `execution_mode: "S"` and `mode_s_auth: "bedrock"` are required.
 
 ### 3. Vertex AI Mode
 
@@ -96,13 +112,14 @@ Connect via Google Vertex AI.
 ```json
 {
   "model": "claude-sonnet-4-6",
-  "credential": "vertex"
+  "credential": "vertex",
+  "execution_mode": "S",
+  "mode_s_auth": "vertex"
 }
 ```
 
 ### 4. Max Plan Mode (Default)
 
-Use a credential with no `api_key` and no provider keys.
 Uses Claude Code subscription authentication (Max plan etc.).
 
 **config.json credential:**
@@ -126,30 +143,57 @@ Uses Claude Code subscription authentication (Max plan etc.).
 }
 ```
 
-## Mixing Auth Modes Across Animas
+Omit `mode_s_auth` or set it to `"max"` for Max plan.
 
-Different Animas in the same organization can use different auth modes:
+## Mixing Auth Modes Per Anima
+
+To use different auth modes within the same organization, set `mode_s_auth` and `credential` per Anima in status.json:
 
 ```json
 {
   "credentials": {
     "anthropic": { "api_key": "sk-ant-api03-xxxxx" },
     "max": { "api_key": "" },
-    "bedrock": { "api_key": "", "keys": { "aws_access_key_id": "AKIA...", "aws_secret_access_key": "...", "aws_region_name": "us-east-1" } }
+    "bedrock": {
+      "api_key": "",
+      "keys": {
+        "aws_access_key_id": "AKIA...",
+        "aws_secret_access_key": "...",
+        "aws_region_name": "us-east-1"
+      }
+    }
   }
 }
 ```
 
-| Anima | credential | Auth mode | Reason |
-|-------|-----------|-----------|--------|
-| sakura | `"max"` | Max plan | Manager role. No API cost |
-| kotoha | `"anthropic"` | API Direct | Needs fast streaming |
-| rin | `"bedrock"` | Bedrock | VPC-only access from AWS |
+| Anima | credential | mode_s_auth | Auth mode | Reason |
+|-------|-----------|-------------|-----------|--------|
+| sakura | `"max"` | omitted | Max plan | Manager. No API cost |
+| kotoha | `"anthropic"` | `"api"` | API Direct | Requires fast streaming |
+| rin | `"bedrock"` | `"bedrock"` | Bedrock | Access only from within AWS VPC |
+
+## Global Default (anima_defaults)
+
+To use Bedrock as the default for all Animas, set it in config.json `anima_defaults`:
+
+```json
+{
+  "anima_defaults": {
+    "mode_s_auth": "bedrock"
+  },
+  "credentials": {
+    "bedrock": { "api_key": "", "keys": { "aws_access_key_id": "...", ... } }
+  }
+}
+```
+
+Individual Animas can override `mode_s_auth` in their status.json.
 
 ## Notes
 
 - Auth mode is passed as environment variables to the Claude Code child process via `_build_env()`
-- When both `api_key` and provider keys exist in a credential, `api_key` takes priority (API Direct mode)
-- To use Bedrock, create a separate credential with an empty `api_key`
+- `mode_s_auth` is not auto-detected from credential content. Explicit setting is required
+- When `mode_s_auth=api` but credential has no `api_key`, it falls back to Max plan
+- For Bedrock / Vertex, set provider-specific keys in credential `keys` and specify the mode with `mode_s_auth`
 - Server restart is required after configuration changes
-- Mode A/B executors use credentials via LiteLLM as before (this setting is Mode S-specific)
+- Mode A/B use credentials via LiteLLM as before (this setting is Mode S-specific)

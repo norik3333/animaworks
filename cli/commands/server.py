@@ -9,6 +9,8 @@ import atexit
 import logging
 import os
 import signal
+import socket
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -17,7 +19,10 @@ logger = logging.getLogger("animaworks")
 
 # Command patterns used to identify the animaworks server process.
 # Matches both direct invocation (main.py start) and entry point (animaworks start).
-_SERVER_CMD_MARKERS = ("main.py start", "animaworks start")
+_SERVER_CMD_MARKERS = ("main.py start", "animaworks start", "-m cli start")
+
+_DAEMON_STARTUP_TIMEOUT = 10
+_DAEMON_POLL_INTERVAL = 0.3
 
 
 # ── PID helpers ───────────────────────────────────────────
@@ -216,6 +221,88 @@ def _kill_orphan_runners() -> int:
     return killed
 
 
+# ── Daemon helpers ────────────────────────────────────────
+
+
+def _is_port_listening(host: str, port: int) -> bool:
+    """Check if a TCP port is accepting connections."""
+    try:
+        with socket.create_connection((host, port), timeout=1):
+            return True
+    except (ConnectionRefusedError, OSError):
+        return False
+
+
+def _get_daemon_log_path() -> Path:
+    """Return path for daemon stdout/stderr redirect."""
+    from core.paths import get_data_dir
+
+    log_dir = get_data_dir() / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    return log_dir / "server-daemon.log"
+
+
+def _spawn_daemon(args: argparse.Namespace) -> None:
+    """Spawn the server as a background process and verify startup."""
+    from core.paths import get_data_dir
+
+    existing_pid = _read_pid()
+    if existing_pid is not None and _is_process_alive(existing_pid):
+        print(f"Error: Server is already running (pid={existing_pid}).")
+        print("Use 'animaworks stop' first, or 'animaworks restart'.")
+        sys.exit(1)
+    elif existing_pid is not None:
+        _remove_pid_file()
+
+    orphan_pid = _find_server_pid_by_process()
+    if orphan_pid is not None and _is_process_alive(orphan_pid):
+        print(f"Error: Server is already running (pid={orphan_pid}, PID file was missing).")
+        print("Use 'animaworks stop' first, or 'animaworks restart'.")
+        sys.exit(1)
+
+    cmd = [sys.executable, "-m", "cli", "start", "--foreground",
+           "--host", args.host, "--port", str(args.port)]
+
+    log_path = _get_daemon_log_path()
+    log_file = open(log_path, "a", encoding="utf-8")  # noqa: SIM115
+
+    proc = subprocess.Popen(
+        cmd,
+        stdout=log_file,
+        stderr=subprocess.STDOUT,
+        start_new_session=True,
+        cwd=Path(__file__).resolve().parent.parent.parent,
+    )
+    log_file.close()
+
+    check_host = "127.0.0.1" if args.host == "0.0.0.0" else args.host
+    deadline = time.monotonic() + _DAEMON_STARTUP_TIMEOUT
+    started = False
+
+    while time.monotonic() < deadline:
+        if proc.poll() is not None:
+            print(f"Error: Server exited immediately (exit code {proc.returncode}).")
+            print(f"Check logs: {log_path}")
+            sys.exit(1)
+        if _is_port_listening(check_host, args.port):
+            started = True
+            break
+        time.sleep(_DAEMON_POLL_INTERVAL)
+
+    if not started:
+        print(f"Warning: Server process started (pid={proc.pid}) but port {args.port} not yet listening.")
+        print(f"Check logs: {log_path}")
+        return
+
+    display_host = "localhost" if args.host == "0.0.0.0" else args.host
+    config_data_dir = get_data_dir()
+    print(f"Server started (pid={proc.pid}).")
+    print(f"  Dashboard: http://{display_host}:{args.port}/")
+    print(f"  Logs:      {log_path}")
+    print(f"  Data:      {config_data_dir}")
+    print(f"  Stop:      animaworks stop")
+
+
 # ── Server commands ───────────────────────────────────────
 
 
@@ -252,7 +339,20 @@ def _start_pid_watchdog() -> None:
 
 
 def cmd_start(args: argparse.Namespace) -> None:
-    """Start the AnimaWorks server."""
+    """Start the AnimaWorks server.
+
+    Default: daemonize (background).  With --foreground: run in the
+    current terminal with log output (old behaviour).
+    """
+    if not getattr(args, "foreground", False):
+        _spawn_daemon(args)
+        return
+
+    _start_foreground(args)
+
+
+def _start_foreground(args: argparse.Namespace) -> None:
+    """Run the server in the foreground (blocking, with log output)."""
     import uvicorn
 
     from core.init import ensure_runtime_dir
@@ -268,14 +368,12 @@ def cmd_start(args: argparse.Namespace) -> None:
         logger.info("Stale PID file found (pid=%d). Cleaning up.", existing_pid)
         _remove_pid_file()
 
-    # Also check for orphaned server process without PID file
     orphan_pid = _find_server_pid_by_process()
     if orphan_pid is not None and _is_process_alive(orphan_pid):
         print(f"Error: Server is already running (pid={orphan_pid}, PID file was missing).")
         print("Use 'animaworks stop' first, or 'animaworks restart'.")
         sys.exit(1)
 
-    # Kill orphan runner processes from previous server instances
     orphan_count = _kill_orphan_runners()
     if orphan_count:
         print(f"Killed {orphan_count} orphan runner process(es) from previous server.")
@@ -347,7 +445,11 @@ def cmd_restart(args: argparse.Namespace) -> None:
     if removed:
         print(f"Cleared {removed} __pycache__ directories.")
     time.sleep(0.5)
-    cmd_start(args)
+
+    if not getattr(args, "foreground", False):
+        _spawn_daemon(args)
+    else:
+        _start_foreground(args)
 
 
 # ── Deprecated modes ──────────────────────────────────────

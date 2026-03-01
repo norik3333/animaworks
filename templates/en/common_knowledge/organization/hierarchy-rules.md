@@ -1,299 +1,316 @@
 # Hierarchy Rules
 
-AnimaWorks communication follows rules based on the org hierarchy.
-This doc defines rules for each relationship (supervisor, subordinate, peer, other departments).
+AnimaWorks defines rules for communication between Anima based on organizational hierarchy.
+This document defines rules for each relationship (supervisor, subordinate, peer, other departments).
 
-## Principles
+## Basic Principles
 
-- All internal communication uses `send_message` (messaging)
-- Sharing internal state directly is not allowed; summarize and interpret in your own words
-- Each message must have a clear purpose (what you want or what you need)
+- All internal communication MUST use `send_message` (messaging)
+- Direct sharing of internal state is prohibited; convey information in your own words, compressed and interpreted
+- Each message MUST have a clear purpose. Include "what you want done" and "what you want to convey" as MUST
 
-## Communicating with Your Supervisor
+## Communicating with Your Supervisor (Reports, Updates, Consultations)
 
-Your supervisor is the Anima in your `supervisor` field.
-Shown in the system prompt "Supervisor" section.
+Your supervisor is the Anima specified in the `supervisor` field.
+It is displayed in the "Supervisor" section of the system prompt.
 
-### MUST
+### MUST (Required)
 
-- Report task completion
-- Report problems and blockers promptly
-- Consult when decisions exceed your authority
-- Ask for clarification when instructions are unclear
+- MUST report results when a task is completed
+- MUST report promptly when problems or blockers occur during work
+- MUST consult when decisions exceed your authority
+- MUST ask for clarification when instructions from your supervisor are unclear
 
-### SHOULD
+### SHOULD (Recommended)
 
-- Report progress on long tasks
-- When reporting problems, include what happened, what you tried, and what you suggest
-- Keep reports short; put details in files and reference them
+- SHOULD report intermediate progress on long-running tasks
+- When reporting problems, SHOULD include "what happened," "what you tried," and "proposal" as a set
+- Keep reports concise. SHOULD put details in files and send references when needed
 
-### Examples
+### Message Examples
 
-Task completion:
+Task completion report:
 ```
-To bob: API endpoints implemented.
-- GET /api/users — list users
-- POST /api/users — create user
+To bob: API endpoint implementation is complete.
+- GET /api/users — List users
+- POST /api/users — Create new user
 - All tests pass.
-Ready for next task.
+Please assign the next task if any.
 ```
 
 Problem report:
 ```
-To bob: DB timeouts are frequent.
-- Started around 2pm
-- Tried: larger pool (no change)
-- Suspect: connection limit
-- Suggestion: Increase max connections to 100. Please confirm.
+To bob: DB connection timeouts are occurring frequently.
+- Occurrence: Since around 2:00 PM today
+- What I tried: Increased connection pool size (no improvement)
+- Hypothesis: Connection limit may have been reached
+- Proposal: I would like to confirm whether we can increase max connection pool from 50 to 100.
 ```
 
-Decision request:
+Decision consultation:
 ```
-To alice: Need decision on caching.
-- Option A: Redis (fast, higher infra cost)
-- Option B: File cache (lower cost, limited speed)
-- I recommend A for speed; cost is your call.
+To alice: I would like your decision on the caching strategy.
+- Option A: Introduce Redis (fast but higher infra cost)
+- Option B: File cache (low cost but limited speed)
+- I recommend A, but cost decisions are up to you.
 ```
 
 ## Supervisor Tools
 
-Anima with subordinates get organizational tools automatically.
+Anima with subordinates have dedicated tools for organizational management automatically enabled.
 
 ### Tool List
 
-| Tool | Scope | Description |
-|------|-------|-------------|
-| `org_dashboard` | All subordinates (recursive) | Show process status, activity, tasks in a tree |
-| `ping_subordinate` | All subordinates (recursive) | Check liveness (omit name for all) |
-| `read_subordinate_state` | All subordinates (recursive) | Read subordinate `current_task.md` and `pending.md` |
-| `delegate_task` | Direct subordinates only | Delegate (add to queue, send DM, track) |
-| `task_tracker` | Your delegated tasks | Track delegated task progress |
-| `disable_subordinate` | Direct subordinates | Disable subordinate (~30s to stop) |
-| `enable_subordinate` | Direct subordinates | Re-enable |
-| `set_subordinate_model` | Direct subordinates | Change model (needs restart_subordinate) |
-| `restart_subordinate` | Direct subordinates | Restart process (~30s) |
+| Tool | Scope | Description | Main Parameters |
+|------|-------|-------------|-----------------|
+| `org_dashboard` | All subordinates (recursive) | Display process status, last activity, current tasks, and task count for all subordinates in a tree | None |
+| `ping_subordinate` | All subordinates (recursive) | Liveness check for subordinates. Omit `name` for all at once, specify for a single Anima | `name` (optional) |
+| `read_subordinate_state` | All subordinates (recursive) | Read subordinate's `state/current_task.md` and `state/pending.md` | `name` (required) |
+| `delegate_task` | Direct subordinates only | Delegate task (add to subordinate queue + send DM + create tracking entry on your side) | `name`, `instruction`, `deadline` (required), `summary` (optional) |
+| `task_tracker` | Your delegated tasks | Track progress of tasks delegated via `delegate_task` from subordinate queue | `status` (optional: "all"/"active"/"completed", default "active") |
+| `disable_subordinate` | Direct subordinates | Disable subordinate (status.json enabled=false, process stops in ~30 seconds) | `name` (required), `reason` (optional) |
+| `enable_subordinate` | Direct subordinates | Re-enable a disabled subordinate | `name` (required) |
+| `set_subordinate_model` | Direct subordinates | Change subordinate's model (updates status.json; `restart_subordinate` required to apply) | `name`, `model` (required), `reason` (optional) |
+| `restart_subordinate` | Direct subordinates | Restart subordinate process (restart_requested flag, restarts in ~30 seconds) | `name` (required), `reason` (optional) |
 
-`check_permissions` is available to all Anima.
+`check_permissions` is available to all Anima (view your permission list).
 
-### Delegation Flow
+### Task Delegation Flow
 
-1. Run `delegate_task(name="dave", instruction="...", deadline="2026-02-20")`
-2. Task is added to dave's queue
-3. DM sent to dave (intent="delegation")
-4. Tracking entry created in your queue
-5. Use `task_tracker()` to monitor
+1. Execute `delegate_task(name="dave", instruction="...", deadline="...")`
+   - `deadline` can be relative format (`30m`, `2h`, `1d`) or ISO8601 format (e.g., `2026-02-20`)
+   - `summary` is optional (first 100 characters of instruction when omitted)
+2. Task is automatically added to dave's task queue (`state/task_queue.jsonl`)
+3. DM is automatically sent to dave (intent="delegation")
+4. Tracking entry is created in your queue (status="delegated")
+5. Use `task_tracker(status="active")` to track in-progress delegated tasks (`status="all"` for all, `status="completed"` for completed only)
 
-### Regular Status Checks
+### Regular Status Checks (Should Be Done Periodically)
 
 ```
-org_dashboard()                        # Tree of all subordinates
-read_subordinate_state(name="dave")    # dave's current and pending tasks
+org_dashboard()                        # Display subordinate status in tree
+read_subordinate_state(name="dave")    # Check dave's current and pending tasks
 ping_subordinate()                     # Liveness check for all
 ```
 
-## Communicating with Subordinates
+### Organization Expansion (Creating New Anima)
 
-Subordinates are Anima whose `supervisor` is your name (shown in the system prompt).
+Anima that hold `skills/newstaff.md` can create new Anima with the `create_anima` tool.
+Specify a character sheet (`character_sheet_content` or `character_sheet_path`).
+After creation, the new Anima is automatically registered in config.json and activated on server reload.
+If `supervisor` is omitted, the calling Anima is set as the supervisor.
 
-### MUST
+## Communicating with Subordinates (Instructions, Confirmation)
 
-- Include in task instructions:
+Subordinates are Anima displayed in the "Subordinates" section of the system prompt.
+All Anima that have you set as their `supervisor` are included.
+
+### MUST (Required)
+
+- Task instructions MUST include:
   - **Purpose**: Why this task is needed
-  - **Expected outcome**: What to produce
+  - **Expected deliverable**: What to produce or do
   - **Deadline and priority**: When and how urgent
-- Give feedback after completion
-- Regularly check status with `org_dashboard`
+- MUST provide feedback on completion when receiving reports from subordinates
+- MUST regularly check subordinate status with `org_dashboard`
 
-### SHOULD
+### SHOULD (Recommended)
 
-- Consider speciality when assigning
-- Be specific; avoid vague instructions
-- If multiple subordinates, clarify dependencies before instructing
+- SHOULD assign tasks considering subordinate's speciality
+- Be specific in instructions. SHOULD avoid vague expressions ("make it look good")
+- When you have multiple subordinates, SHOULD clarify task dependencies before instructing
 
-### MAY
+### MAY (Optional)
 
-- Assign slightly challenging tasks for growth
-- Name collaborators when coordination is needed
+- MAY assign slightly challenging tasks for subordinate growth
+- When coordination between subordinates is needed, MAY instruct with collaborators explicitly named
 
-### Examples
+### Message Examples
 
 Task instruction:
 ```
-To dave: Please implement user auth API.
-- Purpose: Enable login from frontend
-- Deliverable: POST /api/auth/login (returns JWT)
-- Spec: Email+password auth. Return 401 on failure
-- Deadline: Friday
-- Note: eve is building the login UI. You can coordinate directly on API spec.
+To dave: Please implement the user authentication API.
+- Purpose: To enable login functionality from the frontend
+- Deliverable: POST /api/auth/login endpoint (returns JWT)
+- Spec: Email + password authentication. Return 401 on failure
+- Deadline: By this Friday
+- Related: eve is building the login screen on the frontend in parallel.
+  You may coordinate directly with eve on API spec questions.
 ```
 
-Feedback:
+Confirmation and feedback:
 ```
-To dave: Auth API looks good.
-- Login/logout work
-- One fix: token expiry not set. Please add 24h expiry
-- Otherwise fine. Report again after the fix.
+To dave: I've reviewed the auth API implementation.
+- Login and logout both work correctly
+- One point: Token expiry does not appear to be set. Please set expiry to 24 hours
+- Otherwise no issues. Please report again after the fix.
 ```
 
-## Communicating with Peers
+## Communicating with Peers (Coordination, Alignment)
 
-Peers are Anima with the same `supervisor` (shown in the system prompt).
+Peers are Anima that share the same `supervisor`.
+They are displayed in the "Peers" section of the system prompt.
 
-### SHOULD
+### SHOULD (Recommended)
 
-- Work directly with peers on shared tasks
-- Share when your work affects theirs
-- Clarify responsibilities when working together
+- SHOULD communicate directly with peers on related work
+- SHOULD share in advance when your work affects a peer's work
+- When working together, SHOULD clarify who is responsible for what
 
-### MAY
+### MAY (Optional)
 
-- Ask peers about their speciality
-- Request reviews and feedback
+- MAY consult peers on matters related to their speciality
+- MAY request reviews and opinions
 
-### Examples
+### Message Examples
 
-Coordination:
+Coordination request:
 ```
-To eve: Auth API is ready.
+To eve: Auth API implementation is complete, sharing with you.
 - Endpoint: POST /api/auth/login
 - Request: { "email": "...", "password": "..." }
-- Response: { "token": "JWT", "expires_in": 86400 }
-- Error: 401 { "error": "Invalid credentials" }
-Use this in the login screen. Ask if you need anything.
+- Response: { "token": "JWT string", "expires_in": 86400 }
+- On error: 401 { "error": "Invalid credentials" }
+Please use this in the login screen. Feel free to ask if you have questions.
 ```
 
 Consultation:
 ```
-To carol: Need UX advice on the admin UI.
-- User list table has 20+ columns
-- How should we handle layout?
-Would appreciate your input.
+To carol: I'd like to consult on the admin UI.
+Regarding the table layout for the user list screen,
+there are 20+ columns. How should we display them?
+I'd appreciate your advice from a UX perspective.
 ```
 
-## Communicating with Other Departments
+## Communicating with Other Department Members
 
-Other departments = Anima with a different `supervisor`.
-They do not appear in your peers list.
+Other departments are Anima with a different `supervisor` from yours.
+Anima not shown in the peers section are included.
 
-### MUST
+### MUST (Required)
 
-- Do not contact other departments directly
-- When cross-department work is needed, tell your supervisor
-- Chain: you → your supervisor → their supervisor → them
+- As a rule, MUST NOT contact other department members directly
+- When cross-department coordination is needed, MUST inform your supervisor
+- Contact flows through your supervisor to the other department's supervisor, then to the target
 
-### Example Path
+### Communication Path
 
-dave (bob) wants to contact frank (carol):
-
-```
-Correct:
-  dave → bob (supervisor) → alice → carol (frank's supervisor) → frank
-
-Wrong:
-  dave → frank (direct — not allowed)
-```
-
-### Example Message
+Example: dave (under bob) wants to contact frank (under carol)
 
 ```
-To bob: Need to know the CSV format for customer data export that frank (sales) needs.
-Can you ask carol to check?
+Correct path:
+  dave → bob (your supervisor) → alice (common supervisor) → carol (frank's supervisor) → frank
+
+Incorrect:
+  dave → frank (direct contact is prohibited)
 ```
 
-### Why No Direct Contact
+### Message Example
 
-- Supervisor loses visibility
-- Risk of conflicting instructions
-- Supervisors should control prioritization
+Request to supervisor (when cross-department coordination is needed):
+```
+To bob: Regarding the customer data export feature,
+I need to know the CSV format details that frank in sales needs.
+Could you check via carol?
+```
 
-## Top-Level Anima and Humans
+### Why Avoid Direct Contact
 
-Top-level Anima (no supervisor) use `call_human` to contact human admins.
+- Supervisors lose visibility over the overall picture of work
+- Chain of command becomes confused, risking conflicting instructions
+- Supervisors in each department lose the opportunity to judge priorities
 
-### MUST
+## Top-Level Anima Contacting Humans
 
-- Use `call_human` when they detect problems, errors, or incidents
-- Report when decisions exceed their scope
-- Report when they cannot resolve subordinate escalations
+Top-level Anima (no `supervisor` set) have the responsibility to contact human administrators directly.
+Use the `call_human` tool for contact.
 
-### SHOULD
+### MUST (Required)
 
-- Report important completions
-- Report concerns about subordinate workload
+- MUST contact via `call_human` when problems, errors, or incidents are detected
+- MUST report when decisions exceed your authority
+- MUST report when you cannot resolve matters escalated from subordinates
 
-### MAY
+### SHOULD (Recommended)
 
-- Skip report when routine checks find nothing
-- Skip report for minor self-fixed issues
+- SHOULD report when important tasks are completed
+- SHOULD report when there are concerns about subordinate workload
 
-### Examples
+### MAY (Optional)
 
-Problem:
+- MAY skip reporting when routine checks find no issues
+- MAY skip reporting when minor self-repairs are completed
+
+### Message Examples
+
+Problem report:
 ```
 call_human:
-  subject: "Production API latency detected"
+  subject: "Production API response latency detected"
   body: |
-    API latency ~3x normal since 2pm.
-    - Impact: All user-facing endpoints
-    - Tried: connection pool check (OK)
-    - Suspect: DB load
-    - Suggestion: Consider DB scale-up
+    API response time has increased to 3x normal since around 2:00 PM.
+    - Impact: All user-facing API endpoints
+    - What I tried: Connection pool status check (no anomaly)
+    - Hypothesis: DB server load may be high
+    - Proposal: Please consider scaling up the DB server
   priority: high
 ```
 
 Decision request:
 ```
 call_human:
-  subject: "Feature release approval"
+  subject: "New feature release approval request"
   body: |
-    User auth feature done, all tests pass.
+    User authentication feature implementation is complete and all tests pass.
     Request approval for production release.
   priority: normal
 ```
 
-## Emergency Exceptions
+## Emergency Exception Rules
 
-In emergencies, normal rules can be relaxed.
+The following exceptions apply to normal hierarchy rules.
 
-### Emergency Definition
+### Definition of Emergency
 
-- System or service outage
-- Security incident
-- Supervisor unreachable for a long time
-- Deadline at risk and normal path is too slow
+Apply exception rules MAY when the following apply:
 
-### Emergency Exceptions (MAY)
+- System failure or service outage has occurred
+- Security incident has occurred
+- Supervisor has been unresponsive for an extended period
+- Deadline is imminent and the normal path would not be in time
 
-- Contact other departments directly (MUST report to supervisor afterward)
-- Skip a level and contact supervisor’s supervisor (MUST report direct supervisor)
-- Make decisions that normally need approval (MUST report and get approval afterward)
+### Actions Permitted in Emergencies
 
-### Emergency Message Example
+- MAY contact other department members directly (MUST report to supervisor afterward)
+- MAY skip a level and contact supervisor's supervisor directly (MUST report to direct supervisor as well)
+- MAY make decisions that normally require consultation (MUST report and obtain approval afterward)
+
+### Emergency Contact Message Example
 
 ```
 To frank: [URGENT] dave here. Contacting you directly due to emergency.
-Production user data mismatch detected.
-Can you check if customers have reported issues?
+User data inconsistency detected in production.
+Can you check if customers have reported any issues?
 I'm also reporting to bob and carol.
 ```
 
-Follow-up to supervisor:
+Follow-up report to supervisor:
 ```
-To bob: [Follow-up] I contacted frank (carol’s team) directly during the prod incident.
-- Reason: Needed fast check on customer impact
-- Action: Asked frank about customer reports
-- Result: 3 reports, frank is handling
-Apologies for not going through you first.
+To bob: [Follow-up report] I contacted frank (under carol) directly during the production incident.
+- Reason: Needed urgent confirmation of customer data inconsistency impact
+- Action: Asked frank to confirm customer inquiry status
+- Result: 3 inquiries received, frank is handling them
+Apologies for the post-facto report. Please review.
 ```
 
-## Rule Summary
+## Rule Priority Summary
 
 | Priority | Rule | Level |
 |----------|------|-------|
-| 1 | Report problems and escalate to supervisor | MUST |
-| 2 | Report task completion | MUST |
-| 3 | Include purpose, outcome, deadline in task instructions | MUST |
+| 1 | Problem reports and escalation to supervisor | MUST |
+| 2 | Task completion reports | MUST |
+| 3 | Include purpose, deliverable, and deadline in task instructions | MUST |
 | 4 | No direct contact with other departments | MUST |
 | 5 | Direct coordination with peers | SHOULD |
-| 6 | Report progress | SHOULD |
-| 7 | Apply emergency exceptions only when justified | MAY |
+| 6 | Intermediate progress reports | SHOULD |
+| 7 | Emergency exception application | MAY |

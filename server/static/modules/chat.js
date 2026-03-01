@@ -326,6 +326,9 @@ function _renderLiveChatMessage(m) {
     } else if (m.streaming) {
       content = '<span class="cursor-blink"></span>';
     }
+    const compressionHtml = m.compressing
+      ? `<div class="compression-indicator"><span class="tool-spinner"></span>会話履歴を圧縮中...</div>`
+      : "";
     const bootstrapHtml = m.bootstrapping
       ? `<div class="bootstrap-indicator"><span class="tool-spinner"></span>\u521D\u671F\u5316\u4E2D...</div>`
       : "";
@@ -333,7 +336,7 @@ function _renderLiveChatMessage(m) {
       ? `<div class="tool-indicator"><span class="tool-spinner"></span>${escapeHtml(m.activeTool)} \u3092\u5B9F\u884C\u4E2D...</div>`
       : "";
     const imagesHtml = renderChatImages(m.images, { animaName: state.selectedAnima });
-    return `<div class="chat-bubble assistant${streamClass}${notifClass}">${thinkingHtml}${content}${imagesHtml}${bootstrapHtml}${toolHtml}</div>`;
+    return `<div class="chat-bubble assistant${streamClass}${notifClass}">${thinkingHtml}${content}${imagesHtml}${compressionHtml}${bootstrapHtml}${toolHtml}</div>`;
   }
   const imagesHtml = renderChatImages(m.images, { animaName: state.selectedAnima });
   const textHtml = m.text ? `<div class="chat-text">${escapeHtml(m.text)}</div>` : "";
@@ -435,6 +438,10 @@ export function renderStreamingBubble(msg) {
     html = '<span class="cursor-blink"></span>';
   }
 
+  if (msg.compressing) {
+    html += `<div class="compression-indicator"><span class="tool-spinner"></span>会話履歴を圧縮中...</div>`;
+  }
+
   if (msg.bootstrapping) {
     html += `<div class="bootstrap-indicator"><span class="tool-spinner"></span>\u521D\u671F\u5316\u4E2D...</div>`;
   }
@@ -528,6 +535,16 @@ export async function sendChat(message) {
       },
       onChainStart: () => {
         logger.debug("onChainStart");
+      },
+      onCompressionStart: () => {
+        logger.debug("onCompressionStart");
+        streamingMsg.compressing = true;
+        renderStreamingBubble(streamingMsg);
+      },
+      onCompressionEnd: () => {
+        logger.debug("onCompressionEnd");
+        streamingMsg.compressing = false;
+        renderStreamingBubble(streamingMsg);
       },
       onHeartbeatRelayStart: ({ message }) => {
         logger.debug(`onHeartbeatRelayStart: ${message}`);

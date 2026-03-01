@@ -1,7 +1,10 @@
-# Common Issues and Fixes
+# Common Issues and Troubleshooting
 
-Reference for common problems and how to fix them.
-Use this first; if it doesn't help, see `troubleshooting/escalation-flowchart.md`.
+Reference for problems commonly encountered during work and how to address them.
+Each issue is documented in the format: "Symptoms → Causes → Steps".
+
+When stuck, read this document first and follow the steps for the relevant section.
+If it doesn't help, see `troubleshooting/escalation-flowchart.md` and escalate appropriately.
 
 ---
 
@@ -9,57 +12,63 @@ Use this first; if it doesn't help, see `troubleshooting/escalation-flowchart.md
 
 ### Symptoms
 
-- No reply to a sent message
-- Recipient says they never got it
+- No reply to a message you thought you sent
+- Recipient says they never received it
 - `send_message` ran but recipient did not react
 
 ### Causes
 
-1. Wrong Anima name
-2. Server stopped
-3. Recipient between Heartbeat runs (still unread)
-4. Send failed with an error
+1. Wrong recipient name (Anima name)
+2. Server is stopped
+3. Recipient is between Heartbeat intervals (message remains unread until next run)
+4. Send operation failed with an error
+5. `intent` is unspecified or invalid (only report / delegation / question allowed)
+6. Session DM limit exceeded (second send to same recipient, or sending to a third recipient)
 
 ### Steps
 
-1. **Check recipient name**
-   - Verify the name in `send_message` `to` parameter
-   - Names are case-sensitive
-   - Use exact name from `identity.md`
-   - To check org:
+1. **Verify recipient name**
+   - Confirm the name in `send_message` `to` parameter is correct
+   - Names are case-sensitive. Use the official name from `identity.md`
+   - To verify:
      ```
      search_memory(query="organization", scope="common_knowledge")
      ```
-     Or `read_memory_file(path="common_knowledge/organization/structure.md")`
+     Or `read_memory_file(path="common_knowledge/organization/structure.md")` to see all Anima names in the org
+   - **Note**: When chatting with a human, do not use `send_message`; reply directly in text (humans receive it). Use `call_human` to contact humans
 
-2. **Check server**
-   - If you are running, the server is up
-   - If still uncertain, report to supervisor
+2. **Check server status**
+   - If you are running, the server should be up
+   - If still uncertain, report to your supervisor that "messages are not being received"
 
 3. **Wait for recipient**
-   - Recipients check Inbox on Heartbeat (e.g. every 30 min)
-   - No reply immediately is normal; they process on next Heartbeat
-   - If urgent, report to supervisor for manual trigger
+   - Recipients check Inbox on Heartbeat intervals (e.g. every 30 min)
+   - No immediate reply is normal; they will process it on the next Heartbeat
+   - If urgent, report to supervisor that you need to reach them urgently and request manual trigger
 
 4. **If send failed**
-   - Log the error
-   - Add to `state/current_task.md` as a blocker
+   - Log the error message
+   - Record it in `state/current_task.md` as a blocker
    - Report to supervisor
 
 ### Examples
 
 ```
 # Wrong name
-send_message(to="Sakura", content="...")   # OK
-send_message(to="sakura", content="...")   # May fail if name differs
+send_message(to="Sakura", content="...", intent="report")   # OK
+send_message(to="sakura", content="...", intent="report")  # May fail if name differs
 
-# Thread reply
+# DM requires intent (report / delegation / question only)
+# Max 2 recipients per session, 1 send per recipient
 send_message(
     to="sakura",
     content="Understood. Starting work.",
-    reply_to="msg-abc123",
-    thread_id="thread-xyz789"
+    intent="report",           # Required: report / delegation / question
+    reply_to="msg-abc123",     # Optional: original message ID
+    thread_id="thread-xyz789"  # Optional: thread ID
 )
+
+# DM for confirmation/thanks/notice only is not allowed → use post_channel (Board)
 ```
 
 ---
@@ -68,56 +77,57 @@ send_message(
 
 ### Symptoms
 
-- Missing information or permissions to proceed
-- Waiting on another Anima’s work
-- External service errors
+- Cannot proceed because required information or permissions are missing
+- Waiting for another Anima's work to complete
+- External service returns errors
 
 ### Causes
 
-1. Dependency task not done
-2. Insufficient permissions (permissions.md)
-3. Missing information
-4. External service issues
+1. Dependency task not completed
+2. Insufficient permissions (attempted operation not allowed in permissions.md)
+3. Missing required information
+4. External service outage
 
 ### Steps
 
-1. **Clarify blocker**
-   - Identify what is missing
-   - Clarify who, what, and when
+1. **Clarify the blocker**
+   - Identify specifically what is missing
+   - Organize: whose work, what work, and by when
 
 2. **Update `state/current_task.md`**
    ```
    write_memory_file(
        path="state/current_task.md",
-       content="## Current Task\n\nXXX implementation\n\n### Blocked\n- Cause: Waiting for YYY\n- Blocked by: ZZZ\n- Since: 2026-02-15 10:00",
+       content="## Current Task\n\nXXX implementation\n\n### Blocked\n- Cause: Waiting for YYY to complete\n- Waiting on: ZZZ\n- Since: 2026-02-15 10:00",
        mode="overwrite"
    )
    ```
 
-3. **Check if you can resolve**
-   - Look for alternative approaches
-   - Search memory:
+3. **Decide if you can resolve it yourself**
+   - Consider whether an alternative approach can avoid the blocker
+   - Search memory for similar past issues:
      ```
      search_memory(query="blocked", scope="episodes")
      search_memory(query="workaround", scope="knowledge")
      ```
 
 4. **Escalate if unresolved** (see `troubleshooting/escalation-flowchart.md`)
-   - Report to supervisor with:
-     - What you tried
-     - What is blocking
+   - Report to supervisor. Include:
+     - What you tried to do
+     - What is blocking you
      - Since when
-     - What you tried
+     - What you tried to resolve it
    ```
    send_message(
        to="supervisor_name",
-       content="[Blocked] Task: XXX implementation\nBlocked by: YYY API permission\nSince: 2026-02-15 10:00\nTried: Checked permissions.md, no entry\nRequest: Add API permission"
+       content="[Blocked Report]\nTask: XXX implementation\nBlocked by: YYY API permission missing\nSince: 2026-02-15 10:00\nTried: Checked permissions.md, no relevant setting\nRequest: Please add API permission",
+       intent="report"
    )
    ```
 
-5. **Check other work**
-   - Review `state/pending.md`
-   - Start another unblocked task if possible
+5. **Check for other work**
+   - Review `state/pending.md` and task queue (`list_tasks`)
+   - Start another task that is not blocked
 
 ---
 
@@ -125,73 +135,74 @@ send_message(
 
 ### Symptoms
 
-- Can’t recall past work
-- Procedure should exist but can’t find it
-- Search returns nothing
+- Cannot recall past work
+- Procedure should exist but cannot find it
+- Search returns no relevant results
 
 ### Causes
 
-1. Poor keywords
-2. Scope too narrow
-3. Not yet recorded
+1. Search keywords are not appropriate
+2. Search scope is too narrow
+3. Not yet recorded (first time doing this task)
 4. Wrong file path
 
 ### Steps
 
-1. **Broaden scope**
-   - First try `all`:
+1. **Broaden scope and search again**
+   - First try `all` scope:
      ```
-     search_memory(query="keyword", scope="all")
+     search_memory(query="search keyword", scope="all")
      ```
-   - Then narrow:
+   - If too many results, narrow scope:
      ```
-     search_memory(query="Slack setup", scope="procedures")
-     search_memory(query="Slack incident", scope="episodes")
-     search_memory(query="Slack", scope="knowledge")
+     search_memory(query="Slack setup", scope="procedures")    # Procedures only
+     search_memory(query="Slack incident", scope="episodes")   # Past events only
+     search_memory(query="Slack", scope="knowledge")            # Learned knowledge only
      ```
 
-2. **Try other keywords**
-   - Synonyms (e.g. "send", "message", "notify")
-   - English (e.g. "slack", "message", "send")
+2. **Try different keywords**
+   - Synonyms and related terms (e.g. "send", "message", "notify", "contact")
+   - English keywords (e.g. "slack", "message", "send")
    - Partial match (e.g. "Chatwork" → "chatwork", "チャットワーク")
 
-3. **Search common_knowledge**
-   - If personal memory has nothing:
+3. **Search common knowledge**
+   - If not in personal memory, it may be in shared knowledge:
      ```
-     search_memory(query="keyword", scope="common_knowledge")
+     search_memory(query="search keyword", scope="common_knowledge")
      ```
-   - Check index:
+   - Check the index:
      ```
      read_memory_file(path="common_knowledge/00_index.md")
      ```
 
-4. **Check directories**
-   - If search fails, list dirs:
+4. **Check directories directly**
+   - If search fails, list directory contents:
      ```
      list_directory(path="knowledge/")
      list_directory(path="procedures/")
      list_directory(path="episodes/")
      ```
-   - Read directly:
+   - Find the file by name and read directly:
      ```
      read_memory_file(path="procedures/slack-setup.md")
      ```
 
-5. **If it doesn’t exist**
-   - Might be new
-   - Check common_knowledge for related guides
-   - Ask supervisor or peers
-   - Record after completing the work (MUST)
+5. **If memory does not exist**
+   - May be first-time work
+   - Check common knowledge (`common_knowledge/`) for related guides
+   - Ask supervisor or peers if they have knowledge
+   - MUST record as memory after completing the work (for next time)
+   - Old or duplicate memories can be archived with `archive_memory_file` to archive/ (moved, not deleted)
 
-### Search Scopes
+### Search Scope Reference
 
 | scope | Searches | Use for |
 |-------|----------|---------|
-| `knowledge` | Learned knowledge | Approach, tech notes |
-| `episodes` | Past actions | What you did when |
-| `procedures` | Procedures | How-to steps |
-| `common_knowledge` | Shared guides | Org rules, system guides |
-| `all` | All above | Broad search |
+| `knowledge` | Learned knowledge, know-how | Approach, tech notes |
+| `episodes` | Past action logs | Fact-checking "what was done when" |
+| `procedures` | Procedures | "How to" steps |
+| `common_knowledge` | Shared knowledge across all Anima | Org rules, system guides |
+| `all` | All of the above | Keyword existence check, broad search |
 
 ---
 
@@ -199,101 +210,106 @@ send_message(
 
 ### Symptoms
 
-- "Permission denied" or similar from tools
-- Can’t read/write files
-- Commands rejected
+- "Permission denied" or similar error when running a tool
+- Cannot read/write files
+- Command execution rejected
 
 ### Causes
 
-1. Operation not allowed in `permissions.md`
+1. Attempted operation not allowed in `permissions.md`
 2. External tool category not enabled
-3. Path outside allowed scope
+3. File path outside allowed scope
 
 ### Steps
 
 1. **Check your permissions**
    ```
-   read_memory_file(path="permissions.md")
+   check_permissions()
    ```
-   - Read paths
-   - Write paths
-   - Allowed commands
-   - External tool categories
+   - Returns a list of available internal tools, external tools, file access, and restrictions
+   - Details in `read_memory_file(path="permissions.md")`
+   - Main sections in `permissions.md`:
+     - "File operations" / "Readable paths": Paths you can read
+     - "Command execution" / "Allowed commands": Whitelist of executable commands
+     - "Disallowed commands": Blocked commands
+     - External tools: Categories allowed in permissions.md are enabled
 
-2. **Confirm scope**
-   - Read: only paths in read_paths
-   - Write: only paths in write_paths
-   - Commands: only in allowed_commands
+2. **Confirm the operation is allowed**
+   - Your anima_dir is readable and writable. Shared dirs, subordinate management files, etc. — check with `check_permissions`
+   - Commands: Only commands listed in "Allowed commands" can be executed
 
-3. **If you need more**
-   - Re-evaluate if the operation is needed
-   - Look for alternatives within allowed scope
-   - If not possible:
+3. **If you need permission**
+   - Reconsider whether the operation is really necessary
+   - Consider alternatives within allowed scope
+   - If no alternative, ask supervisor for permission:
    ```
    send_message(
        to="supervisor_name",
-       content="[Permission request]\nPurpose: XXX\nNeeded: Read /path/to/dir\nReason: Need YYY"
+       content="[Permission Request]\nPurpose: XXX work\nNeeded: Read /path/to/dir\nReason: Need to reference YYY information",
+       intent="question"
    )
    ```
 
-4. **Don’t**
-   - Bypass permission checks
-   - Run disallowed commands in other ways
-   - Use another Anima’s permissions
+4. **Never do the following**
+   - Attempt to bypass permission checks
+   - Execute disallowed commands by other means
+   - Use another Anima's permissions
 
 ---
 
-## Tools Don’t Work
+## Tools Don't Work
 
 ### Symptoms
 
-- "Tool not found" or similar
+- "Tool not found" or similar error when calling a tool
 - External tools (Slack, Gmail, etc.) unavailable
-- `discover_tools` doesn’t show what you expect
+- `discover_tools` does not show the tool you need
 
 ### Causes
 
-1. Category not enabled
+1. External tool category not enabled
 2. Tool not allowed in `permissions.md`
-3. Missing credentials/config for external service
+3. External service credentials not configured
 
 ### Steps
 
-1. **List tool categories**
+1. **Check available tool categories**
    ```
    discover_tools()
    ```
-   (No args)
+   - Call with no args to get a list of available categories
 
-2. **Enable a category**
+2. **Enable the desired category**
    ```
    discover_tools(category="slack")
    ```
-   Then tools in that category become available.
+   - Enabling adds that category's tools dynamically (A-mode)
+   - Only categories allowed in permissions.md can be enabled
 
 3. **Check permissions**
    ```
-   read_memory_file(path="permissions.md")
+   check_permissions()
    ```
-   - `tool_categories` lists allowed categories
-   - If a category is missing, it is not allowed
+   - `external_tools.enabled` shows currently enabled categories; `available_but_not_enabled` shows allowed but not yet enabled
+   - Categories not allowed in permissions.md cannot be used
 
-4. **If not allowed**
+4. **If category is not allowed**
    - Ask supervisor for permission
-   - Explain why the tool is needed
+   - Clearly state why the tool is needed when requesting
 
-5. **S-mode**
-   - MCP tools (`mcp__aw__*`) should work; restart if not
-   - External tools via Bash: `animaworks-tool <name> --help`
-   - `mcp__aw__discover_tools` for categories, then `animaworks-tool <name> <subcmd>`
+5. **S-mode (Claude Agent SDK)**
+   - MCP tools (`mcp__aw__*`) are available automatically. Restart process if not found
+   - External tools are available via MCP if allowed in permissions.md (e.g. `mcp__aw__slack_post`)
+   - Long-running tools (image gen, local LLM, etc.) run asynchronously via `animaworks-tool submit`
+   - Use `mcp__aw__discover_tools` to check categories → after enabling, call as MCP tool
 
-6. **If a tool errors**
-   - Record the error
-   - Auth errors → report to supervisor (admins manage credentials)
-   - Timeout → retry (up to 3 times)
-   - If still failing, treat as blocker and report
+6. **If tool returns an error**
+   - Record the error message accurately
+   - Report to supervisor for auth errors (credential setup is admin responsibility)
+   - Retry on timeout (up to 3 times)
+   - If still failing after retries, report as blocker
 
-See `operations/tool-usage-overview.md` for tool overview.
+See `operations/tool-usage-overview.md` for the full tool overview.
 
 ---
 
@@ -301,38 +317,39 @@ See `operations/tool-usage-overview.md` for tool overview.
 
 ### Symptoms
 
-- Long session
-- Slower responses
-- Notice about context limit
+- Session has run for a long time
+- Responses are getting slower
+- System notice about approaching context limit
 
 ### Causes
 
-- Long runs or many tool calls using context
-- Large file reads
+- Long work or many tool calls consuming the context window
+- Large file contents loaded
 
 ### Steps
 
-1. **Save state** (MUST)
-   - Write current state to `shortterm/`:
+1. **Save work state to short-term memory** (MUST)
+   - Write current state to `shortterm/` (use `shortterm/chat/` for chat sessions):
    ```
    write_memory_file(
-       path="shortterm/session_state.md",
-       content="## Session State\n\n### Current Task\n- XXX (50% done)\n\n### Next Steps\n1. Finish YYY\n2. Test ZZZ\n\n### Interim Results\n- AAA: BBB\n- CCC: DDD",
+       path="shortterm/chat/session_state.md",
+       content="## Session State\n\n### Current Task\n- XXX implementation (50% done)\n\n### Next Steps\n1. Complete YYY\n2. Test ZZZ\n\n### Important Interim Results\n- AAA findings: BBB\n- CCC setting: DDD",
        mode="overwrite"
    )
    ```
+   - Use `shortterm/heartbeat/session_state.md` for Heartbeat sessions
 
 2. **Update `state/current_task.md`** (MUST)
    ```
    write_memory_file(
        path="state/current_task.md",
-       content="## Current Task\n\nXXX\n\n### Progress\n- 50% done\n- Resume from YYY\n\n### Notes\n- Key findings",
+       content="## Current Task\n\nXXX implementation\n\n### Progress\n- 50% done\n- Resume from YYY next time\n\n### Notes\n- Important findings here",
        mode="overwrite"
    )
    ```
 
-3. **Save important learnings** (SHOULD)
-   - Write to `knowledge/`:
+3. **Save important learnings to persistent memory** (SHOULD)
+   - Save insights from the work to `knowledge/`:
    ```
    write_memory_file(
        path="knowledge/xxx-findings.md",
@@ -342,14 +359,15 @@ See `operations/tool-usage-overview.md` for tool overview.
    ```
 
 4. **Wait for session continuation**
-   - New session will load `shortterm/`
-   - Re-read `state/current_task.md` and resume
+   - System will start a new session automatically
+   - New session will include `shortterm/chat/` (or `shortterm/heartbeat/`) in context
+   - Re-read `state/current_task.md` and resume work
 
 ### Prevention
 
-- Avoid reading whole large files; search for what you need
-- Update `state/current_task.md` regularly
-- Save interim results to memory
+- Don't read whole large files; search for needed parts only
+- Update `state/current_task.md` regularly during long work
+- Save interim results to memory frequently
 
 ---
 
@@ -358,20 +376,21 @@ See `operations/tool-usage-overview.md` for tool overview.
 ### Symptoms
 
 - `send_message` or `post_channel` returns an error
-- "Global outbound limit reached"
+- Message like `GlobalOutboundLimitExceeded: Hourly send limit (30) reached...` is shown
 
 ### Causes
 
-- Hit 30/hour or 100/day limit
-- Or posted to same channel again within cooldown
+- Reached 30/hour or 100/day send limit (config.json `heartbeat.max_messages_per_hour` / `max_messages_per_day`)
+- Repeated post to same channel within cooldown period (default 300 seconds)
 
 ### Steps
 
-1. Check the error: hour vs daily limit
-2. Review recent sends
-3. Wait: next hour for hourly limit, next day for daily limit
-4. For urgent contact: use `call_human` (not rate-limited)
-5. Combine reports into fewer messages
+1. **Check the error message**: Identify whether it's hourly or daily limit
+2. **Review send history**: Check if there were unnecessary sends
+3. **Wait**: Until next hour for hourly limit, or next day for daily limit
+4. **Record what you wanted to send**: For this turn, don't use `send_message`; write the content to `state/current_task.md` and send in the next session
+5. **Urgent contact**: `call_human` is not rate-limited; human contact remains available
+6. **Combine sends**: Merge multiple reports into one message
 
 See `communication/sending-limits.md` for details.
 
@@ -381,29 +400,29 @@ See `communication/sending-limits.md` for details.
 
 ### Symptoms
 
-- "Command blocked" or similar
-- Some commands fail
+- "Command blocked" or similar error when trying to run a command
+- Certain commands cannot be executed
 
 ### Causes
 
-1. System-wide block list (e.g. `rm -rf /`)
-2. `permissions.md` "Disallowed commands" section
+1. Command in system-wide block list (e.g. `rm -rf /`)
+2. Command listed in `permissions.md` "Disallowed commands" section
 
 ### Steps
 
-1. **Check permissions**
+1. **Check your permissions**
    ```
    read_memory_file(path="permissions.md")
    ```
-   - Look for `## Disallowed commands` (or equivalent)
+   - `## Disallowed commands` section lists blocked commands
 
-2. **Find alternatives**
-   - Use allowed tools or commands
-   - Example: if `rm -rf` is blocked, try allowed single-file delete
+2. **Consider alternatives**
+   - See if equivalent operation is possible with allowed tools
+   - Example: If `rm -rf` is blocked, single-file delete may be allowed
 
-3. **If you need the command**
+3. **If permission change is needed**
    - Ask supervisor to unblock
-   - Explain why it is needed
+   - Clearly state why the command is needed when requesting
 
 ---
 
@@ -411,44 +430,44 @@ See `communication/sending-limits.md` for details.
 
 ### Symptoms
 
-- Org context, memory guide, etc. missing from prompt
-- Fewer tools
-- Priming seems inactive
+- Information that normally appears (org context, memory guide, etc.) is missing from system prompt
+- Fewer tools available
+- Memory auto-recall (Priming) seems inactive
 
 ### Causes
 
-Small-context models get a shorter system prompt (Tiered System Prompt).
+When using a model with a small context window, the system prompt is reduced in stages (Tiered System Prompt).
 
-| Tier | Context Size | Omitted |
-|------|--------------|---------|
-| T1 (FULL) | 128k+ | None |
-| T2 (STANDARD) | 32k–128k | Distilled knowledge, smaller Priming |
-| T3 (LIGHT) | 16k–32k | bootstrap, vision, specialty, distilled knowledge, memory guide |
-| T4 (MINIMAL) | Under 16k | Plus permissions, Priming, org, messaging, emotion |
+| Tier | Context Window | Omitted Information |
+|------|----------------|----------------------|
+| T1 (FULL) | 128k+ tokens | None (all info shown) |
+| T2 (STANDARD) | 32k–128k tokens | Distilled knowledge, Priming budget reduced |
+| T3 (LIGHT) | 16k–32k tokens | bootstrap, vision, specialty, distilled knowledge, memory guide omitted |
+| T4 (MINIMAL) | Under 16k tokens | Plus permissions, Priming, org, messaging, emotion omitted |
 
 ### Steps
 
-1. Check model in `status.json` to infer context size
-2. Fetch omitted info with `search_memory` or `read_memory_file`
-3. If model change is needed, ask supervisor
+1. **Check your model**: Infer context window from model name in `status.json` (config.json `model_context_windows` can override)
+2. **Fetch needed info yourself**: Use `search_memory` or `read_memory_file` to get omitted information explicitly
+3. **Consult supervisor**: If model change is needed, ask supervisor
 
 ---
 
-## Other Issues
+## Other Common Issues
 
 ### File Not Found
 
-- **Cause**: Wrong path or missing file
-- **Fix**: Use `list_directory` to verify paths
-- **Note**: `read_memory_file` uses paths relative to Anima dir; `read_file` uses absolute paths
+- **Cause**: Wrong path or file does not exist
+- **Fix**: Use `list_directory` to verify directory contents before specifying path
+- **Note**: `read_memory_file` uses paths relative to Anima dir (e.g. `knowledge/xxx.md`, `common_knowledge/organization/structure.md`). `read_file` uses absolute paths
 
 ### Command Timeout
 
 - **Cause**: Execution exceeded `timeout`
-- **Fix**: Increase `timeout` for `execute_command` (default 30s)
+- **Fix**: Increase `timeout` parameter for `execute_command` (default: 30 seconds)
 - **Note**: Set appropriate timeout for long-running commands
 
-### Recipient Anima Missing
+### Recipient Anima Does Not Exist
 
-- **Cause**: Wrong name or Anima not created
-- **Fix**: Check with supervisor; see `common_knowledge/organization/structure.md` for org layout
+- **Cause**: Wrong Anima name, or that Anima has not been created yet
+- **Fix**: Check with supervisor. See `common_knowledge/organization/structure.md` for org structure

@@ -227,6 +227,12 @@ def _handle_chunk(
             "message": chunk.get("message", t("chat.bootstrap_busy")),
         }), ""
 
+    if event_type == "compression_start":
+        return _format_sse("compression_start", {}), ""
+
+    if event_type == "compression_end":
+        return _format_sse("compression_end", {}), ""
+
     if event_type == "heartbeat_relay_start":
         return _format_sse("heartbeat_relay_start", {
             "message": chunk.get("message", t("chat.heartbeat_processing")),
@@ -296,6 +302,10 @@ def _chunk_to_event(chunk: dict[str, Any]) -> tuple[str, dict[str, Any]] | None:
         return "bootstrap", {"status": "completed"}
     if event_type == "bootstrap_busy":
         return "bootstrap", {"status": "busy", "message": chunk.get("message", t("chat.bootstrap_busy"))}
+    if event_type == "compression_start":
+        return "compression_start", {}
+    if event_type == "compression_end":
+        return "compression_end", {}
     if event_type == "heartbeat_relay_start":
         return "heartbeat_relay_start", {"message": chunk.get("message", t("chat.heartbeat_processing"))}
     if event_type == "heartbeat_relay":

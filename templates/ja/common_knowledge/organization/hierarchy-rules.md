@@ -61,27 +61,29 @@ alice宛: キャッシュ戦略について判断をお願いしたいです。
 
 ### ツール一覧
 
-| ツール | 対象範囲 | 概要 |
-|--------|---------|------|
-| `org_dashboard` | 全配下（再帰） | 配下全体のプロセス状態・最終アクティビティ・現在タスク・タスク数をツリー表示 |
-| `ping_subordinate` | 全配下（再帰） | 配下の生存確認。`name` 省略で全員一括 |
-| `read_subordinate_state` | 全配下（再帰） | 配下の `current_task.md` + `pending.md` を読み取り |
-| `delegate_task` | 直属部下のみ | タスク委譲（部下キュー追加 + DM送信 + 自分側追跡エントリ作成） |
-| `task_tracker` | 自分の委譲タスク | `delegate_task` で委譲したタスクの進捗追跡 |
-| `disable_subordinate` | 直属部下 | 部下を休止（約30秒でプロセス停止） |
-| `enable_subordinate` | 直属部下 | 休止した部下を再開 |
-| `set_subordinate_model` | 直属部下 | 部下のモデルを変更（反映には `restart_subordinate` が必要） |
-| `restart_subordinate` | 直属部下 | 部下プロセスを再起動（約30秒で再起動） |
+| ツール | 対象範囲 | 概要 | 主なパラメータ |
+|--------|---------|------|----------------|
+| `org_dashboard` | 全配下（再帰） | 配下全体のプロセス状態・最終アクティビティ・現在タスク・タスク数をツリー表示 | なし |
+| `ping_subordinate` | 全配下（再帰） | 配下の生存確認。`name` 省略で全員一括、指定で単一 Anima のみ | `name`（任意） |
+| `read_subordinate_state` | 全配下（再帰） | 配下の `state/current_task.md` と `state/pending.md` を読み取り | `name`（必須） |
+| `delegate_task` | 直属部下のみ | タスク委譲（部下キュー追加 + DM送信 + 自分側追跡エントリ作成） | `name`, `instruction`, `deadline`（必須）, `summary`（任意） |
+| `task_tracker` | 自分の委譲タスク | `delegate_task` で委譲したタスクの進捗を部下側キューから追跡 | `status`（任意: "all"/"active"/"completed", デフォルト "active"） |
+| `disable_subordinate` | 直属部下 | 部下を休止（status.json enabled=false、約30秒でプロセス停止） | `name`（必須）, `reason`（任意） |
+| `enable_subordinate` | 直属部下 | 休止した部下を再開 | `name`（必須） |
+| `set_subordinate_model` | 直属部下 | 部下のモデルを変更（status.json 更新。反映には `restart_subordinate` が必要） | `name`, `model`（必須）, `reason`（任意） |
+| `restart_subordinate` | 直属部下 | 部下プロセスを再起動（restart_requested フラグ、約30秒で再起動） | `name`（必須）, `reason`（任意） |
 
 `check_permissions` は全 Anima が利用可能（自分の権限一覧を確認）。
 
 ### タスク委譲フロー
 
-1. `delegate_task(name="dave", instruction="...", deadline="2026-02-20")` を実行
-2. dave のタスクキューにタスクが自動追加される
+1. `delegate_task(name="dave", instruction="...", deadline="...")` を実行
+   - `deadline` は相対形式（`30m`, `2h`, `1d`）または ISO8601 形式（例: `2026-02-20`）
+   - `summary` は任意（省略時は instruction の先頭100文字）
+2. dave のタスクキュー（`state/task_queue.jsonl`）にタスクが自動追加される
 3. dave に DM が自動送信される（intent="delegation"）
-4. 自分のキューに追跡エントリが作成される
-5. `task_tracker()` で進捗を追跡する
+4. 自分のキューに追跡エントリが作成される（status="delegated"）
+5. `task_tracker(status="active")` で進行中の委譲タスクを追跡する（`status="all"` で全件、`status="completed"` で完了済みのみ）
 
 ### 配下の状態確認（定期的に行うべき）
 
@@ -90,6 +92,13 @@ org_dashboard()                        # 配下全体の状態をツリー表示
 read_subordinate_state(name="dave")    # dave の現在タスクと保留タスクを確認
 ping_subordinate()                     # 全員の生存確認
 ```
+
+### 組織の拡張（新規 Anima 作成）
+
+`skills/newstaff.md` を保持している Anima は `create_anima` ツールで新規 Anima を作成できる。
+キャラクターシート（`character_sheet_content` または `character_sheet_path`）を指定し、
+作成後は config.json に自動登録され、サーバー再読み込みで有効化される。
+`supervisor` を省略した場合、呼び出し元の Anima が上司として設定される。
 
 ## 部下へのコミュニケーション（指示・確認）
 
