@@ -432,7 +432,7 @@ body.sidebar-collapsed .sidebar-collapse-btn {
     height: 16px;
   }
 
-  .chat-bubble {
+  .chat-bubble.user {
     max-width: 90%;
   }
 
@@ -543,9 +543,11 @@ body.sidebar-collapsed .sidebar-collapse-btn {
   }
 
   .chat-bubble {
-    max-width: 95%;
     padding: 8px 12px;
     font-size: 0.88rem;
+  }
+  .chat-bubble.user {
+    max-width: 95%;
   }
 
   .card-header {
@@ -612,13 +614,8 @@ body.sidebar-collapsed .sidebar-collapse-btn {
 /* ── Chat Page Mobile (< 768px) ──────────── */
 
 @media (max-width: 768px) {
-  /* Anima header: icon row + inline ➕ (see main mobile block above) */
-
-  .chat-right-pane-toggle-btn {
-    display: none;
-  }
-
-  .chat-right-pane-handle {
+  /* Hide mobile tab bar — use desktop-style toggle button instead */
+  .chat-mobile-tabs {
     display: none;
   }
 
@@ -629,48 +626,65 @@ body.sidebar-collapsed .sidebar-collapse-btn {
     max-height: 280px;
   }
 
-  .chat-mobile-tabs {
+  /* Show toggle button — positioned at top-right of layout */
+  .chat-right-pane-handle {
     display: flex;
-    border-bottom: 2px solid var(--aw-color-border-light);
-    background: var(--aw-color-bg-primary);
-    flex-shrink: 0;
+    position: absolute;
+    top: 0.15rem;
+    right: 0.2rem;
+    z-index: 15;
+    width: auto;
+    padding: 0;
   }
 
-  .chat-mobile-tab {
-    flex: 1;
-    padding: 10px 0;
-    border: none;
-    background: none;
-    font-size: 0.9rem;
-    font-weight: 600;
-    color: var(--aw-color-slate-light);
-    cursor: pointer;
-    transition: color 0.15s, border-color 0.15s;
-    border-bottom: 3px solid transparent;
-    min-height: 44px;
+  .chat-right-pane-toggle-btn {
+    display: inline-flex;
+    width: 28px;
+    height: 28px;
   }
 
-  .chat-mobile-tab.active {
-    color: var(--aw-color-accent);
-    border-bottom-color: var(--aw-color-accent);
+  .chat-right-pane-toggle-icon {
+    width: 14px;
+    height: 14px;
+  }
+
+  /* Make room for toggle button in anima header */
+  .chat-anima-tabs-header {
+    padding-right: 2.2rem;
   }
 
   .chat-page-layout {
     height: 100%;
     gap: 0;
+    position: relative;
   }
 
   .chat-page-main {
     flex: 1;
   }
 
+  /* Sidebar as full overlay on mobile */
   .chat-page-sidebar {
-    width: 100%;
-    flex: 1;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 10;
+    background: var(--aw-color-bg-primary);
     border-left: none;
   }
 
-  .chat-page-sidebar.mobile-hidden,
+  /* sidebar-hidden controls visibility on mobile */
+  .chat-page-layout.sidebar-hidden .chat-page-sidebar {
+    display: none !important;
+  }
+
+  .chat-page-layout:not(.sidebar-hidden) .chat-page-sidebar {
+    display: flex !important;
+    flex-direction: column;
+  }
+
   .chat-page-main.mobile-hidden {
     display: none !important;
   }

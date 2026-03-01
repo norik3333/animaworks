@@ -5,6 +5,7 @@ import { t } from "/shared/i18n.js";
 import { api } from "./api.js";
 import { loadMemoryTab } from "./memory.js";
 import { animaHashColor } from "../shared/avatar-utils.js";
+import { bustupCandidates, resolveAvatar } from "./avatar-resolver.js";
 
 export async function loadAnimas() {
   try {
@@ -116,18 +117,10 @@ export async function updateAnimaAvatar() {
   const initial = escapeHtml(name.charAt(0).toUpperCase());
   const color = animaHashColor(name);
 
-  // Try bust-up first, then chibi
   let imgHtml = "";
-  const candidates = ["avatar_bustup.png", "avatar_chibi.png"];
-  for (const filename of candidates) {
-    const url = `/api/animas/${encodeURIComponent(name)}/assets/${encodeURIComponent(filename)}`;
-    try {
-      const resp = await fetch(url, { method: "HEAD" });
-      if (resp.ok) {
-        imgHtml = `<img class="anima-avatar-img" src="${escapeHtml(url)}" alt="${escapeHtml(name)}">`;
-        break;
-      }
-    } catch { /* try next */ }
+  const url = await resolveAvatar(name, bustupCandidates());
+  if (url) {
+    imgHtml = `<img class="anima-avatar-img" src="${escapeHtml(url)}" alt="${escapeHtml(name)}">`;
   }
 
   // Always render both: img and initial div. CSS variables control visibility per theme.
