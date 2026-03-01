@@ -345,6 +345,15 @@ body.sidebar-collapsed .sidebar-collapse-btn {
     height: 28px;
   }
 
+  /* Flatten header-actions so + button flows inline with avatars */
+  .chat-header-actions {
+    display: contents;
+  }
+
+  .chat-add-conversation {
+    margin-left: auto;
+  }
+
   .chat-add-conversation-btn {
     width: 32px;
     height: 32px;
