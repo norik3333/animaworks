@@ -183,7 +183,7 @@ export function createStreamingController(ctx) {
   }
 
   async function sendChat(message, overrideImages = null) {
-    const name = state.selectedAnima;
+    const name = overrideImages?.targetAnima || state.selectedAnima;
     const images = overrideImages?.images || state.imageInputManager?.getPendingImages() || [];
     const displayImages = overrideImages?.displayImages || state.imageInputManager?.getDisplayImages() || [];
     if (!name || (!message.trim() && images.length === 0)) return;
@@ -205,7 +205,7 @@ export function createStreamingController(ctx) {
       return;
     }
 
-    const tid = state.selectedThreadId;
+    const tid = overrideImages?.targetThread || state.selectedThreadId;
     const threadList = state.threads[name] || [];
     const threadEntry = threadList.find(th => th.id === tid);
     if (threadEntry && threadEntry.label === "新しいスレッド" && message.trim()) {
@@ -325,30 +325,32 @@ export function createStreamingController(ctx) {
         },
       },
       onFinally: () => {
-        if (streamingMsg && streamingMsg.streaming) {
-          streamingMsg.streaming = false;
-          if (!streamingMsg.text) {
-            streamingMsg.text = streamingMsg.afterHeartbeatRelay ? t("chat.receive_failed") : t("chat.empty_response");
+        try {
+          if (streamingMsg && streamingMsg.streaming) {
+            streamingMsg.streaming = false;
+            if (!streamingMsg.text) {
+              streamingMsg.text = streamingMsg.afterHeartbeatRelay ? t("chat.receive_failed") : t("chat.empty_response");
+            }
+            streamingMsg.afterHeartbeatRelay = false;
+            renderFull();
           }
-          streamingMsg.afterHeartbeatRelay = false;
-          renderFull();
-        }
 
-        const inputEl = $("chatPageInput");
-        if (inputEl && state.selectedAnima === name) {
-          inputEl.placeholder = t("chat.message_to", { name });
-          saveDraft(name, inputEl.value || "", tid);
-          inputEl.focus();
-        }
-        updateSendButton();
-        ctx.controllers.anima.renderAnimaTabs();
-        ctx.controllers.thread.renderThreadTabs();
-
-        if (state.selectedAnima === name && mgr.getPendingQueue(name, tid).length > 0) {
-          const next = mgr.dequeue(name, tid);
-          showPendingIndicator();
-          if (mgr.getPendingQueue(name, tid).length === 0) hidePendingIndicator();
-          setTimeout(() => sendChat(next.text, { images: next.images, displayImages: next.displayImages }), 150);
+          const inputEl = $("chatPageInput");
+          if (inputEl && state.selectedAnima === name) {
+            inputEl.placeholder = t("chat.message_to", { name });
+            saveDraft(name, inputEl.value || "", tid);
+            inputEl.focus();
+          }
+          updateSendButton();
+          ctx.controllers.anima.renderAnimaTabs();
+          ctx.controllers.thread.renderThreadTabs();
+        } finally {
+          if (mgr.getPendingQueue(name, tid).length > 0) {
+            const next = mgr.dequeue(name, tid);
+            showPendingIndicator();
+            if (mgr.getPendingQueue(name, tid).length === 0) hidePendingIndicator();
+            setTimeout(() => sendChat(next.text, { images: next.images, displayImages: next.displayImages, targetAnima: name, targetThread: tid }), 150);
+          }
         }
       },
     });
@@ -393,14 +395,23 @@ export function createStreamingController(ctx) {
         },
       },
       onFinally: () => {
-        if (streamingMsg?.streaming) {
-          streamingMsg.streaming = false;
-          if (!streamingMsg.text) streamingMsg.text = t("chat.empty_response");
-          if (state.selectedAnima === animaName) ctx.controllers.renderer.renderChat();
+        try {
+          if (streamingMsg?.streaming) {
+            streamingMsg.streaming = false;
+            if (!streamingMsg.text) streamingMsg.text = t("chat.empty_response");
+            if (state.selectedAnima === animaName) ctx.controllers.renderer.renderChat();
+          }
+          updateSendButton();
+          ctx.controllers.anima.renderAnimaTabs();
+          ctx.controllers.thread.renderThreadTabs();
+        } finally {
+          if (mgr.getPendingQueue(animaName, tid).length > 0) {
+            const next = mgr.dequeue(animaName, tid);
+            showPendingIndicator();
+            if (mgr.getPendingQueue(animaName, tid).length === 0) hidePendingIndicator();
+            setTimeout(() => sendChat(next.text, { images: next.images, displayImages: next.displayImages, targetAnima: animaName, targetThread: tid }), 150);
+          }
         }
-        updateSendButton();
-        ctx.controllers.anima.renderAnimaTabs();
-        ctx.controllers.thread.renderThreadTabs();
       },
     });
 

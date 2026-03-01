@@ -31,8 +31,10 @@ function _animaThread() {
   return { anima: st.conversationAnima, thread: st.activeThreadId || "default" };
 }
 
-function _drainQueue() {
-  const { anima, thread } = _animaThread();
+function _drainQueue(explicitAnima, explicitThread) {
+  const { anima: curAnima, thread: curThread } = _animaThread();
+  const anima = explicitAnima || curAnima;
+  const thread = explicitThread || curThread;
   if (!anima) return;
   const mgr = _mgr();
   const q = mgr.getPendingQueue(anima, thread);
@@ -177,26 +179,28 @@ async function _sendConversation(text, overrideImages = null) {
       },
     },
     onFinally: () => {
-      setTalking(false);
-      if (streamingMsg?.streaming) {
-        streamingMsg.streaming = false;
-        if (!streamingMsg.text) streamingMsg.text = "(空の応答)";
-      }
-      renderConvMessages();
-      renderWsThreadTabs();
-      if (dom.convInput) dom.convInput.disabled = false;
-      wsUpdateSendButton(false); wsSaveDraft(); dom.convInput?.focus();
-
-      const st = getState();
-      const threadList = st.threads[anima] || [];
-      const entry = threadList.find(t => t.id === thread);
-      if (entry && entry.label === "新しいスレッド" && (text || "").trim()) {
-        const lbl = (text || "").trim().slice(0, 20) + ((text || "").trim().length > 20 ? "..." : "");
-        setState({ threads: { ...st.threads, [anima]: threadList.map(t => t.id === thread ? { ...t, label: lbl } : t) } });
+      try {
+        setTalking(false);
+        if (streamingMsg?.streaming) {
+          streamingMsg.streaming = false;
+          if (!streamingMsg.text) streamingMsg.text = "(空の応答)";
+        }
+        renderConvMessages();
         renderWsThreadTabs();
-      }
+        if (dom.convInput) dom.convInput.disabled = false;
+        wsUpdateSendButton(false); wsSaveDraft(); dom.convInput?.focus();
 
-      _drainQueue();
+        const st = getState();
+        const threadList = st.threads[anima] || [];
+        const entry = threadList.find(t => t.id === thread);
+        if (entry && entry.label === "新しいスレッド" && (text || "").trim()) {
+          const lbl = (text || "").trim().slice(0, 20) + ((text || "").trim().length > 20 ? "..." : "");
+          setState({ threads: { ...st.threads, [anima]: threadList.map(t => t.id === thread ? { ...t, label: lbl } : t) } });
+          renderWsThreadTabs();
+        }
+      } finally {
+        _drainQueue(anima, thread);
+      }
     },
   });
 
@@ -243,15 +247,18 @@ export async function resumeConversationStream(animaName) {
       },
     },
     onFinally: () => {
-      setTalking(false);
-      if (streamingMsg?.streaming) {
-        streamingMsg.streaming = false;
-        if (!streamingMsg.text) streamingMsg.text = "(空の応答)";
+      try {
+        setTalking(false);
+        if (streamingMsg?.streaming) {
+          streamingMsg.streaming = false;
+          if (!streamingMsg.text) streamingMsg.text = "(空の応答)";
+        }
+        renderConvMessages();
+        renderWsThreadTabs();
+        wsUpdateSendButton(false); dom.convInput?.focus();
+      } finally {
+        _drainQueue(animaName, threadId);
       }
-      renderConvMessages();
-      renderWsThreadTabs();
-      wsUpdateSendButton(false); dom.convInput?.focus();
-      _drainQueue();
     },
   });
 
