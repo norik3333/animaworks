@@ -1,12 +1,11 @@
 // ── Memory Browser Controller ──────────────────
-import { $ } from "./ctx.js";
-
 export function createMemoryController(ctx) {
+  const $root = ctx.$root;
   const { state, deps } = ctx;
   const { api, t, escapeHtml } = deps;
 
   async function loadMemoryTab() {
-    const fileList = $("chatMemoryFileList");
+    const fileList = $root("chatMemoryFileList");
     if (!fileList) return;
 
     if (!state.selectedAnima) {
@@ -38,10 +37,10 @@ export function createMemoryController(ctx) {
 
   async function loadMemoryContent(tab, file) {
     if (!state.selectedAnima) return;
-    const fileList = $("chatMemoryFileList");
-    const contentArea = $("chatMemoryContentArea");
-    const titleEl = $("chatMemoryContentTitle");
-    const bodyEl = $("chatMemoryContentBody");
+    const fileList = $root("chatMemoryFileList");
+    const contentArea = $root("chatMemoryContentArea");
+    const titleEl = $root("chatMemoryContentTitle");
+    const bodyEl = $root("chatMemoryContentBody");
 
     if (fileList) fileList.style.display = "none";
     if (contentArea) contentArea.style.display = "";

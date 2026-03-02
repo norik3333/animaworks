@@ -42,14 +42,16 @@ class TestChatJsThreadTabs:
     """Verify chat.js HTML structure for thread tabs."""
 
     def test_chat_js_contains_thread_tabs_div_with_id(self) -> None:
-        """chat.js contains thread-tabs div with chatThreadTabs id."""
-        js = _read(CHAT_JS)
+        """Pane host contains thread-tabs div with chatThreadTabs data-chat-id."""
+        pane_host = PROJECT_ROOT / "server" / "static" / "pages" / "chat" / "pane-host.js"
+        js = _read(pane_host)
         assert 'class="thread-tabs"' in js
-        assert 'id="chatThreadTabs"' in js
+        assert 'data-chat-id="chatThreadTabs"' in js
 
     def test_chat_js_contains_chat_new_thread_btn(self) -> None:
-        """chat.js contains chatNewThreadBtn button."""
-        js = _read(CHAT_JS)
+        """Pane host contains chatNewThreadBtn button."""
+        pane_host = PROJECT_ROOT / "server" / "static" / "pages" / "chat" / "pane-host.js"
+        js = _read(pane_host)
         assert "chatNewThreadBtn" in js
 
     def test_chat_js_selected_thread_id_initialized_default(self) -> None:

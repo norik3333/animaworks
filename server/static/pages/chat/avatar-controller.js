@@ -1,8 +1,8 @@
 // ── Bustup Overlay Controller ──────────────────
-import { $ } from "./ctx.js";
 import { bustupCandidates, resolveAvatar } from "../../modules/avatar-resolver.js";
 
 export function createAvatarController(ctx) {
+  const $ = ctx.$;
   const { state, deps } = ctx;
   const { escapeHtml } = deps;
 

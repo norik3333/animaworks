@@ -1,21 +1,20 @@
 // ── History Panel Controller ──────────────────
-import { $ } from "./ctx.js";
-
 export function createHistoryController(ctx) {
+  const $root = ctx.$root;
   const { state, deps } = ctx;
   const { api, t, escapeHtml, renderMarkdown, timeStr } = deps;
 
   function showHistoryDetail(title) {
-    const list = $("chatHistorySessionList");
-    const detail = $("chatHistoryDetail");
-    const titleEl = $("chatHistoryDetailTitle");
+    const list = $root("chatHistorySessionList");
+    const detail = $root("chatHistoryDetail");
+    const titleEl = $root("chatHistoryDetailTitle");
     if (list) list.style.display = "none";
     if (detail) detail.style.display = "";
     if (titleEl) titleEl.textContent = title;
   }
 
   async function loadSessionList() {
-    const list = $("chatHistorySessionList");
+    const list = $root("chatHistorySessionList");
     if (!list || !state.selectedAnima) {
       if (list) list.innerHTML = `<div class="loading-placeholder">${t("chat.anima_select_first")}</div>`;
       return;
@@ -87,7 +86,7 @@ export function createHistoryController(ctx) {
   }
 
   function renderConversationHistoryDetail(data) {
-    const conv = $("chatHistoryConversation");
+    const conv = $root("chatHistoryConversation");
     if (!conv) return;
     if (!data?.sessions?.length) {
       conv.innerHTML = '<div class="loading-placeholder">\u4F1A\u8A71\u30C7\u30FC\u30BF\u304C\u3042\u308A\u307E\u305B\u3093</div>';
@@ -110,7 +109,7 @@ export function createHistoryController(ctx) {
   async function loadActiveConversation() {
     if (!state.selectedAnima) return;
     showHistoryDetail(t("chat.history_detail_title"));
-    const conv = $("chatHistoryConversation");
+    const conv = $root("chatHistoryConversation");
     if (conv) conv.innerHTML = '<div class="loading-placeholder">\u8AAD\u307F\u8FBC\u307F\u4E2D...</div>';
     try {
       const data = await ctx.controllers.renderer.fetchConversationHistory(state.selectedAnima, 50, null, state.selectedThreadId);
@@ -123,7 +122,7 @@ export function createHistoryController(ctx) {
   async function loadArchivedSession(sessionId) {
     if (!state.selectedAnima) return;
     showHistoryDetail(t("chat.session_detail", { id: sessionId }));
-    const conv = $("chatHistoryConversation");
+    const conv = $root("chatHistoryConversation");
     if (conv) conv.innerHTML = `<div class="loading-placeholder">${t("common.loading")}</div>`;
     try {
       const data = await api(`/api/animas/${encodeURIComponent(state.selectedAnima)}/sessions/${encodeURIComponent(sessionId)}`);
@@ -144,7 +143,7 @@ export function createHistoryController(ctx) {
   }
 
   function renderTranscriptDetail(data) {
-    const conv = $("chatHistoryConversation");
+    const conv = $root("chatHistoryConversation");
     if (!conv) return;
     let html = "";
     if (data.turns?.length > 0) {
@@ -164,7 +163,7 @@ export function createHistoryController(ctx) {
   async function loadTranscript(date) {
     if (!state.selectedAnima) return;
     showHistoryDetail(t("chat.transcript_detail", { date }));
-    const conv = $("chatHistoryConversation");
+    const conv = $root("chatHistoryConversation");
     if (conv) conv.innerHTML = `<div class="loading-placeholder">${t("common.loading")}</div>`;
     try {
       const data = await api(`/api/animas/${encodeURIComponent(state.selectedAnima)}/transcripts/${encodeURIComponent(date)}`);
@@ -177,7 +176,7 @@ export function createHistoryController(ctx) {
   async function loadEpisode(date) {
     if (!state.selectedAnima) return;
     showHistoryDetail(t("chat.episode_detail", { date }));
-    const conv = $("chatHistoryConversation");
+    const conv = $root("chatHistoryConversation");
     if (conv) conv.innerHTML = `<div class="loading-placeholder">${t("common.loading")}</div>`;
     try {
       const data = await api(`/api/animas/${encodeURIComponent(state.selectedAnima)}/episodes/${encodeURIComponent(date)}`);

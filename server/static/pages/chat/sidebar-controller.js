@@ -1,13 +1,12 @@
 // ── Sidebar / Tab Switching Controller ─────────
-import { $ } from "./ctx.js";
-
 const RIGHT_PANE_VISIBLE_KEY = "aw-chat-right-pane-visible";
 
 export function createSidebarController(ctx) {
+  const $root = ctx.$root;
   const { state } = ctx;
 
   function applyRightPaneToggleButton(visible) {
-    const btn = $("chatRightPaneToggleBtn");
+    const btn = $root("chatRightPaneToggleBtn");
     if (!btn) return;
     btn.classList.toggle("is-collapsed", !visible);
     btn.setAttribute("aria-pressed", visible ? "true" : "false");
@@ -18,7 +17,7 @@ export function createSidebarController(ctx) {
   function setRightPaneVisible(visible, { persist = true } = {}) {
     const nextVisible = Boolean(visible);
     state.rightPaneVisible = nextVisible;
-    const layout = $("chatPageLayout");
+    const layout = $root("chatPageLayout");
     if (layout) layout.classList.toggle("sidebar-hidden", !nextVisible);
     // Keep mobile-hidden in sync so both mechanisms agree
     const sidebar = state.container?.querySelector(".chat-page-sidebar");
@@ -40,8 +39,8 @@ export function createSidebarController(ctx) {
   }
 
   function switchMobileTab(panel) {
-    const chatTab = $("chatMobileTabChat");
-    const infoTab = $("chatMobileTabInfo");
+    const chatTab = $root("chatMobileTabChat");
+    const infoTab = $root("chatMobileTabInfo");
     const mainPanel = state.container?.querySelector(".chat-page-main");
     const sidePanel = state.container?.querySelector(".chat-page-sidebar");
     if (!mainPanel || !sidePanel) return;
@@ -67,13 +66,13 @@ export function createSidebarController(ctx) {
       btn.classList.toggle("active", btn.dataset.tab === tab);
     }
     for (const [key, id] of Object.entries(tabs)) {
-      const el = $(id);
+      const el = $root(id);
       if (el) el.style.display = key === tab ? "" : "none";
     }
 
     if (tab === "history" && state.selectedAnima) {
-      const detail = $("chatHistoryDetail");
-      const list = $("chatHistorySessionList");
+      const detail = $root("chatHistoryDetail");
+      const list = $root("chatHistorySessionList");
       if (detail) detail.style.display = "none";
       if (list) list.style.display = "";
       ctx.controllers.history.loadSessionList();

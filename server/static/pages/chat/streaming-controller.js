@@ -1,6 +1,6 @@
 // ── Streaming / Send / Queue Controller ────────
 import {
-  $, saveDraft, clearDraft, chatInputMaxHeight,
+  saveDraft, clearDraft, chatInputMaxHeight,
   scheduleSaveChatUiState, CONSTANTS,
 } from "./ctx.js";
 
@@ -11,6 +11,7 @@ const SEND_BTN_ICONS = {
 };
 
 export function createStreamingController(ctx) {
+  const $ = ctx.$;
   const { state, deps } = ctx;
   const { t, escapeHtml, logger, fetchActiveStream, fetchStreamProgress } = deps;
   const mgr = state.manager;

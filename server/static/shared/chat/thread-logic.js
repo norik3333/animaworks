@@ -126,26 +126,26 @@ export function renderThreadTabsHtml(threadList, activeThreadId, opts) {
 
   if (hiddenThreads.length > 0) {
     html += `<span class="thread-more-wrap">` +
-      `<label class="thread-more-label" for="${moreSelectId}">他 ${hiddenThreads.length} 件</label>` +
-      `<select id="${moreSelectId}" class="thread-more-select">` +
+      `<label class="thread-more-label">他 ${hiddenThreads.length} 件</label>` +
+      `<select data-chat-id="${moreSelectId}" class="thread-more-select">` +
       `<option value="">スレッドを選択...</option>` +
       hiddenThreads.map(th => `<option value="${escapeHtml(th.id)}">${escapeHtml(th.label)}${th.unread ? " ★" : ""}</option>`).join("") +
       `</select></span>`;
   }
 
-  html += `<button type="button" class="thread-tab-new" id="${newBtnId}" title="新しいスレッド">＋</button>`;
+  html += `<button type="button" class="thread-tab-new" data-chat-id="${newBtnId}" title="新しいスレッド">＋</button>`;
 
   if (archived.length > 0) {
     const archiveBtnId = opts.archiveBtnId || "chatArchiveBtn";
     const archiveMenuId = opts.archiveMenuId || "chatArchiveMenu";
     html += `<span class="thread-archive-wrap">` +
-      `<button type="button" class="thread-archive-btn" id="${archiveBtnId}" title="アーカイブ (${archived.length})">` +
+      `<button type="button" class="thread-archive-btn" data-chat-id="${archiveBtnId}" title="アーカイブ (${archived.length})">` +
       `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">` +
       `<polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/>` +
       `</svg>` +
       `<span class="thread-archive-badge">${archived.length}</span>` +
       `</button>` +
-      `<div class="thread-archive-menu" id="${archiveMenuId}">` +
+      `<div class="thread-archive-menu" data-chat-id="${archiveMenuId}">` +
       archived.map(th =>
         `<button type="button" class="thread-archive-item" data-thread="${escapeHtml(th.id)}">${escapeHtml(th.label)}</button>`
       ).join("") +

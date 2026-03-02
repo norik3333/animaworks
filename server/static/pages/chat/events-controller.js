@@ -1,7 +1,8 @@
 // ── Event Binding Controller ──────────────────
-import { $, saveDraft, chatInputMaxHeight } from "./ctx.js";
+import { saveDraft, chatInputMaxHeight } from "./ctx.js";
 
 export function createEventsController(ctx) {
+  const $ = ctx.$;
   const { state, deps } = ctx;
   const { t } = deps;
 
@@ -13,12 +14,7 @@ export function createEventsController(ctx) {
     }
   }
 
-  function bindEvents() {
-    // Mobile tab switching
-    for (const tabId of ["chatMobileTabChat", "chatMobileTabInfo"]) {
-      addListener(tabId, "click", e => ctx.controllers.sidebar.switchMobileTab(e.target.dataset.panel));
-    }
-
+  function bindPaneEvents() {
     // Escape to dismiss bustup overlay
     document.addEventListener("keydown", ctx.controllers.avatar.onBustupEscape);
     state.boundListeners.push({ el: document, event: "keydown", handler: ctx.controllers.avatar.onBustupEscape });
@@ -85,27 +81,6 @@ export function createEventsController(ctx) {
       ctx.controllers.streaming.updateSendButton();
     });
 
-    // Right tab switching
-    for (const tabId of ["chatTabState", "chatTabActivity", "chatTabHistory"]) {
-      addListener(tabId, "click", e => ctx.controllers.sidebar.switchRightTab(e.target.dataset.tab));
-    }
-    addListener("chatRightPaneToggleBtn", "click", () => ctx.controllers.sidebar.toggleRightPane());
-
-    // Memory tabs
-    state.container.querySelectorAll(".memory-tab").forEach(btn => {
-      const handler = () => {
-        state.activeMemoryTab = btn.dataset.tab;
-        state.container.querySelectorAll(".memory-tab").forEach(b => b.classList.toggle("active", b.dataset.tab === state.activeMemoryTab));
-        const contentArea = $("chatMemoryContentArea");
-        const fileList = $("chatMemoryFileList");
-        if (contentArea) contentArea.style.display = "none";
-        if (fileList) fileList.style.display = "";
-        ctx.controllers.memory.loadMemoryTab();
-      };
-      btn.addEventListener("click", handler);
-      state.boundListeners.push({ el: btn, event: "click", handler });
-    });
-
     // Attach / file input
     addListener("chatPageAttachBtn", "click", () => { $("chatPageFileInput")?.click(); });
     addListener("chatPageFileInput", "change", () => {
@@ -116,22 +91,6 @@ export function createEventsController(ctx) {
     // Image input + voice init
     ctx.controllers.imageVoice.initImageInput();
 
-    // Memory back
-    addListener("chatMemoryBackBtn", "click", () => {
-      const ca = $("chatMemoryContentArea");
-      const fl = $("chatMemoryFileList");
-      if (ca) ca.style.display = "none";
-      if (fl) fl.style.display = "";
-    });
-
-    // History back
-    addListener("chatHistoryBackBtn", "click", () => {
-      const detail = $("chatHistoryDetail");
-      const list = $("chatHistorySessionList");
-      if (detail) detail.style.display = "none";
-      if (list) list.style.display = "";
-    });
-
     // Infinite scroll observer + scroll-to-bottom tracking
     ctx.controllers.renderer.setupChatObserver();
     ctx.controllers.renderer.initScrollTracking();
@@ -141,12 +100,10 @@ export function createEventsController(ctx) {
   }
 
   function _bindUnifiedHeader(addListener) {
-    // Hamburger: reuse the same logic as the main hamburger
     addListener("chatUnifiedHamburger", "click", () => {
       document.body.classList.toggle("mobile-nav-open");
     });
 
-    // User menu toggle
     addListener("chatUnifiedUserBtn", "click", e => {
       e.stopPropagation();
       const menu = $("chatUnifiedUserMenu");
@@ -163,19 +120,15 @@ export function createEventsController(ctx) {
     document.addEventListener("pointerdown", closeUserMenu);
     state.boundListeners.push({ el: document, event: "pointerdown", handler: closeUserMenu });
 
-    // User logout
     addListener("chatUnifiedUserLogout", "click", () => {
       const mainLogout = document.getElementById("logoutBtn");
       if (mainLogout) mainLogout.click();
     });
 
-    // Info panel toggle (reuse sidebar toggle)
     addListener("chatUnifiedInfoBtn", "click", () => ctx.controllers.sidebar.toggleRightPane());
 
-    // Populate user info
     _populateUnifiedUser();
 
-    // Thread dropdown toggle
     addListener("chatThreadDropdownBtn", "click", e => {
       e.stopPropagation();
       const dd = $("chatThreadDropdown");
@@ -205,5 +158,5 @@ export function createEventsController(ctx) {
     if (initialEl) initialEl.textContent = (userName.charAt(0) || "?").toUpperCase();
   }
 
-  return { bindEvents };
+  return { bindPaneEvents };
 }

@@ -1,12 +1,13 @@
 // ── Anima Selection / Tab / Avatar Controller ──
 import {
-  $, isTabOpen, refreshAnimaUnread,
+  isTabOpen, refreshAnimaUnread,
   clearUnreadForActiveThread, loadDraft, saveDraft, chatInputMaxHeight,
   fetchChatUiState, scheduleSaveChatUiState, mergeThreadsFromSessions,
 } from "./ctx.js";
 import { bustupCandidates, resolveAvatar } from "../../modules/avatar-resolver.js";
 
 export function createAnimaController(ctx) {
+  const $ = ctx.$;
   const { state, deps } = ctx;
   const { api, escapeHtml, t, logger } = deps;
   let _selectGen = 0;

@@ -1,6 +1,6 @@
 // ── Thread CRUD / Tab Controller ──────────────
 import {
-  $, isTabOpen, refreshAnimaUnread, clearUnreadForActiveThread,
+  isTabOpen, refreshAnimaUnread, clearUnreadForActiveThread,
   setThreadUnread, threadTimeValue, scheduleSaveChatUiState,
   saveDraft, loadDraft, chatInputMaxHeight,
   CONSTANTS,
@@ -13,6 +13,7 @@ import {
 } from "../../shared/chat/thread-logic.js";
 
 export function createThreadController(ctx) {
+  const $ = ctx.$;
   const { state, deps } = ctx;
   const { escapeHtml } = deps;
 
@@ -206,7 +207,7 @@ export function createThreadController(ctx) {
     }
 
     html += `<div class="chat-thread-dd-sep"></div>`;
-    html += `<div class="chat-thread-dd-new" id="chatThreadDdNew">＋ 新しいスレッド</div>`;
+    html += `<div class="chat-thread-dd-new" data-chat-id="chatThreadDdNew">＋ 新しいスレッド</div>`;
     menu.innerHTML = html;
 
     menu.querySelectorAll(".chat-thread-dd-item:not(.archived)").forEach(el => {

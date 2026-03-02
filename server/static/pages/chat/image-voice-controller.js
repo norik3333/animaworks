@@ -1,7 +1,7 @@
 // ── Image Input / Voice Chat Controller ────────
-import { $ } from "./ctx.js";
 
 export function createImageVoiceController(ctx) {
+  const $ = ctx.$;
   const { state, deps } = ctx;
   const { createImageInput, initLightbox, initVoiceUI, updateVoiceUIAnima } = deps;
 

@@ -1,137 +1,25 @@
 // ── Chat Page (Orchestrator) ──────────────────
 import { t } from "/shared/i18n.js";
-import { createChatContext, CONSTANTS } from "./chat/ctx.js";
-import { createAnimaController } from "./chat/anima-controller.js";
-import { createThreadController } from "./chat/thread-controller.js";
-import { createChatRenderer } from "./chat/chat-renderer.js";
-import { createAvatarController } from "./chat/avatar-controller.js";
-import { createActivityController } from "./chat/activity-controller.js";
-import { createStreamingController } from "./chat/streaming-controller.js";
-import { createHistoryController } from "./chat/history-controller.js";
-import { createMemoryController } from "./chat/memory-controller.js";
-import { createSidebarController } from "./chat/sidebar-controller.js";
-import { createEventsController } from "./chat/events-controller.js";
-import { createImageVoiceController } from "./chat/image-voice-controller.js";
+import { createPaneHost } from "./chat/pane-host.js";
 
-let _ctx = null;
+let _host = null;
 
 export function render(container) {
-  const ctx = createChatContext();
-  _ctx = ctx;
-  ctx.state.container = container;
-
-  // ── Create controllers (order doesn't matter — cross-refs are lazy via ctx.controllers) ──
-  ctx.controllers.anima = createAnimaController(ctx);
-  ctx.controllers.thread = createThreadController(ctx);
-  ctx.controllers.renderer = createChatRenderer(ctx);
-  ctx.controllers.avatar = createAvatarController(ctx);
-  ctx.controllers.activity = createActivityController(ctx);
-  ctx.controllers.streaming = createStreamingController(ctx);
-  ctx.controllers.history = createHistoryController(ctx);
-  ctx.controllers.memory = createMemoryController(ctx);
-  ctx.controllers.sidebar = createSidebarController(ctx);
-  ctx.controllers.events = createEventsController(ctx);
-  ctx.controllers.imageVoice = createImageVoiceController(ctx);
-
-  // ── DOM ──
   container.innerHTML = `
     <!-- Mobile Tab Bar -->
-    <nav class="chat-mobile-tabs" id="chatMobileTabs">
-      <button class="chat-mobile-tab active" data-panel="chat" id="chatMobileTabChat">${t("nav.chat")}</button>
-      <button class="chat-mobile-tab" data-panel="info" id="chatMobileTabInfo">${t("chat.character_summary")}</button>
+    <nav class="chat-mobile-tabs" data-chat-id="chatMobileTabs">
+      <button class="chat-mobile-tab active" data-panel="chat" data-chat-id="chatMobileTabChat">${t("nav.chat")}</button>
+      <button class="chat-mobile-tab" data-panel="info" data-chat-id="chatMobileTabInfo">${t("chat.character_summary")}</button>
     </nav>
 
-    <div class="chat-page-layout" id="chatPageLayout">
-      <!-- Left: Chat Panel -->
-      <div class="chat-page-main">
-        <div class="chat-anima-tabs-header" id="chatAnimaTabsHeader">
-          <button class="chat-unified-hamburger" id="chatUnifiedHamburger" aria-label="メニュー">&#x2630;</button>
-          <div class="anima-tabs" id="chatAnimaTabs"></div>
-          <div class="chat-header-actions">
-            <div class="chat-add-conversation" id="chatAddConversationArea">
-              <button type="button" id="chatAddConversationBtn" class="chat-add-conversation-btn">${t("chat.anima_select")}</button>
-              <div id="chatAddConversationMenu" class="chat-add-conversation-menu" role="listbox" aria-label="${t("chat.anima_select")}"></div>
-            </div>
-          </div>
-          <div class="chat-thread-dropdown" id="chatThreadDropdown">
-            <button type="button" class="chat-thread-dropdown-btn" id="chatThreadDropdownBtn" aria-label="スレッド">
-              <span class="chat-thread-dropdown-label" id="chatThreadDropdownLabel">メイン</span>
-              <svg class="chat-thread-dropdown-chevron" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
-            </button>
-            <div class="chat-thread-dropdown-menu" id="chatThreadDropdownMenu"></div>
-          </div>
-          <button class="chat-unified-info-btn" id="chatUnifiedInfoBtn" aria-label="情報パネル" title="情報パネル">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
-          </button>
-          <button class="chat-unified-user-btn" id="chatUnifiedUserBtn" aria-label="ユーザー">
-            <span class="chat-unified-user-initial" id="chatUnifiedUserInitial">?</span>
-          </button>
-          <div class="chat-unified-user-menu" id="chatUnifiedUserMenu">
-            <div class="chat-unified-user-name" id="chatUnifiedUserName"></div>
-            <div class="chat-unified-user-status" id="chatUnifiedUserStatus"></div>
-            <hr class="chat-unified-user-sep">
-            <button class="chat-unified-user-logout" id="chatUnifiedUserLogout">${t("ws.logout")}</button>
-          </div>
-        </div>
-
-        <div class="thread-tabs" id="chatThreadTabs">
-          <button class="thread-tab active" data-thread="default">メイン</button>
-          <button class="thread-tab-new" id="chatNewThreadBtn" title="新しいスレッド">＋</button>
-        </div>
-
-        <!-- Chat Messages + Scroll Button wrapper -->
-        <div class="chat-messages-area">
-          <div id="chatPageMessages" class="chat-messages" style="flex:1; overflow-y:auto; padding:1rem;">
-            <div class="chat-empty">${t("chat.anima_select_first")}</div>
-          </div>
-          <button type="button" id="chatScrollToBottom" class="scroll-to-bottom-btn" aria-label="Scroll to bottom">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="6 9 12 15 18 9"></polyline>
-            </svg>
-          </button>
-        </div>
-
-        <!-- Chat Input -->
-        <form id="chatPageForm" class="chat-input-form">
-          <div class="image-preview-bar" id="chatPagePreviewBar" style="display:none"></div>
-          <div class="pending-queue-bar" id="chatPagePending" style="display:none">
-            <div class="pending-queue-header">
-              <span class="pending-queue-label" id="chatPagePendingLabel">${t("chat.queue_label")}</span>
-              <button class="pending-queue-clear" id="chatPagePendingCancel" type="button" title="${t("chat.queue_clear_all")}">✕ all</button>
-            </div>
-            <div id="chatPagePendingList"></div>
-          </div>
-          <div class="chat-input-wrap">
-            <textarea
-              id="chatPageInput"
-              class="chat-input"
-              placeholder="${t("chat.placeholder")}"
-              autocomplete="off"
-              rows="1"
-              disabled
-            ></textarea>
-            <div class="chat-input-actions">
-              <button type="button" class="chat-attach-btn" id="chatPageAttachBtn" title="${t("chat.attach_image")}">+</button>
-              <button type="button" class="chat-queue-btn" id="chatPageQueueBtn" disabled title="${t("chat.queue_add")}">
-                <svg class="chat-queue-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                  <path d="M12 5v14M5 12l7 7 7-7" />
-                </svg>
-              </button>
-              <button type="submit" class="chat-send-btn" id="chatPageSendBtn" disabled>
-                <svg class="chat-send-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                  <path d="M12 19V5M5 12l7-7 7 7" />
-                </svg>
-              </button>
-            </div>
-          </div>
-          <input type="file" id="chatPageFileInput" accept="image/jpeg,image/png,image/gif,image/webp" multiple style="display:none" />
-        </form>
-      </div>
+    <div class="chat-page-layout" data-chat-id="chatPageLayout">
+      <!-- Pane Host -->
+      <div class="chat-pane-host" data-chat-id="chatPaneHost"></div>
 
       <div class="chat-right-pane-handle">
         <button
           type="button"
-          id="chatRightPaneToggleBtn"
+          data-chat-id="chatRightPaneToggleBtn"
           class="chat-right-pane-toggle-btn"
           aria-label="右ペインを表示・非表示"
           title="右ペインを表示・非表示"
@@ -145,28 +33,28 @@ export function render(container) {
       <!-- Right: Sidebar -->
       <div class="chat-page-sidebar mobile-hidden">
         <nav class="right-tabs" style="display:flex; border-bottom:1px solid var(--border-color, #eee);">
-          <button class="right-tab active" data-tab="state" id="chatTabState">${t("chat.state_current")}</button>
-          <button class="right-tab" data-tab="activity" id="chatTabActivity">${t("nav.activity")}</button>
-          <button class="right-tab" data-tab="history" id="chatTabHistory">${t("chat.history_conversation")}</button>
+          <button class="right-tab active" data-tab="state" data-chat-id="chatTabState">${t("chat.state_current")}</button>
+          <button class="right-tab" data-tab="activity" data-chat-id="chatTabActivity">${t("nav.activity")}</button>
+          <button class="right-tab" data-tab="history" data-chat-id="chatTabHistory">${t("chat.history_conversation")}</button>
         </nav>
 
-        <div id="chatRightTabContent" style="padding:0.75rem;">
-          <div id="chatPaneState">
-            <pre class="state-content" id="chatAnimaState" style="white-space:pre-wrap; word-break:break-word; margin:0;">${t("chat.anima_select_first")}</pre>
+        <div data-chat-id="chatRightTabContent" style="padding:0.75rem;">
+          <div data-chat-id="chatPaneState">
+            <pre class="state-content" data-chat-id="chatAnimaState" style="white-space:pre-wrap; word-break:break-word; margin:0;">${t("chat.anima_select_first")}</pre>
           </div>
-          <div id="chatPaneActivity" style="display:none;">
-            <div id="chatActivityFeed" class="activity-feed">
+          <div data-chat-id="chatPaneActivity" style="display:none;">
+            <div data-chat-id="chatActivityFeed" class="activity-feed">
               <div class="activity-empty">${t("activity.feed_empty")}</div>
             </div>
           </div>
-          <div id="chatPaneHistory" style="display:none;">
-            <div id="chatHistorySessionList">
+          <div data-chat-id="chatPaneHistory" style="display:none;">
+            <div data-chat-id="chatHistorySessionList">
               <div class="loading-placeholder">${t("chat.anima_select_first")}</div>
             </div>
-            <div id="chatHistoryDetail" style="display:none;">
-              <button class="memory-back-btn" id="chatHistoryBackBtn">&larr; ${t("chat.back_list")}</button>
-              <h3 id="chatHistoryDetailTitle" style="margin:0.5rem 0;"></h3>
-              <div id="chatHistoryConversation" style="max-height:400px; overflow-y:auto;"></div>
+            <div data-chat-id="chatHistoryDetail" style="display:none;">
+              <button class="memory-back-btn" data-chat-id="chatHistoryBackBtn">&larr; ${t("chat.back_list")}</button>
+              <h3 data-chat-id="chatHistoryDetailTitle" style="margin:0.5rem 0;"></h3>
+              <div data-chat-id="chatHistoryConversation" style="max-height:400px; overflow-y:auto;"></div>
             </div>
           </div>
 
@@ -176,13 +64,13 @@ export function render(container) {
               <button class="memory-tab" data-tab="knowledge">${t("chat.memory_knowledge")}</button>
               <button class="memory-tab" data-tab="procedures">${t("chat.memory_procedures")}</button>
             </nav>
-            <div id="chatMemoryFileList" class="memory-file-list" style="padding:0.5rem;">
+            <div data-chat-id="chatMemoryFileList" class="memory-file-list" style="padding:0.5rem;">
               <div class="loading-placeholder">${t("chat.anima_select")}</div>
             </div>
-            <div id="chatMemoryContentArea" style="display:none; padding:0.5rem;">
-              <button class="memory-back-btn" id="chatMemoryBackBtn">&larr; ${t("chat.memory_back")}</button>
-              <h3 id="chatMemoryContentTitle" style="margin:0.5rem 0;"></h3>
-              <pre id="chatMemoryContentBody" class="memory-content-body" style="white-space:pre-wrap; word-break:break-word;"></pre>
+            <div data-chat-id="chatMemoryContentArea" style="display:none; padding:0.5rem;">
+              <button class="memory-back-btn" data-chat-id="chatMemoryBackBtn">&larr; ${t("chat.memory_back")}</button>
+              <h3 data-chat-id="chatMemoryContentTitle" style="margin:0.5rem 0;"></h3>
+              <pre data-chat-id="chatMemoryContentBody" class="memory-content-body" style="white-space:pre-wrap; word-break:break-word;"></pre>
             </div>
           </div>
         </div>
@@ -190,57 +78,22 @@ export function render(container) {
     </div>
   `;
 
-  // ── Wire up ──
-  ctx.controllers.sidebar.initRightPaneVisibility();
-  ctx.controllers.events.bindEvents();
-  ctx.controllers.anima.loadAnimas();
-
-  // Auto-refresh intervals
-  const actInterval = setInterval(() => ctx.controllers.activity.loadActivity(), 30000);
-  ctx.state.intervals.push(actInterval);
-  const chatInterval = setInterval(() => ctx.controllers.renderer.pollSelectedChat(), CONSTANTS.CHAT_POLL_INTERVAL_MS);
-  ctx.state.intervals.push(chatInterval);
+  _host = createPaneHost(container);
+  _host.bindSharedEvents();
+  _host.restoreLayout();
+  if (_host.panes.length === 0) _host.addPane();
 }
 
 export function destroy() {
-  if (!_ctx) return;
-  const { state } = _ctx;
+  if (!_host) return;
+  _host.destroy();
+  _host = null;
+}
 
-  for (const id of state.intervals) clearInterval(id);
-  state.intervals = [];
+export function splitPane() {
+  return _host?.splitPane() ?? null;
+}
 
-  if (state.chatUiStateSaveTimer) {
-    clearTimeout(state.chatUiStateSaveTimer);
-    state.chatUiStateSaveTimer = null;
-  }
-  for (const { el, event, handler } of state.boundListeners) {
-    el.removeEventListener(event, handler);
-  }
-  state.boundListeners = [];
-
-  if (state.chatObserver) { state.chatObserver.disconnect(); state.chatObserver = null; }
-  if (state.manager) {
-    for (const anima of state.animas) {
-      state.manager.destroyAllForAnima(anima.name);
-    }
-  }
-  _ctx.controllers.avatar.removeBustupOverlay();
-
-  // Reset all state
-  state.bustupUrl = null;
-  state.container = null;
-  state.animas = [];
-  state.selectedAnima = null;
-  state.animaTabs = [];
-  state.selectedThreadId = "default";
-  state.threads = {};
-  state.activeThreadByAnima = {};
-  state.animaLastAccess = {};
-  state.animaDetail = null;
-  state.imageInputManager = null;
-  state.animaTabAvatarUrls = {};
-  state.animaTabAvatarLoading = {};
-  state.rightPaneVisible = true;
-
-  _ctx = null;
+export function getPaneHost() {
+  return _host;
 }

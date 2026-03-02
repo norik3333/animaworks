@@ -1,6 +1,6 @@
 // ── Chat Rendering / Infinite Scroll / Polling ──
 import {
-  $, setThreadUnread, refreshAnimaUnread, threadTimeValue,
+  setThreadUnread, refreshAnimaUnread, threadTimeValue,
   mergeThreadsFromSessions, scheduleSaveChatUiState, CONSTANTS,
 } from "./ctx.js";
 import {
@@ -15,6 +15,7 @@ import { mergePolledHistory } from "../../shared/chat/history-loader.js";
 import { initTextArtifactHandlers } from "../../shared/text-artifact.js";
 
 export function createChatRenderer(ctx) {
+  const $ = ctx.$;
   const { state, deps } = ctx;
   const { api, t, escapeHtml, renderMarkdown, smartTimestamp, timeStr, renderChatImages } = deps;
 

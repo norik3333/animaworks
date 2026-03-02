@@ -74,11 +74,16 @@ export function createChatContext() {
     getIcon, getDisplaySummary,
   };
 
-  return { state, deps, controllers: {} };
-}
+  function $(id) {
+    return state.container?.querySelector(`[data-chat-id="${id}"]`) ?? null;
+  }
 
-// ── DOM helper ──
-export function $(id) { return document.getElementById(id); }
+  function $root(id) {
+    return state.rootContainer?.querySelector(`[data-chat-id="${id}"]`) ?? null;
+  }
+
+  return { state, deps, controllers: {}, $, $root };
+}
 
 export function chatInputMaxHeight() {
   return window.matchMedia("(max-width: 768px)").matches ? 140 : 260;

@@ -1,12 +1,11 @@
 // ── Activity Feed / Anima State Controller ────
-import { $ } from "./ctx.js";
-
 export function createActivityController(ctx) {
+  const $root = ctx.$root;
   const { state, deps } = ctx;
   const { api, t, escapeHtml, timeStr, getIcon, getDisplaySummary } = deps;
 
   function addLocalActivity(type, animaName, summary) {
-    const feed = $("chatActivityFeed");
+    const feed = $root("chatActivityFeed");
     if (!feed) return;
 
     const empty = feed.querySelector(".activity-empty");
@@ -35,7 +34,7 @@ export function createActivityController(ctx) {
     try {
       const data = await api(`/api/activity/recent?hours=6&anima=${encodeURIComponent(state.selectedAnima)}`);
       const events = data.events || [];
-      const feed = $("chatActivityFeed");
+      const feed = $root("chatActivityFeed");
       if (!feed) return;
 
       if (events.length === 0) {
@@ -61,7 +60,7 @@ export function createActivityController(ctx) {
   }
 
   function renderAnimaState() {
-    const el = $("chatAnimaState");
+    const el = $root("chatAnimaState");
     if (!el) return;
     const d = state.animaDetail;
     if (!d || !d.state) { el.textContent = t("animas.no_state"); return; }
