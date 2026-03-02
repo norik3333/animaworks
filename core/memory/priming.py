@@ -464,7 +464,16 @@ class PrimingEngine:
         except Exception:
             logger.warning("Failed to read shared channels", exc_info=True)
 
+        _MAX_CHANNEL_ENTRIES = 15
+        if len(result) > _MAX_CHANNEL_ENTRIES:
+            result.sort(key=lambda e: e.ts, reverse=True)
+            result = result[:_MAX_CHANNEL_ENTRIES]
+
         return result
+
+    _OWN_ACTION_TYPES = frozenset({
+        "message_sent", "response_sent", "message_received", "tool_use",
+    })
 
     def _prioritize_entries(
         self,
@@ -475,26 +484,61 @@ class PrimingEngine:
         """Prioritize activity entries for priming.
 
         Priority order:
-        1. Entries involving the current sender (most relevant)
-        2. Entries matching keywords (topically relevant)
-        3. Most recent entries (temporal relevance)
+        1. Own actions (message_sent, response_sent, message_received, tool_use)
+        2. Entries involving the current sender (most relevant)
+        3. Entries matching keywords (topically relevant)
+        4. Most recent entries (temporal relevance, timestamp-based)
         """
+        from datetime import datetime
         from core.memory.activity import ActivityEntry
 
         keywords_lower = {kw.lower() for kw in keywords} if keywords else set()
 
+        # Compute base timestamp for recency scoring
+        base_ts: datetime | None = None
+        if entries:
+            try:
+                base_ts = datetime.fromisoformat(
+                    entries[0].ts.replace("Z", "+00:00")
+                )
+            except (ValueError, AttributeError):
+                pass
+
         scored: list[tuple[float, int, ActivityEntry]] = []
         for i, entry in enumerate(entries):
             score = 0.0
+
+            # Own action bonus
+            if entry.type in self._OWN_ACTION_TYPES:
+                if entry.type == "message_received":
+                    from_type = (entry.meta or {}).get("from_type", "")
+                    if from_type != "anima":
+                        score += 15.0
+                else:
+                    score += 15.0
+
             # Sender relevance
             if entry.from_person == sender_name or entry.to_person == sender_name:
                 score += 10.0
+
             # Keyword relevance
             text = (entry.content + " " + entry.summary).lower()
             matching_kw = sum(1 for kw in keywords_lower if kw in text)
             score += matching_kw * 3.0
-            # Recency (later index = more recent = higher score)
-            score += i * 0.1
+
+            # Recency (timestamp-based: 1 point per 10 minutes)
+            if base_ts is not None:
+                try:
+                    entry_ts = datetime.fromisoformat(
+                        entry.ts.replace("Z", "+00:00")
+                    )
+                    elapsed_seconds = (entry_ts - base_ts).total_seconds()
+                    score += elapsed_seconds / 600
+                except (ValueError, AttributeError):
+                    score += i * 0.1
+            else:
+                score += i * 0.1
+
             scored.append((score, i, entry))
 
         # Sort by score descending
@@ -843,8 +887,23 @@ class PrimingEngine:
             return result
 
         except Exception as e:
-            logger.warning("Channel D: Skill matching failed: %s", e)
-            return []
+            logger.warning(
+                "Channel D: Full skill matching failed, trying Tier 1/2 only: %s", e,
+            )
+            try:
+                matched = match_skills_by_description(
+                    message, all_metas, retriever=None, anima_name="",
+                )
+                result = [m.name for m in matched[:_MAX_SKILL_MATCHES]]
+                if result:
+                    logger.debug(
+                        "Channel D: Tier 1/2 fallback matched %d skills: %s",
+                        len(result), result,
+                    )
+                return result
+            except Exception as e2:
+                logger.warning("Channel D: Tier 1/2 fallback also failed: %s", e2)
+                return []
 
     async def _channel_e_pending_tasks(self) -> str:
         """Channel E: Pending task queue summary + active parallel tasks.
@@ -955,7 +1014,7 @@ class PrimingEngine:
         lines = [t("priming.outbound_header"), ""]
         for e in reversed(recent):
             time_str = e.ts[11:16] if len(e.ts) >= 16 else e.ts
-            text_preview = (e.summary or e.content or "")[:80]
+            text_preview = (e.summary or e.content or "")[:200]
             if e.type == "channel_post":
                 ch = e.channel or "?"
                 lines.append(t("priming.outbound_posted", time_str=time_str, ch=ch, text_preview=text_preview))

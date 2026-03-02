@@ -248,6 +248,29 @@ class PrimingMixin:
                 )
                 continue
 
+            if entry_type in ("channel_post", "channel_read"):
+                ch_name = entry.channel or ""
+                if (
+                    current_group
+                    and current_group.type == "channel"
+                    and current_group.label == ch_name
+                    and time_diff(current_group.end_ts, entry.ts) <= gap_seconds
+                ):
+                    current_group.entries.append(entry)
+                    current_group.end_ts = entry.ts
+                    continue
+                if current_group:
+                    groups.append(current_group)
+                current_group = EntryGroup(
+                    type="channel",
+                    start_ts=entry.ts,
+                    end_ts=entry.ts,
+                    entries=[entry],
+                    label=ch_name,
+                    source_lines="",
+                )
+                continue
+
             if current_group:
                 groups.append(current_group)
                 current_group = None
@@ -310,6 +333,20 @@ class PrimingMixin:
             exit_info = f": exit={exit_code}" if exit_code != "" else ""
             header = f"{time_range} CRON {group.label}{exit_info}"
             lines = [header]
+            if group.source_lines:
+                lines.append(f"  -> {group.source_lines}")
+            return "\n".join(lines)
+
+        if group.type == "channel":
+            ch_name = group.label or "?"
+            count = len(group.entries)
+            snippets: list[str] = []
+            for e in group.entries:
+                who = e.from_person or "?"
+                text = (e.summary or e.content or "")[:50].replace("\n", " ")
+                snippets.append(f"{who}→{text}")
+            body = ", ".join(snippets)
+            lines = [f"{time_range} #{ch_name} ({count}件): {body}"]
             if group.source_lines:
                 lines.append(f"  -> {group.source_lines}")
             return "\n".join(lines)

@@ -92,9 +92,15 @@ def get_embedding_model(model_name: str | None = None) -> SentenceTransformer:
         from core.paths import get_data_dir
         cache_dir = get_data_dir() / "models"
         cache_dir.mkdir(parents=True, exist_ok=True)
-        logger.info("Loading embedding model (singleton): %s", resolved_name)
+        try:
+            from core.config import load_config
+            _use_gpu = load_config().rag.use_gpu
+        except Exception:
+            _use_gpu = False
+        device = "cuda" if _use_gpu else "cpu"
+        logger.info("Loading embedding model (singleton): %s on %s", resolved_name, device)
         _embedding_model = SentenceTransformer(
-            resolved_name, cache_folder=str(cache_dir)
+            resolved_name, cache_folder=str(cache_dir), device=device
         )
         _embedding_model_name = resolved_name
         logger.info("Embedding model loaded (singleton)")
