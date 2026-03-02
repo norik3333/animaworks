@@ -644,6 +644,8 @@ def dispatch(name: str, args: dict[str, Any]) -> Any:
     if name == "gmail_draft":
         client = GmailClient()
         raw_attachments = args.get("attachments")
+        if isinstance(raw_attachments, str):
+            raw_attachments = json.loads(raw_attachments)
         attach_paths = [Path(p) for p in raw_attachments] if raw_attachments else None
         result = client.create_draft(
             to=args["to"],
