@@ -26,7 +26,9 @@ These descriptors are critical for photographic output. Never omit them.
 
 - Output ONLY a single natural-language description string, nothing else.
 - Start with the style prefix above.
-- Describe the person in natural English: "a young woman with ..." or "a young man with ...".
+- Describe the person in natural English: "a young Japanese woman with ..." or "a young Japanese man with ...".
+- ALWAYS include "Japanese" before "woman" or "man" to ensure \
+  the generated photo depicts a Japanese person.
 - Use plain English color names, NOT gemstone/poetic metaphors \
   (サファイアブルー → blue eyes, エメラルドグリーン → green eyes, \
   ハニーブラウン → light brown hair, プラチナブロンド → platinum blonde hair).
@@ -53,7 +55,7 @@ Input (excerpt):
 Output:
 professional photograph, studio lighting, high resolution, \
 realistic, photorealistic, \
-a young woman with light brown hair in a short bob cut with a side hair clip, \
+a young Japanese woman with light brown hair in a short bob cut with a side hair clip, \
 warm brown eyes, round face with a friendly smile, petite build, \
 full body, standing, plain white background, looking at viewer
 
@@ -66,6 +68,6 @@ Input (excerpt):
 Output:
 professional photograph, studio lighting, high resolution, \
 realistic, photorealistic, \
-a young woman with long straight black hair in a low ponytail, \
+a young Japanese woman with long straight black hair in a low ponytail, \
 striking red eyes, sharp elegant features, cool composed expression, \
 full body, standing, plain white background, looking at viewer

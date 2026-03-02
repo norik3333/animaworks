@@ -262,20 +262,39 @@ _ANIME_QUALITY_TAGS = frozenset({
     "highres", "extremely detailed",
 })
 
-_DANBOORU_TO_NATURAL: dict[str, str] = {
-    "1girl": "a young woman",
-    "1boy": "a young man",
-    "2girls": "two young women",
-    "2boys": "two young men",
+_LOCALE_ETHNICITY: dict[str, str] = {
+    "ja": "Japanese",
+    "en": "American",
+    "ko": "Korean",
+    "zh": "Chinese",
 }
 
+_DANBOORU_PERSON_TAGS = frozenset({"1girl", "1boy", "2girls", "2boys"})
 
-def _convert_anime_to_realistic(anime_prompt: str) -> str:
+
+def _convert_anime_to_realistic(anime_prompt: str, locale: str | None = None) -> str:
     """Convert a Danbooru-style anime prompt to a photographic prompt.
 
     Strips anime quality/style tags, replaces Danbooru shorthands with
-    natural English, and prepends realistic quality descriptors.
+    natural English (with locale-based ethnicity), and prepends
+    realistic quality descriptors.
     """
+    if locale is None:
+        try:
+            from core.config.models import load_config
+            locale = load_config().locale or "ja"
+        except Exception:
+            locale = "ja"
+
+    ethnicity = _LOCALE_ETHNICITY.get(locale, "")
+
+    person_map: dict[str, str] = {
+        "1girl": f"a young {ethnicity} woman" if ethnicity else "a young woman",
+        "1boy": f"a young {ethnicity} man" if ethnicity else "a young man",
+        "2girls": f"two young {ethnicity} women" if ethnicity else "two young women",
+        "2boys": f"two young {ethnicity} men" if ethnicity else "two young men",
+    }
+
     tags = [t.strip() for t in anime_prompt.split(",") if t.strip()]
 
     converted: list[str] = []
@@ -283,7 +302,7 @@ def _convert_anime_to_realistic(anime_prompt: str) -> str:
         lower = tag.lower().strip()
         if lower in _ANIME_QUALITY_TAGS:
             continue
-        natural = _DANBOORU_TO_NATURAL.get(lower)
+        natural = person_map.get(lower)
         if natural:
             converted.append(natural)
         else:
