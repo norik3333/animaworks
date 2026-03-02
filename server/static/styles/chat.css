@@ -315,7 +315,7 @@
   background: var(--aw-color-accent);
 }
 
-.theme-business .anima-tab-avatar-initial {
+.mode-realistic .anima-tab-avatar-initial {
   background: color-mix(in srgb, var(--aw-color-text-primary) 20%, var(--aw-color-bg-tertiary) 80%);
   color: var(--aw-color-text-primary);
 }

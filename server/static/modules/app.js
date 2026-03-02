@@ -8,6 +8,22 @@ import { connectWebSocket } from "./websocket.js";
 // state.authMode is set by login.js checkAuth()
 import { loadSystemStatus } from "./status.js";
 
+// ── Display Mode ─────────────────────────────
+
+export function applyDisplayMode(mode) {
+  document.body.classList.remove("mode-anime", "mode-realistic");
+  document.body.classList.add(`mode-${mode}`);
+  localStorage.setItem("aw-display-mode", mode);
+}
+
+export function getDisplayMode() {
+  return localStorage.getItem("aw-display-mode") || "realistic";
+}
+
+function initDisplayMode() {
+  applyDisplayMode(getDisplayMode());
+}
+
 // ── Theme ────────────────────────────────────
 
 const ALL_THEMES = [
@@ -15,14 +31,12 @@ const ALL_THEMES = [
   "rose", "lavender", "nord", "monokai", "midnight", "solarized"
 ];
 
-function applyTheme(theme) {
+export function applyTheme(theme) {
   state.uiTheme = theme;
   ALL_THEMES.forEach(t => document.body.classList.remove(`theme-${t}`));
   if (theme !== "default") {
     document.body.classList.add(`theme-${theme}`);
   }
-  const select = document.getElementById("themeSelect");
-  if (select) select.value = theme;
   localStorage.setItem("aw-theme", theme);
 }
 
@@ -151,15 +165,9 @@ async function init() {
   await initI18n();
   applyTranslations();
 
-  // Theme (before auth so UI looks correct immediately)
+  // Display mode & theme (before auth so UI looks correct immediately)
+  initDisplayMode();
   await initTheme();
-  const themeSelect = document.getElementById("themeSelect");
-  if (themeSelect) {
-    themeSelect.value = state.uiTheme || "default";
-    themeSelect.addEventListener("change", (e) => {
-      applyTheme(e.target.value);
-    });
-  }
 
   // Logout button binding
   document.getElementById("logoutBtn").addEventListener("click", logout);

@@ -3448,6 +3448,6 @@ html, body {
   z-index: 1;
 }
 
-/* ── Business Theme Overrides ──────────────────────── */
-.theme-business .ws-conv-character { display: none !important; }
-.theme-business .ws-mobile-character-toggle { display: none; }
+/* ── Realistic Mode Overrides ─────────────────────── */
+.mode-realistic .ws-conv-character { display: none !important; }
+.mode-realistic .ws-mobile-character-toggle { display: none; }

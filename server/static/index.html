@@ -20,6 +20,7 @@
   <link rel="stylesheet" href="/styles/board.css">
   <link rel="stylesheet" href="/styles/responsive.css?v=20260301g">
   <link rel="stylesheet" href="/styles/voice.css">
+  <link rel="stylesheet" href="/styles/settings.css">
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
@@ -71,8 +72,8 @@
           <i data-lucide="activity" class="nav-lucide"></i>
           <span class="nav-label" data-i18n="nav.activity">Activity</span></a></li>
         <li><a href="#/setup" class="nav-item" data-route="/setup">
-          <span class="nav-emoji">&#x2699;</span>
-          <i data-lucide="settings" class="nav-lucide"></i>
+          <span class="nav-emoji">&#x1F527;</span>
+          <i data-lucide="wrench" class="nav-lucide"></i>
           <span class="nav-label" data-i18n="nav.setup">Setup</span></a></li>
         <li><a href="#/users" class="nav-item" data-route="/users">
           <span class="nav-emoji">&#x1F465;</span>
@@ -111,26 +112,12 @@
           <span class="nav-emoji">&#x1F3AE;</span>
           <i data-lucide="building-2" class="nav-lucide"></i>
           <span class="nav-label" data-i18n="nav.workspace">Workspace</span></a></li>
+        <li class="nav-divider"></li>
+        <li><a href="#/settings" class="nav-item" data-route="/settings">
+          <span class="nav-emoji">&#x2699;</span>
+          <i data-lucide="sliders-horizontal" class="nav-lucide"></i>
+          <span class="nav-label" data-i18n="nav.settings">Settings</span></a></li>
       </ul>
-      <div class="nav-divider"></div>
-      <div class="theme-picker" id="themePicker">
-        <span class="nav-emoji theme-picker-icon">&#x1F3A8;</span>
-        <span class="nav-label">Theme</span>
-        <select id="themeSelect" class="theme-select">
-          <option value="default">Default</option>
-          <option value="graphite">Graphite</option>
-          <option value="ocean">Ocean</option>
-          <option value="forest">Forest</option>
-          <option value="sunset">Sunset</option>
-          <option value="rose">Rose</option>
-          <option value="lavender">Lavender</option>
-          <option value="nord">Nord</option>
-          <option value="monokai">Monokai</option>
-          <option value="midnight">Midnight</option>
-          <option value="solarized">Solarized</option>
-          <option value="business">Business</option>
-        </select>
-      </div>
     </nav>
 
     <!-- Main Content Area -->
@@ -145,6 +132,6 @@
       if (window.lucide) lucide.createIcons();
     });
   </script>
-  <script type="module" src="/modules/app.js?v=20260228d"></script>
+  <script type="module" src="/modules/app.js?v=20260302a"></script>
 </body>
 </html>

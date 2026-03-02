@@ -21,7 +21,7 @@ export async function loadAnimas() {
 
 // ── Anima State Class Helper ──────────────────
 function statusIndicator(emoji, lucideIcon) {
-  const isBusiness = document.body.classList.contains('theme-business');
+  const isBusiness = document.body.classList.contains('mode-realistic');
   if (isBusiness) {
     return `<i data-lucide="${lucideIcon}" style="width:14px;height:14px;display:inline-block;vertical-align:middle;"></i>`;
   }
