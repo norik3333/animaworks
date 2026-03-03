@@ -97,13 +97,15 @@ class StreamingThinkFilter:
     """Streaming filter that routes ``<think>`` content to thinking deltas.
 
     Feed each streamed chunk via :meth:`feed`; it returns a
-    ``(thinking_delta, text_delta)`` tuple.  Until ``</think>`` is seen,
-    all content is buffered and emitted as *thinking*.  After the closing
-    tag, everything passes through as *text*.
+    ``(thinking_delta, text_delta)`` tuple.  Content is only buffered
+    when the stream begins with ``<think>``; otherwise chunks pass
+    through immediately as *text*.
 
     A safety valve flushes the buffer as plain text if it exceeds
     ``_MAX_THINK_BUFFER`` characters without encountering ``</think>``.
     """
+
+    _THINK_OPEN = "<think>"
 
     __slots__ = ("_buffer", "_done")
 
@@ -116,6 +118,15 @@ class StreamingThinkFilter:
         if self._done:
             return ("", delta)
         self._buffer += delta
+        # Early exit: if accumulated text clearly doesn't start with <think>,
+        # pass through immediately so non-think streams aren't buffered.
+        stripped = self._buffer.lstrip()
+        if stripped and not stripped.startswith(self._THINK_OPEN) \
+                and not self._THINK_OPEN.startswith(stripped):
+            self._done = True
+            text = self._buffer
+            self._buffer = ""
+            return ("", text)
         if "</think>" in self._buffer:
             self._done = True
             parts = self._buffer.split("</think>", 1)
