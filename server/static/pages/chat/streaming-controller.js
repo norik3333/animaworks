@@ -16,7 +16,10 @@ export function createStreamingController(ctx) {
   const { t, escapeHtml, logger, fetchActiveStream, fetchStreamProgress } = deps;
   const mgr = state.manager;
 
-  mgr.addEventListener("stream-state-changed", () => { updateSendButton(); });
+  mgr.addEventListener("stream-state-changed", () => {
+    updateSendButton();
+    ctx.controllers.anima?.renderAnimaTabs();
+  });
 
   function isAnimaStreaming(name) { return mgr.isStreamingForAnima(name); }
 

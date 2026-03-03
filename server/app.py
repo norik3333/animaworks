@@ -226,6 +226,32 @@ async def lifespan(app: FastAPI):
             replace_existing=True,
         )
 
+        # ── Claude CLI / SDK auto-update ─────────────────
+        from core.auto_updater import run_update_check
+
+        async def _auto_update_claude() -> None:
+            try:
+                result = await run_update_check(
+                    supervisor=app.state.supervisor,
+                    animas_dir=app.state.animas_dir,
+                )
+                sdk_info = result.get("sdk", "")
+                cli_info = result.get("cli", "")
+                if "→" in sdk_info or "→" in cli_info:
+                    logger.info("Auto-update completed: sdk=%s cli=%s", sdk_info, cli_info)
+            except asyncio.CancelledError:
+                logger.debug("Auto-update cancelled (shutdown)")
+            except Exception:
+                logger.exception("Auto-update check failed")
+
+        msg_log_scheduler.add_job(
+            _auto_update_claude,
+            IntervalTrigger(hours=4),
+            id="claude_auto_update",
+            name="System: Claude CLI/SDK Auto-Update",
+            replace_existing=True,
+        )
+
         msg_log_scheduler.start()
         app.state.msg_log_scheduler = msg_log_scheduler
 
