@@ -162,7 +162,7 @@ _STRINGS: dict[str, dict[str, str]] = {
     "priming.related_knowledge_header": {"ja": "### 関連する知識", "en": "### Related Knowledge"},
     "priming.matched_skills_header": {"ja": "### 使えそうなスキル", "en": "### Matching Skills"},
     "priming.skills_list": {"ja": "あなたが持っているスキル: {skills_line}", "en": "Your skills: {skills_line}"},
-    "priming.skills_detail_hint": {"ja": "※詳細はスキルファイルをReadで確認してください。", "en": "Use Read to view skill file details."},
+    "priming.skills_detail_hint": {"ja": "※詳細はskillツールで取得してください。", "en": "Use the skill tool to load full details."},
     "priming.pending_tasks_header": {"ja": "### 未完了タスク", "en": "### Pending Tasks"},
     "priming.outbound_header": {"ja": "## 直近のアウトバウンド行動", "en": "## Recent Outbound Actions"},
     "priming.outbound_posted": {"ja": "- [{time_str}] #{ch} に投稿済み: 「{text_preview}」", "en": "- [{time_str}] Posted to #{ch}: \"{text_preview}\""},

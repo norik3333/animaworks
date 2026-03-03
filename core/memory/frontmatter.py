@@ -195,6 +195,19 @@ class FrontmatterService:
             for f in sorted(self._procedures_dir.glob("*.md"))
         ]
 
+    @staticmethod
+    def _extract_description(text: str, fallback_name: str) -> str:
+        """Extract description from the first ``# `` heading in *text*.
+
+        Falls back to *fallback_name* with ``_`` and ``-`` replaced by
+        spaces when no heading is found.
+        """
+        for line in text.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("# "):
+                return stripped.lstrip("# ").strip()
+        return fallback_name.replace("_", " ").replace("-", " ")
+
     def ensure_procedure_frontmatter(self) -> int:
         """Ensure all procedure files have YAML frontmatter with description.
 
@@ -215,15 +228,7 @@ class FrontmatterService:
             if text.lstrip().startswith("---"):
                 continue  # already has frontmatter
 
-            # Extract description from first heading
-            desc = ""
-            for line in text.splitlines():
-                stripped = line.strip()
-                if stripped.startswith("# "):
-                    desc = stripped.lstrip("# ").strip()
-                    break
-            if not desc:
-                desc = f.stem.replace("_", " ").replace("-", " ")
+            desc = self._extract_description(text, f.stem)
 
             metadata = {
                 "description": desc,
@@ -237,4 +242,44 @@ class FrontmatterService:
 
         if migrated:
             logger.info("Added frontmatter to %d procedures", migrated)
+        return migrated
+
+    def ensure_knowledge_frontmatter(self) -> int:
+        """Ensure all knowledge files have YAML frontmatter.
+
+        Scans every .md file in knowledge/. Files without frontmatter
+        get auto-generated metadata with timestamps derived from the
+        file's mtime. Idempotent per-file.
+
+        Returns:
+            Number of files that had frontmatter added.
+        """
+        from datetime import datetime, timedelta, timezone
+
+        if not self._knowledge_dir.exists():
+            return 0
+
+        _JST = timezone(timedelta(hours=9))
+        md_files = sorted(self._knowledge_dir.glob("*.md"))
+        migrated = 0
+        for f in md_files:
+            text = f.read_text(encoding="utf-8")
+            if text.lstrip().startswith("---"):
+                continue
+
+            ts = datetime.fromtimestamp(f.stat().st_mtime, tz=_JST).isoformat()
+            metadata = {
+                "confidence": 0.5,
+                "created_at": ts,
+                "updated_at": ts,
+                "source_episodes": 0,
+                "auto_consolidated": False,
+                "version": 1,
+            }
+            self.write_knowledge_with_meta(f, text, metadata)
+            migrated += 1
+            logger.info("Added frontmatter to knowledge: %s", f.name)
+
+        if migrated:
+            logger.info("Added frontmatter to %d knowledge files", migrated)
         return migrated

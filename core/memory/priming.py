@@ -823,12 +823,8 @@ class PrimingEngine:
 
         Returns list of skill/procedure names (not full content, max 5).
         Searches personal skills/, common_skills/, and procedures/.
-        Skipped for heartbeat/cron triggers to avoid false positives.
         """
         _MAX_SKILL_MATCHES = 5
-
-        if channel in ("heartbeat", "cron"):
-            return []
 
         if not message and not keywords:
             return []

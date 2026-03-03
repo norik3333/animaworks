@@ -736,6 +736,9 @@ def build_system_prompt(
         for m in common_skill_metas:
             desc = f": {m.description}" if m.description else ""
             skill_lines.append(f"- {m.name}{_common}{desc}")
+        for m in procedure_metas:
+            desc = f": {m.description}" if m.description else ""
+            skill_lines.append(f"- {m.name} (手順){desc}")
         skill_names = "\n".join(skill_lines) or _none
         shared_users_list = ", ".join(memory.list_shared_users()) or _none
 
