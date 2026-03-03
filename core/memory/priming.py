@@ -189,11 +189,13 @@ class PrimingEngine:
         # Channel C: conditional based on distilled knowledge injection
         if overflow_files is None:
             # Legacy path: no full injection, run full Channel C
-            channel_c_coro = self._channel_c_related_knowledge(keywords)
+            channel_c_coro = self._channel_c_related_knowledge(
+                keywords, message=message,
+            )
         elif overflow_files:
             # Overflow path: search only among non-injected files
             channel_c_coro = self._channel_c_related_knowledge(
-                keywords, restrict_to=overflow_files,
+                keywords, restrict_to=overflow_files, message=message,
             )
         else:
             # All files injected: skip Channel C entirely
@@ -713,6 +715,7 @@ class PrimingEngine:
         self,
         keywords: list[str],
         restrict_to: list[str] | None = None,
+        message: str = "",
     ) -> tuple[str, str]:
         """Channel C: Related knowledge search (vector search).
 
@@ -728,6 +731,8 @@ class PrimingEngine:
             restrict_to: If provided, only return results whose source file
                 stem is in this list (used for overflow-only search when
                 distilled knowledge injection handles the rest).
+            message: Original message text. Prepended (truncated to 200 chars)
+                to the keyword query to preserve phrase-level semantics.
         """
         if not self.knowledge_dir.is_dir() or not keywords:
             logger.debug("Channel C: No knowledge dir or no keywords")
@@ -739,8 +744,8 @@ class PrimingEngine:
                 logger.debug("Channel C: Retriever unavailable")
                 return ("", "")
 
-            # Build query from keywords
-            query = " ".join(keywords[:5])
+            kw_part = " ".join(keywords[:5])
+            query = f"{message[:200]} {kw_part}" if message else kw_part
             anima_name = self.anima_dir.name
 
             # Vector search (personal + shared common_knowledge)
@@ -748,7 +753,7 @@ class PrimingEngine:
                 query=query,
                 anima_name=anima_name,
                 memory_type="knowledge",
-                top_k=3,
+                top_k=5,
                 include_shared=True,
             )
 
@@ -1200,7 +1205,7 @@ class PrimingEngine:
         # Filter stopwords and short words
         general_keywords = [
             w for w in words
-            if len(w) >= 2 and w.lower() not in stopwords
+            if len(w) >= 1 and w.lower() not in stopwords
         ]
 
         # Entity matches from general keywords
