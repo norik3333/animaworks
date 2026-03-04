@@ -110,8 +110,12 @@ async def test_channel_c_uses_top_k_5(rich_anima_dir: Path):
             sender_name="human",
         )
 
-    mock_retriever.search.assert_called_once()
-    assert mock_retriever.search.call_args.kwargs["top_k"] == 5
+    # Channel C (top_k=5) and Channel F (top_k=3) share the retriever,
+    # so search may be called more than once. Verify Channel C's call exists.
+    calls = mock_retriever.search.call_args_list
+    assert any(c.kwargs.get("top_k") == 5 for c in calls), (
+        f"Expected a search call with top_k=5 (Channel C), got: {calls}"
+    )
 
 
 @pytest.mark.asyncio
