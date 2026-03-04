@@ -22,6 +22,10 @@ class TTSConfig(BaseModel):
     extra: dict = Field(default_factory=dict)
 
 
+class TTSSynthesisError(Exception):
+    """TTS synthesis failed."""
+
+
 class BaseTTSProvider(ABC):
     """Abstract TTS provider interface."""
 

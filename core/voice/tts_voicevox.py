@@ -11,7 +11,7 @@ from typing import Any, AsyncIterator
 
 import httpx
 
-from core.voice.tts_base import BaseTTSProvider, TTSConfig
+from core.voice.tts_base import BaseTTSProvider, TTSConfig, TTSSynthesisError
 
 logger = logging.getLogger(__name__)
 
@@ -66,8 +66,7 @@ class VoicevoxTTS(BaseTTSProvider):
                 r2.raise_for_status()
                 return r2.content
             except httpx.HTTPError as e:
-                logger.warning("VOICEVOX synthesis failed: %s", e)
-                return b""
+                raise TTSSynthesisError(f"VOICEVOX synthesis HTTP error: {e}") from e
 
     async def list_voices(self) -> list[dict]:
         """List available VOICEVOX speakers."""

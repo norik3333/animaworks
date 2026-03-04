@@ -15,7 +15,7 @@ from typing import Any
 from core.i18n import t
 from core.voice.sentence_splitter import StreamingSentenceSplitter
 from core.voice.stt import VoiceSTT
-from core.voice.tts_base import BaseTTSProvider, TTSConfig
+from core.voice.tts_base import BaseTTSProvider, TTSConfig, TTSSynthesisError
 
 logger = logging.getLogger(__name__)
 
@@ -124,6 +124,7 @@ class VoiceSession:
         self._processing = False
         self._tts_available: bool | None = None
         self._splitter = StreamingSentenceSplitter()
+        self._consecutive_tts_failures: int = 0
 
     async def handle_audio_chunk(self, data: bytes) -> None:
         """Receive audio chunk from browser, accumulate in buffer."""
@@ -234,6 +235,7 @@ class VoiceSession:
         except (TypeError, AttributeError):
             pass
 
+        response_done_sent = False
         try:
             async for ipc_response in self._supervisor.send_request_stream(
                 anima_name=self._anima_name,
@@ -262,6 +264,7 @@ class VoiceSession:
                         "type": "response_done",
                         "emotion": emotion,
                     })
+                    response_done_sent = True
                     break
 
                 if ipc_response.chunk:
@@ -310,6 +313,7 @@ class VoiceSession:
                             "type": "response_done",
                             "emotion": emotion,
                         })
+                        response_done_sent = True
                         break
 
         except Exception as e:
@@ -319,6 +323,11 @@ class VoiceSession:
             self._tts_playing = False
             self._interrupted = False
             self._splitter.flush()
+            if not response_done_sent:
+                try:
+                    await self._ws.send_json({"type": "response_done", "emotion": "neutral"})
+                except Exception:
+                    pass
 
     async def _synthesize_and_send(self, text: str) -> None:
         """TTS synthesize a sentence and send audio to client."""
@@ -331,7 +340,21 @@ class VoiceSession:
                 if self._interrupted:
                     break
                 await self._ws.send_bytes(audio_chunk)
+            self._consecutive_tts_failures = 0
             await self._ws.send_json({"type": "tts_done"})
+        except TTSSynthesisError as e:
+            logger.warning("TTS synthesis error: %s", e)
+            self._consecutive_tts_failures += 1
+            if self._consecutive_tts_failures >= 3:
+                self._tts_available = None
+                try:
+                    await self._ws.send_json({"type": "tts_error", "message": str(e)})
+                except Exception:
+                    pass
+            try:
+                await self._ws.send_json({"type": "tts_done"})
+            except Exception:
+                pass
         except Exception as e:
             logger.warning("TTS failed: %s", e)
             try:

@@ -11,7 +11,7 @@ from typing import Any, AsyncIterator
 
 import httpx
 
-from core.voice.tts_base import BaseTTSProvider, TTSConfig
+from core.voice.tts_base import BaseTTSProvider, TTSConfig, TTSSynthesisError
 
 logger = logging.getLogger(__name__)
 
@@ -60,8 +60,7 @@ class StyleBertVits2TTS(BaseTTSProvider):
                 r.raise_for_status()
                 return r.content
             except httpx.HTTPError as e:
-                logger.warning("Style-BERT-VITS2 synthesis failed: %s", e)
-                return b""
+                raise TTSSynthesisError(f"Style-BERT-VITS2 synthesis HTTP error: {e}") from e
 
     async def list_voices(self) -> list[dict]:
         """List available models/speakers from SBV2 API."""
