@@ -51,7 +51,7 @@ _BUDGET_RECENT_ACTIVITY = 1300  # Unified: old B(600) + E(700)
 _BUDGET_RELATED_KNOWLEDGE = 700
 _BUDGET_SKILL_MATCH = 200
 _BUDGET_PENDING_TASKS = 300
-_BUDGET_EPISODES = 400
+_BUDGET_RELATED_EPISODES = 500
 
 # Rough characters-per-token for Japanese/English mixed text
 _CHARS_PER_TOKEN = 4
@@ -250,7 +250,7 @@ class PrimingEngine:
         budget_knowledge = int(_BUDGET_RELATED_KNOWLEDGE * budget_ratio)
         budget_skills = int(_BUDGET_SKILL_MATCH * budget_ratio)
         budget_tasks = int(_BUDGET_PENDING_TASKS * budget_ratio)
-        budget_episodes = int(_BUDGET_EPISODES * budget_ratio)
+        budget_episodes = int(_BUDGET_RELATED_EPISODES * budget_ratio)
 
         # Split knowledge budget: trusted/medium gets priority, untrusted gets remainder
         truncated_knowledge = self._truncate_head(related_knowledge, budget_knowledge)
