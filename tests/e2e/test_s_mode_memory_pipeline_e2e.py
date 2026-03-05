@@ -396,8 +396,9 @@ class TestActivityLogToConsolidationPromptPipeline:
         assert "response_sent" in result, (
             "Collected output should contain response_sent entries"
         )
-        assert "tool_use" in result, (
-            "Collected output should contain tool_use entries"
+        # tool_use is excluded by smart filtering (only tool_result is kept)
+        assert "tool_use" not in result, (
+            "tool_use should be excluded by smart filtering"
         )
         assert "Slack" in result or "slack" in result, (
             "Collected output should contain content from the entries"
@@ -416,6 +417,7 @@ class TestActivityLogToConsolidationPromptPipeline:
             episodes_summary="(テストエピソード)",
             resolved_events_summary="",
             activity_log_summary="[10:00] response_sent: テスト回答",
+            reflections_summary="",
         )
 
         assert "アクティビティログ" in prompt, (
@@ -448,9 +450,10 @@ class TestActivityLogToConsolidationPromptPipeline:
             summary="EC2起動リクエスト",
         )
         activity.log(
-            "tool_use",
+            "tool_result",
             tool="aws_collector",
             summary="EC2 describe-instances実行",
+            meta={"result_status": "ok", "result_bytes": 512},
         )
         activity.log(
             "response_sent",
@@ -473,6 +476,7 @@ class TestActivityLogToConsolidationPromptPipeline:
             episodes_summary="(テストエピソード)",
             resolved_events_summary="",
             activity_log_summary=activity_summary,
+            reflections_summary="",
         )
 
         assert "test-prompt-render" in prompt, (
@@ -482,7 +486,7 @@ class TestActivityLogToConsolidationPromptPipeline:
             "Prompt should contain activity content about EC2"
         )
         assert "aws_collector" in prompt, (
-            "Prompt should contain tool usage from activity log"
+            "Prompt should contain tool_result from activity log"
         )
 
     def test_empty_activity_log_produces_empty_string(self, tmp_path):
