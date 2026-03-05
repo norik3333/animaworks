@@ -305,7 +305,9 @@ class MemoryRetriever:
     ) -> list[RetrievalResult]:
         """Apply spreading activation to expand search results.
 
-        Tries loading cached graph first, then falls back to full build.
+        Builds a graph from all configured memory types (knowledge +
+        episodes by default).  Tries loading from cache first, then
+        falls back to a full build.
 
         Args:
             initial_results: Initial search results
@@ -314,7 +316,6 @@ class MemoryRetriever:
         Returns:
             Expanded results with activated neighbors
         """
-        # Lazy initialization of knowledge graph
         if self._knowledge_graph is None:
             try:
                 from core.memory.rag.graph import KnowledgeGraph
@@ -324,11 +325,13 @@ class MemoryRetriever:
                     self.indexer,
                 )
 
-                # Try loading from cache first
                 cache_dir = self.knowledge_dir.parent / "vectordb"
                 if not self._knowledge_graph.load_graph(cache_dir):
-                    # Cache miss: full build and save
-                    self._knowledge_graph.build_graph(anima_name, self.knowledge_dir)
+                    memory_dirs = self._collect_spreading_dirs()
+                    self._knowledge_graph.build_graph(
+                        anima_name, self.knowledge_dir,
+                        memory_dirs=memory_dirs,
+                    )
                     cache_dir.mkdir(parents=True, exist_ok=True)
                     self._knowledge_graph.save_graph(cache_dir)
 
@@ -336,5 +339,30 @@ class MemoryRetriever:
                 logger.warning("Failed to initialize knowledge graph: %s", e)
                 return initial_results
 
-        # Expand results using graph
         return self._knowledge_graph.expand_search_results(initial_results)
+
+    def _collect_spreading_dirs(self) -> dict[str, Path]:
+        """Collect additional memory directories for spreading activation.
+
+        Reads ``rag.spreading_memory_types`` from config and maps each
+        type (excluding ``knowledge`` which is the primary directory)
+        to its filesystem path.
+        """
+        anima_dir = self.knowledge_dir.parent
+        extra: dict[str, Path] = {}
+
+        try:
+            from core.config.models import load_config
+            config = load_config()
+            memory_types = config.rag.spreading_memory_types
+        except Exception:
+            memory_types = ["knowledge", "episodes"]
+
+        for mt in memory_types:
+            if mt == "knowledge":
+                continue
+            candidate = anima_dir / mt
+            if candidate.is_dir():
+                extra[mt] = candidate
+
+        return extra

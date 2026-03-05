@@ -22,14 +22,19 @@ class MockVectorStore:
         """Mock query method."""
         from core.memory.rag.store import Document, SearchResult
 
-        # Return mock results
+        # Determine memory type from collection name
+        if "_episodes" in collection:
+            prefix = "episodes"
+        else:
+            prefix = "knowledge"
+
         return [
             SearchResult(
                 document=Document(
-                    id=f"anima/knowledge/related{i}.md#0",
+                    id=f"anima/{prefix}/related{i}.md#0",
                     content=f"Related content {i}",
                     embedding=embedding,
-                    metadata={"source_file": f"knowledge/related{i}.md"},
+                    metadata={"source_file": f"{prefix}/related{i}.md"},
                 ),
                 score=0.8 - i * 0.1,
             )
@@ -45,7 +50,6 @@ class MockIndexer:
 
     def _generate_embeddings(self, texts):
         """Mock embedding generation."""
-        # Return dummy embeddings
         return [[0.1] * 384 for _ in texts]
 
 
@@ -68,6 +72,33 @@ def temp_knowledge_dir():
         )
 
         yield knowledge_dir
+
+
+@pytest.fixture
+def temp_anima_dir():
+    """Create temp dir with both knowledge and episodes."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        base = Path(tmpdir)
+        knowledge_dir = base / "knowledge"
+        knowledge_dir.mkdir()
+        episodes_dir = base / "episodes"
+        episodes_dir.mkdir()
+
+        (knowledge_dir / "file1.md").write_text(
+            "# File 1\n\nThis links to [[file2]] and [[2026-03-01]].\n"
+        )
+        (knowledge_dir / "file2.md").write_text(
+            "# File 2\n\nRelated knowledge.\n"
+        )
+
+        (episodes_dir / "2026-03-01.md").write_text(
+            "# 2026-03-01\n\n## 09:30 Meeting\n\nDiscussed file1 topic.\n"
+        )
+        (episodes_dir / "2026-03-02.md").write_text(
+            "# 2026-03-02\n\n## 14:00 Review\n\nReviewed file2.\n"
+        )
+
+        yield base
 
 
 def test_graph_construction(temp_knowledge_dir):
@@ -266,7 +297,7 @@ def test_graph_incremental_update(temp_knowledge_dir):
     new_file.write_text("# File 4\n\nThis links to [[file1]].\n")
 
     # Also need to add it as a node first (simulate watcher detecting new file)
-    graph_builder.graph.add_node("file4", path=str(new_file))
+    graph_builder.graph.add_node("file4", path=str(new_file), memory_type="knowledge", stem="file4")
 
     # Incremental update
     graph_builder.update_graph_incremental([new_file], "test_anima")
@@ -356,3 +387,235 @@ def test_graph_invalidation_on_file_change(temp_knowledge_dir):
 
     # file2 -> file1 explicit link should be re-established (from file2's content)
     assert graph_builder.graph.has_edge("file2", "file1")
+
+
+# ── Episodes support tests ─────────────────────────────────────────
+
+
+def test_build_graph_with_episodes(temp_anima_dir):
+    """Test graph construction from knowledge + episodes."""
+    vector_store = MockVectorStore()
+    indexer = MockIndexer()
+
+    knowledge_dir = temp_anima_dir / "knowledge"
+    episodes_dir = temp_anima_dir / "episodes"
+
+    graph_builder = KnowledgeGraph(vector_store, indexer)
+    graph = graph_builder.build_graph(
+        "test_anima", knowledge_dir,
+        memory_dirs={"episodes": episodes_dir},
+    )
+
+    # Knowledge nodes: bare stem
+    assert "file1" in graph
+    assert "file2" in graph
+
+    # Episode nodes: prefixed with memory type
+    assert "episodes:2026-03-01" in graph
+    assert "episodes:2026-03-02" in graph
+
+    # Total: 2 knowledge + 2 episodes = 4
+    assert graph.number_of_nodes() == 4
+
+
+def test_cross_type_explicit_links(temp_anima_dir):
+    """Test explicit [[links]] from knowledge to episodes."""
+    vector_store = MockVectorStore()
+    indexer = MockIndexer()
+
+    knowledge_dir = temp_anima_dir / "knowledge"
+    episodes_dir = temp_anima_dir / "episodes"
+
+    graph_builder = KnowledgeGraph(vector_store, indexer)
+    graph_builder.build_graph(
+        "test_anima", knowledge_dir,
+        memory_dirs={"episodes": episodes_dir},
+    )
+
+    # file1 links to [[file2]] and [[2026-03-01]]
+    assert graph_builder.graph.has_edge("file1", "file2")
+    assert graph_builder.graph.has_edge("file1", "episodes:2026-03-01")
+
+
+def test_node_memory_type_attribute(temp_anima_dir):
+    """Test that nodes store correct memory_type attribute."""
+    vector_store = MockVectorStore()
+    indexer = MockIndexer()
+
+    knowledge_dir = temp_anima_dir / "knowledge"
+    episodes_dir = temp_anima_dir / "episodes"
+
+    graph_builder = KnowledgeGraph(vector_store, indexer)
+    graph_builder.build_graph(
+        "test_anima", knowledge_dir,
+        memory_dirs={"episodes": episodes_dir},
+    )
+
+    assert graph_builder.graph.nodes["file1"]["memory_type"] == "knowledge"
+    assert graph_builder.graph.nodes["file2"]["memory_type"] == "knowledge"
+    assert graph_builder.graph.nodes["episodes:2026-03-01"]["memory_type"] == "episodes"
+    assert graph_builder.graph.nodes["episodes:2026-03-02"]["memory_type"] == "episodes"
+
+
+def test_spreading_activation_with_episodes(temp_anima_dir):
+    """Test spreading activation expands across knowledge and episodes."""
+    from core.memory.rag.retriever import RetrievalResult
+
+    vector_store = MockVectorStore()
+    indexer = MockIndexer()
+
+    knowledge_dir = temp_anima_dir / "knowledge"
+    episodes_dir = temp_anima_dir / "episodes"
+
+    graph_builder = KnowledgeGraph(vector_store, indexer)
+    graph_builder.build_graph(
+        "test_anima", knowledge_dir,
+        memory_dirs={"episodes": episodes_dir},
+    )
+
+    initial_results = [
+        RetrievalResult(
+            doc_id="test_anima/knowledge/file1.md#0",
+            content="File 1 content",
+            score=0.9,
+            metadata={"source_file": "knowledge/file1.md"},
+            source_scores={"vector": 0.9},
+        )
+    ]
+
+    expanded = graph_builder.expand_search_results(initial_results, max_hops=2)
+
+    # Should have more results than initial
+    assert len(expanded) > len(initial_results)
+
+    # Check that expanded results include correct memory_type in metadata
+    for result in expanded[1:]:
+        assert "memory_type" in result.metadata
+        mt = result.metadata["memory_type"]
+        assert mt in ("knowledge", "episodes")
+        # doc_id should use the correct memory_type
+        assert f"/{mt}/" in result.doc_id
+
+
+def test_episode_doc_id_in_expansion(temp_anima_dir):
+    """Test that episode-sourced activated nodes produce correct doc_ids."""
+    from core.memory.rag.retriever import RetrievalResult
+
+    vector_store = MockVectorStore()
+    indexer = MockIndexer()
+
+    knowledge_dir = temp_anima_dir / "knowledge"
+    episodes_dir = temp_anima_dir / "episodes"
+
+    graph_builder = KnowledgeGraph(vector_store, indexer)
+    graph_builder.build_graph(
+        "test_anima", knowledge_dir,
+        memory_dirs={"episodes": episodes_dir},
+    )
+
+    initial_results = [
+        RetrievalResult(
+            doc_id="test_anima/episodes/2026-03-01.md#0",
+            content="Episode content",
+            score=0.9,
+            metadata={"source_file": "episodes/2026-03-01.md"},
+            source_scores={"vector": 0.9},
+        )
+    ]
+
+    expanded = graph_builder.expand_search_results(initial_results, max_hops=2)
+
+    for result in expanded[1:]:
+        mt = result.metadata.get("memory_type", "")
+        if mt == "episodes":
+            assert result.doc_id.startswith("test_anima/episodes/")
+        elif mt == "knowledge":
+            assert result.doc_id.startswith("test_anima/knowledge/")
+
+
+def test_pagerank_across_types(temp_anima_dir):
+    """Test PageRank scores propagate across knowledge and episodes."""
+    vector_store = MockVectorStore()
+    indexer = MockIndexer()
+
+    knowledge_dir = temp_anima_dir / "knowledge"
+    episodes_dir = temp_anima_dir / "episodes"
+
+    graph_builder = KnowledgeGraph(vector_store, indexer)
+    graph_builder.build_graph(
+        "test_anima", knowledge_dir,
+        memory_dirs={"episodes": episodes_dir},
+    )
+
+    scores = graph_builder.personalized_pagerank(["file1"])
+
+    # All nodes should have scores
+    assert "file1" in scores
+    assert "file2" in scores
+    assert "episodes:2026-03-01" in scores
+    assert "episodes:2026-03-02" in scores
+
+    # file1 (seed) should have highest score
+    assert scores["file1"] > scores["episodes:2026-03-02"]
+
+
+def test_incremental_update_episodes(temp_anima_dir):
+    """Test incremental graph update for episode files."""
+    vector_store = MockVectorStore()
+    indexer = MockIndexer()
+
+    knowledge_dir = temp_anima_dir / "knowledge"
+    episodes_dir = temp_anima_dir / "episodes"
+
+    graph_builder = KnowledgeGraph(vector_store, indexer)
+    graph_builder.build_graph(
+        "test_anima", knowledge_dir,
+        memory_dirs={"episodes": episodes_dir},
+    )
+
+    initial_nodes = graph_builder.graph.number_of_nodes()
+
+    # Add new episode
+    new_episode = episodes_dir / "2026-03-03.md"
+    new_episode.write_text("# 2026-03-03\n\n## 10:00 Stand-up\n\nLinks to [[file1]].\n")
+
+    # Pre-add node (simulate watcher)
+    graph_builder.graph.add_node(
+        "episodes:2026-03-03",
+        path=str(new_episode),
+        memory_type="episodes",
+        stem="2026-03-03",
+    )
+
+    graph_builder.update_graph_incremental(
+        [new_episode], "test_anima", memory_type="episodes",
+    )
+
+    assert graph_builder.graph.number_of_nodes() == initial_nodes + 1
+    assert "episodes:2026-03-03" in graph_builder.graph
+
+    # Cross-type link: episode -> knowledge
+    assert graph_builder.graph.has_edge("episodes:2026-03-03", "file1")
+
+
+def test_make_node_id():
+    """Test node ID generation for different memory types."""
+    assert KnowledgeGraph._make_node_id("file1", "knowledge") == "file1"
+    assert KnowledgeGraph._make_node_id("2026-03-01", "episodes") == "episodes:2026-03-01"
+    assert KnowledgeGraph._make_node_id("proc1", "procedures") == "procedures:proc1"
+
+
+def test_knowledge_only_backward_compat(temp_knowledge_dir):
+    """Test that calling build_graph without memory_dirs still works."""
+    vector_store = MockVectorStore()
+    indexer = MockIndexer()
+
+    graph_builder = KnowledgeGraph(vector_store, indexer)
+    graph = graph_builder.build_graph("test_anima", temp_knowledge_dir)
+
+    # Should work exactly as before
+    assert graph.number_of_nodes() == 3
+    assert "file1" in graph
+    assert "file2" in graph
+    assert "file3" in graph
+    assert graph.nodes["file1"]["memory_type"] == "knowledge"

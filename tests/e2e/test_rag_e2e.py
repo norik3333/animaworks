@@ -423,7 +423,10 @@ def test_e2e_incremental_index_and_graph(anima_dir, vector_store, indexer, retri
     assert chunks_added > 0, "New file should produce chunks"
 
     # Incremental graph update
-    graph.graph.add_node("query-optimization", path=str(new_file))
+    graph.graph.add_node(
+        "query-optimization", path=str(new_file),
+        memory_type="knowledge", stem="query-optimization",
+    )
     graph.update_graph_incremental([new_file], "test_anima")
 
     assert graph.graph.number_of_nodes() == initial_nodes + 1

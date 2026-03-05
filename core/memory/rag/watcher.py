@@ -222,22 +222,23 @@ class FileWatcher:
 
         logger.debug("Queue processor stopped")
 
+    # Memory types whose file changes trigger an incremental graph update
+    _GRAPH_MEMORY_TYPES = frozenset({"knowledge", "episodes"})
+
     async def _process_batch(self, files: list[tuple[Path, str]]) -> None:
         """Process a batch of files for indexing and graph update.
 
         Args:
             files: List of (file_path, memory_type) tuples
         """
-        knowledge_changed_files: list[Path] = []
+        graph_changed: dict[str, list[Path]] = {}
 
-        # Index files sequentially (could be parallelized in future)
         for file_path, memory_type in files:
             if not file_path.exists():
                 logger.debug("File no longer exists, skipping: %s", file_path)
                 continue
 
             try:
-                # Run indexing in executor to avoid blocking
                 loop = asyncio.get_running_loop()
                 await loop.run_in_executor(
                     None,
@@ -248,33 +249,34 @@ class FileWatcher:
                 )
                 logger.debug("Indexed file: %s (type=%s)", file_path, memory_type)
 
-                # Track changed knowledge files for graph update
-                if memory_type == "knowledge":
-                    knowledge_changed_files.append(file_path)
+                if memory_type in self._GRAPH_MEMORY_TYPES:
+                    graph_changed.setdefault(memory_type, []).append(file_path)
 
             except Exception as e:
                 logger.error("Failed to index file %s: %s", file_path, e)
 
-        # Update knowledge graph incrementally if available
-        if knowledge_changed_files and self.knowledge_graph and self.anima_name:
+        if graph_changed and self.knowledge_graph and self.anima_name:
             try:
                 loop = asyncio.get_running_loop()
-                await loop.run_in_executor(
-                    None,
-                    self.knowledge_graph.update_graph_incremental,
-                    knowledge_changed_files,
-                    self.anima_name,
-                )
-                # Save updated graph
+                for mt, changed_files in graph_changed.items():
+                    await loop.run_in_executor(
+                        None,
+                        self.knowledge_graph.update_graph_incremental,
+                        changed_files,
+                        self.anima_name,
+                        mt,
+                    )
+
                 cache_dir = self.anima_dir / "vectordb"
                 await loop.run_in_executor(
                     None,
                     self.knowledge_graph.save_graph,
                     cache_dir,
                 )
+                total = sum(len(v) for v in graph_changed.values())
                 logger.debug(
-                    "Graph incrementally updated and saved for %d knowledge files",
-                    len(knowledge_changed_files),
+                    "Graph incrementally updated and saved for %d files (%s)",
+                    total, ", ".join(graph_changed.keys()),
                 )
             except Exception as e:
                 logger.error("Failed to update knowledge graph: %s", e)
