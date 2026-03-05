@@ -173,6 +173,40 @@ class TestConsumerIntegrationFlow:
         )
 
 
+class TestDuplicateBindingPrevention:
+    """Verify handler is only bound once per container."""
+
+    @pytest.fixture(autouse=True)
+    def _load(self) -> None:
+        self.js = _RENDER_UTILS_JS.read_text(encoding="utf-8")
+
+    def test_guard_attribute_checked(self) -> None:
+        assert "container.dataset.bubbleActionsBound" in self.js
+
+    def test_guard_attribute_set(self) -> None:
+        assert 'container.dataset.bubbleActionsBound = "1"' in self.js
+
+
+class TestInteractionExclusions:
+    """Verify mobile tap toggle doesn't interfere with other interactive elements."""
+
+    @pytest.fixture(autouse=True)
+    def _load(self) -> None:
+        self.js = _RENDER_UTILS_JS.read_text(encoding="utf-8")
+
+    def test_excludes_tool_call_rows(self) -> None:
+        assert '.closest(".tool-call-row")' in self.js
+
+    def test_excludes_tool_call_headers(self) -> None:
+        assert '.closest(".tool-call-group-header")' in self.js
+
+    def test_excludes_links(self) -> None:
+        assert '.closest("a")' in self.js
+
+    def test_excludes_text_artifact_cards(self) -> None:
+        assert '.closest(".text-artifact-card")' in self.js
+
+
 class TestEscapeAttrSafety:
     """Verify _escapeAttr handles all HTML-special characters."""
 

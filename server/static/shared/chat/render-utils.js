@@ -529,7 +529,8 @@ function _formatDuration(ms) {
  * @param {HTMLElement|null} container
  */
 export function bindBubbleActionHandlers(container) {
-  if (!container) return;
+  if (!container || container.dataset.bubbleActionsBound) return;
+  container.dataset.bubbleActionsBound = "1";
 
   container.addEventListener("click", (e) => {
     const btn = e.target.closest(".bubble-action-btn");
@@ -545,7 +546,7 @@ export function bindBubbleActionHandlers(container) {
 
     // Mobile: tap on bubble toggles action bar visibility
     const bubble = e.target.closest(".chat-bubble.assistant");
-    if (bubble && !e.target.closest(".bubble-action-btn") && !e.target.closest(".tool-call-row") && !e.target.closest(".tool-call-group-header") && !e.target.closest("a")) {
+    if (bubble && !e.target.closest(".tool-call-row") && !e.target.closest(".tool-call-group-header") && !e.target.closest("a") && !e.target.closest(".text-artifact-card")) {
       const actions = bubble.querySelector(".bubble-actions");
       if (actions) {
         container.querySelectorAll(".bubble-actions.visible").forEach(a => {

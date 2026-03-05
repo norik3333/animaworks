@@ -136,6 +136,12 @@ class TestBindBubbleActionHandlers:
     def test_mobile_toggle_support(self) -> None:
         assert ".bubble-actions.visible" in self.source or 'classList.toggle("visible")' in self.source
 
+    def test_prevents_duplicate_binding(self) -> None:
+        assert "bubbleActionsBound" in self.source
+
+    def test_excludes_text_artifact_card(self) -> None:
+        assert ".text-artifact-card" in self.source
+
 
 class TestChatCSSBubbleActions:
     """Verify chat.css includes bubble action bar styles."""

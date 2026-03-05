@@ -978,11 +978,17 @@
   padding: 0;
   border: none;
   border-radius: 6px;
-  background: color-mix(in srgb, var(--aw-color-bg-primary) 80%, transparent 20%);
+  background: var(--aw-color-bg-secondary);
   color: var(--aw-color-text-muted);
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
-  backdrop-filter: blur(4px);
+}
+
+@supports (backdrop-filter: blur(4px)) {
+  .bubble-action-btn {
+    background: color-mix(in srgb, var(--aw-color-bg-primary) 80%, transparent 20%);
+    backdrop-filter: blur(4px);
+  }
 }
 
 .bubble-action-btn:hover,
