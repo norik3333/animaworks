@@ -273,6 +273,23 @@ export function createStreamingController(ctx) {
 
     logger.debug(`_sendChat: starting stream for ${name} msg_len=${message.length}`);
 
+    // ── RAF-based text rendering throttle ──
+    // Coalesce rapid text_delta / thinking_delta into one render per frame
+    // to avoid calling renderMarkdown(fullText) on every delta (O(n²) cost).
+    let _rafPending = false;
+    let _rafZone = "all";
+    const _scheduleRender = (msg, zone = "text") => {
+      if (_rafZone !== "all") _rafZone = zone;
+      if (_rafPending) return;
+      _rafPending = true;
+      requestAnimationFrame(() => {
+        _rafPending = false;
+        const z = _rafZone;
+        _rafZone = "all";
+        renderBubble(msg, z);
+      });
+    };
+
     // Use let + onStreamCreated to avoid TDZ: the const destructuring from
     // await would not be initialized when SSE callbacks fire during streaming.
     let streamingMsg = null;
@@ -310,7 +327,7 @@ export function createStreamingController(ctx) {
           if (!streamingMsg?.streaming) return;
           streamingMsg.afterHeartbeatRelay = false;
           streamingMsg.text += text;
-          renderBubble(streamingMsg, "text");
+          _scheduleRender(streamingMsg, "text");
         },
         onToolStart: (toolName, detail) => {
           if (!streamingMsg?.streaming) return;
@@ -366,7 +383,7 @@ export function createStreamingController(ctx) {
         onHeartbeatRelay: ({ text }) => {
           if (!streamingMsg?.streaming) return;
           streamingMsg.heartbeatText = (streamingMsg.heartbeatText || "") + text;
-          renderBubble(streamingMsg, "text");
+          _scheduleRender(streamingMsg, "text");
         },
         onHeartbeatRelayDone: () => {
           if (!streamingMsg?.streaming) return;
@@ -374,7 +391,7 @@ export function createStreamingController(ctx) {
           renderBubble(streamingMsg, "text");
         },
         onThinkingStart: () => { if (!streamingMsg?.streaming) return; streamingMsg.thinkingText = ""; streamingMsg.thinking = true; renderBubble(streamingMsg, "thinking"); },
-        onThinkingDelta: text => { if (!streamingMsg?.streaming) return; streamingMsg.thinkingText = (streamingMsg.thinkingText || "") + text; renderBubble(streamingMsg, "thinking"); },
+        onThinkingDelta: text => { if (!streamingMsg?.streaming) return; streamingMsg.thinkingText = (streamingMsg.thinkingText || "") + text; _scheduleRender(streamingMsg, "thinking"); },
         onThinkingEnd: () => { if (!streamingMsg?.streaming) return; streamingMsg.thinking = false; renderBubble(streamingMsg, "thinking"); },
         onError: ({ message: errorMsg }) => {
           logger.debug(`onError: ${errorMsg}`);

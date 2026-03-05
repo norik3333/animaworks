@@ -85,15 +85,12 @@ export async function streamChat(animaName, body, signal, callbacks) {
 
   const headers = body instanceof FormData ? {} : { "Content-Type": "application/json" };
 
-  logger.info(`[SSE-FE] fetch POST ${url}`);
   const res = await fetch(url, {
     method: "POST",
     headers,
     body,
     ...(signal ? { signal } : {}),
   });
-
-  logger.info(`[SSE-FE] fetch response status=${res.status} ok=${res.ok} type=${res.headers.get("content-type")}`);
 
   if (!res.ok) {
     const text = await res.text().catch(() => res.statusText);
@@ -102,9 +99,7 @@ export async function streamChat(animaName, body, signal, callbacks) {
   }
 
   try {
-    logger.info(`[SSE-FE] _processStream starting anima=${animaName}`);
-    await _processStream(res, callbacks, (id) => { responseId = id; logger.info(`[SSE-FE] response_id set: ${id}`); }, (id) => { lastEventId = id; }, signal);
-    logger.info(`[SSE-FE] _processStream completed anima=${animaName} responseId=${responseId} lastEventId=${lastEventId}`);
+    await _processStream(res, callbacks, (id) => { responseId = id; }, (id) => { lastEventId = id; }, signal);
   } catch (err) {
     const elapsed = ((performance.now() - start) / 1000).toFixed(1);
     logger.info(`[SSE-FE] _processStream ERROR anima=${animaName} err=${err.name}:${err.message} elapsed=${elapsed}s responseId=${responseId} lastEventId=${lastEventId}`);
@@ -139,19 +134,15 @@ async function _processStream(res, callbacks, setResponseId, setLastEventId, sig
   let buffer = "";
   let chunkCount = 0;
   let sseEventCount = 0;
-  let lastChunkTime = performance.now();
   const streamStart = performance.now();
 
-  logger.info("[SSE-FE] _processStream: reader opened");
+  logger.debug("[SSE-FE] _processStream: reader opened");
 
   try {
     while (true) {
       if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
 
-      const readStart = performance.now();
       const { done, value } = await reader.read();
-      const readMs = (performance.now() - readStart).toFixed(0);
-      const gapMs = (performance.now() - lastChunkTime).toFixed(0);
 
       if (done) {
         const totalElapsed = ((performance.now() - streamStart) / 1000).toFixed(1);
@@ -161,18 +152,16 @@ async function _processStream(res, callbacks, setResponseId, setLastEventId, sig
       chunkCount++;
       lastChunkTime = performance.now();
 
-      const rawLen = value ? value.byteLength : 0;
       buffer += decoder.decode(value, { stream: true });
       const { parsed, remaining } = parseConvSSE(buffer);
       buffer = remaining;
 
-      if (chunkCount % 50 === 0 || parsed.length > 0) {
-        logger.info(`[SSE-FE] chunk#${chunkCount} rawBytes=${rawLen} parsedEvents=${parsed.length} bufRemain=${remaining.length} readMs=${readMs} gapMs=${gapMs}`);
+      if (chunkCount % 200 === 0) {
+        logger.debug(`[SSE-FE] chunk#${chunkCount} parsedEvents=${parsed.length} bufRemain=${remaining.length}`);
       }
 
       for (const { id, event, data } of parsed) {
         sseEventCount++;
-        // Track event IDs for reconnection
         if (id) setLastEventId(id);
 
         switch (event) {
@@ -182,25 +171,20 @@ async function _processStream(res, callbacks, setResponseId, setLastEventId, sig
             break;
 
           case "text_delta":
-            // text_delta is high-frequency; log periodically
-            if (sseEventCount % 20 === 0) {
-              logger.info(`[SSE-FE] EVENT text_delta (periodic) sseEvent#${sseEventCount} delta_len=${(data.text || "").length} id=${id}`);
-            }
             callbacks.onTextDelta?.(data.text || "");
             break;
 
           case "tool_start":
-            logger.info(`[SSE-FE] EVENT tool_start tool=${data.tool_name} id=${id}`);
+            logger.debug(`[SSE-FE] EVENT tool_start tool=${data.tool_name} id=${id}`);
             callbacks.onToolStart?.(data.tool_name, { tool_id: data.tool_id });
             break;
 
           case "tool_detail":
-            logger.info(`[SSE-FE] EVENT tool_detail tool=${data.tool_name} detail=${data.detail}`);
             callbacks.onToolDetail?.(data.tool_name, data.detail, { tool_id: data.tool_id });
             break;
 
           case "tool_end":
-            logger.info(`[SSE-FE] EVENT tool_end tool=${data.tool_name || "?"} id=${id}`);
+            logger.debug(`[SSE-FE] EVENT tool_end tool=${data.tool_name || "?"} id=${id}`);
             callbacks.onToolEnd?.({
               tool_id: data.tool_id,
               tool_name: data.tool_name || "",
@@ -233,37 +217,36 @@ async function _processStream(res, callbacks, setResponseId, setLastEventId, sig
             break;
 
           case "chain_start":
-            logger.info(`[SSE-FE] EVENT chain_start id=${id}`);
+            logger.debug(`[SSE-FE] EVENT chain_start id=${id}`);
             callbacks.onChainStart?.();
             break;
 
           case "compression_start":
-            logger.info(`[SSE-FE] EVENT compression_start id=${id}`);
+            logger.debug(`[SSE-FE] EVENT compression_start id=${id}`);
             callbacks.onCompressionStart?.();
             break;
 
           case "compression_end":
-            logger.info(`[SSE-FE] EVENT compression_end id=${id}`);
+            logger.debug(`[SSE-FE] EVENT compression_end id=${id}`);
             callbacks.onCompressionEnd?.();
             break;
 
           case "heartbeat_relay_start":
-            logger.info(`[SSE-FE] EVENT heartbeat_relay_start msg=${data.message || ""} id=${id}`);
+            logger.debug(`[SSE-FE] EVENT heartbeat_relay_start msg=${data.message || ""} id=${id}`);
             callbacks.onHeartbeatRelayStart?.({ message: data.message || "" });
             break;
 
           case "heartbeat_relay":
-            logger.info(`[SSE-FE] EVENT heartbeat_relay len=${(data.text || "").length} id=${id}`);
             callbacks.onHeartbeatRelay?.({ text: data.text || "" });
             break;
 
           case "heartbeat_relay_done":
-            logger.info(`[SSE-FE] EVENT heartbeat_relay_done id=${id}`);
+            logger.debug(`[SSE-FE] EVENT heartbeat_relay_done id=${id}`);
             callbacks.onHeartbeatRelayDone?.();
             break;
 
           case "thinking_start":
-            logger.info(`[SSE-FE] EVENT thinking_start id=${id}`);
+            logger.debug(`[SSE-FE] EVENT thinking_start id=${id}`);
             callbacks.onThinkingStart?.();
             break;
 
@@ -272,12 +255,12 @@ async function _processStream(res, callbacks, setResponseId, setLastEventId, sig
             break;
 
           case "thinking_end":
-            logger.info(`[SSE-FE] EVENT thinking_end id=${id}`);
+            logger.debug(`[SSE-FE] EVENT thinking_end id=${id}`);
             callbacks.onThinkingEnd?.();
             break;
 
           default:
-            logger.info(`[SSE-FE] EVENT unknown event=${event} id=${id}`);
+            logger.debug(`[SSE-FE] EVENT unknown event=${event} id=${id}`);
             break;
         }
       }

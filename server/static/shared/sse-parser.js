@@ -21,7 +21,7 @@ export function parseConvSSE(buffer) {
     if (!part.trim()) continue;
     // Skip SSE comments (keepalive)
     if (part.trim().startsWith(":")) {
-      logger.info(`[SSE-PARSE] keepalive comment received: "${part.trim().slice(0, 50)}"`);
+      logger.debug(`[SSE-PARSE] keepalive comment received: "${part.trim().slice(0, 50)}"`);
       continue;
     }
     let eventName = "message";
@@ -47,7 +47,7 @@ export function parseConvSSE(buffer) {
   }
   if (parsed.length > 0) {
     const eventNames = parsed.map(e => e.event).join(",");
-    logger.info(`[SSE-PARSE] parsed=${parsed.length} events=[${eventNames}] remaining=${remaining.length}`);
+    logger.debug(`[SSE-PARSE] parsed=${parsed.length} events=[${eventNames}] remaining=${remaining.length}`);
   }
   return { parsed, remaining };
 }

@@ -621,6 +621,8 @@ async def _sse_tail(
             for event in events:
                 yield format_sse_with_id(event.event, event.payload, event.event_id)
                 seq = event.seq
+            # Yield control so ASGI server can flush chunks to the client
+            await asyncio.sleep(0)
 
         # Check if stream is complete and fully drained
         if stream.complete:
