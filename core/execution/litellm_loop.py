@@ -28,7 +28,7 @@ from pathlib import Path
 from typing import Any
 
 from core.exceptions import LLMAPIError, ToolExecutionError, ConfigError  # noqa: F401
-from core.prompt.context import ContextTracker, resolve_context_window
+from core.prompt.context import ContextTracker
 from core.execution._session import build_continuation_prompt, handle_session_chaining
 from core.execution.base import BaseExecutor, ExecutionResult, StreamDisconnectedError, TokenUsage, ToolCallRecord, strip_thinking_tags
 from core.execution.reminder import MSG_CONTEXT_THRESHOLD, MSG_FINAL_ITERATION, MSG_OUTPUT_TRUNCATED, SystemReminderQueue
@@ -116,7 +116,7 @@ class LiteLLMExecutor(
 
         tools = self._build_base_tools()
         _active_categories: set[str] = set()
-        context_window = resolve_context_window(self._model_config.model)
+        context_window = self._resolve_cw()
 
         messages = self._build_initial_messages(
             system_prompt, prompt, images, prior_messages=prior_messages,

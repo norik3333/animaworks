@@ -123,13 +123,15 @@ def _handle_tool_use_block(
     pending_records: dict[str, ToolCallRecord],
     journal: Any | None,
     model: str,
+    *,
+    cw_overrides: dict[str, int] | None = None,
 ) -> ToolCallRecord:
     """Process a ToolUseBlock from AssistantMessage.
 
     Registers the block in ``pending_records`` and writes a WAL entry
     via the streaming journal (if provided).
     """
-    context_window = resolve_context_window(model)
+    context_window = resolve_context_window(model, cw_overrides)
     record = ToolCallRecord(
         tool_name=block.name,
         tool_id=block.id,
@@ -170,6 +172,7 @@ def _handle_tool_result_block(
     model: str,
     *,
     anima_dir: Path | None = None,
+    cw_overrides: dict[str, int] | None = None,
 ) -> None:
     """Process a ToolResultBlock from UserMessage.
 
@@ -187,7 +190,7 @@ def _handle_tool_result_block(
 
     record = pending_records.get(block.tool_use_id)
     if record:
-        context_window = resolve_context_window(model)
+        context_window = resolve_context_window(model, cw_overrides)
         record.result_summary = _truncate_for_record(
             content_str,
             tool_result_save_budget(record.tool_name, context_window),

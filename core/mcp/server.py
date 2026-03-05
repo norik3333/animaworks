@@ -390,8 +390,8 @@ _is_supervisor: bool | None = None
 def _has_subordinates_for_anima() -> bool:
     """Check if this Anima has subordinates via config.json.
 
-    Evaluated once at first call and cached. Falls back to True (safe side)
-    on any error.
+    Evaluated once at first call and cached. Falls back to False (safe side —
+    hides supervisor tools when check fails).
     """
     global _is_supervisor
     if _is_supervisor is not None:
@@ -400,16 +400,16 @@ def _has_subordinates_for_anima() -> bool:
     try:
         anima_dir_env = os.environ.get("ANIMAWORKS_ANIMA_DIR", "")
         if not anima_dir_env:
-            _is_supervisor = True
-            return True
+            _is_supervisor = False
+            return False
         anima_name = Path(anima_dir_env).name
 
         from core.paths import get_data_dir
 
         config_path = get_data_dir() / "config.json"
         if not config_path.is_file():
-            _is_supervisor = True
-            return True
+            _is_supervisor = False
+            return False
 
         import json as _json
 
@@ -426,9 +426,9 @@ def _has_subordinates_for_anima() -> bool:
         _is_supervisor = False
         return False
     except Exception:
-        logger.debug("Failed to check subordinate status, defaulting to True")
-        _is_supervisor = True
-        return True
+        logger.debug("Failed to check subordinate status, defaulting to False")
+        _is_supervisor = False
+        return False
 
 
 def _get_tool_handler() -> Any:

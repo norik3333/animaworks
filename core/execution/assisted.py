@@ -40,7 +40,7 @@ from core.execution.reminder import MSG_OUTPUT_TRUNCATED, SystemReminderQueue
 from core.execution._streaming import stream_error_boundary
 from core.memory import MemoryManager
 from core.messenger import Messenger
-from core.prompt.context import ContextTracker, resolve_context_window
+from core.prompt.context import ContextTracker
 from core.schemas import ModelConfig
 from core.memory.shortterm import ShortTermMemory
 from core.tooling.handler import ToolHandler
@@ -248,18 +248,8 @@ class AssistedExecutor(BaseExecutor):
         if the prompt is too large to fit in the context window at all.
         """
         import litellm as _litellm
-        from core.prompt.context import resolve_context_window
-        from core.config import load_config
 
-        try:
-            _cw_overrides = load_config().model_context_windows
-        except Exception:
-            logger.debug("Failed to load model context windows", exc_info=True)
-            _cw_overrides = None
-
-        ctx_window = resolve_context_window(
-            self._model_config.model, _cw_overrides,
-        )
+        ctx_window = self._resolve_cw()
 
         try:
             est_input = _litellm.token_counter(
@@ -382,16 +372,7 @@ class AssistedExecutor(BaseExecutor):
 
         # Ollama num_ctx: explicitly set context window to prevent silent truncation
         if self._model_config.model.startswith("ollama/"):
-            from core.prompt.context import resolve_context_window
-            from core.config import load_config
-            try:
-                _cw_overrides = load_config().model_context_windows
-            except Exception:
-                logger.debug("Failed to load model context windows", exc_info=True)
-                _cw_overrides = None
-            kwargs["num_ctx"] = resolve_context_window(
-                self._model_config.model, _cw_overrides,
-            )
+            kwargs["num_ctx"] = self._resolve_cw()
 
         return await litellm.acompletion(**kwargs)
 
@@ -424,7 +405,7 @@ class AssistedExecutor(BaseExecutor):
         tool_spec = self._build_tool_spec_text()
         full_system = system_prompt + "\n\n" + tool_spec if system_prompt else tool_spec
 
-        context_window = resolve_context_window(self._model_config.model)
+        context_window = self._resolve_cw()
         messages: list[dict[str, Any]] = [
             {"role": "system", "content": full_system},
             {"role": "user", "content": prompt},
@@ -629,7 +610,7 @@ class AssistedExecutor(BaseExecutor):
         tool_spec = self._build_tool_spec_text()
         full_system = system_prompt + "\n\n" + tool_spec if system_prompt else tool_spec
 
-        context_window = resolve_context_window(self._model_config.model)
+        context_window = self._resolve_cw()
         messages: list[dict[str, Any]] = [
             {"role": "system", "content": full_system},
             {"role": "user", "content": prompt},

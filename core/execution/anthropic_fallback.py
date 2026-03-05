@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Any
 
 from core.exceptions import LLMAPIError, ToolExecutionError  # noqa: F401
-from core.prompt.context import ContextTracker, resolve_context_window
+from core.prompt.context import ContextTracker
 from core.execution._sanitize import TOOL_TRUST_LEVELS, wrap_tool_result
 from core.execution._session import build_continuation_prompt, handle_session_chaining
 from core.execution._streaming import stream_error_boundary
@@ -216,7 +216,7 @@ class AnthropicFallbackExecutor(BaseExecutor):
         """Run Anthropic SDK with tool_use loop."""
         client = self._build_client()
         tools = self._build_tools()
-        context_window = resolve_context_window(self._model_config.model)
+        context_window = self._resolve_cw()
         if prior_messages:
             messages = prior_messages  # Structured history including current msg
         else:
@@ -445,7 +445,7 @@ class AnthropicFallbackExecutor(BaseExecutor):
         """
         client = self._build_client()
         tools = self._build_tools()
-        context_window = resolve_context_window(self._model_config.model)
+        context_window = self._resolve_cw()
         if prior_messages:
             messages = prior_messages
         else:

@@ -858,14 +858,14 @@ class TestHasSubordinatesForAnima:
         import core.mcp.server as mcp_mod
         mcp_mod._is_supervisor = None
 
-    def test_returns_true_when_env_not_set(
+    def test_returns_false_when_env_not_set(
         self, monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        """Falls back to True when ANIMAWORKS_ANIMA_DIR is not set."""
+        """Falls back to False when ANIMAWORKS_ANIMA_DIR is not set."""
         import core.mcp.server as mcp_mod
 
         monkeypatch.delenv("ANIMAWORKS_ANIMA_DIR", raising=False)
-        assert mcp_mod._has_subordinates_for_anima() is True
+        assert mcp_mod._has_subordinates_for_anima() is False
 
     def test_returns_true_when_has_subordinates(
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
@@ -924,10 +924,10 @@ class TestHasSubordinatesForAnima:
         mcp_mod._is_supervisor = False
         assert mcp_mod._has_subordinates_for_anima() is False
 
-    def test_config_read_failure_defaults_to_true(
+    def test_config_read_failure_defaults_to_false(
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
     ) -> None:
-        """Falls back to True if config.json cannot be read."""
+        """Falls back to False if config.json cannot be read."""
         import core.mcp.server as mcp_mod
 
         anima_dir = tmp_path / "animas" / "test"
@@ -937,4 +937,4 @@ class TestHasSubordinatesForAnima:
         with patch("core.paths.get_data_dir", side_effect=RuntimeError("no dir")):
             result = mcp_mod._has_subordinates_for_anima()
 
-        assert result is True
+        assert result is False

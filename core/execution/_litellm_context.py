@@ -16,8 +16,6 @@ import json as _json
 import logging
 from typing import Any
 
-from core.prompt.context import resolve_context_window
-
 logger = logging.getLogger("animaworks.execution.litellm_loop")
 
 
@@ -86,15 +84,7 @@ class ContextMixin:
             kwargs["think"] = False
         # Ollama num_ctx: explicitly set context window to prevent silent truncation
         if self._model_config.model.startswith("ollama/"):
-            from core.config import load_config
-            try:
-                _cw_overrides = load_config().model_context_windows
-            except Exception:
-                logger.debug("Failed to load model context windows", exc_info=True)
-                _cw_overrides = None
-            kwargs["num_ctx"] = resolve_context_window(
-                self._model_config.model, _cw_overrides,
-            )
+            kwargs["num_ctx"] = self._resolve_cw()
         return kwargs
 
     def _build_initial_messages(
@@ -160,15 +150,7 @@ class ContextMixin:
         As a last resort, truncates the system message to fit within the
         context window rather than failing outright.
         """
-        try:
-            from core.config import load_config
-            _cw_overrides = load_config().model_context_windows
-        except Exception:
-            logger.debug("Failed to load model context windows", exc_info=True)
-            _cw_overrides = None
-        ctx_window = resolve_context_window(
-            self._model_config.model, _cw_overrides,
-        )
+        ctx_window = self._resolve_cw()
 
         def _estimate_tokens() -> int:
             try:

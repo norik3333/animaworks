@@ -36,7 +36,7 @@ if TYPE_CHECKING:
     except ImportError:
         pass
 
-from core.prompt.context import CHARS_PER_TOKEN, ContextTracker, resolve_context_window
+from core.prompt.context import CHARS_PER_TOKEN, ContextTracker
 from core.exceptions import ExecutionError, LLMAPIError, MemoryWriteError  # noqa: F401
 from core.execution.base import BaseExecutor, ExecutionResult, StreamDisconnectedError, TokenUsage, ToolCallRecord
 from core.schemas import ModelConfig
@@ -441,6 +441,7 @@ class AgentSDKExecutor(BaseExecutor):
                         _handle_tool_use_block(
                             block, pending_records, None,
                             self._model_config.model,
+                            cw_overrides=self._resolve_cw_overrides(),
                         )
             elif isinstance(message, UserMessage):
                 if isinstance(message.content, list):
@@ -453,6 +454,7 @@ class AgentSDKExecutor(BaseExecutor):
                                 block, pending_records, None,
                                 self._model_config.model,
                                 anima_dir=self._anima_dir,
+                                cw_overrides=self._resolve_cw_overrides(),
                             )
             elif isinstance(message, SystemMessage):
                 if message.subtype == "init" and message.data:
@@ -503,7 +505,7 @@ class AgentSDKExecutor(BaseExecutor):
         #    whether to terminate the session for auto-compact; the loop
         #    updates total_result_bytes after each ToolResultBlock.
         #    Both run in the same async task — no concurrent access.
-        _cw = resolve_context_window(self._model_config.model)
+        _cw = self._resolve_cw()
         _max_turns = max_turns_override or self._model_config.max_turns
         session_stats: dict[str, Any] = {
             "tool_call_count": 0,
@@ -648,7 +650,7 @@ class AgentSDKExecutor(BaseExecutor):
 
         # ── Session stats: shared between PreToolUse hook closure and this
         #    outer message loop (see execute() for detailed comment).
-        _cw = resolve_context_window(self._model_config.model)
+        _cw = self._resolve_cw()
         _max_turns = max_turns_override or self._model_config.max_turns
         session_stats: dict[str, Any] = {
             "tool_call_count": 0,
@@ -753,6 +755,7 @@ class AgentSDKExecutor(BaseExecutor):
                             _handle_tool_use_block(
                                 block, pending_records, None,
                                 self._model_config.model,
+                                cw_overrides=self._resolve_cw_overrides(),
                             )
                             detail_chunk = make_tool_detail_chunk(
                                 block.name, block.id, block.input or {},
@@ -780,6 +783,7 @@ class AgentSDKExecutor(BaseExecutor):
                                     block, pending_records, None,
                                     self._model_config.model,
                                     anima_dir=self._anima_dir,
+                                    cw_overrides=self._resolve_cw_overrides(),
                                 )
 
                 elif isinstance(message, ResultMessage):

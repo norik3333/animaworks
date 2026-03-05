@@ -25,7 +25,7 @@ from core.execution._streaming import (
 )
 from core.execution.base import ExecutionResult, StreamingThinkFilter, TokenUsage, ToolCallRecord, strip_thinking_tags
 from core.execution.reminder import MSG_CONTEXT_THRESHOLD, MSG_FINAL_ITERATION, MSG_OUTPUT_TRUNCATED, SystemReminderQueue
-from core.prompt.context import ContextTracker, resolve_context_window
+from core.prompt.context import ContextTracker
 from core.execution._litellm_tools import _convert_litellm_tool_calls
 
 logger = logging.getLogger("animaworks.execution.litellm_loop")
@@ -58,7 +58,7 @@ class StreamingMixin:
 
         tools = self._build_base_tools()
         _active_categories: set[str] = set()
-        context_window = resolve_context_window(self._model_config.model)
+        context_window = self._resolve_cw()
 
         messages = self._build_initial_messages(system_prompt, prompt, images, prior_messages=prior_messages)
         all_response_text: list[str] = []
@@ -396,7 +396,7 @@ class StreamingMixin:
 
         tools = self._build_base_tools()
         _active_categories: set[str] = set()
-        context_window = resolve_context_window(self._model_config.model)
+        context_window = self._resolve_cw()
 
         messages = self._build_initial_messages(system_prompt, prompt, images, prior_messages=prior_messages)
         all_response_text: list[str] = []
