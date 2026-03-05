@@ -354,6 +354,54 @@ class OrgToolsMixin:
             result += "\n" + t("handler.reason_prefix", reason=reason)
         return result + warn_msg
 
+    def _handle_set_subordinate_background_model(self, args: dict[str, Any]) -> str:
+        """Change a subordinate's background model (heartbeat/cron)."""
+        from core.config.models import update_status_model
+        from core.paths import get_data_dir
+
+        target_name = args.get("name", "")
+        model = args.get("model", "")
+        credential = args.get("credential")
+        reason = args.get("reason", "")
+
+        if not target_name:
+            return _error_result("InvalidArguments", "name is required")
+
+        err = self._check_subordinate(target_name)
+        if err:
+            return err
+
+        target_dir = get_data_dir() / "animas" / target_name
+        update_status_model(
+            target_dir,
+            background_model=model if model else "",
+            background_credential=credential if credential else "",
+        )
+
+        log_summary = (
+            f"{target_name}のbackground_modelを{model or '(クリア)'}に変更"
+        )
+        if reason:
+            log_summary += f" (理由: {reason})"
+        self._activity.log(
+            "tool_use",
+            tool="set_subordinate_background_model",
+            summary=log_summary,
+            meta={"target": target_name, "model": model, "reason": reason},
+        )
+
+        logger.info(
+            "set_subordinate_background_model: %s changed %s background_model to %s (reason=%s)",
+            self._anima_name, target_name, model or "(clear)", reason or "(none)",
+        )
+
+        if model:
+            return (
+                f"{target_name}のbackground_modelを'{model}'に変更しました。"
+                f"反映にはrestart_subordinateが必要です。"
+            )
+        return f"{target_name}のbackground_modelをクリアしました（メインモデルを使用）。"
+
     def _handle_restart_subordinate(self, args: dict[str, Any]) -> str:
         """Request restart of a subordinate anima via sentinel flag in status.json."""
         from core.paths import get_animas_dir

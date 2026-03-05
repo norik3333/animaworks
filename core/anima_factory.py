@@ -530,8 +530,8 @@ def _create_status_json(
         status["execution_mode"] = explicit_mode
 
     # Merge role defaults (model config fields)
-    for key in ("model", "context_threshold", "max_turns", "max_chains",
-                "conversation_history_threshold"):
+    for key in ("model", "background_model", "context_threshold", "max_turns",
+                "max_chains", "conversation_history_threshold"):
         if key in role_defaults:
             status[key] = role_defaults[key]
 

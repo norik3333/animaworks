@@ -1,5 +1,6 @@
 {
   "model": "claude-opus-4-6",
+  "background_model": "claude-sonnet-4-6",
   "context_threshold": 0.60,
   "max_turns": 50,
   "max_chains": 3,

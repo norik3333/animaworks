@@ -238,6 +238,8 @@ class TestReadModelConfig:
         mock_resolved.thinking = None
         mock_resolved.thinking_effort = None
         mock_resolved.llm_timeout = None
+        mock_resolved.background_model = None
+        mock_resolved.background_credential = None
 
         mock_credential = MagicMock()
         mock_credential.api_key = "sk-test"
@@ -300,6 +302,8 @@ class TestReadModelConfig:
         mock_resolved.thinking = None
         mock_resolved.thinking_effort = None
         mock_resolved.llm_timeout = None
+        mock_resolved.background_model = None
+        mock_resolved.background_credential = None
 
         mock_credential = MagicMock()
         mock_credential.api_key = ""

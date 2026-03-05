@@ -47,6 +47,8 @@ class ConfigReader:
             return ModelConfig(
                 model=resolved.model,
                 fallback_model=resolved.fallback_model,
+                background_model=resolved.background_model,
+                background_credential=resolved.background_credential,
                 max_tokens=resolved.max_tokens,
                 max_turns=resolved.max_turns,
                 api_key=credential.api_key or None,

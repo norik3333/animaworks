@@ -85,6 +85,8 @@ class AnimaDefaults(BaseModel):
 
     model: str = DEFAULT_ANIMA_MODEL
     fallback_model: str | None = None
+    background_model: str | None = None
+    background_credential: str | None = None
     max_tokens: int = 8192
     max_turns: int = 20
     credential: str = "anthropic"
@@ -273,6 +275,7 @@ class HeartbeatConfig(BaseModel):
     """Heartbeat scheduling and cascade prevention settings."""
 
     interval_minutes: int = Field(default=30, ge=1, le=60)  # heartbeat interval (config-driven, not parsed from heartbeat.md)
+    default_model: str | None = None  # global background model for heartbeat/cron (None = use main model)
     msg_heartbeat_cooldown_s: int = 300  # message-triggered heartbeat cooldown
     cascade_window_s: int = 1800  # sliding window for cascade detection
     cascade_threshold: int = 3  # max round-trips per pair within window
@@ -508,6 +511,8 @@ def _load_status_json(anima_dir: Path) -> dict[str, Any]:
     result: dict[str, Any] = {}
     field_mapping = {
         "model": "model",
+        "background_model": "background_model",
+        "background_credential": "background_credential",
         "context_threshold": "context_threshold",
         "max_turns": "max_turns",
         "max_chains": "max_chains",
@@ -875,6 +880,8 @@ def load_model_config(anima_dir: Path) -> "ModelConfig":
     return ModelConfig(
         model=resolved.model,
         fallback_model=resolved.fallback_model,
+        background_model=resolved.background_model,
+        background_credential=resolved.background_credential,
         max_tokens=resolved.max_tokens,
         max_turns=resolved.max_turns,
         api_key=credential.api_key or None,
@@ -1099,6 +1106,8 @@ def resolve_max_tokens(
 # ---------------------------------------------------------------------------
 
 
+_SENTINEL = object()
+
 _NONE_SUPERVISOR_VALUES = frozenset({"なし", "(なし)", "（なし）", "-", "---", ""})
 
 _PAREN_EN_NAME_RE = re.compile(r"[（(]([A-Za-z_][A-Za-z0-9_]*)[）)]")
@@ -1109,8 +1118,14 @@ def update_status_model(
     *,
     model: str | None = None,
     credential: str | None = None,
+    background_model: str | None | object = _SENTINEL,
+    background_credential: str | None | object = _SENTINEL,
 ) -> None:
-    """Update model/credential in an anima's status.json (atomic write)."""
+    """Update model/credential in an anima's status.json (atomic write).
+
+    For background_model/background_credential, pass empty string ``""`` to
+    clear (remove the field).  The default sentinel leaves the field unchanged.
+    """
     status_path = anima_dir / "status.json"
     if not status_path.is_file():
         raise FileNotFoundError(f"status.json not found: {status_path}")
@@ -1119,6 +1134,16 @@ def update_status_model(
         data["model"] = model
     if credential is not None:
         data["credential"] = credential
+    if background_model is not _SENTINEL:
+        if background_model:
+            data["background_model"] = background_model
+        else:
+            data.pop("background_model", None)
+    if background_credential is not _SENTINEL:
+        if background_credential:
+            data["background_credential"] = background_credential
+        else:
+            data.pop("background_credential", None)
     tmp = status_path.with_suffix(".tmp")
     tmp.write_text(
         json.dumps(data, indent=2, ensure_ascii=False) + "\n",

@@ -145,6 +145,12 @@ class InboxMixin:
                     accumulated_text = ""
                     result: CycleResult | None = None
 
+                    original_config = None
+                    bg_config = self._resolve_background_config()
+                    if bg_config is not None:
+                        original_config = self.agent.model_config
+                        self.agent.update_model_config(bg_config)
+
                     try:
                         async for chunk in self.agent.run_cycle_streaming(
                             prompt, trigger=trigger,
@@ -177,6 +183,8 @@ class InboxMixin:
                                 summary=accumulated_text[:500] or "(no result)",
                             )
                     finally:
+                        if original_config is not None:
+                            self.agent.update_model_config(original_config)
                         journal.close()
                         if _fanout_token is not None:
                             suppress_board_fanout.reset(_fanout_token)

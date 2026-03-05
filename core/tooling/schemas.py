@@ -668,6 +668,37 @@ SUPERVISOR_TOOLS: list[dict[str, Any]] = [
         },
     },
     {
+        "name": "set_subordinate_background_model",
+        "description": (
+            "部下のバックグラウンドモデル（heartbeat/cron用）を変更する（直属部下のみ可能）。\n"
+            "変更は即時 status.json に保存される。反映には restart_subordinate を併用すること。\n\n"
+            "バックグラウンドモデル未設定時はメインモデル（model）がそのまま使用される。\n"
+            "クリアするには model に空文字 '' を指定する。"
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "description": "対象の部下Anima名",
+                },
+                "model": {
+                    "type": "string",
+                    "description": "バックグラウンドモデル名（空文字でクリア）",
+                },
+                "credential": {
+                    "type": "string",
+                    "description": "credential名（省略可）",
+                },
+                "reason": {
+                    "type": "string",
+                    "description": "変更理由",
+                },
+            },
+            "required": ["name", "model"],
+        },
+    },
+    {
         "name": "restart_subordinate",
         "description": (
             "部下のAnimaプロセスを再起動する（直属部下のみ可能）。\n"

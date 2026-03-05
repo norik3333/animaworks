@@ -66,6 +66,7 @@ EXPECTED_BUILTIN_TOOLS = frozenset({
     "disable_subordinate",
     "enable_subordinate",
     "set_subordinate_model",
+    "set_subordinate_background_model",
     "restart_subordinate",
     "org_dashboard",
     "ping_subordinate",
@@ -106,8 +107,8 @@ class TestDispatchDictCompleteness:
         assert extra == set(), f"Unexpected tools in dispatch dict: {extra}"
 
     def test_dispatch_count(self, handler: ToolHandler):
-        """Dispatch dict should have exactly 42 entries."""
-        assert len(handler._dispatch) == 42
+        """Dispatch dict should have exactly 43 entries."""
+        assert len(handler._dispatch) == 43
 
     def test_all_dispatch_values_are_callable(self, handler: ToolHandler):
         """Every value in the dispatch dict must be callable."""

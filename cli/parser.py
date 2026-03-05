@@ -374,6 +374,15 @@ def cli_main() -> None:
     )
     p_anima_set_model.set_defaults(func=_lazy_anima_set_model)
 
+    # anima set-background-model
+    p_bg = anima_sub.add_parser("set-background-model", help="Set heartbeat/cron model")
+    p_bg.add_argument("anima", nargs="?", default=None, help="Anima name")
+    p_bg.add_argument("model", nargs="?", default=None, help="Background model name")
+    p_bg.add_argument("--credential", default=None, help="Credential name")
+    p_bg.add_argument("--all", action="store_true", help="Apply to all enabled animas")
+    p_bg.add_argument("--clear", action="store_true", help="Remove background model override")
+    p_bg.set_defaults(func=_lazy_anima_set_background_model)
+
     # anima reload
     p_anima_reload = anima_sub.add_parser("reload", help="Hot-reload anima config from status.json")
     p_anima_reload.add_argument(
@@ -671,6 +680,12 @@ def _lazy_anima_set_model(args: argparse.Namespace) -> None:
     from cli.commands.anima_mgmt import cmd_anima_set_model
 
     cmd_anima_set_model(args)
+
+
+def _lazy_anima_set_background_model(args: argparse.Namespace) -> None:
+    from cli.commands.anima_mgmt import cmd_anima_set_background_model
+
+    cmd_anima_set_background_model(args)
 
 
 def _lazy_anima_reload(args: argparse.Namespace) -> None:

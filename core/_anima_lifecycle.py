@@ -272,6 +272,13 @@ class LifecycleMixin:
                     task_name, description, command_output=command_output,
                 )
 
+                # ── Background model swap ──
+                original_config = None
+                bg_config = self._resolve_background_config()
+                if bg_config is not None:
+                    original_config = self.agent.model_config
+                    self.agent.update_model_config(bg_config)
+
                 try:
                     result = await self.agent.run_cycle(
                         prompt, trigger=f"cron:{task_name}"
@@ -313,6 +320,8 @@ class LifecycleMixin:
                     )
                     raise
                 finally:
+                    if original_config is not None:
+                        self.agent.update_model_config(original_config)
                     active_session_type.reset(_session_token)
                     self._cron_idle.set()
                     self._status_slots["background"] = "idle"

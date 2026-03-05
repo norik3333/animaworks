@@ -203,6 +203,7 @@ class ToolHandler(
             "disable_subordinate": self._handle_disable_subordinate,
             "enable_subordinate": self._handle_enable_subordinate,
             "set_subordinate_model": self._handle_set_subordinate_model,
+            "set_subordinate_background_model": self._handle_set_subordinate_background_model,
             "restart_subordinate":   self._handle_restart_subordinate,
             "org_dashboard":         self._handle_org_dashboard,
             "ping_subordinate":      self._handle_ping_subordinate,

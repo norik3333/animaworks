@@ -620,6 +620,119 @@ def cmd_anima_set_model(args: argparse.Namespace) -> None:
         sys.exit(1)
 
 
+def cmd_anima_set_background_model(args: argparse.Namespace) -> None:
+    """Set an anima's background model for heartbeat/cron (updates status.json)."""
+    from core.config.models import update_status_model
+    from core.paths import get_data_dir
+
+    try:
+        data_dir = get_data_dir()
+        animas_dir = data_dir / "animas"
+        pid_file = data_dir / "server.pid"
+
+        if args.clear:
+            if args.all:
+                updated = 0
+                for entry in sorted(animas_dir.iterdir()):
+                    if not entry.is_dir():
+                        continue
+                    status_file = entry / "status.json"
+                    if not status_file.exists():
+                        continue
+                    try:
+                        status_data = json.loads(status_file.read_text(encoding="utf-8"))
+                        if not status_data.get("enabled", True):
+                            continue
+                    except Exception:
+                        continue
+                    try:
+                        update_status_model(
+                            entry,
+                            background_model="",
+                            background_credential="",
+                        )
+                        updated += 1
+                        print(f"  {entry.name}: background_model cleared")
+                    except Exception as e:
+                        print(f"  {entry.name}: ERROR - {e}", file=sys.stderr)
+                if updated == 0:
+                    print("No enabled animas found.")
+                    return
+                print(f"Cleared background_model for {updated} anima(s)")
+            else:
+                name = args.anima
+                if not name:
+                    print("Error: anima name is required (or use --all)")
+                    sys.exit(1)
+                anima_dir = animas_dir / name
+                if not anima_dir.exists():
+                    print(f"Error: Anima '{name}' not found")
+                    sys.exit(1)
+                update_status_model(
+                    anima_dir,
+                    background_model="",
+                    background_credential="",
+                )
+                print(f"Cleared background_model for '{name}'")
+        elif args.all:
+            model = args.model or args.anima
+            if not model:
+                print("Error: model is required (e.g. animaworks anima set-background-model claude-sonnet-4-6 --all)")
+                sys.exit(1)
+            credential = args.credential
+            updated = 0
+            for entry in sorted(animas_dir.iterdir()):
+                if not entry.is_dir():
+                    continue
+                status_file = entry / "status.json"
+                if not status_file.exists():
+                    continue
+                try:
+                    status_data = json.loads(status_file.read_text(encoding="utf-8"))
+                    if not status_data.get("enabled", True):
+                        continue
+                except Exception:
+                    continue
+                try:
+                    kwargs: dict = {"background_model": model}
+                    if credential:
+                        kwargs["background_credential"] = credential
+                    update_status_model(entry, **kwargs)
+                    updated += 1
+                    print(f"  {entry.name}: background_model={model}")
+                except Exception as e:
+                    print(f"  {entry.name}: ERROR - {e}", file=sys.stderr)
+            if updated == 0:
+                print("No enabled animas found.")
+                return
+            print(f"Updated background_model for {updated} anima(s) to '{model}'")
+        else:
+            if not args.anima or not args.model:
+                print(
+                    "Error: anima name and model are required "
+                    "(e.g. animaworks anima set-background-model hinata claude-sonnet-4-6)"
+                )
+                sys.exit(1)
+            anima_dir = animas_dir / args.anima
+            if not anima_dir.exists():
+                print(f"Error: Anima '{args.anima}' not found")
+                sys.exit(1)
+            kwargs_update: dict = {"background_model": args.model}
+            if args.credential:
+                kwargs_update["background_credential"] = args.credential
+            update_status_model(anima_dir, **kwargs_update)
+            print(f"Background model updated to '{args.model}' for '{args.anima}'")
+
+        if pid_file.exists():
+            print("  Server is running. Restart animas to apply changes (animaworks anima restart <name>).")
+    except FileNotFoundError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+    except Exception as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
 def cmd_anima_audit(args: argparse.Namespace) -> None:
     """Audit a subordinate anima's recent activity."""
     from collections import Counter

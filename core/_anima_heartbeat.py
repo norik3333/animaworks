@@ -51,6 +51,41 @@ def _extract_reflection(text: str) -> str:
 class HeartbeatMixin:
     """Mixin: heartbeat/cron prompt building, cycle execution, failure handling."""
 
+    # ── Background model resolution ──────────────────────────
+
+    def _resolve_background_config(self) -> "ModelConfig | None":
+        """Resolve background model config for heartbeat/cron.
+
+        Resolution order:
+          1. status.json background_model (per-anima)
+          2. config.heartbeat.default_model (global)
+          3. None (use main model)
+        """
+        from core.config.models import load_config
+        from core.schemas import ModelConfig
+
+        bg_model = self.agent.model_config.background_model
+        if not bg_model:
+            config = load_config()
+            bg_model = config.heartbeat.default_model
+        if not bg_model:
+            return None
+        if bg_model == self.agent.model_config.model:
+            return None
+
+        bg_credential = self.agent.model_config.background_credential
+        new_config: ModelConfig = self.agent.model_config.model_copy(
+            update={"model": bg_model},
+        )
+        if bg_credential:
+            config = load_config()
+            if bg_credential in config.credentials:
+                cred = config.credentials[bg_credential]
+                new_config.api_key = cred.api_key or None
+                new_config.api_base_url = cred.base_url or None
+                new_config.extra_keys = dict(cred.keys) if cred.keys else {}
+        return new_config
+
     # ── Heartbeat history ────────────────────────────────────
 
     _HEARTBEAT_HISTORY_N = 3
@@ -300,6 +335,13 @@ class HeartbeatMixin:
         journal = StreamingJournal(self.anima_dir, session_type="heartbeat")
         journal.open(trigger="heartbeat")
 
+        # ── Background model swap ──
+        original_config = None
+        bg_config = self._resolve_background_config()
+        if bg_config is not None:
+            original_config = self.agent.model_config
+            self.agent.update_model_config(bg_config)
+
         try:
             async for chunk in self.agent.run_cycle_streaming(
                 prompt, trigger="heartbeat",
@@ -386,6 +428,8 @@ class HeartbeatMixin:
 
             return result
         finally:
+            if original_config is not None:
+                self.agent.update_model_config(original_config)
             journal.close()
 
     async def _handle_heartbeat_failure(
