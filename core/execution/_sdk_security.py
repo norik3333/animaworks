@@ -23,14 +23,6 @@ logger = logging.getLogger("animaworks.execution.agent_sdk")
 # ── Mode S Bash blocklist ────────────────────────────────────
 
 _BASH_BLOCKED_PATTERNS: list[tuple[re.Pattern[str], str]] = [
-    (re.compile(r"chatwork\s+send", re.IGNORECASE),
-     "Chatwork send via Bash is blocked; use the mcp__aw__chatwork_send tool instead"),
-    (re.compile(r"chatwork_cli\.py\s+send", re.IGNORECASE),
-     "Chatwork CLI send via Bash is blocked; use the mcp__aw__chatwork_send tool instead"),
-    (re.compile(r"curl.*api\.chatwork\.com.*/messages", re.IGNORECASE),
-     "Direct Chatwork API post is blocked; use the mcp__aw__chatwork_send tool instead"),
-    (re.compile(r"wget.*api\.chatwork\.com.*/messages", re.IGNORECASE),
-     "Direct Chatwork API post via wget is blocked; use the mcp__aw__chatwork_send tool instead"),
     (re.compile(r"(?:^|[|;&]\s*)nc\b"),
      "nc (netcat) is blocked for security"),
     (re.compile(r"(?:^|[|;&]\s*)ncat\b"),

@@ -19,10 +19,9 @@ Your mode is determined automatically from your model name in `status.json`.
 Three tool families:
 
 1. **Claude Code built-ins**: Read, Write, Edit, Grep, Glob, Bash, git, etc. For file operations and command execution
-2. **MCP tools (`mcp__aw__*`)**: AnimaWorks-specific internal features. External tools permitted in `permissions.md` are also available directly via MCP
-   - Internal: `send_message`, `post_channel`, `read_channel`, `read_dm_history`, `add_task`, `update_task`, `list_tasks`, `call_human`, `search_memory`, `report_procedure_outcome`, `report_knowledge_outcome`, `skill`, `disable_subordinate`, `enable_subordinate`, `set_subordinate_model`, `restart_subordinate`, `org_dashboard`, `ping_subordinate`, `read_subordinate_state`, `delegate_task`, `task_tracker`, `audit_subordinate`
-   - External (when permitted): `mcp__aw__slack_post`, `mcp__aw__chatwork_send`, etc.
-3. **Bash + animaworks-tool**: Long-running tools (image generation, local LLM, speech transcription, etc.) are executed asynchronously via `animaworks-tool submit`
+2. **MCP tools (`mcp__aw__*`)**: AnimaWorks-specific internal features
+   - `send_message`, `post_channel`, `read_channel`, `read_dm_history`, `add_task`, `update_task`, `list_tasks`, `call_human`, `search_memory`, `report_procedure_outcome`, `report_knowledge_outcome`, `skill`, `disable_subordinate`, `enable_subordinate`, `set_subordinate_model`, `restart_subordinate`, `org_dashboard`, `ping_subordinate`, `read_subordinate_state`, `delegate_task`, `task_tracker`, `audit_subordinate`
+3. **Bash + animaworks-tool**: External tools (chatwork, slack, gmail, web_search, etc.) are accessed via `skill` to check CLI usage, then executed with `animaworks-tool <tool> <subcommand>`. Long-running tools use `animaworks-tool submit` for async execution
 
 ### A-mode (LiteLLM)
 
@@ -139,8 +138,8 @@ Main categories: `slack`, `chatwork`, `gmail`, `github`, `aws_collector`, `web_s
 
 ### S-mode
 
-1. **Check categories**: Confirm permitted categories in `permissions.md`
-2. **Execute**: Permitted external tools can be called directly via MCP (e.g. `mcp__aw__slack_post`)
+1. **Check skill**: Use `skill` tool to check CLI usage (e.g. `skill("chatwork-tool")`)
+2. **Execute**: Run `animaworks-tool <tool> <subcommand> [args...]` via Bash (e.g. `animaworks-tool chatwork send 123 "message"`)
 3. **Long-running tools**: Execute asynchronously with `animaworks-tool submit <tool_name> <subcommand> [args...]`
 4. **Help**: `animaworks-tool <tool_name> --help` for subcommands and arguments
 

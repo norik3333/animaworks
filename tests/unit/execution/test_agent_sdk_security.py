@@ -221,6 +221,12 @@ class TestBashBlockedPatterns:
         result = _check_a1_bash_command("chatwork unreplied --json", anima_dir)
         assert result is None
 
+    def test_animaworks_tool_chatwork_send_allowed(self, anima_dir: Path):
+        """animaworks-tool chatwork send is the intended CLI path after migration."""
+        cmd = 'animaworks-tool chatwork send 373957118 "Hello"'
+        result = _check_a1_bash_command(cmd, anima_dir)
+        assert result is None
+
     def test_normal_curl_allowed(self, anima_dir: Path):
         result = _check_a1_bash_command("curl https://example.com", anima_dir)
         assert result is None
