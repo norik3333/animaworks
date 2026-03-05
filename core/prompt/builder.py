@@ -868,11 +868,19 @@ def build_system_prompt(
                     f"Available via `use_tool`: {_cats_str}\n"
                     f"Use the `skill` tool to look up usage details for each tool before calling."
                 )
+            elif execution_mode.lower() in ("s", "c"):
+                parts.append(
+                    f"## External Tools\n"
+                    f"Available categories: {_cats_str}\n"
+                    f"Use the `skill` tool to look up CLI usage, "
+                    f"then execute via Bash: `animaworks-tool <tool> <subcommand>`."
+                )
             else:
                 parts.append(
                     f"## External Tools\n"
                     f"Available categories: {_cats_str}\n"
-                    f"Use the `skill` tool to look up CLI usage, then execute via `animaworks-tool <tool> <subcommand>`."
+                    f"Use the `skill` tool to look up CLI usage, "
+                    f"then execute via `execute_command`: `animaworks-tool <tool> <subcommand>`."
                 )
 
     # ── Group 5: 組織とコミュニケーション ─────────────────────

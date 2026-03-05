@@ -119,12 +119,22 @@ class TestBuildTools:
             assert "name" in t
             assert "input_schema" in t
 
-    def test_does_not_include_file_tools(self, executor: AnthropicFallbackExecutor):
+    def test_includes_file_tools(self, executor: AnthropicFallbackExecutor):
         with patch("core.tooling.schemas.load_external_schemas", return_value=[]):
             tools = executor._build_tools()
         names = [t["name"] for t in tools]
-        assert "read_file" not in names
-        assert "write_file" not in names
+        assert "read_file" in names
+        assert "write_file" in names
+        assert "edit_file" in names
+        assert "execute_command" in names
+
+    def test_includes_search_tools(self, executor: AnthropicFallbackExecutor):
+        with patch("core.tooling.schemas.load_external_schemas", return_value=[]):
+            tools = executor._build_tools()
+        names = [t["name"] for t in tools]
+        assert "web_fetch" in names
+        assert "search_code" in names
+        assert "list_directory" in names
 
 
 

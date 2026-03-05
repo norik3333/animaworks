@@ -28,8 +28,11 @@ EXPECTED_INTERNAL_TOOL_NAMES: frozenset[str] = frozenset({
     "search_memory",
     "report_procedure_outcome",
     "report_knowledge_outcome",
+    "check_permissions",
     "disable_subordinate",
     "enable_subordinate",
+    "create_skill",
+    "set_subordinate_background_model",
     "skill",
 })
 
@@ -120,14 +123,59 @@ class TestBuildMcpTools:
 
 
 class TestListToolsHandler:
-    """Tests for the list_tools() MCP handler."""
+    """Tests for the list_tools() MCP handler with dynamic supervisor filtering."""
 
-    async def test_returns_mcp_tools_list(self) -> None:
-        """list_tools() returns the MCP_TOOLS list."""
+    async def test_returns_all_tools_when_supervisor(self) -> None:
+        """list_tools() returns all MCP_TOOLS when Anima has subordinates."""
+        import core.mcp.server as mcp_mod
         from core.mcp.server import MCP_TOOLS, list_tools
 
-        result = await list_tools()
+        with patch.object(mcp_mod, "_is_supervisor", True):
+            result = await list_tools()
         assert result is MCP_TOOLS
+
+    async def test_filters_supervisor_tools_when_non_supervisor(self) -> None:
+        """list_tools() excludes supervisor tools when Anima has no subordinates."""
+        import core.mcp.server as mcp_mod
+        from core.mcp.server import MCP_TOOLS, _SUPERVISOR_TOOL_NAMES, list_tools
+
+        with patch.object(mcp_mod, "_is_supervisor", False):
+            result = await list_tools()
+
+        result_names = {t.name for t in result}
+        assert result_names & _SUPERVISOR_TOOL_NAMES == set()
+        non_supervisor_names = {t.name for t in MCP_TOOLS if t.name not in _SUPERVISOR_TOOL_NAMES}
+        assert result_names == non_supervisor_names
+
+    async def test_supervisor_tool_names_from_schemas(self) -> None:
+        """_SUPERVISOR_TOOL_NAMES matches SUPERVISOR_TOOLS from schemas.py."""
+        from core.mcp.server import _SUPERVISOR_TOOL_NAMES
+        from core.tooling.schemas import SUPERVISOR_TOOLS
+
+        expected = frozenset(t["name"] for t in SUPERVISOR_TOOLS)
+        assert _SUPERVISOR_TOOL_NAMES == expected
+
+    async def test_check_permissions_always_visible(self) -> None:
+        """check_permissions is NOT a supervisor tool and is always visible."""
+        import core.mcp.server as mcp_mod
+        from core.mcp.server import _SUPERVISOR_TOOL_NAMES, list_tools
+
+        assert "check_permissions" not in _SUPERVISOR_TOOL_NAMES
+        with patch.object(mcp_mod, "_is_supervisor", False):
+            result = await list_tools()
+        result_names = {t.name for t in result}
+        assert "check_permissions" in result_names
+
+    async def test_create_skill_always_visible(self) -> None:
+        """create_skill is NOT a supervisor tool and is always visible."""
+        import core.mcp.server as mcp_mod
+        from core.mcp.server import _SUPERVISOR_TOOL_NAMES, list_tools
+
+        assert "create_skill" not in _SUPERVISOR_TOOL_NAMES
+        with patch.object(mcp_mod, "_is_supervisor", False):
+            result = await list_tools()
+        result_names = {t.name for t in result}
+        assert "create_skill" in result_names
 
     def test_list_tools_is_async(self) -> None:
         """list_tools should be a coroutine function."""
@@ -794,3 +842,99 @@ class TestWrapResultHelper:
             result = _wrap_result("search_memory", "raw data")
 
         assert result == "raw data"
+
+
+# ── TestHasSubordinatesForAnima ──────────────────────────────────────
+
+
+class TestHasSubordinatesForAnima:
+    """Tests for _has_subordinates_for_anima() helper."""
+
+    def setup_method(self) -> None:
+        import core.mcp.server as mcp_mod
+        mcp_mod._is_supervisor = None
+
+    def teardown_method(self) -> None:
+        import core.mcp.server as mcp_mod
+        mcp_mod._is_supervisor = None
+
+    def test_returns_true_when_env_not_set(
+        self, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Falls back to True when ANIMAWORKS_ANIMA_DIR is not set."""
+        import core.mcp.server as mcp_mod
+
+        monkeypatch.delenv("ANIMAWORKS_ANIMA_DIR", raising=False)
+        assert mcp_mod._has_subordinates_for_anima() is True
+
+    def test_returns_true_when_has_subordinates(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+    ) -> None:
+        """Returns True when config.json shows subordinates."""
+        import core.mcp.server as mcp_mod
+
+        anima_dir = tmp_path / "animas" / "boss"
+        anima_dir.mkdir(parents=True)
+        monkeypatch.setenv("ANIMAWORKS_ANIMA_DIR", str(anima_dir))
+
+        config_data = {
+            "animas": {
+                "boss": {"supervisor": None},
+                "worker1": {"supervisor": "boss"},
+            }
+        }
+        config_path = tmp_path / "config.json"
+        config_path.write_text(json.dumps(config_data), encoding="utf-8")
+
+        with patch("core.paths.get_data_dir", return_value=tmp_path):
+            result = mcp_mod._has_subordinates_for_anima()
+
+        assert result is True
+
+    def test_returns_false_when_no_subordinates(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+    ) -> None:
+        """Returns False when config.json shows no subordinates."""
+        import core.mcp.server as mcp_mod
+
+        anima_dir = tmp_path / "animas" / "leaf"
+        anima_dir.mkdir(parents=True)
+        monkeypatch.setenv("ANIMAWORKS_ANIMA_DIR", str(anima_dir))
+
+        config_data = {
+            "animas": {
+                "boss": {"supervisor": None},
+                "leaf": {"supervisor": "boss"},
+            }
+        }
+        config_path = tmp_path / "config.json"
+        config_path.write_text(json.dumps(config_data), encoding="utf-8")
+
+        with patch("core.paths.get_data_dir", return_value=tmp_path):
+            result = mcp_mod._has_subordinates_for_anima()
+
+        assert result is False
+
+    def test_caches_result(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+    ) -> None:
+        """Result is cached on second call."""
+        import core.mcp.server as mcp_mod
+
+        mcp_mod._is_supervisor = False
+        assert mcp_mod._has_subordinates_for_anima() is False
+
+    def test_config_read_failure_defaults_to_true(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+    ) -> None:
+        """Falls back to True if config.json cannot be read."""
+        import core.mcp.server as mcp_mod
+
+        anima_dir = tmp_path / "animas" / "test"
+        anima_dir.mkdir(parents=True)
+        monkeypatch.setenv("ANIMAWORKS_ANIMA_DIR", str(anima_dir))
+
+        with patch("core.paths.get_data_dir", side_effect=RuntimeError("no dir")):
+            result = mcp_mod._has_subordinates_for_anima()
+
+        assert result is True

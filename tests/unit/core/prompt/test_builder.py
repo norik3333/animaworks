@@ -365,7 +365,8 @@ class TestBuildSystemPrompt:
             assert "未完了タスク" in result
             assert "task 1" in result
 
-    def test_a_mode_injects_external_tools_hint(self, tmp_path, data_dir):
+    def test_a_mode_injects_external_tools_hint_with_execute_command(self, tmp_path, data_dir):
+        """Mode A hints should mention execute_command."""
         anima_dir = tmp_path / "animas" / "alice"
         anima_dir.mkdir(parents=True)
         (anima_dir / "identity.md").write_text("I am Alice", encoding="utf-8")
@@ -390,7 +391,6 @@ class TestBuildSystemPrompt:
         memory.collect_distilled_knowledge_separated.return_value = ([], [])
         memory.common_skills_dir = data_dir / "common_skills"
         memory.list_shared_users.return_value = []
-        memory.collect_distilled_knowledge_separated.return_value = ([], [])
 
         with patch("core.prompt.builder.load_prompt", side_effect=_mock_load_prompt_with_builder()):
             result = build_system_prompt(
@@ -398,13 +398,13 @@ class TestBuildSystemPrompt:
                 tool_registry=["chatwork", "slack"],
                 execution_mode="a",
             )
-            assert "animaworks-tool" in result
+            assert "execute_command" in result
             assert "animaworks-tool" in result
 
-    def test_s_mode_injects_external_tools_hint_when_tool_registry_provided(
+    def test_s_mode_injects_external_tools_hint_with_bash(
         self, tmp_path, data_dir
     ):
-        """S mode injects External Tools hint when tool_registry is provided."""
+        """S mode injects External Tools hint mentioning Bash."""
         anima_dir = tmp_path / "animas" / "alice"
         anima_dir.mkdir(parents=True)
         (anima_dir / "identity.md").write_text("I am Alice", encoding="utf-8")
@@ -429,7 +429,6 @@ class TestBuildSystemPrompt:
         memory.collect_distilled_knowledge_separated.return_value = ([], [])
         memory.common_skills_dir = data_dir / "common_skills"
         memory.list_shared_users.return_value = []
-        memory.collect_distilled_knowledge_separated.return_value = ([], [])
 
         with patch("core.prompt.builder.load_prompt", return_value="section"):
             result = build_system_prompt(
@@ -438,8 +437,46 @@ class TestBuildSystemPrompt:
                 execution_mode="s",
             )
             assert "External Tools" in result
+            assert "Bash" in result
             assert "animaworks-tool" in result
-            assert "animaworks-tool" in result
+
+    def test_b_mode_injects_external_tools_hint_with_use_tool(
+        self, tmp_path, data_dir
+    ):
+        """B mode injects External Tools hint mentioning use_tool."""
+        anima_dir = tmp_path / "animas" / "alice"
+        anima_dir.mkdir(parents=True)
+        (anima_dir / "identity.md").write_text("I am Alice", encoding="utf-8")
+
+        memory = MagicMock()
+        memory.anima_dir = anima_dir
+        memory.read_company_vision.return_value = ""
+        memory.read_identity.return_value = ""
+        memory.read_injection.return_value = ""
+        memory.read_permissions.return_value = "## 外部ツール\n- chatwork: OK"
+        memory.read_specialty_prompt.return_value = ""
+        memory.read_current_state.return_value = ""
+        memory.read_pending.return_value = ""
+        memory.read_bootstrap.return_value = ""
+        memory.list_knowledge_files.return_value = []
+        memory.list_episode_files.return_value = []
+        memory.list_procedure_files.return_value = []
+        memory.list_skill_summaries.return_value = []
+        memory.list_common_skill_summaries.return_value = []
+        memory.list_skill_metas.return_value = []
+        memory.list_common_skill_metas.return_value = []
+        memory.collect_distilled_knowledge_separated.return_value = ([], [])
+        memory.common_skills_dir = data_dir / "common_skills"
+        memory.list_shared_users.return_value = []
+
+        with patch("core.prompt.builder.load_prompt", return_value="section"):
+            result = build_system_prompt(
+                memory,
+                tool_registry=["chatwork"],
+                execution_mode="b",
+            )
+            assert "External Tools" in result
+            assert "use_tool" in result
 
 
 # ── _format_anima_entry ──────────────────────────────────

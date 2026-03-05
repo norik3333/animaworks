@@ -151,7 +151,8 @@ class AnthropicFallbackExecutor(BaseExecutor):
     def _build_tools(self) -> list[dict[str, Any]]:
         """Build the Anthropic-format tool list."""
         canonical = build_tool_list(
-            include_file_tools=False,
+            include_file_tools=True,
+            include_search_tools=True,
             include_use_tool=False,
             include_notification_tools=self._tool_handler._human_notifier is not None,
             include_admin_tools=(self._anima_dir / "skills" / "newstaff.md").exists(),

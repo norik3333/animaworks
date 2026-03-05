@@ -62,9 +62,11 @@ _EXPOSED_TOOL_NAMES: frozenset[str] = frozenset({
     "search_memory",
     "report_procedure_outcome",
     "report_knowledge_outcome",
+    "check_permissions",
     "disable_subordinate",
     "enable_subordinate",
     "set_subordinate_model",
+    "set_subordinate_background_model",
     "restart_subordinate",
     "org_dashboard",
     "ping_subordinate",
@@ -73,6 +75,7 @@ _EXPOSED_TOOL_NAMES: frozenset[str] = frozenset({
     "task_tracker",
     "audit_subordinate",
     "skill",
+    "create_skill",
     "plan_tasks",
     "check_background_task",
     "list_background_tasks",
@@ -80,6 +83,19 @@ _EXPOSED_TOOL_NAMES: frozenset[str] = frozenset({
     "vault_store",
     "vault_list",
 })
+
+
+def _get_supervisor_tool_names() -> frozenset[str]:
+    """Supervisor tool names — derived from SUPERVISOR_TOOLS at import time.
+
+    Used by list_tools() to dynamically filter supervisor-only tools.
+    """
+    from core.tooling.schemas import SUPERVISOR_TOOLS
+
+    return frozenset(t["name"] for t in SUPERVISOR_TOOLS)
+
+
+_SUPERVISOR_TOOL_NAMES: frozenset[str] = _get_supervisor_tool_names()
 
 
 # Cached original parameter schemas (before relaxation) for type coercion
@@ -163,6 +179,7 @@ def _build_mcp_tools() -> tuple[list[Tool], frozenset[str]]:
     from core.tooling.schemas import (
         BACKGROUND_TASK_TOOLS,
         CHANNEL_TOOLS,
+        CHECK_PERMISSIONS_TOOLS,
         KNOWLEDGE_TOOLS,
         MEMORY_TOOLS,
         NOTIFICATION_TOOLS,
@@ -186,6 +203,7 @@ def _build_mcp_tools() -> tuple[list[Tool], frozenset[str]]:
         *PLAN_TASKS_TOOLS,
         *BACKGROUND_TASK_TOOLS,
         *VAULT_TOOLS,
+        *CHECK_PERMISSIONS_TOOLS,
     ]
 
     exposed = _EXPOSED_TOOL_NAMES
@@ -366,6 +384,51 @@ def _make_on_complete_callback(anima_dir: Path) -> Any:
 
 _tool_handler: Any = None  # core.tooling.handler.ToolHandler | None
 _init_error: str | None = None
+_is_supervisor: bool | None = None
+
+
+def _has_subordinates_for_anima() -> bool:
+    """Check if this Anima has subordinates via config.json.
+
+    Evaluated once at first call and cached. Falls back to True (safe side)
+    on any error.
+    """
+    global _is_supervisor
+    if _is_supervisor is not None:
+        return _is_supervisor
+
+    try:
+        anima_dir_env = os.environ.get("ANIMAWORKS_ANIMA_DIR", "")
+        if not anima_dir_env:
+            _is_supervisor = True
+            return True
+        anima_name = Path(anima_dir_env).name
+
+        from core.paths import get_data_dir
+
+        config_path = get_data_dir() / "config.json"
+        if not config_path.is_file():
+            _is_supervisor = True
+            return True
+
+        import json as _json
+
+        config_data = _json.loads(config_path.read_text(encoding="utf-8"))
+        animas = config_data.get("animas", {})
+
+        for other_name, other_cfg in animas.items():
+            if other_name == anima_name:
+                continue
+            if isinstance(other_cfg, dict) and other_cfg.get("supervisor") == anima_name:
+                _is_supervisor = True
+                return True
+
+        _is_supervisor = False
+        return False
+    except Exception:
+        logger.debug("Failed to check subordinate status, defaulting to True")
+        _is_supervisor = True
+        return True
 
 
 def _get_tool_handler() -> Any:
@@ -501,8 +564,10 @@ def _wrap_result(tool_name: str, result: str) -> str:
 
 @server.list_tools()
 async def list_tools() -> list[Tool]:
-    """Return the static list of exposed AnimaWorks tools."""
-    return MCP_TOOLS
+    """Return exposed AnimaWorks tools, filtering supervisor tools dynamically."""
+    if _has_subordinates_for_anima():
+        return MCP_TOOLS
+    return [t for t in MCP_TOOLS if t.name not in _SUPERVISOR_TOOL_NAMES]
 
 
 @server.call_tool()
