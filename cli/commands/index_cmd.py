@@ -32,6 +32,11 @@ def setup_index_command(subparsers: argparse._SubParsersAction) -> None:
         help="Force full re-indexing (delete existing index and rebuild)",
     )
     parser.add_argument(
+        "--shared",
+        action="store_true",
+        help="Index shared collections (common_knowledge + common_skills) into each enabled anima's DB",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Show what would be indexed without actually indexing",
@@ -97,6 +102,83 @@ def _save_global_index_meta(base_dir: Path, model_name: str) -> None:
     )
 
 
+def _is_anima_enabled(anima_dir: Path) -> bool:
+    """Check whether an anima is enabled via its status.json."""
+    import json
+
+    status_file = anima_dir / "status.json"
+    if not status_file.is_file():
+        return True
+    try:
+        data = json.loads(status_file.read_text(encoding="utf-8"))
+        return data.get("enabled", True)
+    except (json.JSONDecodeError, OSError):
+        return True
+
+
+def _index_shared_collections(
+    anima_dirs: list[Path],
+    base_dir: Path,
+    *,
+    full: bool,
+    dry_run: bool,
+) -> int:
+    """Index common_knowledge + common_skills into each anima's per-anima DB.
+
+    Returns total chunks indexed across all animas.
+    """
+    from core.memory.rag import MemoryIndexer
+    from core.memory.rag.store import ChromaVectorStore
+    from core.memory.rag_search import _compute_dir_hash, _read_shared_hash, _write_shared_hash
+    from core.paths import get_anima_vectordb_dir
+
+    ck_dir = base_dir / "common_knowledge"
+    cs_dir = base_dir / "common_skills"
+
+    shared_dirs: list[tuple[str, Path, str, str]] = []
+    if ck_dir.is_dir() and any(ck_dir.rglob("*.md")):
+        shared_dirs.append(("common_knowledge", ck_dir, "*.md", "shared_common_knowledge_hash"))
+    if cs_dir.is_dir() and (any(cs_dir.glob("*/SKILL.md")) or any(cs_dir.rglob("*.md"))):
+        shared_dirs.append(("common_skills", cs_dir, "*.md", "shared_common_skills_hash"))
+
+    if not shared_dirs:
+        logger.info("No shared knowledge/skills files found, skipping")
+        return 0
+
+    total = 0
+    for anima_dir in anima_dirs:
+        anima_name = anima_dir.name
+        meta_path = anima_dir / "index_meta.json"
+        vector_store = ChromaVectorStore(persist_dir=get_anima_vectordb_dir(anima_name))
+
+        for label, src_dir, glob, meta_key in shared_dirs:
+            current_hash = _compute_dir_hash(src_dir, glob)
+            stored_hash = _read_shared_hash(meta_path, meta_key)
+
+            if not full and current_hash == stored_hash:
+                logger.info("  %s: %s unchanged, skipping", anima_name, label)
+                continue
+
+            logger.info("  %s: indexing %s...", anima_name, label)
+            if dry_run:
+                md_files = list(src_dir.rglob(glob))
+                logger.info("    Would index %d files", len(md_files))
+                continue
+
+            shared_indexer = MemoryIndexer(
+                vector_store,
+                anima_name="shared",
+                anima_dir=base_dir,
+                collection_prefix="shared",
+            )
+            chunks = shared_indexer.index_directory(src_dir, label, force=full)
+            total += chunks
+            _write_shared_hash(meta_path, meta_key, current_hash)
+            logger.info("    Indexed %d chunks", chunks)
+
+    return total
+
+
 def index_command(args: argparse.Namespace) -> None:
     """Execute the index command."""
     try:
@@ -132,6 +214,8 @@ def index_command(args: argparse.Namespace) -> None:
     if not anima_dirs:
         logger.warning("No animas found to index")
         return
+
+    include_shared = args.shared or (not args.anima)
 
     from core.paths import get_anima_vectordb_dir
 
@@ -200,6 +284,17 @@ def index_command(args: argparse.Namespace) -> None:
                 )
                 total_chunks += chunks
                 logger.info("  Indexed %d chunks from conversation_summary", chunks)
+
+    # Index shared collections (common_knowledge + common_skills)
+    if include_shared:
+        enabled_dirs = [d for d in anima_dirs if _is_anima_enabled(d)]
+        if enabled_dirs:
+            logger.info("=" * 60)
+            logger.info("Indexing shared collections (common_knowledge + common_skills)")
+            logger.info("=" * 60)
+            total_chunks += _index_shared_collections(
+                enabled_dirs, base_dir, full=args.full, dry_run=args.dry_run,
+            )
 
     # Index shared user memories
     shared_users_dir = base_dir / "shared" / "users"

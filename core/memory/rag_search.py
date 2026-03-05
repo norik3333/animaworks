@@ -3,11 +3,55 @@ from __future__ import annotations
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: Apache-2.0
 
+import hashlib
 import json
 import logging
 from pathlib import Path
 
 logger = logging.getLogger("animaworks.memory")
+
+
+# ── Shared-index change detection helpers ─────────────────
+
+def _compute_dir_hash(dir_path: Path, glob_pattern: str = "*.md") -> str:
+    """Compute a SHA-256 hash over file relative paths + mtimes in *dir_path*.
+
+    The hash changes whenever a file is added, removed, or modified.
+    """
+    entries: list[tuple[str, float]] = []
+    for f in dir_path.rglob(glob_pattern):
+        if f.is_file():
+            entries.append((str(f.relative_to(dir_path)), f.stat().st_mtime))
+    entries.sort()
+    h = hashlib.sha256(repr(entries).encode()).hexdigest()
+    return h
+
+
+def _read_shared_hash(meta_path: Path, key: str) -> str | None:
+    """Read a stored shared-index hash from *meta_path* (index_meta.json)."""
+    if not meta_path.is_file():
+        return None
+    try:
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        return meta.get(key)
+    except (json.JSONDecodeError, OSError):
+        return None
+
+
+def _write_shared_hash(meta_path: Path, key: str, value: str) -> None:
+    """Write a shared-index hash into *meta_path* (index_meta.json)."""
+    meta: dict = {}
+    if meta_path.is_file():
+        try:
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            pass
+    meta[key] = value
+    meta_path.write_text(
+        json.dumps(meta, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+
 
 # ── RAGMemorySearch ───────────────────────────────────────
 
@@ -33,9 +77,6 @@ class RAGMemorySearch:
         Called lazily by ``_get_indexer()`` on first access.
         Uses process-level singletons for ChromaVectorStore and embedding
         model to avoid costly repeated initialization.
-
-        Also ensures the ``shared_common_knowledge`` collection is indexed
-        from ``~/.animaworks/common_knowledge/``.
         """
         self._indexer_initialized = True
         try:
@@ -76,19 +117,50 @@ class RAGMemorySearch:
                 except Exception as e:
                     logger.warning("Failed to index conversation_summary: %s", e)
 
-            # Ensure shared collections exist
-            self._ensure_shared_knowledge_indexed(vector_store)
-            self._ensure_shared_skills_indexed(vector_store)
         except ImportError:
             logger.debug("RAG dependencies not installed, indexing disabled")
         except Exception as e:
             logger.warning("Failed to initialize RAG indexer: %s", e)
 
+    # ── Shared collection change detection ────────────────
+
+    def _check_shared_collections(self) -> None:
+        """Re-index shared common_knowledge / common_skills if changed.
+
+        Called on every ``_get_indexer()`` access so that file changes are
+        picked up even after the initial ``_init_indexer()`` run.  Uses a
+        SHA-256 hash of (relative_path, mtime) tuples stored in the
+        per-anima ``index_meta.json`` to skip re-indexing when unchanged.
+        """
+        if self._indexer is None:
+            return
+        try:
+            from core.memory.rag.singleton import get_vector_store
+
+            anima_name = self._anima_dir.name
+            vector_store = get_vector_store(anima_name)
+            self._ensure_shared_knowledge_indexed(vector_store)
+            self._ensure_shared_skills_indexed(vector_store)
+        except ImportError:
+            pass
+        except Exception as e:
+            logger.debug("Shared collection check failed: %s", e)
+
     def _ensure_shared_knowledge_indexed(self, vector_store) -> None:
-        """Index common_knowledge/ into ``shared_common_knowledge`` collection."""
+        """Index common_knowledge/ into ``shared_common_knowledge`` collection.
+
+        Skips re-indexing when the directory hash matches the stored value.
+        """
         ck_dir = self._common_knowledge_dir
         if not ck_dir.is_dir() or not any(ck_dir.rglob("*.md")):
             logger.debug("No common_knowledge files found, skipping shared indexing")
+            return
+
+        meta_path = self._anima_dir / "index_meta.json"
+        current_hash = _compute_dir_hash(ck_dir, "*.md")
+        stored_hash = _read_shared_hash(meta_path, "shared_common_knowledge_hash")
+        if current_hash == stored_hash:
+            logger.debug("common_knowledge unchanged (hash match), skipping")
             return
 
         try:
@@ -104,6 +176,7 @@ class RAGMemorySearch:
                 embedding_model=self._indexer.embedding_model if self._indexer else None,
             )
             indexed = shared_indexer.index_directory(ck_dir, "common_knowledge")
+            _write_shared_hash(meta_path, "shared_common_knowledge_hash", current_hash)
             if indexed > 0:
                 logger.info(
                     "Indexed %d chunks into shared_common_knowledge", indexed,
@@ -112,10 +185,20 @@ class RAGMemorySearch:
             logger.warning("Failed to index shared common_knowledge: %s", e)
 
     def _ensure_shared_skills_indexed(self, vector_store) -> None:
-        """Index common_skills/ into ``shared_common_skills`` collection."""
+        """Index common_skills/ into ``shared_common_skills`` collection.
+
+        Skips re-indexing when the directory hash matches the stored value.
+        """
         cs_dir = self._common_skills_dir
         if not cs_dir.is_dir() or not any(cs_dir.glob("*/SKILL.md")):
             logger.debug("No common_skills files found, skipping shared skills indexing")
+            return
+
+        meta_path = self._anima_dir / "index_meta.json"
+        current_hash = _compute_dir_hash(cs_dir, "*.md")
+        stored_hash = _read_shared_hash(meta_path, "shared_common_skills_hash")
+        if current_hash == stored_hash:
+            logger.debug("common_skills unchanged (hash match), skipping")
             return
 
         try:
@@ -131,6 +214,7 @@ class RAGMemorySearch:
                 embedding_model=self._indexer.embedding_model if self._indexer else None,
             )
             indexed = shared_indexer.index_directory(cs_dir, "common_skills")
+            _write_shared_hash(meta_path, "shared_common_skills_hash", current_hash)
             if indexed > 0:
                 logger.info(
                     "Indexed %d chunks into shared_common_skills", indexed,
@@ -139,9 +223,13 @@ class RAGMemorySearch:
             logger.warning("Failed to index shared common_skills: %s", e)
 
     def _get_indexer(self):
-        """Return the RAG indexer, initializing it on first call."""
+        """Return the RAG indexer, initializing it on first call.
+
+        Also checks shared collections for changes on every call.
+        """
         if not self._indexer_initialized:
             self._init_indexer()
+        self._check_shared_collections()
         return self._indexer
 
     # ── Search methods ────────────────────────────────────
