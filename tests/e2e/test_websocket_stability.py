@@ -380,10 +380,10 @@ class TestWebSocketBroadcastDelivery:
                 assert data["type"] == "test.event"
                 assert data["data"] == "hello"
 
-    def test_broadcast_survives_concurrent_disconnect(
+    def test_broadcast_after_disconnect_no_crash(
         self, ws_app: tuple[FastAPI, WebSocketManager],
     ) -> None:
-        """broadcast() must not crash when a client disconnects mid-broadcast."""
+        """broadcast() works correctly after a client disconnect (regression guard)."""
         app, ws_manager = ws_app
 
         with TestClient(app) as client:
