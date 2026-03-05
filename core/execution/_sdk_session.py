@@ -20,6 +20,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from core.schemas import ImageData
+
 logger = logging.getLogger("animaworks.execution.agent_sdk")
 
 
@@ -152,7 +154,7 @@ def clear_session_ids(anima_dir: Path, thread_id: str = "default") -> None:
 
 async def _image_prompt_messages(
     prompt: str,
-    images: list[dict[str, Any]],
+    images: list[ImageData],
 ) -> AsyncGenerator[dict[str, Any], None]:
     """Yield a single SDK user message with image content blocks.
 
@@ -180,7 +182,7 @@ async def _image_prompt_messages(
 
 def _build_sdk_query_input(
     prompt: str,
-    images: list[dict[str, Any]] | None,
+    images: list[ImageData] | None,
 ) -> str | AsyncGenerator[dict[str, Any], None]:
     """Return the appropriate input for ``ClaudeSDKClient.query()``.
 

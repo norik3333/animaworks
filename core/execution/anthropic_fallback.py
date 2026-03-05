@@ -32,7 +32,7 @@ from core.execution.base import BaseExecutor, ExecutionResult, StreamDisconnecte
 from core.execution.reminder import MSG_CONTEXT_THRESHOLD, MSG_FINAL_ITERATION, MSG_OUTPUT_TRUNCATED, SystemReminderQueue
 from core.memory import MemoryManager
 from core.prompt.builder import build_system_prompt
-from core.schemas import ModelConfig
+from core.schemas import ImageData, ModelConfig
 from core.memory.shortterm import ShortTermMemory
 from core.tooling.handler import ToolHandler
 from core.tooling.schemas import (
@@ -184,7 +184,7 @@ class AnthropicFallbackExecutor(BaseExecutor):
     def _build_initial_messages(
         self,
         prompt: str,
-        images: list[dict[str, Any]] | None = None,
+        images: list[ImageData] | None = None,
     ) -> list[dict[str, Any]]:
         """Build the initial user message with optional image content blocks."""
         if images:
@@ -209,7 +209,7 @@ class AnthropicFallbackExecutor(BaseExecutor):
         tracker: ContextTracker | None = None,
         shortterm: ShortTermMemory | None = None,
         trigger: str = "",
-        images: list[dict[str, Any]] | None = None,
+        images: list[ImageData] | None = None,
         prior_messages: list[dict[str, Any]] | None = None,
         max_turns_override: int | None = None,
     ) -> ExecutionResult:
@@ -427,7 +427,7 @@ class AnthropicFallbackExecutor(BaseExecutor):
         system_prompt: str,
         prompt: str,
         tracker: ContextTracker,
-        images: list[dict[str, Any]] | None = None,
+        images: list[ImageData] | None = None,
         prior_messages: list[dict[str, Any]] | None = None,
         max_turns_override: int | None = None,
         trigger: str = "",

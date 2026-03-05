@@ -17,11 +17,11 @@ from collections.abc import AsyncGenerator
 from contextvars import ContextVar
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol, runtime_checkable
 
 from core.prompt.context import ContextTracker
 from core.execution.reminder import SystemReminderQueue
-from core.schemas import ModelConfig
+from core.schemas import ImageData, ModelConfig
 from core.memory.shortterm import ShortTermMemory
 
 
@@ -200,6 +200,24 @@ def tool_input_save_budget(context_window: int) -> int:
     return max(200, int(_TOOL_INPUT_BASE_BUDGET * scale))
 
 
+# ── Session result protocol ───────────────────────────────────
+
+
+@runtime_checkable
+class SessionResultLike(Protocol):
+    """Minimal interface required for session chaining.
+
+    S mode's ``ResultMessage`` satisfies this structurally.
+    A/B modes pass ``None``.
+    """
+
+    @property
+    def num_turns(self) -> int: ...
+
+    @property
+    def session_id(self) -> str: ...
+
+
 # ── Result ───────────────────────────────────────────────────
 
 
@@ -266,7 +284,7 @@ class ExecutionResult:
     """
 
     text: str
-    result_message: Any = field(default=None, repr=False)
+    result_message: SessionResultLike | None = field(default=None, repr=False)
     replied_to_from_transcript: set[str] = field(default_factory=set)
     unconfirmed_sends: list[dict] = field(default_factory=list)
     tool_call_records: list[ToolCallRecord] = field(default_factory=list)
@@ -432,7 +450,7 @@ class BaseExecutor(ABC):
         tracker: ContextTracker | None = None,
         shortterm: ShortTermMemory | None = None,
         trigger: str = "",
-        images: list[dict[str, Any]] | None = None,
+        images: list[ImageData] | None = None,
         prior_messages: list[dict[str, Any]] | None = None,
         max_turns_override: int | None = None,
     ) -> ExecutionResult:
@@ -464,7 +482,7 @@ class BaseExecutor(ABC):
         system_prompt: str,
         prompt: str,
         tracker: ContextTracker,
-        images: list[dict[str, Any]] | None = None,
+        images: list[ImageData] | None = None,
         prior_messages: list[dict[str, Any]] | None = None,
         max_turns_override: int | None = None,
         trigger: str = "",

@@ -38,7 +38,7 @@ from core.execution.base import (
     _truncate_for_record,
 )
 from core.prompt.context import ContextTracker
-from core.schemas import ModelConfig
+from core.schemas import ImageData, ModelConfig
 from core.memory.shortterm import ShortTermMemory
 
 logger = logging.getLogger("animaworks.execution.codex_sdk")
@@ -437,7 +437,7 @@ class CodexSDKExecutor(BaseExecutor):
         tracker: ContextTracker | None = None,
         shortterm: ShortTermMemory | None = None,
         trigger: str = "",
-        images: list[dict[str, Any]] | None = None,
+        images: list[ImageData] | None = None,
         prior_messages: list[dict[str, Any]] | None = None,
         max_turns_override: int | None = None,
     ) -> ExecutionResult:
@@ -528,7 +528,7 @@ class CodexSDKExecutor(BaseExecutor):
         system_prompt: str,
         prompt: str,
         tracker: ContextTracker,
-        images: list[dict[str, Any]] | None = None,
+        images: list[ImageData] | None = None,
         prior_messages: list[dict[str, Any]] | None = None,
         max_turns_override: int | None = None,
         trigger: str = "",

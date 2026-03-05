@@ -39,7 +39,7 @@ if TYPE_CHECKING:
 from core.prompt.context import CHARS_PER_TOKEN, ContextTracker, resolve_context_window
 from core.exceptions import ExecutionError, LLMAPIError, MemoryWriteError  # noqa: F401
 from core.execution.base import BaseExecutor, ExecutionResult, StreamDisconnectedError, TokenUsage, ToolCallRecord
-from core.schemas import ModelConfig
+from core.schemas import ImageData, ModelConfig
 from core.memory.shortterm import ShortTermMemory
 from pathlib import Path
 
@@ -394,7 +394,7 @@ class AgentSDKExecutor(BaseExecutor):
         session_stats: dict[str, Any],
         tracker: ContextTracker | None,
         session_type: str = "chat",
-        images: list[dict[str, Any]] | None = None,
+        images: list[ImageData] | None = None,
         usage_acc: TokenUsage | None = None,
     ) -> "ResultMessage | None":
         """Run query + message loop for blocking (non-streaming) execution.
@@ -479,7 +479,7 @@ class AgentSDKExecutor(BaseExecutor):
         tracker: ContextTracker | None = None,
         shortterm: ShortTermMemory | None = None,
         trigger: str = "",
-        images: list[dict[str, Any]] | None = None,
+        images: list[ImageData] | None = None,
         # S mode: prior_messages is intentionally unused. The Agent SDK manages
         # conversation history internally via session resume. AnimaWorks only
         # provides system_prompt (rebuilt each time with fresh Priming/RAG)
@@ -615,7 +615,7 @@ class AgentSDKExecutor(BaseExecutor):
         system_prompt: str,
         prompt: str,
         tracker: ContextTracker,
-        images: list[dict[str, Any]] | None = None,
+        images: list[ImageData] | None = None,
         # S mode: prior_messages is intentionally unused. The Agent SDK manages
         # conversation history internally via session resume. AnimaWorks only
         # provides system_prompt (rebuilt each time with fresh Priming/RAG)

@@ -16,6 +16,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
 from core.exceptions import AnimaNotFoundError, IPCConnectionError as IPCConnError  # noqa: F401
+from core.schemas import ImageData
 from core.i18n import t
 from core.time_utils import now_jst
 from server.dependencies import get_anima
@@ -41,6 +42,11 @@ class ImageAttachment(BaseModel):
 
     data: str  # Base64 encoded string (no data: prefix)
     media_type: str  # "image/jpeg", "image/png", "image/gif", "image/webp"
+
+
+def _to_image_data(attachments: list[ImageAttachment]) -> list[ImageData]:
+    """Convert API-layer ImageAttachment list to core-layer ImageData list."""
+    return [{"data": img.data, "media_type": img.media_type} for img in attachments]
 
 
 class ChatRequest(BaseModel):
@@ -437,7 +443,7 @@ async def _run_producer(
                 "from_person": body.from_person,
                 "intent": body.intent,
                 "stream": True,
-                "images": [img.model_dump() for img in body.images] if body.images else [],
+                "images": _to_image_data(body.images),
                 "attachment_paths": saved_paths,
                 "thread_id": body.thread_id,
             },
@@ -720,7 +726,7 @@ def create_chat_router() -> APIRouter:
                     "message": body.message,
                     "from_person": body.from_person,
                     "intent": body.intent,
-                    "images": [img.model_dump() for img in body.images] if body.images else [],
+                    "images": _to_image_data(body.images),
                     "attachment_paths": saved_paths,
                     "thread_id": body.thread_id,
                 },

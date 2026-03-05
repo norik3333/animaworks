@@ -29,7 +29,7 @@ _PROMPT_HARD_LIMIT_BYTES = 1_200_000  # Fall back to S Fallback
 
 
 _PROMPT_LOG_RETENTION_DAYS = 3
-_last_rotation_date: str = ""
+_last_rotation_date: str | None = None
 
 
 def _rotate_prompt_logs(log_dir: Path) -> None:

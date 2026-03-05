@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, TypedDict
 
 from pydantic import BaseModel, Field
 
@@ -129,6 +129,25 @@ class Message(BaseModel):
     origin_chain: list[str] = Field(default_factory=list)
 
 
+# ── Shared TypedDicts ────────────────────────────────────────
+
+class ImageData(TypedDict):
+    """Base64-encoded image payload used across core and server layers."""
+
+    data: str        # Base64 encoded (no data: prefix)
+    media_type: str  # "image/jpeg", "image/png", etc.
+
+
+class ToolCallRecordDict(TypedDict):
+    """Serialised form of :class:`core.execution.base.ToolCallRecord`."""
+
+    tool_name: str
+    tool_id: str
+    input_summary: str
+    result_summary: str
+    is_error: bool
+
+
 class CycleResult(BaseModel):
     trigger: str
     action: str
@@ -139,7 +158,7 @@ class CycleResult(BaseModel):
     context_usage_ratio: float = 0.0
     session_chained: bool = False
     total_turns: int = 0
-    tool_call_records: list[dict] = Field(default_factory=list)
+    tool_call_records: list[ToolCallRecordDict] = Field(default_factory=list)
     images: list[dict[str, str]] = Field(default_factory=list)
     usage: dict[str, int] | None = None
 

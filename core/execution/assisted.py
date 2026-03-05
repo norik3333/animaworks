@@ -41,7 +41,7 @@ from core.execution._streaming import stream_error_boundary
 from core.memory import MemoryManager
 from core.messenger import Messenger
 from core.prompt.context import ContextTracker, resolve_context_window
-from core.schemas import ModelConfig
+from core.schemas import ImageData, ModelConfig
 from core.memory.shortterm import ShortTermMemory
 from core.tooling.handler import ToolHandler
 from core.tooling.schemas import build_tool_list, to_text_format
@@ -402,7 +402,7 @@ class AssistedExecutor(BaseExecutor):
         tracker: ContextTracker | None = None,
         shortterm: ShortTermMemory | None = None,
         trigger: str = "",
-        images: list[dict[str, Any]] | None = None,
+        images: list[ImageData] | None = None,
         prior_messages: list[dict[str, Any]] | None = None,
         max_turns_override: int | None = None,
     ) -> ExecutionResult:
@@ -598,7 +598,7 @@ class AssistedExecutor(BaseExecutor):
         system_prompt: str,
         prompt: str,
         tracker: ContextTracker,
-        images: list[dict[str, Any]] | None = None,
+        images: list[ImageData] | None = None,
         prior_messages: list[dict[str, Any]] | None = None,
         max_turns_override: int | None = None,
         trigger: str = "",

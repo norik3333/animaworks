@@ -46,7 +46,7 @@ class MemoryToolsMixin:
     _descendant_state_dirs: list[Path]
     _peer_activity_dirs: list[Path]
     _state_file_lock: threading.Lock | None
-    _on_schedule_changed: Callable[[str], Any] | None
+    _on_schedule_changed: Callable[[str], None] | None
     _min_trust_seen: int
 
     def _handle_search_memory(self, args: dict[str, Any]) -> str:

@@ -383,7 +383,8 @@ class TestExecutionResultToolRecords:
             action="responded",
             tool_call_records=[
                 {"tool_name": "search", "tool_id": "t1",
-                 "input_summary": "", "result_summary": ""},
+                 "input_summary": "", "result_summary": "",
+                 "is_error": False},
             ],
         )
         assert len(r.tool_call_records) == 1
@@ -596,3 +597,41 @@ class TestDeserializationSafety:
         assert "tool_records" in reloaded["turns"][0], (
             "tool_records should still exist in the saved file"
         )
+
+
+# ── ToolCallRecordDict ↔ ToolCallRecord field parity ─────────
+
+
+class TestToolCallRecordDictParity:
+    """Verify that ToolCallRecordDict TypedDict keys match ToolCallRecord fields."""
+
+    def test_fields_match(self):
+        import dataclasses
+        from typing import get_type_hints
+
+        from core.execution.base import ToolCallRecord
+        from core.schemas import ToolCallRecordDict
+
+        dc_fields = {f.name for f in dataclasses.fields(ToolCallRecord)}
+        td_keys = set(get_type_hints(ToolCallRecordDict).keys())
+        assert dc_fields == td_keys, (
+            f"ToolCallRecord fields {dc_fields} != ToolCallRecordDict keys {td_keys}"
+        )
+
+    def test_asdict_roundtrip(self):
+        """asdict(ToolCallRecord(...)) should be valid ToolCallRecordDict."""
+        from dataclasses import asdict
+
+        from core.execution.base import ToolCallRecord
+        from core.schemas import CycleResult
+
+        rec = ToolCallRecord(
+            tool_name="test", tool_id="t1",
+            input_summary="in", result_summary="out", is_error=False,
+        )
+        cycle = CycleResult(
+            trigger="test", action="ok",
+            tool_call_records=[asdict(rec)],
+        )
+        assert cycle.tool_call_records[0]["tool_name"] == "test"
+        assert cycle.tool_call_records[0]["is_error"] is False

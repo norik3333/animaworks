@@ -14,9 +14,11 @@ pre-flight context window clamping.
 
 import json as _json
 import logging
+import types
 from typing import Any
 
 from core.prompt.context import resolve_context_window
+from core.schemas import ImageData
 
 logger = logging.getLogger("animaworks.execution.litellm_loop")
 
@@ -101,7 +103,7 @@ class ContextMixin:
         self,
         system_prompt: str,
         prompt: str,
-        images: list[dict[str, Any]] | None,
+        images: list[ImageData] | None,
         prior_messages: list[dict[str, Any]] | None = None,
     ) -> list[dict[str, Any]]:
         """Build the initial messages list for an LLM call.
@@ -150,7 +152,7 @@ class ContextMixin:
         llm_kwargs: dict[str, Any],
         messages: list[dict[str, Any]],
         tools: list[dict[str, Any]],
-        litellm: Any,
+        litellm: types.ModuleType,
     ) -> dict[str, Any] | None:
         """Pre-flight context window check, clamping max_tokens if needed.
 

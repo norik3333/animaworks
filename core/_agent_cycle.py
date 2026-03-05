@@ -23,7 +23,7 @@ from core._agent_prompt_log import _save_prompt_log, _save_prompt_log_end
 from core.prompt.builder import BuildResult, build_system_prompt, inject_shortterm
 from core.prompt.context import ContextTracker
 from core.memory.shortterm import SessionState, ShortTermMemory
-from core.schemas import CycleResult
+from core.schemas import CycleResult, ImageData
 from core.time_utils import now_iso
 from core.paths import load_prompt
 from core.i18n import t
@@ -84,7 +84,7 @@ class CycleMixin:
         self,
         prompt: str,
         trigger: str = "manual",
-        images: list[dict[str, Any]] | None = None,
+        images: list[ImageData] | None = None,
         prior_messages: list[dict[str, Any]] | None = None,
         message_intent: str = "",
         max_turns_override: int | None = None,
@@ -117,7 +117,7 @@ class CycleMixin:
         self,
         prompt: str,
         trigger: str,
-        images: list[dict[str, Any]] | None = None,
+        images: list[ImageData] | None = None,
         prior_messages: list[dict[str, Any]] | None = None,
         message_intent: str = "",
         max_turns_override: int | None = None,
@@ -490,7 +490,7 @@ class CycleMixin:
         self,
         prompt: str,
         trigger: str = "manual",
-        images: list[dict[str, Any]] | None = None,
+        images: list[ImageData] | None = None,
         prior_messages: list[dict[str, Any]] | None = None,
         message_intent: str = "",
         max_turns_override: int | None = None,

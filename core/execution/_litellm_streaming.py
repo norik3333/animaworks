@@ -18,6 +18,7 @@ from collections.abc import AsyncGenerator
 from dataclasses import asdict
 from typing import Any, cast
 
+from core.schemas import ImageData
 from core.execution._streaming import (
     accumulate_tool_call_chunks,
     parse_accumulated_tool_calls,
@@ -41,7 +42,7 @@ class StreamingMixin:
         system_prompt: str,
         prompt: str,
         tracker: ContextTracker,
-        images: list[dict[str, Any]] | None = None,
+        images: list[ImageData] | None = None,
         prior_messages: list[dict[str, Any]] | None = None,
         max_turns_override: int | None = None,
     ) -> AsyncGenerator[dict[str, Any], None]:
@@ -380,7 +381,7 @@ class StreamingMixin:
         system_prompt: str,
         prompt: str,
         tracker: ContextTracker,
-        images: list[dict[str, Any]] | None = None,
+        images: list[ImageData] | None = None,
         prior_messages: list[dict[str, Any]] | None = None,
         max_turns_override: int | None = None,
     ) -> AsyncGenerator[dict[str, Any], None]:

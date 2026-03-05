@@ -31,7 +31,7 @@ from core.exceptions import (
     ToolError,
     MemoryIOError,
 )
-from core.schemas import CycleResult, VALID_EMOTIONS
+from core.schemas import CycleResult, ImageData, VALID_EMOTIONS
 
 logger = logging.getLogger("animaworks.anima")
 
@@ -132,7 +132,7 @@ class MessagingMixin:
         self,
         content: str,
         from_person: str = "human",
-        images: list[dict[str, Any]] | None = None,
+        images: list[ImageData] | None = None,
         attachment_paths: list[str] | None = None,
         intent: str = "",
         thread_id: str = "default",
@@ -289,7 +289,7 @@ class MessagingMixin:
         self,
         content: str,
         from_person: str = "human",
-        images: list[dict[str, Any]] | None = None,
+        images: list[ImageData] | None = None,
         attachment_paths: list[str] | None = None,
         intent: str = "",
         thread_id: str = "default",
