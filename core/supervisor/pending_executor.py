@@ -672,6 +672,8 @@ class PendingTaskExecutor:
             reply_to = task_desc.get("reply_to")
             if isinstance(reply_to, dict):
                 reply_to = reply_to.get("name")
+            elif not isinstance(reply_to, str):
+                reply_to = None
             if reply_to:
                 try:
                     from core.i18n import t
