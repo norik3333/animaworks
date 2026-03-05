@@ -133,6 +133,14 @@ Communications:
 - If nothing, do nothing (HEARTBEAT_OK)
 ```
 
+### Execution Model (Cost Optimization)
+
+When `background_model` is configured, Heartbeat / Inbox / Cron run on that model instead of the main model.
+Chat (human interaction) and TaskExec (actual work) continue using the main model.
+
+Setup: `animaworks anima set-background-model {name} claude-sonnet-4-6`
+See the "Background Model" section in `operations/model-guide.md` for details.
+
 ### Heartbeat Internal Behavior
 
 - **Crash recovery**: If the previous Heartbeat failed, error info is saved to `state/recovery_note.md`. It is injected into the prompt on the next run and the file is removed after recovery.

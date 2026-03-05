@@ -127,6 +127,8 @@ Find the right document from relevant keywords.
 | model, models, execution mode, model change, models.json, provider | `operations/model-guide.md` |
 | model selection, context window, credential, set-model, models list, models info | `operations/model-guide.md` |
 | anima info, anima list, anima set-model | `operations/model-guide.md` |
+| background_model, background model, cost optimization, set-background-model | `operations/model-guide.md` |
+| background_credential, heartbeat model, cron model, inbox model | `operations/model-guide.md` |
 | add Anima, template, identity | `operations/project-setup.md` |
 | task, progress, block, priority | `operations/task-management.md` |
 | current_task, pending, state management | `operations/task-management.md` |
@@ -152,6 +154,7 @@ Find the right document from relevant keywords.
 | add_task, task queue, TaskQueue | `operations/task-management.md` |
 | pending, TaskExec, 3-path, execution path | `operations/task-management.md`, `operations/heartbeat-cron-guide.md` |
 | org_dashboard, ping_subordinate, supervisor tools | `organization/hierarchy-rules.md` |
+| set_subordinate_background_model, subordinate model change | `organization/hierarchy-rules.md` |
 | status.json, SSoT, model change, set-model, reload | `operations/project-setup.md` |
 | blocked command, disallowed command, blocked | `operations/project-setup.md`, `troubleshooting/common-issues.md` |
 | tier, tiered, prompt shortening, T1, T2, T3, T4 | `troubleshooting/common-issues.md` |

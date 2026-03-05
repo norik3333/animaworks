@@ -232,18 +232,74 @@ animaworks anima set-model {名前} {モデル名} --credential {credential名}
 
 ---
 
+## バックグラウンドモデル（コスト最適化）
+
+Heartbeat / Inbox / Cron はメインモデルとは別の軽量モデルで実行できる。
+`background_model` を設定すると、これらのバックグラウンド処理のコストを大幅に削減可能。
+
+### foreground / background の区分
+
+| 区分 | 使用モデル | 対象トリガー |
+|------|-----------|-------------|
+| **foreground** | メインモデル（`model`） | `chat`（人間との対話）、`task:*`（TaskExec実作業） |
+| **background** | `background_model`（未設定時はメインモデル） | `heartbeat`、`inbox:*`（Anima間DM）、`cron:*` |
+
+Heartbeat / Inbox / Cron は「判断・トリアージ」が主目的で、実行は TaskExec（メインモデル）が担う。
+
+### 解決順序
+
+1. Per-anima `status.json` の `background_model`
+2. `config.json` の `heartbeat.default_model`（グローバルデフォルト）
+3. メインモデル（`model`）にフォールバック
+
+### 設定方法
+
+```bash
+# 特定Animaにbackground_model を設定
+animaworks anima set-background-model {名前} claude-sonnet-4-6
+
+# credential が異なるプロバイダの場合
+animaworks anima set-background-model {名前} azure/gpt-4.1-mini --credential azure
+
+# 全Animaに一括設定
+animaworks anima set-background-model --all claude-sonnet-4-6
+
+# background_model を削除（メインモデルにフォールバック）
+animaworks anima set-background-model {名前} --clear
+
+# サーバー起動中なら再起動
+animaworks anima restart {名前}
+```
+
+### status.json での確認
+
+```json
+{
+  "model": "claude-opus-4-6",
+  "background_model": "claude-sonnet-4-6",
+  "background_credential": null
+}
+```
+
+`background_model` が未設定またはメインモデルと同一の場合、切替はスキップされる。
+
+---
+
 ## ロールテンプレートとデフォルトモデル
 
 `animaworks anima set-role` でロールを変更すると、デフォルトモデルも変更される:
 
-| ロール | デフォルトモデル | max_turns | max_chains |
-|--------|---------------|-----------|------------|
-| engineer | claude-opus-4-6 | 200 | 10 |
-| manager | claude-opus-4-6 | 50 | 3 |
-| writer | claude-sonnet-4-6 | 80 | 5 |
-| researcher | claude-sonnet-4-6 | 30 | 2 |
-| ops | openai/glm-4.7-flash | 30 | 2 |
-| general | claude-sonnet-4-6 | 20 | 2 |
+| ロール | デフォルトモデル | background_model | max_turns | max_chains |
+|--------|---------------|-----------------|-----------|------------|
+| engineer | claude-opus-4-6 | claude-sonnet-4-6 | 200 | 10 |
+| manager | claude-opus-4-6 | claude-sonnet-4-6 | 50 | 3 |
+| writer | claude-sonnet-4-6 | — | 80 | 5 |
+| researcher | claude-sonnet-4-6 | — | 30 | 2 |
+| ops | openai/glm-4.7-flash | — | 30 | 2 |
+| general | claude-sonnet-4-6 | — | 20 | 2 |
+
+Opus 系ロール（engineer, manager）は `background_model` として Sonnet が自動設定される。
+Sonnet 以下のロールは既にコスト効率が良いため、`background_model` は未設定。
 
 ---
 
@@ -267,3 +323,8 @@ models.json はファイルの mtime で自動リロードされる。`anima rel
 - **バランス・コスト重視** → `claude-sonnet-4-6`（Mode S）
 - **低コスト・大量処理** → `openai/gpt-4.1-mini`（Mode A）
 - **ローカル・プライベート** → `ollama/qwen3:14b`（Mode A）
+
+### Heartbeat / Cron のコストを下げたい
+
+`background_model` を設定する。詳細は上記「バックグラウンドモデル（コスト最適化）」セクションを参照。
+Opus をメインに使っている場合、`background_model` に Sonnet を設定するだけで Heartbeat + Inbox コストを約73%削減できる。

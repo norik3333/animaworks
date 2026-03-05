@@ -232,18 +232,74 @@ animaworks anima set-model {name} {model_name} --credential {cred_name}
 
 ---
 
+## Background Model (Cost Optimization)
+
+Heartbeat / Inbox / Cron can run on a lighter model separate from the main model.
+Setting `background_model` can drastically reduce the cost of these background processes.
+
+### Foreground / Background Scope
+
+| Scope | Model Used | Triggers |
+|-------|-----------|----------|
+| **foreground** | Main model (`model`) | `chat` (human interaction), `task:*` (TaskExec work) |
+| **background** | `background_model` (falls back to main model if unset) | `heartbeat`, `inbox:*` (Anima-to-Anima DM), `cron:*` |
+
+Heartbeat / Inbox / Cron primarily do triage and judgment; actual execution is handled by TaskExec (main model).
+
+### Resolution Order
+
+1. Per-anima `status.json` `background_model`
+2. `config.json` `heartbeat.default_model` (global default)
+3. Falls back to main model (`model`)
+
+### Configuration
+
+```bash
+# Set background_model for a specific Anima
+animaworks anima set-background-model {name} claude-sonnet-4-6
+
+# When using a different provider credential
+animaworks anima set-background-model {name} azure/gpt-4.1-mini --credential azure
+
+# Set for all Anima at once
+animaworks anima set-background-model --all claude-sonnet-4-6
+
+# Remove background_model (falls back to main model)
+animaworks anima set-background-model {name} --clear
+
+# Restart if server is running
+animaworks anima restart {name}
+```
+
+### Checking in status.json
+
+```json
+{
+  "model": "claude-opus-4-6",
+  "background_model": "claude-sonnet-4-6",
+  "background_credential": null
+}
+```
+
+When `background_model` is unset or identical to the main model, the swap is skipped.
+
+---
+
 ## Role Templates and Default Models
 
 Changing role with `animaworks anima set-role` also updates the default model:
 
-| Role | Default Model | max_turns | max_chains |
-|------|--------------|-----------|------------|
-| engineer | claude-opus-4-6 | 200 | 10 |
-| manager | claude-opus-4-6 | 50 | 3 |
-| writer | claude-sonnet-4-6 | 80 | 5 |
-| researcher | claude-sonnet-4-6 | 30 | 2 |
-| ops | openai/glm-4.7-flash | 30 | 2 |
-| general | claude-sonnet-4-6 | 20 | 2 |
+| Role | Default Model | background_model | max_turns | max_chains |
+|------|--------------|-----------------|-----------|------------|
+| engineer | claude-opus-4-6 | claude-sonnet-4-6 | 200 | 10 |
+| manager | claude-opus-4-6 | claude-sonnet-4-6 | 50 | 3 |
+| writer | claude-sonnet-4-6 | — | 80 | 5 |
+| researcher | claude-sonnet-4-6 | — | 30 | 2 |
+| ops | openai/glm-4.7-flash | — | 30 | 2 |
+| general | claude-sonnet-4-6 | — | 20 | 2 |
+
+Opus-tier roles (engineer, manager) get Sonnet as `background_model` automatically.
+Sonnet-tier and below are already cost-efficient, so `background_model` is left unset.
 
 ---
 
@@ -267,3 +323,8 @@ Edit `context_window` in `models.json`, or override via `config.json` `model_con
 - **Balanced, cost-conscious** → `claude-sonnet-4-6` (Mode S)
 - **Low cost, high volume** → `openai/gpt-4.1-mini` (Mode A)
 - **Local, private** → `ollama/qwen3:14b` (Mode A)
+
+### How to reduce Heartbeat / Cron costs
+
+Set `background_model`. See the "Background Model (Cost Optimization)" section above.
+For Opus-based Anima, setting Sonnet as `background_model` reduces Heartbeat + Inbox costs by ~73%.

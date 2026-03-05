@@ -71,6 +71,7 @@ alice宛: キャッシュ戦略について判断をお願いしたいです。
 | `disable_subordinate` | 直属部下 | 部下を休止（status.json enabled=false、約30秒でプロセス停止） | `name`（必須）, `reason`（任意） |
 | `enable_subordinate` | 直属部下 | 休止した部下を再開 | `name`（必須） |
 | `set_subordinate_model` | 直属部下 | 部下のモデルを変更（status.json 更新。反映には `restart_subordinate` が必要） | `name`, `model`（必須）, `reason`（任意） |
+| `set_subordinate_background_model` | 直属部下 | 部下のバックグラウンドモデル（Heartbeat/Inbox/Cron用）を変更。空文字でクリア。反映には `restart_subordinate` が必要 | `name`, `model`（必須）, `credential`, `reason`（任意） |
 | `restart_subordinate` | 直属部下 | 部下プロセスを再起動（restart_requested フラグ、約30秒で再起動） | `name`（必須）, `reason`（任意） |
 
 `check_permissions` は全 Anima が利用可能（自分の権限一覧を確認）。

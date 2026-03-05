@@ -71,6 +71,7 @@ Anima with subordinates have dedicated tools for organizational management autom
 | `disable_subordinate` | Direct subordinates | Disable subordinate (status.json enabled=false, process stops in ~30 seconds) | `name` (required), `reason` (optional) |
 | `enable_subordinate` | Direct subordinates | Re-enable a disabled subordinate | `name` (required) |
 | `set_subordinate_model` | Direct subordinates | Change subordinate's model (updates status.json; `restart_subordinate` required to apply) | `name`, `model` (required), `reason` (optional) |
+| `set_subordinate_background_model` | Direct subordinates | Change subordinate's background model (Heartbeat/Inbox/Cron). Empty string to clear. `restart_subordinate` required to apply | `name`, `model` (required), `credential`, `reason` (optional) |
 | `restart_subordinate` | Direct subordinates | Restart subordinate process (restart_requested flag, restarts in ~30 seconds) | `name` (required), `reason` (optional) |
 
 `check_permissions` is available to all Anima (view your permission list).
