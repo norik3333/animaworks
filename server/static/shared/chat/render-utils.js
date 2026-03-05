@@ -360,8 +360,8 @@ export function updateStreamingZone(bubble, msg, opts, zone = "all") {
   if (fn) el.innerHTML = fn(msg, opts);
 }
 
-const _MD_RERENDER_MS = 300;
-const _MD_RERENDER_CHARS = 200;
+const _MD_RERENDER_MS = 30;
+const _MD_RERENDER_CHARS = 10;
 
 function _renderTextZoneContent(msg, opts) {
   const { escapeHtml, renderMarkdown } = opts;
