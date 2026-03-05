@@ -892,6 +892,72 @@ KNOWLEDGE_TOOLS: list[dict[str, Any]] = [
     },
 ]
 
+VAULT_TOOLS: list[dict[str, Any]] = [
+    {
+        "name": "vault_get",
+        "description": (
+            "暗号化されたクレデンシャルvaultから値を取得する。"
+            "APIキー、パスワード、トークンなどの秘密情報を安全に保管・取得できる。"
+            "sectionとkeyを指定して値を取得する。"
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "section": {
+                    "type": "string",
+                    "description": "セクション名（例: 'shared', 'bitwarden', 'bank'）",
+                },
+                "key": {
+                    "type": "string",
+                    "description": "キー名（例: 'api_key', 'master_password'）",
+                },
+            },
+            "required": ["section", "key"],
+        },
+    },
+    {
+        "name": "vault_store",
+        "description": (
+            "暗号化されたクレデンシャルvaultに値を保存する。"
+            "APIキー、パスワード、トークンなどの秘密情報を暗号化して保管する。"
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "section": {
+                    "type": "string",
+                    "description": "セクション名（例: 'shared', 'bitwarden', 'bank'）",
+                },
+                "key": {
+                    "type": "string",
+                    "description": "キー名（例: 'api_key', 'master_password'）",
+                },
+                "value": {
+                    "type": "string",
+                    "description": "保存する値（暗号化されて保存される）",
+                },
+            },
+            "required": ["section", "key", "value"],
+        },
+    },
+    {
+        "name": "vault_list",
+        "description": (
+            "暗号化されたクレデンシャルvaultのセクション・キー一覧を表示する。"
+            "値は表示されない（セクション名とキー名のみ）。"
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "section": {
+                    "type": "string",
+                    "description": "セクション名（省略時は全セクション一覧）",
+                },
+            },
+        },
+    },
+]
+
 SKILL_TOOLS: list[dict[str, Any]] = [
     {
         "name": "skill",
@@ -1320,6 +1386,7 @@ def build_tool_list(
     include_task_tools: bool = False,
     include_plan_tasks: bool = False,
     include_background_task_tools: bool = False,
+    include_vault_tools: bool = False,
     include_skill_tools: bool = False,
     skill_metas: list[Any] | None = None,
     common_skill_metas: list[Any] | None = None,
@@ -1340,6 +1407,7 @@ def build_tool_list(
         include_task_tools: Include task queue tools (add_task, update_task, list_tasks).
         include_plan_tasks: Include plan_tasks DAG batch submission tool.
         include_background_task_tools: Include background task check/list tools.
+        include_vault_tools: Include credential vault tools (get/store/list).
         include_skill_tools: Include skill on-demand loading tool.
         skill_metas: Personal skill metadata for dynamic description generation.
         common_skill_metas: Common skill metadata for dynamic description generation.
@@ -1380,6 +1448,8 @@ def build_tool_list(
         tools.extend(PLAN_TASKS_TOOLS)
     if include_background_task_tools:
         tools.extend(BACKGROUND_TASK_TOOLS)
+    if include_vault_tools:
+        tools.extend(VAULT_TOOLS)
     if external_schemas:
         tools.extend(external_schemas)
     tools = apply_db_descriptions(tools)

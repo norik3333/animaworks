@@ -224,6 +224,9 @@ class ToolHandler(
             "use_tool": self._handle_use_tool,
             "check_background_task": self._handle_check_background_task,
             "list_background_tasks": self._handle_list_background_tasks,
+            "vault_get": self._handle_vault_get,
+            "vault_store": self._handle_vault_store,
+            "vault_list": self._handle_vault_list,
         }
 
     # ── Properties and session management ─────────────────────
@@ -539,3 +542,54 @@ class ToolHandler(
                 "ToolExecutionError",
                 f"use_tool execution failed: {tool_name}/{action}: {e}",
             )
+
+    # ── Vault tools ──────────────────────────────────────────
+
+    def _handle_vault_get(self, args: dict[str, Any]) -> str:
+        """Retrieve a decrypted value from the credential vault."""
+        from core.config.vault import get_vault_manager
+
+        section = args.get("section", "")
+        key = args.get("key", "")
+        if not section or not key:
+            return _error_result("InvalidArguments", "section and key are required")
+
+        vault = get_vault_manager()
+        value = vault.get(section, key)
+        if value is None:
+            return _error_result("NotFound", f"No entry for {section}/{key}")
+        return value
+
+    def _handle_vault_store(self, args: dict[str, Any]) -> str:
+        """Store an encrypted value in the credential vault."""
+        from core.config.vault import get_vault_manager
+
+        section = args.get("section", "")
+        key = args.get("key", "")
+        value = args.get("value", "")
+        if not section or not key or not value:
+            return _error_result(
+                "InvalidArguments", "section, key, and value are required",
+            )
+
+        vault = get_vault_manager()
+        vault.store(section, key, value)
+        return _json.dumps(
+            {"status": "ok", "message": f"Stored {section}/{key}"},
+            ensure_ascii=False,
+        )
+
+    def _handle_vault_list(self, args: dict[str, Any]) -> str:
+        """List vault sections and keys (values are never shown)."""
+        from core.config.vault import get_vault_manager
+
+        vault = get_vault_manager()
+        data = vault.load_vault()
+        section = args.get("section")
+        if section:
+            keys = list(data.get(section, {}).keys())
+            return _json.dumps(
+                {"section": section, "keys": keys}, ensure_ascii=False,
+            )
+        sections = {s: list(v.keys()) for s, v in data.items()}
+        return _json.dumps({"sections": sections}, ensure_ascii=False)

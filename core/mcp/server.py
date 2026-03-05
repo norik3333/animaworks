@@ -76,6 +76,9 @@ _EXPOSED_TOOL_NAMES: frozenset[str] = frozenset({
     "plan_tasks",
     "check_background_task",
     "list_background_tasks",
+    "vault_get",
+    "vault_store",
+    "vault_list",
 })
 
 
