@@ -593,6 +593,7 @@ class Messenger:
         source_message_id: str = "",
         external_user_id: str = "",
         external_channel_id: str = "",
+        intent: str = "",
     ) -> Message:
         """Receive a message from an external platform and place it in inbox.
 
@@ -605,6 +606,7 @@ class Messenger:
             to_person=self.anima_name,
             content=content,
             source=source,
+            intent=intent,
             source_message_id=source_message_id,
             external_user_id=external_user_id,
             external_channel_id=external_channel_id,

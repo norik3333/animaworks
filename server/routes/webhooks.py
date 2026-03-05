@@ -25,6 +25,17 @@ from core.tools._base import ToolConfigError, get_credential
 
 logger = logging.getLogger("animaworks.webhooks")
 
+_slack_bot_user_ids: dict[str, str] = {}
+
+
+def _detect_slack_intent(text: str, channel_id: str, bot_user_id: str) -> str:
+    """Return ``"question"`` if the message is a DM or mentions the bot."""
+    if channel_id.startswith("D"):
+        return "question"
+    if bot_user_id and f"<@{bot_user_id}>" in (text or ""):
+        return "question"
+    return ""
+
 
 def create_webhooks_router() -> APIRouter:
     """Create the webhooks API router."""
@@ -134,6 +145,31 @@ def create_webhooks_router() -> APIRouter:
             user_id = event.get("user", "")
             message_ts = event.get("ts", "")
 
+            # Resolve bot user ID for mention detection (cached per app_id)
+            cache_key = anima_from_app or "__shared__"
+            bot_user_id = _slack_bot_user_ids.get(cache_key, "")
+            if not bot_user_id and api_app_id:
+                try:
+                    from slack_sdk.web.async_client import AsyncWebClient
+
+                    _token = None
+                    if anima_from_app:
+                        from server.slack_socket import SlackSocketModeManager
+                        _token = SlackSocketModeManager._get_per_anima_credential(
+                            "SLACK_BOT_TOKEN", anima_from_app,
+                        )
+                    if not _token:
+                        _token = get_credential("slack", "slack_webhook", env_var="SLACK_BOT_TOKEN")
+                    client = AsyncWebClient(token=_token)
+                    resp = await client.auth_test()
+                    bot_user_id = resp.get("user_id", "") or ""
+                    if bot_user_id:
+                        _slack_bot_user_ids[cache_key] = bot_user_id
+                except Exception:
+                    logger.debug("Failed to resolve bot user ID for webhook", exc_info=True)
+
+            intent = _detect_slack_intent(text, channel_id, bot_user_id)
+
             shared_dir = get_data_dir() / "shared"
             messenger = Messenger(shared_dir, anima_name)
             messenger.receive_external(
@@ -142,10 +178,11 @@ def create_webhooks_router() -> APIRouter:
                 source_message_id=message_ts,
                 external_user_id=user_id,
                 external_channel_id=channel_id,
+                intent=intent,
             )
             logger.info(
-                "Slack message delivered: channel=%s user=%s -> anima=%s",
-                channel_id, user_id, anima_name,
+                "Slack message delivered: channel=%s user=%s -> anima=%s (intent=%s)",
+                channel_id, user_id, anima_name, intent or "none",
             )
 
         return {"ok": True}

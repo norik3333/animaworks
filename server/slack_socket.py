@@ -23,6 +23,25 @@ from core.tools._base import get_credential, _lookup_vault_credential, _lookup_s
 logger = logging.getLogger("animaworks.slack_socket")
 
 
+def _detect_slack_intent(text: str, channel_id: str, bot_user_id: str) -> str:
+    """Return ``"question"`` if the message is a DM or mentions the bot."""
+    if channel_id.startswith("D"):
+        return "question"
+    if bot_user_id and f"<@{bot_user_id}>" in (text or ""):
+        return "question"
+    return ""
+
+
+async def _resolve_bot_user_id(app: AsyncApp) -> str:
+    """Call ``auth.test`` once and return the bot's Slack user ID."""
+    try:
+        resp = await app.client.auth_test()
+        return resp.get("user_id", "") or ""
+    except Exception:
+        logger.warning("Failed to resolve bot user ID via auth.test", exc_info=True)
+        return ""
+
+
 class SlackSocketModeManager:
     """Manages Slack Socket Mode WebSocket connections.
 
@@ -34,6 +53,7 @@ class SlackSocketModeManager:
     def __init__(self) -> None:
         self._handlers: list[AsyncSocketModeHandler] = []
         self._apps: list[AsyncApp] = []
+        self._bot_user_ids: dict[str, str] = {}
 
     async def start(self) -> None:
         """Start Socket Mode connections if enabled in config."""
@@ -49,11 +69,13 @@ class SlackSocketModeManager:
             if bot_token and app_token:
                 try:
                     app = AsyncApp(token=bot_token)
-                    self._register_per_anima_handler(app, anima_name)
+                    bot_uid = await _resolve_bot_user_id(app)
+                    self._bot_user_ids[anima_name] = bot_uid
+                    self._register_per_anima_handler(app, anima_name, bot_uid)
                     handler = AsyncSocketModeHandler(app, app_token)
                     self._apps.append(app)
                     self._handlers.append(handler)
-                    logger.info("Per-Anima Slack bot registered: %s", anima_name)
+                    logger.info("Per-Anima Slack bot registered: %s (bot_uid=%s)", anima_name, bot_uid)
                 except Exception:
                     logger.exception(
                         "Failed to set up per-Anima Slack bot for '%s'", anima_name,
@@ -63,11 +85,13 @@ class SlackSocketModeManager:
             shared_bot = get_credential("slack", "slack_socket", env_var="SLACK_BOT_TOKEN")
             shared_app_token = get_credential("slack_app", "slack_socket", env_var="SLACK_APP_TOKEN")
             app = AsyncApp(token=shared_bot)
-            self._register_shared_handler(app, slack_config.anima_mapping, slack_config.default_anima)
+            shared_bot_uid = await _resolve_bot_user_id(app)
+            self._bot_user_ids["__shared__"] = shared_bot_uid
+            self._register_shared_handler(app, slack_config.anima_mapping, slack_config.default_anima, shared_bot_uid)
             handler = AsyncSocketModeHandler(app, shared_app_token)
             self._apps.append(app)
             self._handlers.append(handler)
-            logger.info("Shared Slack bot registered")
+            logger.info("Shared Slack bot registered (bot_uid=%s)", shared_bot_uid)
         except Exception:
             if not self._handlers:
                 raise
@@ -118,7 +142,7 @@ class SlackSocketModeManager:
             return token
         return _lookup_shared_credentials(key)
 
-    def _register_per_anima_handler(self, app: AsyncApp, anima_name: str) -> None:
+    def _register_per_anima_handler(self, app: AsyncApp, anima_name: str, bot_user_id: str = "") -> None:
         """Register event handler that routes all messages to a specific Anima."""
 
         @app.event("message")
@@ -134,23 +158,30 @@ class SlackSocketModeManager:
             except Exception:
                 logger.debug("Reply routing lookup failed", exc_info=True)
 
+            text = event.get("text", "")
+            channel_id = event.get("channel", "")
+            intent = _detect_slack_intent(text, channel_id, bot_user_id)
+
             shared_dir = get_data_dir() / "shared"
             messenger = Messenger(shared_dir, anima_name)
             messenger.receive_external(
-                content=event.get("text", ""),
+                content=text,
                 source="slack",
                 source_message_id=event.get("ts", ""),
                 external_user_id=event.get("user", ""),
-                external_channel_id=event.get("channel", ""),
+                external_channel_id=channel_id,
+                intent=intent,
             )
             logger.info(
-                "Per-Anima Socket Mode message routed: channel=%s -> anima=%s",
-                event.get("channel", ""),
+                "Per-Anima Socket Mode message routed: channel=%s -> anima=%s (intent=%s)",
+                channel_id,
                 anima_name,
+                intent or "none",
             )
 
     def _register_shared_handler(
         self, app: AsyncApp, anima_mapping: dict[str, str], default_anima: str = "",
+        bot_user_id: str = "",
     ) -> None:
         """Register event handler for the shared bot (channel-based routing)."""
 
@@ -176,19 +207,24 @@ class SlackSocketModeManager:
                 )
                 return
 
+            text = event.get("text", "")
+            intent = _detect_slack_intent(text, channel_id, bot_user_id)
+
             shared_dir = get_data_dir() / "shared"
             messenger = Messenger(shared_dir, anima_name)
             messenger.receive_external(
-                content=event.get("text", ""),
+                content=text,
                 source="slack",
                 source_message_id=event.get("ts", ""),
                 external_user_id=event.get("user", ""),
                 external_channel_id=channel_id,
+                intent=intent,
             )
             logger.info(
-                "Shared Socket Mode message routed: channel=%s -> anima=%s",
+                "Shared Socket Mode message routed: channel=%s -> anima=%s (intent=%s)",
                 channel_id,
                 anima_name,
+                intent or "none",
             )
 
     async def stop(self) -> None:

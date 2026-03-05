@@ -185,6 +185,18 @@ Messages from external platforms differ from inter-Anima messages in the followi
 2. **call_human replies**: When a human replies in the Slack thread of a `call_human` notification (details: `communication/call-human-guide.md`)
 3. **Channel mentions**: When a message is posted to a Slack channel targeting an Anima
 
+### Slack Message: Immediate vs Deferred Processing
+
+Slack messages are automatically classified for immediate or deferred processing:
+
+| Condition | Processing Timing | Reason |
+|-----------|------------------|--------|
+| **@mention** (Bot is mentioned) | **Immediate** | `intent="question"` is auto-assigned, triggering immediate inbox processing |
+| **DM** (direct message to Bot) | **Immediate** | DMs target the Bot directly, so `intent="question"` is auto-assigned |
+| **Channel message without mention** | **Next heartbeat** | `intent` is empty, so it is not triggered immediately and is processed as unread during the scheduled heartbeat |
+
+This ensures Animas are not woken up for every channel message (e.g., casual chat), but respond quickly when explicitly addressed via @mention or DM.
+
 ### Responding to External Messages
 
 When you receive an external message:
