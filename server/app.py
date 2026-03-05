@@ -20,9 +20,10 @@ from apscheduler.triggers.interval import IntervalTrigger
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.datastructures import MutableHeaders
 from starlette.requests import Request
 from starlette.responses import JSONResponse as StarletteJSONResponse
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from core.auth.manager import load_auth, validate_session, find_user
 from core.config import load_config
@@ -43,18 +44,27 @@ _NOISY_PATHS = frozenset({
 })
 
 
-class RequestLoggingMiddleware(BaseHTTPMiddleware):
-    """Log every HTTP request with method, path, status, and duration.
+class RequestLoggingMiddleware:
+    """Pure ASGI middleware for request logging.
 
-    Automatically binds a ``request_id`` into structlog contextvars so that
-    all log records emitted during request processing carry the ID.
+    Avoids BaseHTTPMiddleware which buffers StreamingResponse bodies,
+    causing stuttery SSE delivery. Binds ``request_id`` into structlog
+    contextvars so all log records carry the ID.
     """
 
-    async def dispatch(self, request: Request, call_next):  # type: ignore[override]
-        structlog.contextvars.clear_contextvars()
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        request = Request(scope)
         request_id = request.headers.get(
             "X-Request-ID", uuid.uuid4().hex[:12],
         )
+        structlog.contextvars.clear_contextvars()
         structlog.contextvars.bind_contextvars(
             request_id=request_id,
             method=request.method,
@@ -62,23 +72,29 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         )
 
         start = time.perf_counter()
-        response = await call_next(request)
-        duration_ms = round((time.perf_counter() - start) * 1000, 1)
+        status_code = 500
 
-        response.headers["X-Request-ID"] = request_id
+        async def _send_wrapper(message: dict) -> None:  # type: ignore[type-arg]
+            nonlocal status_code
+            if message["type"] == "http.response.start":
+                status_code = message.get("status", 500)
+                headers = MutableHeaders(scope=message)
+                headers.append("X-Request-ID", request_id)
+            await send(message)
 
-        # Skip noisy endpoints to reduce log volume
-        if request.url.path not in _NOISY_PATHS:
-            req_logger = logging.getLogger("animaworks.request")
-            req_logger.info(
-                "request %s %s -> %d (%.1fms)",
-                request.method,
-                request.url.path,
-                response.status_code,
-                duration_ms,
-            )
-
-        return response
+        try:
+            await self.app(scope, receive, _send_wrapper)
+        finally:
+            duration_ms = round((time.perf_counter() - start) * 1000, 1)
+            if request.url.path not in _NOISY_PATHS:
+                req_logger = logging.getLogger("animaworks.request")
+                req_logger.info(
+                    "request %s %s -> %d (%.1fms)",
+                    request.method,
+                    request.url.path,
+                    status_code,
+                    duration_ms,
+                )
 
 
 async def _reconcile_assets_at_startup(animas_dir: Path) -> None:

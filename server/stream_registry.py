@@ -112,7 +112,7 @@ class ResponseStream:
                 self.full_text = summary
 
         # Log every event added (non-text_delta at INFO, text_delta at DEBUG to avoid flood)
-        if event != "text_delta":
+        if event not in ("text_delta", "thinking_delta", "tool_detail"):
             logger.info(
                 "[SSE-BUF] add_event stream=%s seq=%d event=%s buf_size=%d",
                 self.response_id, seq, event, len(self.events),
@@ -134,7 +134,7 @@ class ResponseStream:
         """Return all events with seq > after_seq."""
         result = [e for e in self.events if e.seq > after_seq]
         if result:
-            logger.info(
+            logger.debug(
                 "[SSE-BUF] events_after stream=%s after_seq=%d found=%d",
                 self.response_id, after_seq, len(result),
             )
@@ -153,7 +153,7 @@ class ResponseStream:
         already cleared, the changed ``_notify_seq`` tells us a new
         event arrived.
         """
-        logger.info(
+        logger.debug(
             "[SSE-WAIT] wait_new_event stream=%s timeout=%.1fs complete=%s seq=%d",
             self.response_id, timeout, self.complete, self._seq_counter - 1,
         )
@@ -163,19 +163,19 @@ class ResponseStream:
             while self._notify_seq == seen_seq:
                 remaining = deadline - asyncio.get_event_loop().time()
                 if remaining <= 0:
-                    logger.info(
+                    logger.debug(
                         "[SSE-WAIT] timeout stream=%s after=%.1fs complete=%s",
                         self.response_id, timeout, self.complete,
                     )
                     return False
                 await asyncio.wait_for(self._new_event.wait(), timeout=remaining)
-            logger.info(
+            logger.debug(
                 "[SSE-WAIT] got_event stream=%s new_seq=%d",
                 self.response_id, self._seq_counter - 1,
             )
             return True
         except asyncio.TimeoutError:
-            logger.info(
+            logger.debug(
                 "[SSE-WAIT] timeout stream=%s after=%.1fs complete=%s",
                 self.response_id, timeout, self.complete,
             )
@@ -249,7 +249,7 @@ class StreamRegistry:
         """
         threads = self._anima_active.get(anima_name)
         if not threads:
-            logger.info("[SSE-REG] get_active anima=%s -> no active stream", anima_name)
+            logger.debug("[SSE-REG] get_active anima=%s -> no active stream", anima_name)
             return None
 
         if thread_id is not None:
@@ -258,7 +258,7 @@ class StreamRegistry:
             response_id = threads.get("default") or next(iter(threads.values()), None)
 
         if response_id is None:
-            logger.info(
+            logger.debug(
                 "[SSE-REG] get_active anima=%s thread=%s -> no matching stream",
                 anima_name, thread_id,
             )
@@ -266,7 +266,7 @@ class StreamRegistry:
 
         stream = self._streams.get(response_id)
         if stream:
-            logger.info(
+            logger.debug(
                 "[SSE-REG] get_active anima=%s thread=%s -> stream=%s status=%s events=%d",
                 anima_name, thread_id, response_id, stream.status, stream.event_count,
             )
@@ -399,8 +399,8 @@ class StreamRegistry:
         """Add an event to the stream buffer and return the formatted SSE frame."""
         sse_event = stream.add_event(event, payload)
         frame = format_sse_with_id(event, payload, sse_event.event_id)
-        if event != "text_delta":
-            logger.info(
+        if event not in ("text_delta", "thinking_delta", "tool_detail"):
+            logger.debug(
                 "[SSE-FRAME] yield stream=%s event=%s id=%s frame_len=%d",
                 stream.response_id, event, sse_event.event_id, len(frame),
             )

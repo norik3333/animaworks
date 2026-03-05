@@ -479,7 +479,7 @@ async def _run_producer(
                     if chunk_data.get("type") == "keepalive":
                         keepalive_count += 1
                         elapsed = _time.monotonic() - _start
-                        logger.info(
+                        logger.debug(
                             "[PRODUCER] keepalive anima=%s stream=%s keepalive#%d elapsed=%.1fs",
                             name, stream.response_id, keepalive_count, elapsed,
                         )
