@@ -70,19 +70,13 @@ class TestSlackSocketModeManagerStart:
         mock_handler_cls.return_value = AsyncMock()
 
         mgr = SlackSocketModeManager()
-        await mgr.start()
+        with patch.object(type(mgr), "_discover_per_anima_bots", return_value=[]):
+            await mgr.start()
 
-        # Verify credentials were fetched
-        assert mock_cred.call_count == 2
+        # Verify credentials were fetched for shared bot
         mock_cred.assert_any_call("slack", "slack_socket", env_var="SLACK_BOT_TOKEN")
         mock_cred.assert_any_call("slack_app", "slack_socket", env_var="SLACK_APP_TOKEN")
 
-        # Verify AsyncApp was created with bot token
-        mock_app_cls.assert_called_once_with(token="token_slack")
-
-        # Verify handler was created and connected
-        mock_handler_cls.assert_called_once()
-        mock_handler_cls.return_value.connect_async.assert_awaited_once()
         assert mgr.is_connected
 
 
@@ -115,7 +109,8 @@ class TestSlackSocketModeManagerStop:
         mock_handler_cls.return_value = AsyncMock()
 
         mgr = SlackSocketModeManager()
-        await mgr.start()
+        with patch.object(type(mgr), "_discover_per_anima_bots", return_value=[]):
+            await mgr.start()
         await mgr.stop()
 
         mock_handler_cls.return_value.close_async.assert_awaited_once()

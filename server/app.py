@@ -198,6 +198,11 @@ async def _startup_animas_background(app: FastAPI) -> None:
             logger.exception("Slack Socket Mode startup failed")
             app.state.slack_socket_manager = None
 
+        # ── ConfigReloadManager ───────────────────────────────
+        from server.reload_manager import ConfigReloadManager
+
+        app.state.reload_manager = ConfigReloadManager(app)
+
         logger.info("All anima processes started")
 
     except asyncio.CancelledError:

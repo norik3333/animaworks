@@ -13,6 +13,7 @@ import collections
 import json
 import logging
 import time
+from typing import Any
 
 from slack_bolt.app.async_app import AsyncApp
 from slack_bolt.adapter.socket_mode.async_handler import AsyncSocketModeHandler
@@ -70,9 +71,19 @@ class SlackSocketModeManager:
     """
 
     def __init__(self) -> None:
-        self._handlers: list[AsyncSocketModeHandler] = []
-        self._apps: list[AsyncApp] = []
+        self._handler_map: dict[str, AsyncSocketModeHandler] = {}
+        self._app_map: dict[str, AsyncApp] = {}
         self._bot_user_ids: dict[str, str] = {}
+
+    @property
+    def _handlers(self) -> list[AsyncSocketModeHandler]:
+        """Backward-compatible list view of active handlers."""
+        return list(self._handler_map.values())
+
+    @property
+    def _apps(self) -> list[AsyncApp]:
+        """Backward-compatible list view of active apps."""
+        return list(self._app_map.values())
 
     async def start(self) -> None:
         """Start Socket Mode connections if enabled in config."""
@@ -83,22 +94,7 @@ class SlackSocketModeManager:
             return
 
         for anima_name in self._discover_per_anima_bots():
-            bot_token = self._get_per_anima_credential("SLACK_BOT_TOKEN", anima_name)
-            app_token = self._get_per_anima_credential("SLACK_APP_TOKEN", anima_name)
-            if bot_token and app_token:
-                try:
-                    app = AsyncApp(token=bot_token)
-                    bot_uid = await _resolve_bot_user_id(app)
-                    self._bot_user_ids[anima_name] = bot_uid
-                    self._register_per_anima_handler(app, anima_name, bot_uid)
-                    handler = AsyncSocketModeHandler(app, app_token)
-                    self._apps.append(app)
-                    self._handlers.append(handler)
-                    logger.info("Per-Anima Slack bot registered: %s (bot_uid=%s)", anima_name, bot_uid)
-                except Exception:
-                    logger.exception(
-                        "Failed to set up per-Anima Slack bot for '%s'", anima_name,
-                    )
+            await self._add_per_anima_handler(anima_name)
 
         try:
             shared_bot = get_credential("slack", "slack_socket", env_var="SLACK_BOT_TOKEN")
@@ -106,21 +102,119 @@ class SlackSocketModeManager:
             app = AsyncApp(token=shared_bot)
             shared_bot_uid = await _resolve_bot_user_id(app)
             self._bot_user_ids["__shared__"] = shared_bot_uid
-            self._register_shared_handler(app, slack_config.anima_mapping, slack_config.default_anima, shared_bot_uid)
+            self._register_shared_handler(app, shared_bot_uid)
             handler = AsyncSocketModeHandler(app, shared_app_token)
-            self._apps.append(app)
-            self._handlers.append(handler)
+            self._app_map["__shared__"] = app
+            self._handler_map["__shared__"] = handler
             logger.info("Shared Slack bot registered (bot_uid=%s)", shared_bot_uid)
         except Exception:
-            if not self._handlers:
+            if not self._handler_map:
                 raise
             logger.info("Shared Slack bot not configured; per-Anima bots only")
 
-        if self._handlers:
-            await asyncio.gather(*(h.connect_async() for h in self._handlers))
+        if self._handler_map:
+            await asyncio.gather(*(h.connect_async() for h in self._handler_map.values()))
             logger.info(
-                "Slack Socket Mode connected (%d handler(s))", len(self._handlers),
+                "Slack Socket Mode connected (%d handler(s))", len(self._handler_map),
             )
+
+    async def reload(self) -> dict[str, Any]:
+        """Diff-based handler reload: add new, remove deleted, keep existing."""
+        config = load_config()
+        slack_config = config.external_messaging.slack
+        if not slack_config.enabled or slack_config.mode != "socket":
+            if self._handler_map:
+                await self.stop()
+            return {"status": "disabled"}
+
+        current_animas = {
+            name for name in self._handler_map if name != "__shared__"
+        }
+        desired_animas = set(self._discover_per_anima_bots())
+
+        added: list[str] = []
+        removed: list[str] = []
+        errors: list[dict[str, str]] = []
+
+        # Add new handlers first (add-before-remove for safety)
+        to_add = desired_animas - current_animas
+        for name in sorted(to_add):
+            try:
+                ok = await self._add_per_anima_handler(name)
+                if ok:
+                    added.append(name)
+            except Exception as exc:
+                logger.exception("Failed to add per-Anima handler for '%s'", name)
+                errors.append({"name": name, "error": str(exc)})
+
+        # Remove handlers no longer desired
+        to_remove = current_animas - desired_animas
+        for name in sorted(to_remove):
+            try:
+                await self._remove_per_anima_handler(name)
+                removed.append(name)
+            except Exception as exc:
+                logger.exception("Failed to remove per-Anima handler for '%s'", name)
+                errors.append({"name": name, "error": str(exc)})
+
+        result: dict[str, Any] = {
+            "status": "ok",
+            "added": added,
+            "removed": removed,
+            "active_handlers": len(self._handler_map),
+        }
+        if errors:
+            result["errors"] = errors
+        return result
+
+    async def _add_per_anima_handler(self, anima_name: str) -> bool:
+        """Create and connect a per-Anima Socket Mode handler.
+
+        Returns True on success, False if credentials are missing.
+        """
+        bot_token = self._get_per_anima_credential("SLACK_BOT_TOKEN", anima_name)
+        app_token = self._get_per_anima_credential("SLACK_APP_TOKEN", anima_name)
+        if not bot_token or not app_token:
+            logger.debug("Missing credentials for per-Anima bot '%s'", anima_name)
+            return False
+
+        try:
+            app = AsyncApp(token=bot_token)
+            bot_uid = await _resolve_bot_user_id(app)
+            self._bot_user_ids[anima_name] = bot_uid
+            self._register_per_anima_handler(app, anima_name, bot_uid)
+            handler = AsyncSocketModeHandler(app, app_token)
+            self._app_map[anima_name] = app
+            self._handler_map[anima_name] = handler
+            await handler.connect_async()
+            logger.info(
+                "Per-Anima Slack bot registered: %s (bot_uid=%s)",
+                anima_name, bot_uid,
+            )
+            return True
+        except Exception:
+            logger.exception(
+                "Failed to set up per-Anima Slack bot for '%s'", anima_name,
+            )
+            # Clean up partial state
+            self._app_map.pop(anima_name, None)
+            self._handler_map.pop(anima_name, None)
+            self._bot_user_ids.pop(anima_name, None)
+            return False
+
+    async def _remove_per_anima_handler(self, anima_name: str) -> None:
+        """Disconnect and remove a per-Anima Socket Mode handler."""
+        handler = self._handler_map.pop(anima_name, None)
+        self._app_map.pop(anima_name, None)
+        self._bot_user_ids.pop(anima_name, None)
+        if handler is not None:
+            try:
+                await handler.close_async()
+            except Exception:
+                logger.exception(
+                    "Error closing Socket Mode handler for '%s'", anima_name,
+                )
+        logger.info("Per-Anima Slack bot removed: %s", anima_name)
 
     @staticmethod
     def _discover_per_anima_bots() -> list[str]:
@@ -228,10 +322,14 @@ class SlackSocketModeManager:
             )
 
     def _register_shared_handler(
-        self, app: AsyncApp, anima_mapping: dict[str, str], default_anima: str = "",
-        bot_user_id: str = "",
+        self, app: AsyncApp, bot_user_id: str = "",
     ) -> None:
-        """Register event handler for the shared bot (channel-based routing)."""
+        """Register event handler for the shared bot (channel-based routing).
+
+        The ``anima_mapping`` is resolved dynamically via ``load_config()``
+        on every incoming message so that config changes take effect without
+        reconnecting the Socket Mode handler.
+        """
 
         @app.event("message")
         async def handle_message(event: dict, say) -> None:  # noqa: ARG001
@@ -251,7 +349,9 @@ class SlackSocketModeManager:
                 logger.debug("Reply routing lookup failed", exc_info=True)
 
             channel_id = event.get("channel", "")
-            anima_name = anima_mapping.get(channel_id) or default_anima
+            cfg = load_config()
+            slack_cfg = cfg.external_messaging.slack
+            anima_name = slack_cfg.anima_mapping.get(channel_id) or slack_cfg.default_anima
             if not anima_name:
                 logger.debug(
                     "No anima mapping for channel %s and no default_anima; ignoring",
@@ -286,7 +386,9 @@ class SlackSocketModeManager:
                 return
 
             channel_id = event.get("channel", "")
-            anima_name_resolved = anima_mapping.get(channel_id) or default_anima
+            cfg = load_config()
+            slack_cfg = cfg.external_messaging.slack
+            anima_name_resolved = slack_cfg.anima_mapping.get(channel_id) or slack_cfg.default_anima
             if not anima_name_resolved:
                 logger.debug(
                     "No anima mapping for channel %s (app_mention); ignoring",
@@ -314,16 +416,17 @@ class SlackSocketModeManager:
 
     async def stop(self) -> None:
         """Disconnect all Socket Mode handlers gracefully."""
-        for handler in self._handlers:
+        for handler in self._handler_map.values():
             try:
                 await handler.close_async()
             except Exception:
                 logger.exception("Error closing Socket Mode handler")
-        self._handlers.clear()
-        self._apps.clear()
+        self._handler_map.clear()
+        self._app_map.clear()
+        self._bot_user_ids.clear()
         logger.info("Slack Socket Mode disconnected")
 
     @property
     def is_connected(self) -> bool:
         """Return whether any Socket Mode handler is active."""
-        return len(self._handlers) > 0
+        return len(self._handler_map) > 0

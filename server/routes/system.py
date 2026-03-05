@@ -669,6 +669,52 @@ def create_system_router() -> APIRouter:
                         result[ad.name] = s
         return result
 
+    # ── Hot Reload ─────────────────────────────────────────
+
+    @router.post("/system/hot-reload")
+    async def hot_reload_all(request: Request):
+        """Hot-reload all configuration and connections."""
+        manager = getattr(request.app.state, "reload_manager", None)
+        if manager is None:
+            return JSONResponse(
+                {"error": "Reload manager not initialized"},
+                status_code=503,
+            )
+        return await manager.reload_all()
+
+    @router.post("/system/hot-reload/slack")
+    async def hot_reload_slack(request: Request):
+        """Hot-reload Slack Socket Mode connections only."""
+        manager = getattr(request.app.state, "reload_manager", None)
+        if manager is None:
+            return JSONResponse(
+                {"error": "Reload manager not initialized"},
+                status_code=503,
+            )
+        return await manager.reload_slack()
+
+    @router.post("/system/hot-reload/credentials")
+    async def hot_reload_credentials(request: Request):
+        """Hot-reload credentials and dependent connections."""
+        manager = getattr(request.app.state, "reload_manager", None)
+        if manager is None:
+            return JSONResponse(
+                {"error": "Reload manager not initialized"},
+                status_code=503,
+            )
+        return await manager.reload_credentials()
+
+    @router.post("/system/hot-reload/animas")
+    async def hot_reload_animas(request: Request):
+        """Sync Anima processes with disk state."""
+        manager = getattr(request.app.state, "reload_manager", None)
+        if manager is None:
+            return JSONResponse(
+                {"error": "Reload manager not initialized"},
+                status_code=503,
+            )
+        return await manager.reload_animas()
+
     # ── Health Check ────────────────────────────────────────
 
     @router.get("/system/health")

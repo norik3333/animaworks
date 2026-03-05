@@ -38,6 +38,8 @@ class ReconcileMixin:
 
     async def _reconcile(self) -> None:
         """Scan animas_dir and sync desired state with actual process state."""
+        self._check_config_freshness()
+
         if not self.animas_dir.exists():
             return
 
@@ -229,3 +231,24 @@ class ReconcileMixin:
                     )
         except Exception:
             logger.exception("Asset reconciliation failed")
+
+    def _check_config_freshness(self) -> None:
+        """Detect config.json changes and refresh the singleton cache.
+
+        This is a supplementary auto-detection mechanism.  The primary
+        trigger is the ``POST /api/system/hot-reload`` API endpoint.
+        """
+        try:
+            from core.config.models import get_config_path, load_config
+
+            config_path = get_config_path()
+            mtime = config_path.stat().st_mtime
+            if not hasattr(self, "_last_config_mtime"):
+                self._last_config_mtime = mtime
+                return
+            if mtime != self._last_config_mtime:
+                self._last_config_mtime = mtime
+                load_config()
+                logger.info("Reconciliation: config.json changed, cache refreshed")
+        except Exception:
+            pass
