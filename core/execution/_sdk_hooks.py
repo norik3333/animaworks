@@ -346,9 +346,12 @@ def _intercept_task_to_delegation(
             deadline="2h",
             relay_chain=[my_name],
         )
-    except Exception:
-        logger.warning("Failed to add task to subordinate queue", exc_info=True)
-        return None
+    except Exception as e:
+        logger.error("Task persistence failed in delegate_task (subordinate queue): %s", e)
+        return {
+            "task_id": "persist_failed",
+            "reason": f"DELEGATION_FAILED: Failed to persist task to subordinate queue: {e}. Please retry.",
+        }
 
     # Send DM via Messenger
     dm_result = ""
@@ -372,17 +375,25 @@ def _intercept_task_to_delegation(
 
     # Add tracking entry to own queue
     own_tqm = TaskQueueManager(anima_dir)
-    own_entry = own_tqm.add_delegated_task(
-        original_instruction=prompt,
-        assignee=target_name,
-        summary=f"[delegated→{target_name}] {description[:80]}",
-        deadline="2h",
-        relay_chain=[my_name, target_name],
-        meta={
-            "delegated_to": target_name,
-            "delegated_task_id": sub_entry.task_id,
-        },
-    )
+    try:
+        own_entry = own_tqm.add_delegated_task(
+            original_instruction=prompt,
+            assignee=target_name,
+            summary=f"[delegated→{target_name}] {description[:80]}",
+            deadline="2h",
+            relay_chain=[my_name, target_name],
+            meta={
+                "delegated_to": target_name,
+                "delegated_task_id": sub_entry.task_id,
+            },
+        )
+    except Exception as e:
+        logger.warning("Failed to persist tracking entry for delegate_task (DM already sent): %s", e)
+        return {
+            "task_id": "persist_failed",
+            "reason": f"DELEGATION_PARTIAL: Task sent to {target_name} but tracking entry failed: {e}. "
+            "DM was delivered; check subordinate queue manually.",
+        }
 
     # Write wake file so inbox_wake_dispatcher triggers process_inbox
     try:

@@ -20,6 +20,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
+from core.exceptions import MemoryWriteError
 from core.i18n import t
 from core.time_utils import now_jst
 
@@ -106,16 +107,22 @@ class ShortTermMemory:
         # Archive any existing state before overwriting
         self._archive_existing()
 
-        # Write JSON
+        # Write JSON (critical: raise MemoryWriteError on failure)
         json_path = self.shortterm_dir / "session_state.json"
-        json_path.write_text(
-            json.dumps(asdict(state), ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
+        try:
+            json_path.write_text(
+                json.dumps(asdict(state), ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+        except OSError as exc:
+            raise MemoryWriteError(f"Short-term memory save failed: {exc}") from exc
 
-        # Write Markdown
+        # Write Markdown (non-critical: log warning only)
         md_path = self.shortterm_dir / "session_state.md"
-        md_path.write_text(self._render_markdown(state), encoding="utf-8")
+        try:
+            md_path.write_text(self._render_markdown(state), encoding="utf-8")
+        except OSError:
+            logger.warning("Failed to write short-term memory markdown to %s", md_path, exc_info=True)
 
         logger.info(
             "Short-term memory saved: %.1f%% context, %d turns",
@@ -147,7 +154,7 @@ class ShortTermMemory:
         try:
             data = json.loads(json_path.read_text(encoding="utf-8"))
             return SessionState(**data)
-        except (json.JSONDecodeError, TypeError):
+        except (json.JSONDecodeError, TypeError, OSError):
             logger.warning("Failed to parse short-term memory JSON")
             return None
 
@@ -155,7 +162,11 @@ class ShortTermMemory:
         """Load the markdown dump directly (for system prompt injection)."""
         md_path = self.shortterm_dir / "session_state.md"
         if md_path.exists():
-            return md_path.read_text(encoding="utf-8")
+            try:
+                return md_path.read_text(encoding="utf-8")
+            except OSError:
+                logger.warning("Failed to read short-term memory markdown from %s", md_path, exc_info=True)
+                return ""
         return ""
 
     # ── Clear ───────────────────────────────────────────────
@@ -175,10 +186,13 @@ class ShortTermMemory:
         """Persist a streaming checkpoint for retry-on-disconnect."""
         self.shortterm_dir.mkdir(parents=True, exist_ok=True)
         path = self.shortterm_dir / self._CHECKPOINT_FILE
-        path.write_text(
-            json.dumps(asdict(checkpoint), ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
+        try:
+            path.write_text(
+                json.dumps(asdict(checkpoint), ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+        except OSError:
+            logger.warning("Failed to write stream checkpoint to %s", path, exc_info=True)
         logger.debug(
             "Stream checkpoint saved: %d completed tools, retry=%d",
             len(checkpoint.completed_tools),
@@ -194,7 +208,7 @@ class ShortTermMemory:
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
             return StreamCheckpoint(**data)
-        except (json.JSONDecodeError, TypeError):
+        except (json.JSONDecodeError, TypeError, OSError):
             logger.warning("Failed to parse stream checkpoint JSON")
             return None
 

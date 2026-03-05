@@ -242,7 +242,7 @@ class ConversationMemory:
                     compressed_turn_count=data.get("compressed_turn_count", 0),
                     last_finalized_turn_index=data.get("last_finalized_turn_index", 0),
                 )
-            except (json.JSONDecodeError, TypeError):
+            except (json.JSONDecodeError, TypeError, OSError):
                 logger.warning("Failed to parse conversation state; starting fresh")
                 self._state = ConversationState(anima_name=self.anima_name)
         else:
@@ -289,10 +289,13 @@ class ConversationMemory:
             "procedures": [str(p) for p in procedures],
             "session_id": session_id,
         }
-        self._pending_procedures_path.write_text(
-            json.dumps(data, ensure_ascii=False),
-            encoding="utf-8",
-        )
+        try:
+            self._pending_procedures_path.write_text(
+                json.dumps(data, ensure_ascii=False),
+                encoding="utf-8",
+            )
+        except OSError:
+            logger.warning("Failed to write pending procedures to %s", self._pending_procedures_path, exc_info=True)
 
     def _load_pending_procedures(self) -> tuple[list[Path], str]:
         """Load and clear pending procedure info.
@@ -309,6 +312,9 @@ class ConversationMemory:
             session_id = data.get("session_id", "")
             path.unlink(missing_ok=True)
             return procedures, session_id
+        except OSError:
+            logger.warning("Failed to read pending procedures from %s", path, exc_info=True)
+            return [], ""
         except (json.JSONDecodeError, TypeError):
             path.unlink(missing_ok=True)
             return [], ""
@@ -337,8 +343,13 @@ class ConversationMemory:
         path = self._transcript_dir / f"{date}.jsonl"
         if not path.exists():
             return []
+        try:
+            lines = path.read_text(encoding="utf-8").splitlines()
+        except OSError:
+            logger.warning("Failed to read transcript from %s", path, exc_info=True)
+            return []
         messages = []
-        for line in path.read_text(encoding="utf-8").splitlines():
+        for line in lines:
             line = line.strip()
             if not line:
                 continue

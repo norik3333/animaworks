@@ -26,7 +26,13 @@ from core.time_utils import ensure_aware, now_iso, now_jst
 logger = logging.getLogger("animaworks.task_queue")
 
 # Valid task statuses
-_VALID_STATUSES = frozenset({"pending", "in_progress", "done", "cancelled", "blocked", "delegated"})
+_VALID_STATUSES = frozenset({"pending", "in_progress", "done", "cancelled", "blocked", "delegated", "failed"})
+_TERMINAL_STATUSES = frozenset({"done", "cancelled", "failed"})
+
+
+class TaskPersistenceError(Exception):
+    """Raised when task queue file I/O fails."""
+
 # Valid task sources
 _VALID_SOURCES = frozenset({"human", "anima"})
 # Maximum characters for original_instruction
@@ -409,7 +415,7 @@ class TaskQueueManager:
         Returns the number of tasks removed.
         """
         tasks = self._load_all()
-        active = {tid: t for tid, t in tasks.items() if t.status not in ("done", "cancelled")}
+        active = {tid: t for tid, t in tasks.items() if t.status not in _TERMINAL_STATUSES}
         removed = len(tasks) - len(active)
         if removed == 0:
             return 0
@@ -441,5 +447,6 @@ class TaskQueueManager:
                 f.write(line + "\n")
                 f.flush()
                 os.fsync(f.fileno())
-        except Exception:
+        except OSError as exc:
             logger.exception("Failed to append to task queue")
+            raise TaskPersistenceError(str(exc)) from exc

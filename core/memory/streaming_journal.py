@@ -107,7 +107,12 @@ class StreamingJournal:
                 logger.warning(
                     "Orphaned journal found on open; no content recovered",
                 )
-        self._fd = open(self._journal_path, "w", encoding="utf-8")
+        try:
+            self._fd = open(self._journal_path, "w", encoding="utf-8")
+        except OSError:
+            logger.warning("Failed to open streaming journal at %s", self._journal_path, exc_info=True)
+            self._fd = None
+            return
         self._buffer = ""
         self._last_flush = time.monotonic()
         self._finalized = False
@@ -426,16 +431,19 @@ class StreamingJournal:
 
     def _write_event(self, event: dict[str, Any]) -> None:
         """Write a single JSONL event line with timestamp."""
-        if not self._fd:
+        if self._fd is None:
             return
         event.setdefault("ts", now_jst().isoformat(timespec="seconds"))
         line = json.dumps(event, ensure_ascii=False, separators=(",", ":"))
-        self._fd.write(line + "\n")
-        self._fd.flush()
         try:
-            os.fsync(self._fd.fileno())
+            self._fd.write(line + "\n")
+            self._fd.flush()
+            try:
+                os.fsync(self._fd.fileno())
+            except OSError:
+                logger.debug("fsync failed for journal", exc_info=True)
         except OSError:
-            logger.debug("fsync failed for journal", exc_info=True)
+            logger.warning("Failed to write streaming journal event", exc_info=True)
 
     def _flush_buffer(self) -> None:
         """Write buffered text as a single text event."""

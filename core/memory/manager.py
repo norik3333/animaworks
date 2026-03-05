@@ -155,7 +155,13 @@ class MemoryManager:
     # ── Read helpers ──────────────────────────────────────
 
     def _read(self, path: Path) -> str:
-        return path.read_text(encoding="utf-8") if path.exists() else ""
+        if not path.exists():
+            return ""
+        try:
+            return path.read_text(encoding="utf-8")
+        except OSError:
+            logger.warning("Failed to read %s", path, exc_info=True)
+            return ""
 
     def read_company_vision(self) -> str:
         return self._read(self.company_dir / "vision.md")
@@ -198,7 +204,11 @@ class MemoryManager:
 
         lines: list[str] = []
         for f in sorted(history_dir.glob("*.jsonl"), reverse=True)[:3]:
-            file_lines = f.read_text(encoding="utf-8").strip().splitlines()
+            try:
+                file_lines = f.read_text(encoding="utf-8").strip().splitlines()
+            except OSError:
+                logger.warning("Failed to read heartbeat history %s", f, exc_info=True)
+                continue
             lines = file_lines + lines
             if len(lines) >= limit:
                 break
@@ -267,15 +277,19 @@ class MemoryManager:
 
     def append_episode(self, entry: str, *, origin: str = "") -> None:
         path = self.episodes_dir / f"{date.today().isoformat()}.md"
-        if not path.exists():
-            path.write_text(
-                t("manager.action_log_header", date=date.today().isoformat()),
-                encoding="utf-8",
-            )
-        with open(path, "a", encoding="utf-8") as f:
-            f.write(f"\n{entry}\n")
-            f.flush()
-            os.fsync(f.fileno())
+        try:
+            if not path.exists():
+                path.write_text(
+                    t("manager.action_log_header", date=date.today().isoformat()),
+                    encoding="utf-8",
+                )
+            with open(path, "a", encoding="utf-8") as f:
+                f.write(f"\n{entry}\n")
+                f.flush()
+                os.fsync(f.fileno())
+        except OSError:
+            logger.warning("Failed to append episode to %s", path, exc_info=True)
+            return
         logger.debug("Episode appended, length=%d", len(entry))
 
         # Index the updated episode file (incremental)
@@ -306,7 +320,10 @@ class MemoryManager:
             d = today - timedelta(days=offset)
             path = self.episodes_dir / f"{d.isoformat()}.md"
             if path.exists():
-                parts.append(path.read_text(encoding="utf-8"))
+                try:
+                    parts.append(path.read_text(encoding="utf-8"))
+                except OSError:
+                    logger.warning("Failed to read episode %s", path, exc_info=True)
         return "\n\n".join(parts)
 
     # ── Backward-compatible RAG proxies ─────────────────

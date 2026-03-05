@@ -344,6 +344,37 @@ class PendingTaskExecutor:
                         )
                         failed.add(task["task_id"])
                         self._write_failed_result(task["task_id"], str(result))
+                        reply_to = task.get("reply_to")
+                        if isinstance(reply_to, dict):
+                            reply_to = reply_to.get("name")
+                        elif not isinstance(reply_to, str):
+                            reply_to = None
+                        if reply_to:
+                            try:
+                                from core.execution._sanitize import ORIGIN_ANIMA
+                                from core.i18n import t
+                                notify_text = t(
+                                    "pending_executor.task_fail_notify",
+                                    task_id=task["task_id"],
+                                    title=task.get("description", "unknown"),
+                                    error=f"Batch execution failed: {type(result).__name__}: {str(result)[:200]}",
+                                )
+                                for _attempt in range(2):
+                                    try:
+                                        self._anima.messenger.send(
+                                            to=reply_to,
+                                            content=notify_text,
+                                            origin_chain=[ORIGIN_ANIMA],
+                                        )
+                                        break
+                                    except Exception:
+                                        if _attempt > 0:
+                                            logger.error(
+                                                "[%s] Batch failure notification failed after retry to %s",
+                                                self._anima_name, reply_to, exc_info=True,
+                                            )
+                            except Exception:
+                                logger.warning("[%s] Failed to build batch failure notification", self._anima_name)
                     else:
                         completed[task["task_id"]] = result or ""
 
@@ -366,6 +397,37 @@ class PendingTaskExecutor:
                     )
                     failed.add(task["task_id"])
                     self._write_failed_result(task["task_id"], str(exc))
+                    reply_to = task.get("reply_to")
+                    if isinstance(reply_to, dict):
+                        reply_to = reply_to.get("name")
+                    elif not isinstance(reply_to, str):
+                        reply_to = None
+                    if reply_to:
+                        try:
+                            from core.execution._sanitize import ORIGIN_ANIMA
+                            from core.i18n import t
+                            notify_text = t(
+                                "pending_executor.task_fail_notify",
+                                task_id=task["task_id"],
+                                title=task.get("description", "unknown"),
+                                error=f"Batch execution failed: {type(exc).__name__}: {str(exc)[:200]}",
+                            )
+                            for _attempt in range(2):
+                                try:
+                                    self._anima.messenger.send(
+                                        to=reply_to,
+                                        content=notify_text,
+                                        origin_chain=[ORIGIN_ANIMA],
+                                    )
+                                    break
+                                except Exception:
+                                    if _attempt > 0:
+                                        logger.error(
+                                            "[%s] Batch failure notification failed after retry to %s",
+                                            self._anima_name, reply_to, exc_info=True,
+                                        )
+                        except Exception:
+                            logger.warning("[%s] Failed to build batch failure notification", self._anima_name)
 
         logger.info(
             "[%s] Batch %s complete: %d succeeded, %d failed",
@@ -534,6 +596,11 @@ class PendingTaskExecutor:
 
         # Send completion notification
         if reply_to:
+            if isinstance(reply_to, dict):
+                reply_to = reply_to.get("name")
+            elif not isinstance(reply_to, str):
+                reply_to = None
+        if reply_to:
             try:
                 notify_text = load_prompt(
                     "task_complete_notify",
@@ -542,14 +609,33 @@ class PendingTaskExecutor:
                     result_summary=result_summary[:1000],
                 )
                 from core.execution._sanitize import ORIGIN_ANIMA
-                self._anima.messenger.send(
-                    to=reply_to,
-                    content=notify_text,
-                    origin_chain=[ORIGIN_ANIMA],
-                )
+                for _attempt in range(2):
+                    try:
+                        self._anima.messenger.send(
+                            to=reply_to,
+                            content=notify_text,
+                            origin_chain=[ORIGIN_ANIMA],
+                        )
+                        break
+                    except Exception:
+                        if _attempt == 0:
+                            logger.warning(
+                                "[%s] Task completion notification failed, retrying",
+                                self._anima_name,
+                            )
+                        else:
+                            logger.error(
+                                "[%s] Task completion notification failed after retry to %s",
+                                self._anima_name, reply_to, exc_info=True,
+                            )
+                            if hasattr(self._anima, "activity_logger"):
+                                self._anima.activity_logger.log(
+                                    "error",
+                                    content=f"Task completion notification failed: {task_id} → {reply_to}",
+                                )
             except Exception:
                 logger.warning(
-                    "[%s] Failed to send task completion notification",
+                    "[%s] Failed to build task completion notification",
                     self._anima_name, exc_info=True,
                 )
 
@@ -684,13 +770,32 @@ class PendingTaskExecutor:
                         title=task_desc.get("description", "unknown"),
                         error=f"{type(exc).__name__}: {str(exc)[:200]}",
                     )
-                    self._anima.messenger.send(
-                        to=reply_to,
-                        content=notify_text,
-                        origin_chain=[ORIGIN_ANIMA],
-                    )
+                    for _attempt in range(2):
+                        try:
+                            self._anima.messenger.send(
+                                to=reply_to,
+                                content=notify_text,
+                                origin_chain=[ORIGIN_ANIMA],
+                            )
+                            break
+                        except Exception:
+                            if _attempt == 0:
+                                logger.warning(
+                                    "[%s] Task failure notification failed, retrying to %s",
+                                    self._anima_name, reply_to,
+                                )
+                            else:
+                                logger.error(
+                                    "[%s] Task failure notification failed after retry to %s",
+                                    self._anima_name, reply_to, exc_info=True,
+                                )
+                                if hasattr(self._anima, "activity_logger"):
+                                    self._anima.activity_logger.log(
+                                        "error",
+                                        content=f"Task failure notification failed: {task_id} → {reply_to}",
+                                    )
                 except Exception:
                     logger.warning(
-                        "[%s] Failed to notify task failure to %s",
-                        self._anima_name, reply_to,
+                        "[%s] Failed to build task failure notification for %s",
+                        self._anima_name, reply_to, exc_info=True,
                     )

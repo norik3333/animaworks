@@ -312,6 +312,9 @@ class SkillsToolsMixin:
             )
         except ValueError as e:
             return _error_result("InvalidArguments", str(e))
+        except Exception as e:
+            logger.error("Task persistence failed in add_task: %s", e)
+            return _error_result("PersistenceFailed", f"Failed to persist task: {e}")
 
         self._activity.log(
             "task_created",
@@ -334,7 +337,11 @@ class SkillsToolsMixin:
         if not status:
             return _error_result("InvalidArguments", "status is required")
 
-        entry = manager.update_status(task_id, status, summary=summary)
+        try:
+            entry = manager.update_status(task_id, status, summary=summary)
+        except Exception as e:
+            logger.error("Task persistence failed in update_task: %s", e)
+            return _error_result("PersistenceFailed", f"Failed to update task: {e}")
         if entry is None:
             return _error_result(
                 "TaskNotFound",
@@ -426,6 +433,7 @@ class SkillsToolsMixin:
                 "file_paths": t.get("file_paths", []),
                 "submitted_by": self._anima_name,
                 "submitted_at": now_iso,
+                "reply_to": self._anima_name,
             }
             path = pending_dir / f"{t['task_id']}.json"
             path.write_text(

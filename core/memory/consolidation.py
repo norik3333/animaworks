@@ -139,10 +139,13 @@ class ConsolidationEngine:
                 continue
 
         # Write marker
-        marker.write_text(
-            now_iso() + "\n",
-            encoding="utf-8",
-        )
+        try:
+            marker.write_text(
+                now_iso() + "\n",
+                encoding="utf-8",
+            )
+        except OSError:
+            logger.warning("Failed to write migration marker to %s", marker, exc_info=True)
         if migrated > 0:
             logger.info(
                 "Legacy knowledge migration complete for anima=%s: migrated=%d",
@@ -175,7 +178,11 @@ class ConsolidationEngine:
             episode_files = sorted(self.episodes_dir.glob(f"{target_date}*.md"))
 
             for episode_file in episode_files:
-                content = episode_file.read_text(encoding="utf-8")
+                try:
+                    content = episode_file.read_text(encoding="utf-8")
+                except OSError:
+                    logger.warning("Failed to read episode file %s", episode_file, exc_info=True)
+                    continue
 
                 # Parse episode entries (format: ## HH:MM — Title)
                 found_entries = list(re.finditer(

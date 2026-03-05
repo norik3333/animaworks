@@ -737,6 +737,9 @@ class OrgToolsMixin:
             )
         except ValueError as e:
             return _error_result("InvalidArguments", str(e))
+        except Exception as e:
+            logger.error("Task persistence failed in delegate_task (subordinate queue): %s", e)
+            return _error_result("PersistenceFailed", f"Failed to persist task to subordinate queue: {e}")
 
         # Build outgoing origin_chain (provenance Phase 3)
         outgoing_chain = build_outgoing_origin_chain(
@@ -778,25 +781,30 @@ class OrgToolsMixin:
             logger.debug("Failed to check subordinate process status for %s", target_name, exc_info=True)
 
         own_tqm = TaskQueueManager(self._anima_dir)
-        own_entry = own_tqm.add_delegated_task(
-            original_instruction=instruction,
-            assignee=target_name,
-            summary=t("handler.delegation_summary", summary=summary),
-            deadline=deadline,
-            relay_chain=[self._anima_name, target_name],
-            meta={
-                "delegated_to": target_name,
-                "delegated_task_id": sub_entry.task_id,
-            },
-        )
+        try:
+            own_entry = own_tqm.add_delegated_task(
+                original_instruction=instruction,
+                assignee=target_name,
+                summary=t("handler.delegation_summary", summary=summary),
+                deadline=deadline,
+                relay_chain=[self._anima_name, target_name],
+                meta={
+                    "delegated_to": target_name,
+                    "delegated_task_id": sub_entry.task_id,
+                },
+            )
+        except Exception as e:
+            logger.warning("Failed to persist tracking entry for delegate_task (DM already sent): %s", e)
+            own_entry = None
 
+        own_id = own_entry.task_id if own_entry else "persist_failed"
         self._activity.log(
             "tool_use",
             tool="delegate_task",
             summary=t("handler.delegate_log", target_name=target_name, summary=summary[:80]),
             meta={
                 "target": target_name,
-                "own_task_id": own_entry.task_id,
+                "own_task_id": own_id,
                 "sub_task_id": sub_entry.task_id,
             },
         )
@@ -805,7 +813,7 @@ class OrgToolsMixin:
             "handler.delegated_success",
             target_name=target_name,
             sub_id=sub_entry.task_id,
-            own_id=own_entry.task_id,
+            own_id=own_id,
             dm_result=dm_result,
         )
         return result + process_warning

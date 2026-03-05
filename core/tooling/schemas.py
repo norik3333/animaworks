@@ -1222,7 +1222,7 @@ TASK_TOOLS: list[dict[str, Any]] = [
                 },
                 "status": {
                     "type": "string",
-                    "enum": ["pending", "in_progress", "done", "cancelled", "blocked"],
+                    "enum": ["pending", "in_progress", "done", "cancelled", "blocked", "failed"],
                     "description": "新しいステータス",
                 },
                 "summary": {
@@ -1244,7 +1244,7 @@ TASK_TOOLS: list[dict[str, Any]] = [
             "properties": {
                 "status": {
                     "type": "string",
-                    "enum": ["pending", "in_progress", "done", "cancelled", "blocked"],
+                    "enum": ["pending", "in_progress", "done", "cancelled", "blocked", "failed"],
                     "description": "フィルタするステータス（省略時は全件）",
                 },
             },
