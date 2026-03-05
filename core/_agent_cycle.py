@@ -680,10 +680,15 @@ class CycleMixin:
                             _stream_force_chain = True
                         stream_succeeded = True
                     elif chunk["type"] == "tool_end" and checkpoint_enabled:
+                        record = chunk.get("record")
+                        summary = (
+                            (record.result_summary if record else "")
+                            or chunk.get("tool_name", "unknown")
+                        )
                         completed_tools.append({
                             "tool_name": chunk.get("tool_name", ""),
                             "tool_id": chunk.get("tool_id", ""),
-                            "summary": chunk.get("tool_name", ""),
+                            "summary": summary,
                         })
                         # Save checkpoint after each tool completion
                         from core.memory.shortterm import StreamCheckpoint
