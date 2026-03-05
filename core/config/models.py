@@ -1334,12 +1334,16 @@ def rename_anima_in_config(
             anima_cfg.supervisor = new_name
             supervisor_count += 1
 
-    # 3. Update external_messaging anima_mapping values
+    # 3. Update external_messaging: anima_mapping, app_id_mapping, default_anima
     for channel_cfg in (config.external_messaging.slack,
                         config.external_messaging.chatwork):
-        for channel_id, mapped_name in list(channel_cfg.anima_mapping.items()):
-            if mapped_name == old_name:
-                channel_cfg.anima_mapping[channel_id] = new_name
+        for mapping_attr in ("anima_mapping", "app_id_mapping"):
+            mapping = getattr(channel_cfg, mapping_attr, {})
+            for key, mapped_name in list(mapping.items()):
+                if mapped_name == old_name:
+                    mapping[key] = new_name
+        if channel_cfg.default_anima == old_name:
+            channel_cfg.default_anima = new_name
 
     save_config(config, config_path)
     logger.debug(

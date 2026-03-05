@@ -124,6 +124,42 @@ class TestRenameAnimaInConfig:
         cw_mapping = raw["external_messaging"]["chatwork"]["anima_mapping"]
         assert cw_mapping["R789"] == "hinata"
 
+    def test_app_id_mapping_updated(self, tmp_path: Path) -> None:
+        """external_messaging.app_id_mapping values are updated."""
+        data_dir = _setup_data_dir(tmp_path)
+        config = AnimaWorksConfig()
+        config.animas["sakura"] = AnimaModelConfig()
+        config.external_messaging = ExternalMessagingConfig(
+            slack=ExternalMessagingChannelConfig(
+                app_id_mapping={"A111": "sakura", "A222": "mei"}
+            ),
+        )
+        save_config(config, data_dir / "config.json")
+
+        rename_anima_in_config(data_dir, "sakura", "hinata")
+
+        raw = json.loads((data_dir / "config.json").read_text(encoding="utf-8"))
+        app_mapping = raw["external_messaging"]["slack"]["app_id_mapping"]
+        assert app_mapping["A111"] == "hinata"
+        assert app_mapping["A222"] == "mei"
+
+    def test_default_anima_updated(self, tmp_path: Path) -> None:
+        """external_messaging default_anima is updated."""
+        data_dir = _setup_data_dir(tmp_path)
+        config = AnimaWorksConfig()
+        config.animas["sakura"] = AnimaModelConfig()
+        config.external_messaging = ExternalMessagingConfig(
+            slack=ExternalMessagingChannelConfig(default_anima="sakura"),
+            chatwork=ExternalMessagingChannelConfig(default_anima="mei"),
+        )
+        save_config(config, data_dir / "config.json")
+
+        rename_anima_in_config(data_dir, "sakura", "hinata")
+
+        raw = json.loads((data_dir / "config.json").read_text(encoding="utf-8"))
+        assert raw["external_messaging"]["slack"]["default_anima"] == "hinata"
+        assert raw["external_messaging"]["chatwork"]["default_anima"] == "mei"
+
     def test_nonexistent_anima_raises(self, tmp_path: Path) -> None:
         """KeyError for non-existent anima name."""
         data_dir = _setup_data_dir(tmp_path)
