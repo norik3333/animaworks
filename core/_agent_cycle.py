@@ -147,7 +147,7 @@ class CycleMixin:
 
         # ── Priming: Automatic memory retrieval ────────────────
         overflow_files = self._compute_overflow_files()
-        priming_section = await self._run_priming(
+        priming_section, pending_human_notifications = await self._run_priming(
             prompt,
             trigger,
             message_intent=message_intent,
@@ -172,6 +172,7 @@ class CycleMixin:
             retriever=self._get_retriever(),
             trigger=trigger,
             context_window=_ctx_window,
+            pending_human_notifications=pending_human_notifications,
         )
         system_prompt = build_result.system_prompt
         injected_procedures = build_result.injected_procedures
@@ -581,7 +582,7 @@ class CycleMixin:
 
         # ── Streaming executor (S / A / all modes) ───────────────
         overflow_files = self._compute_overflow_files()
-        priming_section = await self._run_priming(
+        priming_section, pending_human_notifications = await self._run_priming(
             prompt,
             trigger,
             message_intent=message_intent,
@@ -606,6 +607,7 @@ class CycleMixin:
             retriever=self._get_retriever(),
             trigger=trigger,
             context_window=_ctx_window_s,
+            pending_human_notifications=pending_human_notifications,
         )
         system_prompt = build_result.system_prompt
 

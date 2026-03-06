@@ -78,6 +78,7 @@ class PrimingResult:
     pending_tasks: str = ""
     recent_outbound: str = ""
     episodes: str = ""
+    pending_human_notifications: str = ""
 
     def is_empty(self) -> bool:
         """Return True if no memories were primed."""
@@ -90,6 +91,7 @@ class PrimingResult:
             and not self.pending_tasks
             and not self.recent_outbound
             and not self.episodes
+            and not self.pending_human_notifications
         )
 
     def total_chars(self) -> int:
@@ -103,6 +105,7 @@ class PrimingResult:
             + len(self.pending_tasks)
             + len(self.recent_outbound)
             + len(self.episodes)
+            + len(self.pending_human_notifications)
         )
 
     def estimated_tokens(self) -> int:
@@ -213,7 +216,7 @@ class PrimingEngine:
 
             channel_c_coro = _noop()
 
-        # Execute 6 channels + outbound collection in parallel
+        # Execute 6 channels + outbound + human notifications in parallel
         results = await asyncio.gather(
             self._channel_a_sender_profile(sender_name),
             self._channel_b_recent_activity(sender_name, keywords, channel=channel),
@@ -222,6 +225,7 @@ class PrimingEngine:
             self._channel_e_pending_tasks(),
             self._collect_recent_outbound(),
             self._channel_f_episodes(keywords, message=message),
+            self._collect_pending_human_notifications(channel=channel),
             return_exceptions=True,
         )
 
@@ -240,6 +244,7 @@ class PrimingEngine:
         pending_tasks = results[4] if isinstance(results[4], str) else ""
         recent_outbound = results[5] if isinstance(results[5], str) else ""
         episodes = results[6] if isinstance(results[6], str) else ""
+        pending_human_notifications = results[7] if isinstance(results[7], str) else ""
 
         # Log exceptions if any
         for i, r in enumerate(results):
@@ -277,6 +282,7 @@ class PrimingEngine:
             pending_tasks=self._truncate_head(pending_tasks, budget_tasks),
             recent_outbound=recent_outbound,
             episodes=self._truncate_tail(episodes, budget_episodes),
+            pending_human_notifications=pending_human_notifications,
         )
 
         logger.info(
@@ -1178,6 +1184,46 @@ class PrimingEngine:
                 lines.append(t("priming.outbound_sent", time_str=time_str, to=to, text_preview=text_preview))
         lines.append("")
         return "\n".join(lines)
+
+    # ── Pending human notifications ─────────────────────────────
+
+    _HUMAN_NOTIFY_BUDGET_TOKENS = 500
+
+    async def _collect_pending_human_notifications(self, *, channel: str = "") -> str:
+        """Collect recent call_human notifications for context injection.
+
+        Returns formatted string of human_notify entries from last 24 hours.
+        Only active for chat, heartbeat, and message: sessions.
+        """
+        if channel not in ("chat", "heartbeat") and not channel.startswith("message:"):
+            return ""
+
+        from core.memory.activity import ActivityLogger
+
+        activity = ActivityLogger(self.anima_dir)
+        entries = activity.recent(days=1, limit=10, types=["human_notify"])
+        if not entries:
+            return ""
+
+        lines: list[str] = []
+        budget_chars = self._HUMAN_NOTIFY_BUDGET_TOKENS * _CHARS_PER_TOKEN
+        total = 0
+        for entry in reversed(entries):
+            ts = entry.ts[:16]
+            body = entry.content or entry.summary or ""
+            via = entry.via or ""
+            line = f"[{ts}] call_human (via {via}):\n{body}"
+            if total + len(line) > budget_chars:
+                break
+            lines.append(line)
+            total += len(line)
+
+        if not lines:
+            return ""
+
+        lines.reverse()
+        header = "## Pending Human Notifications (last 24h)"
+        return header + "\n\n" + "\n\n".join(lines)
 
     # ── Config loading ──────────────────────────────────────────
 

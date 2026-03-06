@@ -43,7 +43,7 @@ class PrimingMixin:
         message_intent: str = "",
         overflow_files: list[str] | None = None,
         prompt_tier: str = "full",
-    ) -> str:
+    ) -> tuple[str, str]:
         """Run priming layer to automatically retrieve relevant memories.
 
         Args:
@@ -56,14 +56,14 @@ class PrimingMixin:
                 ("full"/"standard"/"light"/"minimal").
 
         Returns:
-            Formatted priming section for system prompt injection, or empty string.
+            Tuple of (priming_section, pending_human_notifications).
         """
         from core.memory.priming import PrimingEngine, format_priming_section
         from core.prompt.builder import TIER_LIGHT, TIER_MINIMAL, TIER_STANDARD
 
         if prompt_tier == TIER_MINIMAL:
             logger.debug("Priming: skipped (tier=minimal)")
-            return ""
+            return ("", "")
 
         sender_name = "human"
         if trigger.startswith("message:"):
@@ -99,16 +99,19 @@ class PrimingMixin:
                 enable_dynamic_budget=True,
             )
 
+            pending_notifications = result.pending_human_notifications
+
             if result.is_empty():
                 logger.debug("Priming: No memories found")
-                return ""
+                return ("", pending_notifications)
 
             # T3 Light: sender_profile only
             if prompt_tier == TIER_LIGHT:
                 if result.sender_profile:
                     logger.info("Priming: tier=light, returning sender_profile only")
-                    return t("agent.priming_tier_light_header", sender_name=sender_name) + result.sender_profile
-                return ""
+                    section = t("agent.priming_tier_light_header", sender_name=sender_name) + result.sender_profile
+                    return (section, pending_notifications)
+                return ("", pending_notifications)
 
             formatted = format_priming_section(result, sender_name)
             logger.info(
@@ -121,11 +124,11 @@ class PrimingMixin:
             if prompt_tier == TIER_STANDARD and len(formatted) > 4000:
                 formatted = formatted[:4000] + t("agent.omitted_rest")
 
-            return formatted
+            return (formatted, pending_notifications)
 
         except Exception:
             logger.exception("Priming failed; continuing without primed memories")
-            return ""
+            return ("", "")
 
     def _extract_message_from_prompt(self, prompt: str) -> str:
         """Extract the latest message content from a chat prompt.

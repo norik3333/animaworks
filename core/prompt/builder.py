@@ -606,6 +606,7 @@ def build_system_prompt(
     trigger: str = "",
     context_window: int = 200_000,
     system_budget: int | None = None,
+    pending_human_notifications: str = "",
 ) -> BuildResult:
     """Construct the full system prompt from Markdown files.
 
@@ -791,6 +792,10 @@ def build_system_prompt(
     # Priming: skip for task
     if not is_task and priming_section:
         _add(priming_section, "priming", 2, "elastic")
+
+    # Pending human notifications: chat and heartbeat only
+    if pending_human_notifications and (is_chat or is_heartbeat):
+        _add(pending_human_notifications, "pending_human_notifications", 3, "elastic")
 
     # Recent tool results: only for chat
     if is_chat:

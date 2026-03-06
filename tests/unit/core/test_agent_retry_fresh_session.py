@@ -76,7 +76,7 @@ def _common_patches(*, spy_clear=None, retry_max=2):
         patch("core._agent_cycle.load_prompt", return_value="sys_prompt"),
         patch("core._agent_cycle._save_prompt_log"),
         patch("core.execution._sdk_session._clear_session_id", side_effect=clear_side_effect),
-        patch("core.agent.AgentCore._run_priming", new_callable=AsyncMock),
+        patch("core.agent.AgentCore._run_priming", new_callable=AsyncMock, return_value=("", "")),
         patch("core.agent.AgentCore._compute_overflow_files", return_value=[]),
     ]
 
@@ -141,7 +141,7 @@ class TestRetryFreshSession:
                 "retry_max": 2,
                 "retry_delay_s": 0.0,
             }
-            mock_priming.return_value = ""
+            mock_priming.return_value = ("", "")
 
             events = []
             async for event in agent.run_cycle_streaming(
@@ -198,7 +198,7 @@ class TestRetryFreshSession:
                 "retry_max": 2,
                 "retry_delay_s": 0.0,
             }
-            mock_priming.return_value = ""
+            mock_priming.return_value = ("", "")
 
             events = []
             async for event in agent.run_cycle_streaming(
@@ -264,7 +264,7 @@ class TestRetryFreshSession:
                 "retry_max": 3,
                 "retry_delay_s": 0.0,
             }
-            mock_priming.return_value = ""
+            mock_priming.return_value = ("", "")
 
             events = []
             async for event in agent.run_cycle_streaming(
@@ -317,7 +317,7 @@ class TestRetryExhausted:
                 "retry_max": 1,
                 "retry_delay_s": 0.0,
             }
-            mock_priming.return_value = ""
+            mock_priming.return_value = ("", "")
 
             events = []
             async for event in agent.run_cycle_streaming(

@@ -60,7 +60,7 @@ def _make_priming_result(*, sender_profile: str = "", recent_activity: str = "")
 
 
 class TestPrimingTierMinimal:
-    """T4 (< 16k): _run_priming must return '' without calling prime_memories."""
+    """T4 (< 16k): _run_priming must return ('', '') without calling prime_memories."""
 
     @pytest.mark.asyncio
     async def test_minimal_returns_empty(self, tmp_path):
@@ -69,7 +69,7 @@ class TestPrimingTierMinimal:
             "hello", "message:human",
             prompt_tier=TIER_MINIMAL,
         )
-        assert result == ""
+        assert result == ("", "")
 
     @pytest.mark.asyncio
     async def test_minimal_does_not_call_priming_engine(self, tmp_path):
@@ -100,14 +100,14 @@ class TestPrimingTierLight:
         mock_engine.prime_memories = AsyncMock(return_value=priming_result)
         agent._priming_engine = mock_engine
 
-        result = await agent._run_priming(
+        section, notifications = await agent._run_priming(
             "hello", "message:yamada",
             prompt_tier=TIER_LIGHT,
         )
 
-        assert "This is sender info" in result
-        assert "yamada" in result
-        assert "Recent activity" not in result
+        assert "This is sender info" in section
+        assert "yamada" in section
+        assert "Recent activity" not in section
 
     @pytest.mark.asyncio
     async def test_light_empty_profile_returns_empty(self, tmp_path):
@@ -121,12 +121,12 @@ class TestPrimingTierLight:
         mock_engine.prime_memories = AsyncMock(return_value=priming_result)
         agent._priming_engine = mock_engine
 
-        result = await agent._run_priming(
+        section, notifications = await agent._run_priming(
             "hello", "message:human",
             prompt_tier=TIER_LIGHT,
         )
 
-        assert result == ""
+        assert section == ""
 
 
 # ── T2 Standard: truncation to 4000 chars ─────────────────
@@ -147,13 +147,13 @@ class TestPrimingTierStandard:
         mock_engine.prime_memories = AsyncMock(return_value=priming_result)
         agent._priming_engine = mock_engine
 
-        result = await agent._run_priming(
+        section, notifications = await agent._run_priming(
             "hello", "message:human",
             prompt_tier=TIER_STANDARD,
         )
 
-        assert len(result) <= 4000 + len("\n\n（以降省略）")
-        assert "（以降省略）" in result
+        assert len(section) <= 4000 + len("\n\n（以降省略）")
+        assert "（以降省略）" in section
 
     @pytest.mark.asyncio
     async def test_standard_short_priming_not_truncated(self, tmp_path):
@@ -166,13 +166,13 @@ class TestPrimingTierStandard:
         mock_engine.prime_memories = AsyncMock(return_value=priming_result)
         agent._priming_engine = mock_engine
 
-        result = await agent._run_priming(
+        section, notifications = await agent._run_priming(
             "hello", "message:human",
             prompt_tier=TIER_STANDARD,
         )
 
-        assert "（以降省略）" not in result
-        assert "short profile" in result
+        assert "（以降省略）" not in section
+        assert "short profile" in section
 
 
 # ── T1 Full: no change to existing behaviour ──────────────
@@ -193,11 +193,11 @@ class TestPrimingTierFull:
         mock_engine.prime_memories = AsyncMock(return_value=priming_result)
         agent._priming_engine = mock_engine
 
-        result = await agent._run_priming(
+        section, notifications = await agent._run_priming(
             "hello", "message:human",
             prompt_tier=TIER_FULL,
         )
 
-        assert "（以降省略）" not in result
-        assert "x" * 100 in result
-        assert "y" * 100 in result
+        assert "（以降省略）" not in section
+        assert "x" * 100 in section
+        assert "y" * 100 in section

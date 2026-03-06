@@ -468,7 +468,7 @@ class ToolHandler(
                 )
             elif name == "call_human":
                 self._activity.log(
-                    activity_type, content=args.get("body", "")[:200], via="configured_channels", meta=meta or None
+                    activity_type, content=args.get("body", "")[:1000], via="configured_channels", meta=meta or None
                 )
         except Exception as e:
             logger.warning("Activity logging failed for tool '%s': %s", name, e)
