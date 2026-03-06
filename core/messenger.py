@@ -6,9 +6,11 @@ from __future__ import annotations
 #
 # This file is part of AnimaWorks core/server, licensed under Apache-2.0.
 # See LICENSE for the full license text.
+import collections
 import json
 import logging
 import re
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -24,6 +26,24 @@ from core.time_utils import now_iso
 logger = logging.getLogger("animaworks.messenger")
 
 _SAFE_NAME_RE = re.compile(r"^[a-z][a-z0-9_-]{0,30}$")
+
+# ── External message dedup (source_message_id) ──────────
+_EXTERNAL_DEDUP_TTL = 30  # seconds
+_external_seen: collections.OrderedDict[str, float] = collections.OrderedDict()
+
+
+def _is_duplicate_external(source: str, source_message_id: str) -> bool:
+    """Return True if this external message was already delivered recently."""
+    if not source_message_id:
+        return False
+    key = f"{source}:{source_message_id}"
+    now = time.monotonic()
+    while _external_seen and next(iter(_external_seen.values())) < now - _EXTERNAL_DEDUP_TTL:
+        _external_seen.popitem(last=False)
+    if key in _external_seen:
+        return True
+    _external_seen[key] = now
+    return False
 
 
 def _validate_name(name: str, kind: str = "name") -> None:
@@ -625,12 +645,22 @@ class Messenger:
         external_channel_id: str = "",
         external_thread_ts: str = "",
         intent: str = "",
-    ) -> Message:
+    ) -> Message | None:
         """Receive a message from an external platform and place it in inbox.
 
         Creates a Message with external source metadata and writes it to the
-        anima's inbox directory.
+        anima's inbox directory.  Returns ``None`` if the message was already
+        delivered (dedup by *source_message_id*).
         """
+        if _is_duplicate_external(source, source_message_id):
+            logger.debug(
+                "Duplicate external message ignored: source=%s id=%s -> %s",
+                source,
+                source_message_id,
+                self.anima_name,
+            )
+            return None  # type: ignore[return-value]
+
         from core.execution._sanitize import ORIGIN_EXTERNAL_PLATFORM
 
         msg = Message(

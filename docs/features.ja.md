@@ -2,629 +2,158 @@
 
 **[English version](features.md)**
 
-> 最終更新: 2026-03-05
-> 関連: [spec.md](spec.md), [memory.ja.md](memory.ja.md), [vision.ja.md](vision.ja.md), [brain-mapping.ja.md](brain-mapping.ja.md)
+> 最終更新: 2026-03-06
+> 関連: [spec.ja.md](spec.ja.md), [memory.ja.md](memory.ja.md), [security.ja.md](security.ja.md), [vision.ja.md](vision.ja.md), [brain-mapping.ja.md](brain-mapping.ja.md)
 
-AnimaWorksフレームワークの実装済み機能を21カテゴリに分類した索引。各エントリの「設計」リンクは設計・実装文書、「Review」リンクはコードレビューレポートを参照する。
+AnimaWorksは、AIエージェントを「自律的な人」として扱うフレームワークである。各Animaは固有のアイデンティティ・記憶・判断基準を持ち、ハートビートやcronで人間の指示なしに行動する。組織として階層を定義し、タスクを委譲し、メッセージで協働する。脳科学に基づく記憶システムにより、限られたコンテキストウィンドウでも経験を蓄え、学び、成長できる。
 
----
-
-## 1. コアアーキテクチャ
-
-agent.pyリファクタリング、階層設計、プロセス隔離、リネーム等のフレームワーク基盤変更。
-
-- **agent.py リファクタリング計画書** (2026-02-14) — エージェントコアの責務分離とクラス設計の見直し
-  [設計](implemented/20260214_agent-refactoring_implementation.md)
-- **設計書と実装の差異ノート** (2026-02-14) — 原案設計書と実装コードの乖離を特定・修正
-  [設計](implemented/20260214_design-implementation-gap_issue.md)
-- **動的システムプロンプト注入アーキテクチャ** (2026-02-14) — 18セクション構成のシステムプロンプト動的構築
-  [設計](implemented/20260214_dynamic-prompt-injection_implementation.md)
-- **階層構造・非同期通信・マルチモデル設計書** (2026-02-14) — supervisor階層、A1/A2/Bモード、マルチプロバイダ設計
-  [設計](implemented/20260214_hierarchy-and-delegation_design.md)
-- **設計書準拠 修正計画ノート** (2026-02-14) — 設計書と実装のギャップを埋める修正計画
-  [設計](implemented/20260214_plan-gap-fix_implementation.md)
-- **API Critical Refactoring — スケーリング対応** (2026-02-15) — FastAPIルート分割とスケーリング基盤整備
-  [設計](implemented/20260215_api-critical-refactoring-for-scaling_implemented-20260215.md) | [Review](implemented/20260215_review_api-critical-refactoring-for-scaling_approved-20260215.md)
-- **システムリファレンスドキュメント作成** (2026-02-15) — Animaが自律参照できる共有知識ベース
-  [設計](implemented/20260215_system-reference-documents_implemented-20260215.md)
-- **Person ライフサイクル CLI コマンド統合** (2026-02-16) — CLIコマンド体系のAnima対応整理
-  [設計](implemented/20260216_person-lifecycle-cli-commands-20260217.md) | [Review](implemented/20260217_review_person-lifecycle-cli-commands_approved-20260217.md)
-- **Anima → Anima 全面リネーム** (2026-02-16) — Person→Animaへの全コードベースリネーム
-  [設計](implemented/20260216_rename-person-to-anima_implemented-20260216.md) | [Review](implemented/20260216_review_rename-person-to-anima_approved-20260216.md)
-- **ドキュメント全面改訂** (2026-02-17) — CLAUDE.md・README・specを現行コードベースに同期
-  [設計](implemented/20260217_documentation-overhaul-implemented-20260217.md) | [Review](implemented/20260217_review_documentation-overhaul_approved-20260217.md)
+本ドキュメントでは、AnimaWorksが提供する主要機能をカテゴリ別に紹介する。技術仕様の詳細は [spec.ja.md](spec.ja.md) を、設計思想は [vision.ja.md](vision.ja.md) を参照のこと。記憶システムの設計は [memory.ja.md](memory.ja.md)、脳との対応関係は [brain-mapping.ja.md](brain-mapping.ja.md)、セキュリティモデルは [security.ja.md](security.ja.md) に詳述する。
 
 ---
 
-## 2. 実行エンジン
+## 1. 自律エージェント基盤
 
-S/A/B/C各モード改善、Agent SDKクラッシュリカバリー、SSE改善等。Mode C (Codex) はCodex CLI経由でOpenAIモデルを実行。
+各Animaは固有のアイデンティティ（`identity.md`）・役割（`injection.md`）・人格を持つ。人間の指示を待たず、自ら計画し行動する。
 
-- **A2エージェンティックループの高度化** (2026-02-15) — LiteLLM + tool_useループの信頼性・機能向上
-  [設計](implemented/20260215_a2-agentic-loop-enhancement_implemented-20260215.md) | [Review](implemented/20260215_review_a2-agentic-loop-enhancement_approved-20260215.md)
-- **エラー時の会話データ消失問題** (2026-02-15) — 実行エラー発生時のコンテキスト保全
-  [設計](implemented/20260215_error-conversation-data-loss_implemented-20260215.md) | [Review](implemented/20260215_review_error-conversation-data-loss_approved-20260215.md)
-- **ストリーム切断時のチェックポイントリトライ機構** (2026-02-16) — SSEストリーム切断時の自動復旧
-  [設計](implemented/20260216_checkpoint-retry-on-stream-disconnect-implemented-20260216.md) | [Review](implemented/20260216_review_checkpoint-retry-on-stream-disconnect_approved-20260216.md)
-- **Mode A1 で create_anima ツールが利用不可** (2026-02-16) — Agent SDKモードでのAnima雇用連鎖障害修正
-  [設計](implemented/20260216_mode-a1-create-anima-unavailable.md) | [Review](implemented/20260216_review_mode-a1-create-anima-unavailable_approved.md)
-- **SSEストリームがアニマ再起動後に空応答を返す** (2026-02-16) — プロセス再起動後のSSEストリーム復旧
-  [設計](implemented/20260216_sse-stream-empty-after-anima-restart_implemented-20260216.md) | [Review](implemented/20260216_review_sse-stream-empty-after-anima-restart_approved-20260216.md)
-- **uvicornタイムアウト設定不備とAgent SDK hookレースコンディション** (2026-02-16) — サーバー初期化の安定性向上
-  [設計](implemented/20260216_uvicorn-timeout-and-agent-sdk-hook-errors_implemented-20260216.md) | [Review](implemented/20260216_review_uvicorn-timeout-and-agent-sdk-hook-errors_approved-20260216.md)
-- **Agent SDKクラッシュ時のプロセス自動復旧** (2026-02-17) — クラッシュ検知・自動再起動メカニズム
-  [設計](implemented/20260217_agent-sdk-crash-recovery_implemented-20260217.md) | [Review](implemented/20260217_review_agent-sdk-crash-recovery_approved-20260217.md)
-- **Mode B: テキストベース擬似ツールコールループ** (2026-02-17) — tool_use非対応モデル向けのテキストベースツール実行
-  [設計](implemented/20260217_mode-b-text-based-tool-loop_implemented-20260217.md) | [Review](implemented/20260217_review_mode-b-text-based-tool-loop_approved-20260217.md)
-- **SSE チャットストリーミング 3重複コードの統合** (2026-02-17) — SSEストリーミングコードのDRY化
-  [設計](implemented/20260217_sse-chat-code-deduplication_implemented-20260217.md) | [Review](implemented/20260217_review_sse-chat-code-deduplication_approved-20260217.md)
+- **ハートビート**: 30分周期の定期巡回。Observe → Plan → Reflect の3フェーズで状況を把握し、計画を立て、振り返る。Heartbeatは計画のみを行い、実行が必要なタスクは `state/pending/` に書き出す。TaskExecパスがこれを検出し、独立したLLMセッションで実行する。活動時間は `heartbeat.md` で `HH:MM - HH:MM` 指定可能である（デフォルト24時間）。
+- **cron**: 定時タスク。Markdown + YAML形式でスケジュールを定義し、LLM型（判断を伴う）とCommand型（確定的実行）の両方をサポートする。標準5フィールドcron式（Asia/Tokyo固定）。`trigger_heartbeat` フラグで実行後の分析スキップを制御できる。
+- **ブートストラップ**: 初回起動時に自己紹介・環境把握を自動実行する。新規Animaの「誕生」を確実に完了させる。バックグラウンド実行とタイムアウト制御により、起動ブロックを防ぐ。
 
 ---
 
-## 3. 記憶システム
+## 2. 脳科学に基づく記憶システム
 
-Priming、RAG、記憶統合/忘却、アクティビティログ、ストリーミングジャーナル等。
+AnimaWorksの記憶システムは人間の脳のメカニズムを設計パターンとして採用する。詳細は [memory.ja.md](memory.ja.md) と [brain-mapping.ja.md](brain-mapping.ja.md) を参照。
 
-- **プライミングレイヤー実装計画書** (2026-02-14) — RAG設計、固定化アーキテクチャを含む全体計画
-  [設計](implemented/20260214_priming-layer_design.md)
-- **プライミングレイヤー Phase 1 実装完了** (2026-02-14) — 4チャネル並列プライミングの初期実装
-  [設計](implemented/20260214_priming-layer-phase1_implementation.md)
-- **プライミングレイヤー Phase 2: 日次固定化** (2026-02-14) — NREM睡眠アナログの日次記憶固定化
-  [設計](implemented/20260214_priming-layer-phase2-consolidation_implementation.md)
-- **記憶パフォーマンス評価 Phase 2: データセット生成** (2026-02-14) — 記憶検索精度評価用データセットの自動生成
-  [設計](implemented/20260214_memory-eval-phase2_dataset-generation.md)
-- **common_knowledge RAGインフラ整備** (2026-02-15) — 共有知識ベースのベクトル検索対応
-  [設計](implemented/20260215_common-knowledge-rag-infrastructure-implemented-20260215.md) | [Review](implemented/20260215_common-knowledge-rag-infrastructure_review-approved-20260215.md)
-- **記憶の活性化強度と能動的忘却メカニズム** (2026-02-15) — ヘブ則LTP + 3段階忘却の実装
-  [設計](implemented/20260215_memory-access-frequency-and-forgetting-implemented-20260215.md) | [Review](implemented/20260215_review_memory-access-frequency-and-forgetting_approved-20260215.md)
-- **記憶検索の神経科学的拡張 — 3つの改善提案** (2026-02-15) — 拡散活性化・時間減衰・アクセス頻度の改善
-  [設計](implemented/20260215_memory-retrieval-neuroscience-enhancements.md)
-- **プライミング導入後のhiring_context修正** (2026-02-15) — プライミングと雇用コンテキストの競合解消
-  [設計](implemented/20260215_priming-hiring-context-fix.md) | [Review](implemented/20260215_review_priming-hiring-context-fix_approved.md)
-- **RAG: Embedding Model の多重初期化によるパフォーマンス劣化** (2026-02-15) — シングルトン化による起動時間短縮
-  [設計](implemented/20260215_rag-embedding-model-multi-init_implemented-20260215.md)
-- **Dense Vector単独検索への移行 + 知識グラフ完全実装** (2026-02-15) — BM25廃止、密ベクトル検索一本化 + NetworkX PageRank
-  [設計](implemented/20260215_simplify-rag-to-dense-vector-only_implemented-20260215.md) | [Review](implemented/20260215_review_simplify-rag-to-dense-vector-only_approved-20260215.md)
-- **_chunk_by_markdown_headings のチャンクID衝突バグ** (2026-02-16) — preambleセクションのID重複修正
-  [設計](implemented/20260216_chunk-id-preamble-collision-20260216.md) | [Review](implemented/20260216_review_chunk-id-preamble-collision_approved-20260216.md)
-- **統合プロンプトの改善とLLMレスポンスのログ追加** (2026-02-16) — 記憶統合品質向上とデバッグ支援
-  [設計](implemented/20260216_consolidation-prompt-and-logging-improvement-20260216.md)
-- **RAG インデクサーのチャンクID重複バグ & shared_common_knowledge 初期化欠落** (2026-02-16) — RAGインデックスのパスバグ修正
-  [設計](implemented/20260216_rag-indexer-path-bug-and-shared-knowledge-init-20260216.md) | [Review](implemented/20260216_review_rag-indexer-path-bug-and-shared-knowledge-init_approved-20260216.md)
-- **Anima間メッセージがエピソード記憶に記録されない** (2026-02-17) — DM/チャネルメッセージの記憶記録漏れ修正
-  [設計](implemented/20260217_anima-message-episode-recording_implemented-20260217.md) | [Review](implemented/20260217_review_anima-message-episode-recording_approved-20260217.md)
-- **日次統合エンジンがサフィックス付きエピソードファイルを無視する** (2026-02-17) — ファイル名パターンマッチの修正
-  [設計](implemented/20260217_consolidation-episode-filename-pattern_implemented-20260217.md)
-- **記憶統合が停止中のAnimaに対して実行されない** (2026-02-17) — 全初期化済みAnimaへの統合実行保証
-  [設計](implemented/20260217_consolidation-run-for-all-animas_implemented-20260217.md) | [Review](implemented/20260217_review_consolidation-run-for-all-animas_approved-20260217.md)
-- **埋め込みモデル比較テスト結果** (2026-02-17) — multilingual-e5-small vs 他モデルの精度比較
-  [設計](implemented/20260217_embedding-model-comparison.md)
-- **write_memory_file ツールに episodes/ パス検証を追加** (2026-02-17) — 不正パスへの記憶書き込み防止
-  [設計](implemented/20260217_write-memory-file-episode-path-validation_implemented-20260217.md)
-- **Unified Activity Log: 仕様準拠修正（6項目）** (2026-02-18) — アクティビティログの仕様準拠性向上
-  [設計](implemented/20260218_activity-log-spec-compliance-fixes-implemented-20260218.md) | [Review](implemented/20260218_review_activity-log-spec-compliance_approved-20260218.md)
-- **ストリーミングジャーナル — クラッシュ耐性のある応答出力永続化** (2026-02-18) — WALによるストリーミング出力の耐障害性
-  [設計](implemented/20260218_streaming-journal-implemented-20260218.md) | [Review](implemented/20260218_review_streaming-journal_approved-20260218.md)
-- **統一アクティビティログ — 全インタラクションの単一時系列記録化** (2026-02-18) — transcript/dm_log/heartbeat_historyの統合
-  [設計](implemented/20260218_unified-activity-log-implemented-20260218.md) | [Review](implemented/20260218_review_unified-activity-log_approved-20260218.md)
+- **RAG（検索拡張生成）**: ChromaDB + multilingual-e5-small（384次元）によるベクトル検索。NetworkX を用いたグラフベース拡散活性化（Personalized PageRank）で関連記憶を活性化する。チャンキングは Markdown セクション、時系列エピソード、全ファイルに対応する。
+- **プライミング（自動想起）**: メッセージ受信時に6チャネル並列で関連記憶を自動検索し、システムプロンプトに注入する。送信者プロファイル、直近活動、関連知識、スキルマッチ、未完了タスク、エピソードを対象とする。バジェットは動的調整可能である。
+- **記憶統合（Consolidation）**: 日次でエピソード→知識への昇華、失敗からの手続き記憶自動生成を行う。
+- **能動的忘却（Forgetting）**: シナプスホメオスタシス仮説に基づく3段階忘却。ダウンスケーリング→再編→完全忘却で、使われない記憶を整理する。procedures、skills、shared_users は保護対象である。
+- **統一アクティビティログ**: 全インタラクション（メッセージ受送信、ツール使用、heartbeat、cron、人間通知等）を `activity_log/{date}.jsonl` に単一時系列で記録する。Priming の直近活動チャネルと会話履歴APIのソースとなる。
+- **ストリーミングジャーナル**: WAL（Write-Ahead Log）によるクラッシュ耐性のある応答記録。異常終了時も復旧可能である。
+- **common_knowledge**: 全Anima共有の知識ベース。組織構造、メッセージングガイド、タスク管理、セキュリティ、トラブルシューティング等を格納する。`read_memory_file(path="common_knowledge/...")` で参照する。
 
 ---
 
-## 4. 通信・メッセージング
+## 3. マルチモデル・マルチプロバイダ実行
 
-Board/共有チャネル、外部メッセージング、アウトバウンドルーティング等。
+モデル名からワイルドカードパターンマッチで実行モードを自動判定する。`models.json` でモデルごとの実行モード・コンテキストウィンドウを定義する。
 
-- **A1モードのAnima間メッセージング統合** (2026-02-15) — Agent SDKモードでの内部メッセージング実装
-  [設計](implemented/20260215_a1-messaging-integration_implemented-20260215.md) | [Review](implemented/20260215_review_a1-messaging-integration_approved-20260215.md)
-- **Greet重複呼び出しとInbox孤立ファイルの残存問題** (2026-02-16) — メッセージングの重複・孤立問題修正
-  [設計](implemented/20260216_greet-duplicate-and-orphaned-inbox-files_implemented-20260216.md) | [Review](implemented/20260216_review_greet-duplicate-and-orphaned-inbox-files_approved-20260216.md)
-- **外部メッセージングWebhook統合（Slack・Chatwork）** (2026-02-17) — 外部サービスからのWebhookメッセージ受信
-  [設計](implemented/20260217_external-messaging-integration_implemented-20260217.md) | [Review](implemented/20260217_review_external-messaging-integration_approved-20260217.md)
-- **send_message 統一アウトバウンドルーティング** (2026-02-17) — 宛先に応じたSlack/Chatwork/内部の自動振り分け
-  [設計](implemented/20260217_send-message-unified-outbound-routing.md)
-- **Slack Socket Modeによるリアルタイムメッセージ受信** (2026-02-17) — WebSocket経由のSlakリアルタイム連携
-  [設計](implemented/20260217_slack-socket-mode-integration_implemented-20260217.md) | [Review](implemented/20260217_review_slack-socket-mode-integration_approved-20260217.md)
-- **Board WebUI実装 — ダッシュボード + ワークスペース** (2026-02-18) — 共有チャネルのWebUIフロントエンド
-  [設計](implemented/20260218_channel-webui-and-onboarding_implemented-20260218.md) | [Review](implemented/20260218_review_channel-webui-and-onboarding_approved-20260218.md)
-- **Slack型共有チャネル + 統一メッセージログアーキテクチャ** (2026-02-18) — #general/#ops等の共有チャネル基盤
-  [設計](implemented/20260218_shared-channel-messaging_implemented-20260218.md) | [Review](implemented/20260218_review_shared-channel-messaging_approved-20260218.md)
+- **Mode S (SDK)**: Claude Agent SDK。最もリッチなツール連携。Claude Code 組込みツール + MCP + 外部ツールを統合する。
+- **Mode A (Autonomous)**: LiteLLM 経由の tool_use ループ。GPT、Gemini、Mistral、Vertex AI、Azure、ローカルモデル等に対応する。
+- **Mode B (Basic)**: tool_use 非対応モデル向けの1ショット実行。フレームワークが記憶I/Oを代行する。
+- **Mode C (Codex)**: OpenAI Codex CLI 経由。サンドボックス実行で安全性を確保する。
+
+バックグラウンドモデルにより、heartbeat / cron / inbox は軽量モデルで実行可能である。コスト最適化に寄与する。ローカルLLM（vLLM、Ollama）も OpenAI 互換 API で統合する。
+
+実行パスは分離されている。Chat/Inbox（メッセージ応答）、Heartbeat（定期巡回）、Cron（定時タスク）、TaskExec（pending タスク実行）はそれぞれ独立したロックを持ち、並行動作する。コンテキストティア（Full / Background-Auto / Minimal）に応じてシステムプロンプトのセクションを動的に選択する。
 
 ---
 
-## 5. スケジュール・ライフサイクル
+## 4. 組織構造と階層管理
 
-ハートビート、cron、ブートストラップ、Reconciliation等。
+`supervisor` / `subordinate` フィールドで階層を定義する。上司・部下・同僚の関係を自動算出し、システムプロンプトに注入する。
 
-- **bootstrap.md が全 Anima に無条件で配置される** (2026-02-14) — 初回起動指示の条件付き配置化
-  [設計](implemented/20260214_bootstrap-unconditional-placement_issue.md)
-- **Cron Command型タスク設計書** (2026-02-14) — cronタスクのcommand型実行方式
-  [設計](implemented/20260214_cron-command-type_issue.md)
-- **ハートビートカスケード問題 — 修正検討ノート** (2026-02-14) — 連鎖的ハートビート暴走の防止
-  [設計](implemented/20260214_heartbeat-cascade-fix_notes.md)
-- **ハートビートカスケード問題 — インシデント報告** (2026-02-14) — 2026-02-13発生のカスケード障害分析
-  [設計](implemented/20260214_heartbeat-cascade_incident.md)
-- **ブートストラップのバックグラウンド実行化 + タイムアウト改善** (2026-02-15) — 初回起動の非同期化とタイムアウト制御
-  [設計](implemented/20260215_bootstrap-background-execution-and-timeout_implemented-20260215.md) | [Review](implemented/20260215_review_bootstrap-background-execution_approved-20260215.md)
-- **ハートビート間隔を30分固定にする** (2026-02-15) — 間隔パース機能の削除と固定化
-  [設計](implemented/20260215_fix-heartbeat-interval-to-30min_implemented-20260215.md)
-- **Animaごとの自律スケジューラ導入** (2026-02-15) — heartbeat/cronの子プロセス内実行
-  [設計](implemented/20260215_person-autonomous-scheduler_implemented-20260215.md) | [Review](implemented/20260215_review_person-autonomous-scheduler_approved-20260215.md)
-- **Animaの自律的業務管理: ハートビート/cronの自己更新** (2026-02-15) — Anima自身によるスケジュール更新
-  [設計](implemented/20260215_self-modify-heartbeat-cron-implemented-20260215.md) | [Review](implemented/20260215_review_self-modify-heartbeat-cron_approved-20260215.md)
-- **Supervisor定期リコンシリエーション** (2026-02-15) — 未起動Anima自動検出・起動メカニズム
-  [設計](implemented/20260215_supervisor-person-reconciliation_implemented-20260215.md) | [Review](implemented/20260215_review_supervisor-person-reconciliation_approved-20260215.md)
-- **Heartbeat競合クラッシュ + 孤児ディレクトリ検出 + 組織ツリー可視化** (2026-02-16) — ハートビート排他制御と孤児プロセス検出
-  [設計](implemented/20260216_heartbeat-collision-orphan-detection-org-tree-implemented-20260216.md) | [Review](implemented/20260216_review_heartbeat-collision-orphan-detection-org-tree_approved-20260216.md)
-- **スケジューラーリグレッション・Activity Tab表示不具合** (2026-02-16) — スケジューラー回帰バグの修正
-  [設計](implemented/20260216_scheduler-regression-and-activity-tab-20260216.md) | [Review](implemented/20260216_review_scheduler-regression-and-activity-tab_approved-20260216.md)
-- **cron.mdテンプレート改善 + Mode Bスキル注入修正** (2026-02-17) — cronテンプレートの品質向上
-  [設計](implemented/20260217_cron-template-and-mode-b-skill-fix_implemented-20260217.md) | [Review](implemented/20260217_review_cron-template-and-mode-b-skill-fix_approved-20260217.md)
-- **ハートビート・対話間のコンテキスト断絶とメッセージング改善** (2026-02-17) — ハートビートと会話のコンテキスト共有
-  [設計](implemented/20260217_heartbeat-dialogue-context-gap-and-messaging_implemented-20260217.md) | [Review](implemented/20260217_review_heartbeat-dialogue-context-gap-and-messaging_approved-20260217.md)
-- **heartbeat処理中のLLM応答をSSEで中継** (2026-02-17) — ハートビート中の応答リアルタイム配信
-  [設計](implemented/20260217_heartbeat-sse-relay-implemented-20260217.md)
-- **Reconciliation がブートストラップ中の Anima を kill し無限ループ** (2026-02-17) — ブートストラップ保護
-  [設計](implemented/20260217_protect-bootstrapping-from-reconciliation-implemented-20260217.md) | [Review](implemented/20260217_review_protect-bootstrapping-from-reconciliation_approved-20260217.md)
-- **Reconciliation が status.json 未作成の Anima を30秒周期で KILL** (2026-02-17) — status.json未生成時の保護
-  [設計](implemented/20260217_reconciliation-kills-animas-missing-status-json_implemented-20260217.md) | [Review](implemented/20260217_review_reconciliation-kills-animas-missing-status-json_revision-20260217.md)
+- **タスク委譲（delegate_task）**: 上司→部下への委任。部下のタスクキューに追加し、DMで通知する。進捗は `task_tracker` で追跡する。
+- **組織ダッシュボード（org_dashboard）**: 全配下のプロセス状態・タスク・アクティビティをツリー表示する。部下の生存確認（ping_subordinate）、状態読み取り（read_subordinate_state）、活動監査（audit_subordinate）も可能である。
+- **部下制御**: 休止/再開（disable_subordinate / enable_subordinate）、モデル変更（set_subordinate_model）、再起動（restart_subordinate）を直属部下に対して実行できる。権限チェックは supervisor フィールドで検証し、全配下へのアクセスは BFS で再帰探索する（循環参照は自動検出）。
+- **通信経路ルール**: 進捗報告は上司へ、他部署連絡は上司経由。組織としての秩序を保つ。
 
 ---
 
-## 6. スキル・ツール
+## 5. メッセージングとコミュニケーション
 
-トリガーベース注入、自動検出、バックグラウンドタスク実行等。
-
-- **ツールコールのタイムアウト改善とバックグラウンド実行** (2026-02-15) — 長時間ツールの非同期実行化
-  [設計](implemented/20260215_tool-call-timeout-background-execution_implemented-20260216.md) | [Review](implemented/20260216_review_tool-call-timeout-background-execution_approved-20260216.md)
-- **長時間ツール実行がチャットをブロックする問題** (2026-02-16) — ツール実行のノンブロッキング化
-  [設計](implemented/20260216_long-running-tool-chat-blocking_implemented-20260216.md) | [Review](implemented/20260216_review_long-running-tool-chat-blocking_approved-20260216.md)
-- **ツール自動発見・Anima作成・ホットリロード・dispatch規約統一** (2026-02-16) — ツールプラグインの自動検出と統一ディスパッチ
-  [設計](implemented/20260216_tool-auto-discovery-creation-hotreload-implemented-20260216.md) | [Review](implemented/20260216_review_tool-auto-discovery-creation-hotreload_approved-20260216.md)
-- **バックグラウンドタスク投入システム（Mode A1 長時間ツール対策）** (2026-02-17) — 非同期タスクキューの導入
-  [設計](implemented/20260217_background-task-submission_implemented-20260217.md) | [Review](implemented/20260217_review_background-task-submission_approved-20260217.md)
-- **スキルマッチング3段階化 + スキルクリエイター** (2026-02-17) — description/trigger/keywordの3段階スキルマッチング
-  [設計](implemented/20260217_skill-matching-enhancement-and-skill-creator_implemented-20260218.md) | [Review](implemented/20260217_review_skill-matching-enhancement-and-skill-creator_approved-20260218.md)
-- **外部ツール権限をデフォルト全許可（ブラックリスト方式）に変更** (2026-02-17) — ホワイトリストからブラックリスト方式への転換
-  [設計](implemented/20260217_tool-permissions-default-all-implemented-20260217.md)
-- **スキル形式のClaude Code準拠化 + description ベース自動注入** (2026-02-17) — トリガーベースのスキル注入アーキテクチャ
-  [設計](implemented/20260217_trigger-based-skill-injection_implemented-20260217.md) | [Review](implemented/20260217_review_trigger-based-skill-injection_approved-20260217.md)
+- **Anima間DM**: `send_message` による非同期メッセージング。intent は report / delegation / question に限定する。1 run あたり最大2人、同一宛先へは1通まで。1ラウンドルール（1トピック1往復が原則、3往復以上ならBoard移行）を適用する。
+- **Board（共有チャネル）**: Slack型の共有チャネル（#general, #ops 等）。append-only JSONL で蓄積する。ack・感謝・FYI・3人以上への伝達に使用する。
+- **外部メッセージング統合**: Slack Socket Mode、Chatwork Webhook からメッセージを自動受信し、対象AnimaのInboxに配信する。@メンション付き / DM は即時処理、メンションなしは次回ハートビートで処理する。
+- **統一アウトバウンドルーティング**: 宛先に応じて Anima内部 / Slack / Chatwork / 人間通知を自動判定する。
+- **レート制限**: per-run（同一宛先再送防止）、cross-run（30通/hour, 100通/day）、行動認識（直近送信履歴の Priming 注入）の3層で制御する。
+- **人間通知（call_human）**: Slack、Chatwork、LINE、Telegram、ntfy を統合する。トップレベルAnimaの責務である。
 
 ---
 
-## 7. 設定・認証
+## 6. タスク管理
 
-クレデンシャル一元化、ロールテンプレート、埋め込みモデル選択等。
-
-- **統一Credential管理: config.json優先カスケードと汎用スキーマ** (2026-02-15) — 認証情報の3層マージ管理
-  [設計](implemented/20260215_unified-credential-management_implemented-20260215.md) | [Review](implemented/20260215_review_unified-credential-management_approved-20260215.md)
-- **組織構造（supervisor）がconfig.jsonに同期されない** (2026-02-16) — 作成パイプライン修正 + 定期同期機構
-  [設計](implemented/20260216_org-structure-config-sync_implemented-20260216.md) | [Review](implemented/20260216_review_org-structure-config-sync_approved-20260216.md)
-- **クレデンシャルを shared/credentials.json に一元化** (2026-02-17) — 散在する認証情報の統合
-  [設計](implemented/20260217_centralize-credentials-to-shared-file_implemented-20260217.md) | [Review](implemented/20260217_review_centralize-credentials-to-shared-file_approved-20260217.md)
-- **埋め込みモデルをconfig.jsonから選択可能にする** (2026-02-17) — RAGモデルの動的切り替え
-  [Review](implemented/20260217_review_embedding-model-config_approved.md)
-- **load_config() mtime-based cache reload** (2026-02-17) — 設定ファイルの自動リロード
-  [Review](implemented/20260217_review_config-mtime-reload_approved-20260217.md)
-- **ロールテンプレート導入 — Animaの「役職＋能力値」システム** (2026-02-17) — 6ロールのテンプレート化
-  [設計](implemented/20260217_role-templates-and-ability-scores-implemented-20260217.md) | [Review](implemented/20260217_review_role-templates-and-ability-scores_approved-20260217.md)
+- **永続タスクキュー**: `state/task_queue.jsonl` に append-only JSONL 形式で記録する。`add_task` / `update_task` / `list_tasks` で操作する。`source: human` のタスクは最優先で処理する（MUST）。
+- **タスク滞留検知**: 30分更新なしで ⚠️ STALE、期限超過で 🔴 OVERDUE をマークする。Priming セクションに要約表示し、委任判断プロンプトに連携する。
+- **並列タスク実行（plan_tasks）**: DAG 依存関係を解決し、独立タスクを同時実行する。最大並列数は設定可能である（デフォルト3）。
+- **タスク委譲と追跡**: 部下への委任は永続キューと DM で連携し、進捗を追跡する。
 
 ---
 
-## 8. Web UI: ダッシュボード
+## 7. スキルとツール
 
-SPA移行、アクティビティタイムライン、スケジューラータブ等。
-
-- **ダッシュボードGUI化 — SPA構成への移行** (2026-02-15) — 静的HTMLからSingle Page Applicationへ
-  [設計](implemented/20260215_dashboard-gui-spa-migration_implemented-20260215.md) | [Review](implemented/20260215_review_dashboard-gui-spa-migration_approved-20260215.md)
-- **Animaステートの視覚的表現改善** (2026-02-15) — Sleeping/Bootstrapping/Activeのステート表示
-  [設計](implemented/20260215_bootstrap-ui-during-creation_implemented-20260215.md) | [Review](implemented/20260215_review_bootstrap-ui-during-creation_approved-20260215.md)
-- **ダッシュボードUI表示不具合の一括修正** (2026-02-15) — 複数のUI表示問題の包括修正
-  [設計](implemented/20260215_fix-dashboard-ui-display-issues_implemented-20260215.md) | [Review](implemented/20260215_review_fix-dashboard-ui-display-issues_approved-20260215.md)
-- **Web UI: ブートストラップ中のメッセージがフロントエンドに表示されない** (2026-02-15) — ブートストラップ進捗のリアルタイム表示
-  [設計](implemented/20260215_webui-bootstrap-message-invisible_implemented-20260215.md)
-- **Web UI: システムステータス表示が壊れている** (2026-02-15) — scheduler_runningフィールド欠落修正
-  [設計](implemented/20260215_webui-status-display-broken_implemented-20260215.md)
-- **Activity Timeline: メッセージ表示欠損・Cron信頼性・書式統一** (2026-02-16) — タイムライン表示の品質向上
-  [設計](implemented/20260216_activity-timeline-message-cron-reliability_implemented-20260216.md) | [Review](implemented/20260216_review_activity-timeline-message-cron-reliability_approved-20260216.md)
-- **Activity Timeline: Anima間メッセージ表示・ページネーション・フィルタUI** (2026-02-16) — タイムラインの機能拡張
-  [設計](implemented/20260216_activity-timeline-message-visibility-and-pagination-implemented-20260216.md) | [Review](implemented/20260216_review_activity-timeline-message-visibility-and-pagination_revision-20260216.md)
-- **crypto.randomUUID 非セキュアコンテキストでフロントエンド全機能クラッシュ** (2026-02-17) — HTTPコンテキストでのUUID生成修正
-  [設計](implemented/20260217_fix-crypto-randomuuid-crash_implemented-20260217.md)
-- **Activity Timeline メッセージ詳細ポップアップ** (2026-02-17) — タイムラインエントリのクリック詳細表示
-  [設計](implemented/20260217_timeline-message-detail-popup_implemented-20260217.md) | [Review](implemented/20260217_review_timeline-message-detail-popup_approved-20260217.md)
+- **内部ツール**: 記憶操作（search_memory, read_memory_file, write_memory_file）、通信（send_message, post_channel, read_channel）、タスク管理（add_task, update_task, list_tasks, plan_tasks）、スキル検索（skill）等を提供する。Mode S では Claude Code 組込みツール（Read, Write, Edit, Bash, git 等）と MCP ツール（mcp__aw__*）も利用可能である。
+- **外部ツール**: Slack、Chatwork、Gmail、GitHub、AWS、Web検索、X検索、画像生成（NovelAI, fal.ai）、Whisper 文字起こし等。`permissions.md` で Per-Anima の許可を制御する。長時間ツール（⚠マーク付き）は `animaworks-tool submit` で非同期実行し、結果は `state/background_notifications/` に記録される。
+- **スキルシステム**: 段階開示（名前のみ→必要時に全文読み込み）。description / trigger / keyword の3段階マッチングで関連スキルを想起する。
+- **ツールプラグイン**: 自動発見、ホットリロード、統一ディスパッチ。長時間ツールは `submit` で非同期実行し、結果は次回 heartbeat で確認する。
 
 ---
 
-## 9. Web UI: ワークスペース
+## 8. Web UI
 
-3Dオフィス、キャラクター表示、レスポンシブ、iPad対応等。
-
-- **フロントエンド (Workspace) 設計** (2026-02-14) — Three.js + WebSocket ワークスペース初期設計
-  [設計](implemented/20260214_frontend-viewer_implementation.md)
-- **3Dオフィス キャラクターシミュレーション — 詳細実装仕様書** (2026-02-14) — Three.jsベース3Dオフィスの仕様
-  [設計](implemented/20260214_office-simulation_issue.md)
-- **Workspace会話画面: エモーションタグ表示 & ステータス通知重複** (2026-02-15) — 感情表現とステータス通知のUI修正
-  [設計](implemented/20260215_fix-workspace-chat-emotion-tag-and-status-notifications_implemented-20260215.md) | [Review](implemented/20260215_review_fix-workspace-chat-emotion-tag-and-status-notifications_approved-20260215.md)
-- **Workspace: Anima誕生時の確定演出（Reveal Animation）** (2026-02-15) — 新Anima作成時のアニメーション演出
-  [設計](implemented/20260215_person-birth-reveal-animation_implemented-20260215.md) | [Review](implemented/20260215_review_person-birth-reveal-animation_approved-20260215.md)
-- **Live2D Canvas手続き描画の削除 — 静的イラスト配置への簡素化** (2026-02-15) — Live2Dから静的画像表示への移行
-  [設計](implemented/20260215_remove-live2d-canvas-rendering_implemented-20260215.md) | [Review](implemented/20260215_review_remove-live2d-canvas-rendering_approved-20260215.md)
-- **Workspace チャット吹き出しの途中切れ問題** (2026-02-15) — チャットバブルのテキスト表示修正
-  [設計](implemented/20260215_workspace-chat-bubble-cutoff_implemented-20260215.md) | [Review](implemented/20260215_review_workspace-chat-bubble-cutoff_approved-20260215.md)
-- **ワークスペース3Dキャラクタークリック時の挨拶機能** (2026-02-15) — 3Dキャラクターとのインタラクション
-  [設計](implemented/20260215_workspace_character_greeting_implemented-20260215.md) | [Review](implemented/20260215_review_workspace_character_greeting_approved-20260215.md)
-- **GLBキャッシュの scene.clone(true) によるスケルトンバインディング破壊** (2026-02-16) — SkinnedMeshクローン時の3Dモデル修正
-  [設計](implemented/20260216_glb-skinnedmesh-clone-skeleton-binding-broken-20260216.md) | [Review](implemented/20260216_review_glb-skinnedmesh-clone-skeleton-binding-broken_approved-20260216.md)
-- **レスポンシブデザイン対応 — ダッシュボード & ワークスペース モバイルUX** (2026-02-16) — モバイル・タブレット対応
-  [設計](implemented/20260216_responsive-design-mobile-ux_implemented-20260216.md) | [Review](implemented/20260216_review_responsive-design-mobile-ux_approved-20260216.md)
-- **Workspace 3Dオフィス: キャラクタースケール異常 + 組織階層ツリー不正** (2026-02-16) — 3Dスケーリングとツリーレイアウトの修正
-  [設計](implemented/20260216_workspace-character-scale-and-hierarchy-bug_implemented-20260216.md) | [Review](implemented/20260216_review_workspace-character-scale-and-hierarchy-bug_approved-20260216.md)
-- **Workspace iPad表示修正** (2026-02-16) — ビューポート・タイムライン配置・レスポンシブ
-  [設計](implemented/20260216_workspace-ipad-viewport-fix_implemented-20260216.md) | [Review](implemented/20260216_review_workspace-ipad-viewport-fix_approved-20260216.md)
-- **Workspace 3Dオフィス: ツリーレイアウトが機能せず全員横並び** (2026-02-16) — 組織階層に基づくレイアウト修正
-  [設計](implemented/20260216_workspace-tree-layout-broken_implemented-20260216.md)
-- **Workspace 3D キャラクタースケーリング修正** (2026-02-17) — キャラクター表示サイズの修正
-  [設計](implemented/20260217_workspace-character-scaling-fix_implemented-20260217.md)
+- **ダッシュボード**: SPA 構成。Anima一覧、ステート表示（Sleeping / Bootstrapping / Active）、アクティビティタイムライン、スケジューラータブを提供する。
+- **3Dワークスペース**: Three.js ベースの3Dオフィス。組織階層に基づくキャラクター配置。クリックで会話を開始する。
+- **チャット**: SSE ストリーミング、無限スクロール、マルチモーダル画像入力、マルチスレッド、マルチタブ対応。ツール実行のリアルタイム可視化（Live Tool Activity）をサポートする。
+- **音声チャット**: ブラウザ音声入力 → STT（faster-whisper）→ チャット → TTS（VOICEVOX / Style-BERT-VITS2 / ElevenLabs）→ 再生。PTT / VAD モード、barge-in（割り込み）対応。
+- **セットアップウィザード**: 初回起動時の Web ベース設定。17言語対応。
+- **レスポンシブデザイン**: モバイル、タブレット、iPad に対応する。
 
 ---
 
-## 10. Web UI: チャット
+## 9. キャラクターアセット生成
 
-無限スクロール、マルチモーダル画像入力、SSE再接続等。
-
-- **チャット画面のメッセージ二重表示問題** (2026-02-15) — WebSocketとSSEの重複メッセージ修正
-  [設計](implemented/20260215_chat-duplicate-message_implemented-20260215.md) | [Review](implemented/20260215_review_chat-duplicate-message_approved-20260215.md)
-- **グリーティングメッセージの二重表示とプロンプト改善** (2026-02-15) — 挨拶メッセージの重複排除
-  [設計](implemented/20260215_greeting-duplicate-and-prompt-improvement-20260216.md) | [Review](implemented/20260216_review_greeting-duplicate-and-prompt-improvement_approved.md)
-- **ストリーミング中のローディング表示改善** (2026-02-15) — ツール呼び出し中のUI改善
-  [設計](implemented/20260215_tool-call-loading-indicator-visibility-implemented-20260215.md) | [Review](implemented/20260215_review_tool-call-loading-indicator-visibility_approved-20260215.md)
-- **会話履歴の無限スクロール（ページネーション）** (2026-02-17) — 過去のチャット履歴の動的読み込み
-  [設計](implemented/20260217_chat-history-infinite-scroll_implemented-20260217.md) | [Review](implemented/20260217_review_chat-history-infinite-scroll_approved-20260217.md)
-- **WebUIチャット マルチモーダル画像入力対応** (2026-02-17) — チャットへの画像添付・送信機能
-  [設計](implemented/20260217_multimodal-image-input-for-chat_implemented-20260217.md) | [Review](implemented/20260217_review_multimodal-image-input-for-chat_approved-20260217.md)
-- **SSEストリーム再接続・進行状態リカバリ** (2026-02-17) — SSE切断時の自動再接続と状態復元
-  [設計](implemented/20260217_sse-reconnection-and-progress-recovery_implemented-20260217.md) | [Review](implemented/20260217_review_sse-reconnection-and-progress-recovery_approved-20260217.md)
+- **画像生成パイプライン**: NovelAI、fal.ai (Flux) を統合する。
+- **Vibe Transfer**: 上司の画像スタイルを部下に自動継承する。組織内で絵柄の一貫性を保つ。
+- **表情差分システム**: 感情に応じたバリエーションを自動生成する。
+- **3Dモデル**: Meshy 統合。GLB キャッシュ・圧縮最適化でダウンロード量を削減する。
+- **Asset Reconciler**: LLM がキャラクター情報から画像プロンプトを自動合成する。
 
 ---
 
-## 11. アセット生成
+## 10. セキュリティ
 
-画像生成パイプライン、表情差分、3Dモデルキャッシュ、NovelAI V4等。
+自律エージェント向けの多層防御モデルを採用する。詳細は [security.ja.md](security.ja.md) を参照。
 
-- **キャラクター画像の絵柄一貫性** (2026-02-14) — 複数Animaの絵柄統一手法
-  [設計](implemented/20260214_avatar-style-consistency_issue.md) | [Review](implemented/20260214_review_avatar-style-consistency_revision.md)
-- **バストアップ表情差分システム** (2026-02-14) — 感情に応じた表情バリエーション生成
-  [設計](implemented/20260214_bustup-expression-system_implemented-20260215.md) | [Review](implemented/20260214_review_bustup-expression-system_approved-20260215.md)
-- **キャラクター画像・3Dモデル生成パイプライン** (2026-02-14) — NovelAI/Flux/Meshyを統合した生成パイプライン
-  [設計](implemented/20260214_image-gen-pipeline_issue.md)
-- **部下作成時に上司の画像をVibe Transfer参照画像として自動適用** (2026-02-15) — 絵柄継承の自動化
-  [設計](implemented/20260215_supervisor-image-as-vibe-reference_implemented-20260215.md) | [Review](implemented/20260215_review_supervisor-image-as-vibe-reference_approved-20260215.md)
-- **3Dモデルのダウンロード量削減・キャッシュ・圧縮の3層最適化** (2026-02-16) — GLBモデルのパフォーマンス改善
-  [設計](implemented/20260216_3d-model-cache-and-optimization_implemented-20260216.md) | [Review](implemented/20260216_review_3d-model-cache-and-optimization_approved-20260216.md)
-- **アセット欠落時の自動生成フォールバックパイプライン** (2026-02-16) — 画像未生成時の自動フォールバック
-  [設計](implemented/20260216_asset-generation-fallback-pipeline_implemented-20260216.md) | [Review](implemented/20260216_review_asset-generation-fallback-pipeline_approved-20260216.md)
-- **Asset Reconciler: LLM による画像プロンプト自動合成** (2026-02-16) — キャラクター情報からの画像プロンプト生成
-  [設計](implemented/20260216_asset-reconciler-llm-prompt-synthesis_implemented-20260216.md) | [Review](implemented/20260216_review_asset-reconciler-llm-prompt-synthesis_approved-20260216.md)
-- **キャラクターアセット リメイク機能（Vibe Transfer + Web UI プレビュー）** (2026-02-16) — 既存画像のスタイル変換
-  [設計](implemented/20260216_character-asset-remake-with-style-transfer-implemented-20260216.md) | [Review](implemented/20260216_review_character-asset-remake-with-style-transfer_revision-20260216.md)
-- **NovelAI V4/V4.5 Vibe Transfer: encode-vibe 未使用による 500 エラー** (2026-02-16) — Vibe Transfer APIの修正
-  [設計](implemented/20260216_novelai-v4-vibe-transfer-encode-fix_implemented-20260216.md)
+- **プロンプトインジェクション防御**: 来歴・信頼境界システム。trusted / medium / untrusted の3段階で、外部データ由来の命令的テキストを無視する。`origin_chain` に `external_platform` が含まれる場合、中継Animaが trusted でも全体を untrusted として扱う。
+- **コマンドブロック**: ハードコード（`rm -rf /` 等）+ Per-anima `permissions.md` の2層で破壊的コマンドを防止する。パイプラインの各セグメントを個別チェックする。
+- **パストラバーサル防止**: メモリ書き込み・ファイルアクセスのパス検証を行う。
+- **メッセージストーム防御**: 会話深度リミッター、褒め合いループ防止で無限送信を抑制する。
 
 ---
 
-## 12. プロセス管理・IPC
+## 11. プロセス管理
 
-ゾンビ検出、keepalive、バッファオーバーフロー修正等。
-
-- **プロセス隔離アーキテクチャ** (2026-02-14) — Unix Domain Socket + 子プロセスによるAnima隔離
-  [設計](implemented/20260214_process-isolation_issue.md) | [Review](implemented/20260214_review_process-isolation-design_revision.md)
-- **IPC層でdatetimeオブジェクトのJSONシリアライズに失敗する** (2026-02-15) — IPC通信のシリアライズ修正
-  [設計](implemented/20260215_fix-ipc-datetime-serialization_implemented-20260215.md) | [Review](implemented/20260215_review_fix-ipc-datetime-serialization_approved-20260215.md)
-- **個別Animaプロセス管理APIの実装** (2026-02-16) — REST APIによるプロセス制御
-  [設計](implemented/20260216_individual-anima-restart-api_implemented-20260216.md) | [Review](implemented/20260216_review_individual-anima-restart-api_approved-20260216.md)
-- **ping() が FAILED 状態でカウンタを増加させず、ゾンビ化** (2026-02-16) — ゾンビプロセス検出の修正
-  [設計](implemented/20260216_ipc-ping-counter-zombie-state_implemented-20260216.md)
-- **IPC readline() バッファ上限 64KB で大きなメッセージ送信時に即死** (2026-02-16) — バッファオーバーフロー対策
-  [設計](implemented/20260216_ipc-readline-buffer-overflow_implemented-20260216.md)
-- **IPC/SSEストリームにkeep-aliveとチャンク間タイムアウトを導入** (2026-02-16) — 接続維持とタイムアウト制御
-  [設計](implemented/20260216_ipc-stream-keepalive-and-chunk-timeout-20260216.md) | [Review](implemented/20260216_review_ipc-stream-keepalive-and-chunk-timeout_approved-20260216.md)
-- **is_alive() が IPC 接続死を検出できない** (2026-02-16) — 死活監視の精度向上
-  [設計](implemented/20260216_is-alive-ipc-death-detection_implemented-20260216.md)
-- **PIDファイル消失時のサーバー停止・起動耐性** (2026-02-17) — PIDファイルの堅牢性向上
-  [Review](implemented/20260217_review_pid-file-resilience_approved-20260217.md)
-- **WebSocket接続安定性の包括的改善** (2026-02-16) — WebSocket通信の信頼性向上
-  [Review](implemented/20260216_review_websocket-stability-improvements_approved-20260216.md)
+- **プロセス分離**: 各Animaを Unix ソケット付き独立子プロセスとして起動する（ProcessSupervisor）。単一障害点を避ける。
+- **自動クラッシュリカバリ**: Agent SDK クラッシュ検知時に自動再起動する。`state/recovery_note.md` に復旧情報を保存する。
+- **Reconciliation**: 未起動 Anima を自動検出・起動する。
+- **IPC 通信**: keep-alive、バッファ管理、ストリーム対応。PID ファイル耐性、WebSocket 安定性を確保する。
 
 ---
 
-## 13. 人間通知
+## 12. CLI 管理
 
-call_human統合、組織構成プロンプト注入等。
-
-- **トップレベルAnimaの人間通知機能 — A1メッセージング統合** (2026-02-15) — supervisorなしAnimaからの人間通知
-  [設計](implemented/20260215_a1-messaging-integration_human-notification_implemented-20260215.md) | [Review](implemented/20260215_review_a1-messaging-integration_human-notification_approved-20260215.md)
-- **Notify Human のチャットウィンドウ統合確認** (2026-02-15) — 人間通知のチャットUI統合
-  [設計](implemented/20260215_notify-human-chat-window-integration-implemented-20260216.md) | [Review](implemented/20260216_review_notify-human-chat-window-integration_approved-20260216.md)
-- **組織構造情報のシステムプロンプト注入** (2026-02-15) — supervisor/subordinates/peersの自動注入
-  [設計](implemented/20260215_org-structure-prompt-injection_implemented-20260215.md) | [Review](implemented/20260215_review_org-structure-prompt-injection_approved-20260215.md)
-- **call_human統一: 人間への連絡を単一関数に集約** (2026-02-17) — Slack/Chatwork/LINE/Telegram/ntfyの統合
-  [設計](implemented/20260217_unify-call-human-notification_implemented-20260217.md) | [Review](implemented/20260217_review_unify-call-human-notification_approved-20260217.md)
+- **サーバー制御**: `animaworks start` / `stop` / `restart`
+- **Anima操作**: `animaworks anima list` / `info` / `create` / `enable` / `disable` / `rename`
+- **モデル・設定管理**: `animaworks anima set-model` / `set-background-model` / `reload` / `restart`
+- **モデル情報**: `animaworks models list` / `show` / `info`
+- **初期セットアップ**: `animaworks init`
 
 ---
 
-## 14. セットアップ・オンボーディング
+## 13. 設定管理
 
-セットアップウィザード、i18n、自動起動等。
-
-- **Setup完了後にAnimaが起動しない（RAG初期化タイムアウト）** (2026-02-15) — 初期化フローの修正
-  [設計](implemented/20260215_person-startup-timeout-after-setup_implemented-20260215.md)
-- **セットアップ画面の言語選択を17言語対応ドロップダウンに拡張** (2026-02-15) — 多言語対応の強化
-  [設計](implemented/20260215_setup-language-selector-expansion_implemented-20260215.md)
-- **セットアップウィザード: ユーザー情報ステップ追加 & Anima自動起動** (2026-02-15) — 初期設定フローの拡充
-  [設計](implemented/20260215_setup-user-info-and-person-autostart-20260215.md) | [Review](implemented/20260215_review_setup-user-info-and-person-autostart_approved-20260215.md)
-- **セットアップウィザード: i18n反映不備 & ブラウザキャッシュ問題** (2026-02-15) — 国際化と表示の修正
-  [設計](implemented/20260215_setup-wizard-i18n-and-cache-fix-20260215.md) | [Review](implemented/20260215_review_setup-wizard-i18n-and-cache-fix_approved-20260215.md)
-- **セットアップウィザード: キャラクター作成ステップの簡素化** (2026-02-15) — リーダー作成ステップへの変更
-  [設計](implemented/20260215_setup-wizard-simplify-character-step_implemented-20260215.md)
-- **GUIセットアップウィザード — 初回起動時のWeb UIベース初期設定** (2026-02-15) — Web UIによる初期設定フロー
-  [設計](implemented/20260215_setup-wizard_implemented-20260215.md) | [Review](implemented/20260215_review_setup-wizard_approved-20260215.md)
+- **2層マージ**: `config.json`（グローバル）+ `status.json`（Per-Anima SSoT）。Anima単位の設定が最優先される。
+- **models.json**: モデルごとの実行モード・コンテキストウィンドウを fnmatch パターンで定義する。
+- **credentials.json**: 認証情報を一元管理する。Per-Anima クレデンシャル（`CHATWORK_API_TOKEN_WRITE__<anima_name>` 等）に対応する。
+- **ホットリロード**: 設定変更の自動検知・反映。cron.md の更新も次回実行時にリロードする。
+- **ロールテンプレート**: engineer / manager / writer / researcher / ops / general の6ロール。モデル・max_turns・max_chains を一括設定する。
 
 ---
 
-## 15. ログ・可観測性
+## 14. 運用機能
 
-ロギング強化、フロントエンドログ配信等。
-
-- **ログ基盤の包括的強化** (2026-02-17) — フロントエンドサーバー送信 + structlog + バックエンドトレーサビリティ
-  [設計](implemented/20260217_comprehensive-logging-enhancement_implemented-20260217.md) | [Review](implemented/20260217_review_comprehensive-logging-enhancement_approved-20260217.md)
-- **フロントエンドログがサーバーに到達しない問題の修正** (2026-02-17) — ログ配信パイプラインの修正
-  [設計](implemented/20260217_fix-frontend-log-delivery_implemented-20260217.md) | [Review](implemented/20260217_review_fix-frontend-log-delivery_approved-20260217.md)
-- **トークン使用量追跡** (2026-03-03) — LLM呼び出しの入力/出力トークン計測と記録
-  [設計](implemented/20260303_review_token-usage-tracking_approved-20260303.md)
-
----
-
-## 16. テスト・品質
-
-テスト修正、500エラー根本原因等。
-
-- **500サーバーエラーの根本原因と包括的エラーハンドリング改善** (2026-02-15) — app.state.animasのKeyError修正
-  [設計](implemented/20260215_500-server-error-root-cause-implemented-20260216.md) | [Review](implemented/20260216_review_500-server-error-root-cause_approved-20260216.md)
-- **Phase 3 ProcessSupervisor リファクタリングに伴うテスト修正** (2026-02-15) — Supervisor移行後のテスト適合
-  [設計](implemented/20260215_fix-failing-unit-tests-after-supervisor-refactor_implemented-20260215.md) | [Review](implemented/20260215_review_fix-failing-unit-tests-after-supervisor-refactor_approved-20260215.md)
-- **残存テスト失敗23件の修正** (2026-02-15) — テストスイートの安定化
-  [設計](implemented/20260215_fix-remaining-23-test-failures_implemented-20260215.md) | [Review](implemented/20260215_review_fix-remaining-23-test-failures_approved-20260215.md)
-- **Fix app.state.animas KeyError (500 Server Error)** (2026-02-15) — サーバーステート初期化の修正
-  [Review](implemented/20260215_review_fix-state-persons-keyerror_approved-20260215.md)
-- **テストスイート 135件の失敗・エラー修正** (2026-02-17) — 大規模テスト修正
-  [設計](implemented/20260217_test-suite-135-failures-cleanup.md)
-
----
-
-## 17. セキュリティ
-
-自律エージェント向けの多層防御セキュリティモデル。全体概要は **[セキュリティアーキテクチャ](security.md)** を参照。
-
-- **ライセンス戦略設計書** (2026-02-14) — Apache-2.0 ライセンス戦略
-  [設計](implemented/20260214_licensing-strategy_design.md)
-- **メモリ書き込みセキュリティ: 全実行モードの保護ファイル・パストラバーサル対策** (2026-02-15) — 記憶書き込みのセキュリティ強化
-  [設計](implemented/20260215_memory-write-security-20260216.md) | [Review](implemented/20260216_review_memory-write-security_approved-20260216.md)
-- **コマンドインジェクション修正** (2026-02-28) — パイプ経由インタープリタ実行・改行インジェクション防止
-  [設計](implemented/20260228_security-command-injection-fix.md)
-- **パストラバーサル修正** (2026-02-28) — common_knowledge・create_animaのパス検証
-  [設計](implemented/20260228_security-path-traversal-fix.md)
-- **来歴・信頼境界システム** (2026-02-28) — 5フェーズの信頼ラベリング、オリジンチェーン伝播、RAG来歴追跡
-  [Phase 1](implemented/20260228_provenance-1-foundation.md) | [Phase 2](implemented/20260228_provenance-2-input-boundary.md) | [Phase 3](implemented/20260228_provenance-3-propagation.md) | [Phase 4](implemented/20260228_provenance-4-rag-provenance.md) | [Phase 5](implemented/20260228_provenance-5-mode-s-trust.md)
-
----
-
-## 18. Anima生成
-
-ハイブリッド作成、動的プロンプト注入等。
-
-- **Anima作成ハイブリッド化: create_animaツール + キャラクターシート仕様統一** (2026-02-16) — ツール呼出し + MDシートの統一作成方式
-  [設計](implemented/20260216_person-creation-hybrid-and-create-tool_implemented-20260216.md) | [Review](implemented/20260216_review_person-creation-hybrid-and-create-tool_approved-20260216.md)
-
----
-
-## 19. v0.2後の拡張（2026-02-18 — 2026-02-23）
-
-実行モード再設計、タスクキュー、解決レジストリ、動的Priming、リファクタリング、運用耐障害性の改善。
-
-### 実行エンジン
-
-- **実行モード再設計: S/A/B 3モードアーキテクチャ** (2026-02-23) — 実行モードをS (SDK) / A (Autonomous) / B (Basic) の3つに再定義。SモードはAgent SDKにセッション管理を委任。後に **Mode C (Codex)** が追加され、Codex CLI経由でOpenAIモデルを実行
-  [設計](implemented/20260223_execution-mode-redesign-s-a-b-20260223.md) | [Review](implemented/20260223_review_execution-mode-redesign-s-a-b_approved-20260223.md)
-- **Sモード記憶エンコーディングギャップ修正** (2026-02-23) — 会話ターン保存・要旨記憶検索・行動トレース知識生成の3層対策
-  [設計](implemented/20260223_s-mode-memory-encoding-gap_implemented-20260223.md) | [Review](implemented/20260223_review_s-mode-memory-encoding-gap_approved-20260223.md)
-- **A1モード中間セッションコンテキスト自動コンパクト** (2026-02-22) — コンテキストトークン追跡とオーバーフロー時の自動終了・チェイニング
-  [設計](implemented/20260222_a1-mid-session-context-autocompact-implemented-20260222.md) | [Review](implemented/20260222_review_a1-mid-session-context-autocompact_approved-20260222.md)
-- **A1モードMCPネイティブツール** (2026-02-20) — Stdio MCPサーバーでAnimaWorks固有ツール12種をネイティブツールコールとして提供
-  [設計](implemented/20260220_a1-mcp-native-tools_implemented-20260220.md) | [Review](implemented/20260220_review_a1-mcp-native-tools_approved-20260220.md)
-- **A1フック: ツールコールログ & Bashブロックリスト** (2026-02-20) — PreToolUseフックの全ツールコール記録とBashコマンドブロックリスト
-  [設計](implemented/20260220_a1-hook-tool-logging-and-bash-blocklist-20260220.md) | [Review](implemented/20260220_review_a1-hook-tool-logging-and-bash-blocklist_approved-20260220.md)
-- **Mode Bコンテキストオーバーフロー保護** (2026-02-19) — preflight check・タイムアウト・ツール出力制限・会話閾値自動スケール
-  [設計](implemented/20260219_mode-b-context-overflow-protection_implemented-20260220.md) | [Review](implemented/20260219_review2_mode-b-context-overflow-protection_approved-20260220.md)
-- **コンテキスト過剰圧縮の包括的改善** (2026-02-21) — ツール結果保存・構造化メッセージ・セッション引き継ぎ・デバッグペイロード保存
-  [設計](implemented/20260221_K_context-over-compression-implemented-20260222.md) | [Review](implemented/20260222_review_context-over-compression_approved-20260222.md)
-
-### 記憶システム
-
-- **タスク永続化・Heartbeat耐障害性** (2026-02-19) — 永続JSONLタスクキュー・タスクチェックポイント・リカバリ・メッセージ重複排除・Priming注入
-  [設計](implemented/20260219_task-persistence-and-heartbeat-resilience_implemented-20260219.md) | [Review](implemented/20260219_review_task-persistence-and-heartbeat-resilience_approved-20260219.md)
-- **タスク滞留検知・deadline必須化・委任判断プロンプト注入** (2026-02-19) — 経過時間可視化・滞留マーカー・deadline自動適用・委任判断プロンプト
-  [設計](implemented/20260219_task-staleness-detection-and-delegation-implemented-20260219.md) | [Review](implemented/20260219_review_task-staleness-detection-and-delegation_approved-20260219.md)
-- **蒸留済み知識のシステムプロンプト全量注入** (2026-02-22) — knowledge/とprocedures/の全文をシステムプロンプトに直接注入
-  [設計](implemented/20260222_knowledge-procedures-full-injection_implemented-20260222.md) | [Review](implemented/20260222_review_knowledge-procedures-full-injection_approved-20260222.md)
-- **issue_resolved → procedure自動生成パイプライン** (2026-02-22) — 上司指摘の解決をprocedures/に自動蒸留する固定化パイプライン
-  [設計](implemented/20260222_consolidation-resolved-to-procedure-pipeline-20260222.md) | [Review](implemented/20260222_review_consolidation-resolved-to-procedure-pipeline_approved-20260222.md)
-- **Primingバジェット分類にintentを連携** (2026-02-19) — send_messageのintentフィールドをPrimingバジェット分類に接続
-  [設計](implemented/20260219_priming-intent-budget-allocation_implemented-20260220.md) | [Review](implemented/20260220_review2_priming-intent-budget-allocation_revision-20260220.md)
-- **記憶システム対称性改善・スキルベクトル検索化** (2026-02-19) — knowledgeに失敗カウント追加・スキルマッチングをベクトル検索化・矛盾履歴永続化
-  [設計](implemented/20260219_memory-system-symmetry-and-skill-vector-search_implemented-20260220.md) | [Review](implemented/20260220_review2_memory-system-symmetry-and-skill-vector-search_approved-20260220.md)
-
-### 通信・耐障害性
-
-- **メッセージストーム多層防御** (2026-02-19) — 会話深度リミッター・再処理カウンタ可視化・スケジュールHBカスケード検知
-  [設計](implemented/20260219_message-storm-defense-in-depth_implemented-20260219.md) | [Review](implemented/20260219_review_message-storm-defense-in-depth_approved-20260219.md)
-- **褒め合いループ防止** (2026-02-22) — プロンプト＋コード両面でAnima間の無限称賛連鎖を断ち切る
-  [設計](implemented/20260222_praise-loop-prevention_implemented-20260222.md) | [Review](implemented/20260222_review_praise-loop-prevention_approved-20260222.md)
-- **Per-Run DM制限** (2026-02-21) — 1回のrunにつき最大2名、1人1通、report/delegationのみ
-  [設計](implemented/20260221_A_per-anima-global-send-limit-20260222.md) | [Review](implemented/20260222_review_AHK_dm-heartbeat-cron_approved-20260222.md)
-
-### スケジュール・ライフサイクル
-
-- **heartbeat間隔のconfig.json化** (2026-02-21) — 自由文パース廃止、config.json管理・ハッシュ固定オフセット導入
-  [設計](implemented/20260221_H_schedule-parser-strict-20260222.md) | [Review](implemented/20260222_review_AHK_dm-heartbeat-cron_approved-20260222.md)
-- **CronTask trigger_heartbeatフラグ** (2026-02-23) — cronタスク実行後にheartbeatをトリガーするタスク単位フラグ
-  [設計](implemented/20260223_activity-log-conversation-history-api_implemented-20260223.md)
-- **Heartbeat Reflection Stream** (2026-02-20) — チェックリスト型からObserve-Reflect-Plan-Actフレームワークへの構造化
-  [設計](implemented/20260220_heartbeat-reflection-stream-20260220.md) | [Review](implemented/20260220_review_heartbeat-reflection-stream_approved-20260220.md)
-- **Heartbeat定数統一・intentベーストリガー** (2026-02-20) — カスケード定数外部化とメッセージ起因HBの「actionable intentのみ」への逆転
-  [設計](implemented/20260220_unify-heartbeat-constants-and-intent-based-trigger.md) | [Review](implemented/20260220_review_unify-heartbeat-constants-and-intent-based-trigger_approved.md)
-- **時間管理・タイムゾーン統一** (2026-02-19) — 現在時刻注入・naive datetime排除・heartbeat 24時間デフォルト化・timezone設定
-  [設計](implemented/20260219_time-management-and-timezone-implemented-20260220.md) | [Review](implemented/20260220_review_time-management-and-timezone_approved-20260220.md)
-
-### スキル・ツール
-
-- **skillツール: Progressive Disclosure** (2026-02-22) — `skill`ツールで全実行モード対応のオンデマンドスキル全文注入
-  [設計](implemented/20260222_skill-tool-progressive-disclosure_implemented-20260222.md) | [Review](implemented/20260222_review_skill-tool-progressive-disclosure_approved-20260222.md)
-- **ツールプロンプト外部化** (2026-02-22) — ツール説明をschemas.pyからSQLite DBに移行、WebUI編集対応
-  [設計](implemented/20260222_tool-prompt-externalization-implemented-20260222.md) | [Review](implemented/20260222_review_tool-prompt-externalization_approved-20260222.md)
-- **上司Animaの部下休止・復帰ツール** (2026-02-22) — disable_subordinate / enable_subordinateによるプロセス制御
-  [設計](implemented/20260222_supervisor-subordinate-disable-enable_implemented-20260222.md) | [Review](implemented/20260222_review_supervisor-subordinate-disable-enable_approved-20260222.md)
-
-### Web UI
-
-- **activity_logベース会話履歴API** (2026-02-23) — ワークスペースチャットのセッション区切り・ツールコール展開・無限スクロール対応
-  [設計](implemented/20260223_activity-log-conversation-history-api_implemented-20260223.md) | [Review](implemented/20260223_review_activity-log-conversation-history-api_approved-20260223.md)
-
-### プロセス管理
-
-- **ProcessSupervisorプロセス分離 + ヘルスチェック改善** (2026-02-22) — SIGTERM伝播防止・ログスパム解消・Reconciliationベース自動回復
-  [設計](implemented/20260222_supervisor-process-isolation-and-healthcheck-fix-implemented-20260223.md) | [Review](implemented/20260223_review_supervisor-process-isolation-and-healthcheck-fix_approved-20260223.md)
-- **IPC unaryリクエスト専用接続化** (2026-02-22) — 共有接続廃止によるID_MISMATCH根絶
-  [設計](implemented/20260222_ipc-dedicated-connection-for-unary_implemented-20260222.md) | [Review](implemented/20260222_review_ipc-dedicated-connection-for-unary_approved-20260222.md)
-- **IPCストリーミング残課題** (2026-02-22) — Claude SDK hook無効化 + ChromaDB Anima別分離
-  [設計](implemented/20260222_ipc-streaming-residual-issues_implemented-20260222.md) | [Review](implemented/20260222_review_ipc-streaming-residual-issues_approved-20260222.md)
-
-### リファクタリング・品質
-
-- **AnimaRunner責務分解** (2026-02-19) — 33メソッドの神クラスを4つの委譲クラスに分離
-  [設計](implemented/20260219_refactor-anima-runner-decomposition_implemented-20260220.md) | [Review](implemented/20260220_review_refactor-anima-runner-decomposition_approved-20260220.md)
-- **カスタム例外階層の導入** (2026-02-20) — 322箇所のbare Exception catchをドメイン例外に置換
-  [設計](implemented/20260220_custom-exception-hierarchy_implemented-20260220.md) | [Review](implemented/20260220_review_custom-exception-hierarchy_approved-20260220.md)
-- **ハードコードプロンプトの外部テンプレート抽出** (2026-02-20) — LLMプロンプト約6,500文字をtemplates/prompts/に外部化
-  [設計](implemented/20260220_extract-hardcoded-prompts-to-templates_implemented-20260220.md) | [Review](implemented/20260220_review_extract-hardcoded-prompts-to-templates_approved-20260220.md)
-- **システムプロンプトトークン効率最適化** (2026-02-20) — スキル全文注入廃止・手順書YAML自動構造化・会話履歴制限
-  [設計](implemented/20260220_system-prompt-token-optimization_implemented-20260220.md) | [Review](implemented/20260220_review_system-prompt-token-optimization_approved-20260220.md)
-- **ハードコードモデル名のconfig集約** (2026-02-20) — 18箇所のハードコードモデル名をPydantic defaults 2箇所に一元化
-  [設計](implemented/20260220_consolidate-hardcoded-model-names_implemented-20260220.md) | [Review](implemented/20260220_review_consolidate-hardcoded-model-names_approved-20260220.md)
-- **会話履歴ターン数上限の導入** (2026-02-20) — 膨張コンテキストによるツールコール放棄の防止
-  [設計](implemented/20260220_conversation-history-turn-limit_implemented-20260220.md) | [Review](implemented/20260220_review_conversation-history-turn-limit_approved-20260220.md)
-- **cronタスク型の適正使用** (2026-02-21) — command型の活用促進とバリデーション追加
-  [設計](implemented/20260221_K_cron-type-correctness-20260222.md) | [Review](implemented/20260222_review_AHK_dm-heartbeat-cron_approved-20260222.md)
-
----
-
-## 20. 音声チャット（Voice Chat）
-
-Animaとのリアルタイム音声会話機能。ブラウザ音声入力 → STT → 既存チャットパイプライン → TTS → ブラウザ再生。
-
-- **Voice Chat System — STT + TTS + WebSocket音声会話** (2026-02-26) — 音声専用WebSocket `/ws/voice/{name}` + faster-whisper STT + マルチプロバイダTTS（VOICEVOX / Style-BERT-VITS2 / ElevenLabs）。AudioWorklet PCM 16kHz直送、文分割ストリーミングTTS、VAD/PTT両対応、barge-in、Per-Anima音声設定
-  [設計](implemented/20260226_voice-chat-system-implemented-20260226.md) | [Review](implemented/20260226_review_voice-chat-system_approved-20260226.md)
-- **TTS不安定性修正** (2026-03-04) — 音声プロバイダの接続・再生エラー時の堅牢性向上
-  [設計](implemented/20260304_tts-instability-implemented-20260304.md) | [Review](implemented/20260304_review_tts-instability_approved-20260304.md)
-
----
-
-## 21. v0.2後の拡張（2026-02-27 — 2026-03-05）
-
-ツールアーキテクチャ統一、記憶システム改善、ハウスキーピング、Live Tool Activity、Mode C (Codex)、運用堅牢性の強化。
-
-### 実行エンジン
-
-- **Mode C (Codex) 追加** — Codex CLI経由でOpenAIモデル（o4-mini, o3, gpt-4.1等）を実行。サンドボックスモード + MCP連携でツール安全性を確保
-  [設計](core/execution/codex_sdk.py)
-- **LLM APIリトライ** (2026-03-05) — API呼び出し失敗時の自動リトライ機構
-  [設計](implemented/20260305_llm-api-retry_implemented-20260305.md) | [Review](implemented/20260305_review_llm-api-retry_approved-20260305.md)
-- **バックグラウンドモデルオーバーライド** (2026-03-05) — heartbeat/cron/task実行時のモデル切り替え
-  [設計](implemented/20260305_background-model-override-20260305.md) | [Review](implemented/20260305_review_background-model-override_approved-20260305.md)
-- **SDKエージェントツールインターセプト・ハートビート監視** (2026-03-05) — Mode Sでのツール呼び出し監視とハートビート応答検知
-  [設計](implemented/20260305_sdk-agent-tool-intercept-and-heartbeat-monitoring_implemented-20260305.md) | [Review](implemented/20260305_review_sdk-agent-tool-intercept-and-heartbeat-monitoring_approved-20260305.md)
-- **Agentサイクルツールサマリー** (2026-03-05) — ツール呼び出し引数の要約をSSE `tool_detail` で配信
-  [設計](implemented/20260305_agent-cycle-tool-summary_implemented-20260305.md) | [Review](implemented/20260305_review_agent-cycle-tool-summary_approved-20260305.md)
-- **クラッシュリカバリノート** (2026-03-05) — Agent SDKクラッシュ時の復旧ドキュメント整備
-  [設計](implemented/20260305_crash-recovery-note-implemented-20260305.md) | [Review](implemented/20260305_review_crash-recovery-note_approved-20260305.md)
-
-### ツール・スキルアーキテクチャ
-
-- **ツールアーキテクチャ — 外部ツールMCP全廃・スキル+CLI統一** (2026-03-04) — 外部ツール38スキーマを廃止し、ビルトイン内部ツール + スキル経由CLIの2層に統一。Mode B専用 `use_tool` ディスパッチャー導入
-  [設計](implemented/20260303_tool-architecture-skill-cli-migration_implemented-20260304.md) | [Review](implemented/20260304_review_tool-architecture-skill-cli-migration_r4_approved-20260304.md)
-- **ツール可視性統一** (2026-03-05) — 全実行モードでツール一覧の一貫性を確保
-  [設計](implemented/20260305_tool-visibility-unification_implemented-20260305.md) | [Review](implemented/20260305_review_tool-visibility-unification_approved-20260305.md)
-- **スキルクリエイター仕様準拠・パス修正** (2026-03-05) — スキル作成フローの仕様整合とパス検証
-  [設計](implemented/20260305_skill-creator-spec-alignment-and-path-fixes_implemented-20260305.md) | [Review](implemented/20260305_review_skill-creator-spec-alignment_approved-20260305.md)
-- **Live Tool Activity Streaming** (2026-03-04) — ツール実行のリアルタイム可視化。SSE `tool_detail` + ActivityLogger → WebSocketブロードキャスト
-  [設計](implemented/20260303_live-tool-activity-streaming.md) | [Review](implemented/20260304_review_live-tool-activity-streaming_approved.md)
-
-### 記憶システム
-
-- **DK段階廃止 Phase 1: Channel C 全知識検索** (2026-03-04) — Priming Channel Cの検索対象を「DK溢れファイル限定」から「全knowledge/procedures」に拡大
-  [設計](implemented/20260304_dk-removal-phase1-channel-c-full-search.md)
-- **Priming Channel C キーワード・topk修正** (2026-03-04) — 関連知識検索の精度向上
-  [設計](implemented/20260304_priming-channel-c-keyword-and-topk-fix_implemented-20260304.md)
-- **DK注入フロントマター修復** (2026-03-04) — knowledge/proceduresのfrontmatter検証・自動修復
-  [設計](implemented/20260303_dk-injection-frontmatter-repair-20260304.md) | [Review](implemented/20260304_review_dk-injection-frontmatter-repair_approved-20260304.md)
-- **知識フロントマター検証・修復** (2026-03-05) — 不正frontmatterの検出と自動修復
-  [設計](implemented/20260305_knowledge-frontmatter-validation-repair-implemented-20260305.md)
-- **スプレッディングアクティベーション残り修正** (2026-03-05) — 拡散活性化のepisodes対応と検索品質改善
-  [設計](implemented/20260305_spreading-activation-remaining-fixes_implemented-20260305.md)
-- **メモリファイルI/O保護** (2026-03-05) — 記憶書き込みのアトミック性と整合性保証
-  [設計](implemented/20260305_memory-file-io-protection_implemented-20260305.md)
-- **ファイル書き込みアトミック性** (2026-03-05) — クラッシュ耐性のあるファイル更新
-  [設計](implemented/20260305_file-write-atomicity-20260305.md) | [Review](implemented/20260305_review_file-write-atomicity_approved-20260305.md)
-
-### ハウスキーピング・運用
-
-- **ディスク容量管理 — ハウスキーピングジョブによる統一ローテーション** (2026-03-05) — prompt_logs、server-daemon.log、shortterm、cron_logs、DM archives等の統一クリーンアップ
-  [設計](implemented/20260305_housekeeping-disk-rotation_implemented-20260305.md) | [Review](implemented/20260305_review_housekeeping-disk-rotation_approved-20260305.md)
-- **Cronロガーデータ整合性** (2026-03-05) — cron実行ログの信頼性向上
-  [設計](implemented/20260305_cron-logger-data-integrity_implemented-20260305.md)
-- **タスクライフサイクルサイレント失敗** (2026-03-05) — pendingタスク実行失敗時の安全なハンドリング
-  [設計](implemented/20260305_task-lifecycle-silent-failure_implemented-20260305.md)
-- **ペンディングタスク失敗時の安全性** (2026-03-05) — タスク実行エラー時の復旧と再試行
-  [設計](implemented/20260305_pending-task-failure-safety-20260305.md) | [Review](implemented/20260305_review_pending-task-failure-safety_approved-20260305.md)
-
-### 通信・通知
-
-- **Per-Anima Slackボット** (2026-03-05) — AnimaごとのSlack Bot Token対応
-  [設計](implemented/20260305_per-anima-slack-bot_implemented-20260305.md) | [Review](implemented/20260305_per-anima-slack-bot_review-20260305.md)
-- **Slackスレッド返信メタデータ自動注入** (2026-03-05) — スレッド返信時のコンテキスト自動付与
-  [設計](implemented/20260305_slack-reply-metadata-autoinjection_implemented-20260305.md) | [Review](implemented/20260305_review_slack-reply-metadata-autoinjection_approved-20260305.md)
-- **通知ボールト堅牢性** (2026-03-05) — 認証情報の安全な保存・取得
-  [設計](implemented/20260305_notification-vault-robustness_implemented-20260305.md) | [Review](implemented/20260305_review_notification-vault-robustness_approved-20260305.md)
-
-### 設定・CLI
-
-- **設定スレッドセーフティクリーンアップ** (2026-03-05) — マルチスレッド環境での設定読み込みの安全性
-  [設計](implemented/20260305_config-thread-safety-cleanup_implemented-20260305.md)
-- **WebSocketブロードキャストレース** (2026-03-05) — ブロードキャスト時の競合状態解消
-  [設計](implemented/20260305_websocket-broadcast-race_implemented-20260305.md)
-- **animaworks anima rename コマンド** (2026-03-05) — Anima名のCLIからの変更
-  [設計](implemented/20260301_anima-rename-command_implemented-20260305.md) | [Review](implemented/20260305_review_anima-rename-command_approved-20260305.md)
-- **Opus 4 参照更新** (2026-03-05) — モデル参照の最新化
-  [設計](implemented/20260305_update-opus-4-20250514-refs_implemented-20260305.md) | [Review](implemented/20260305_review_update-opus-4-20250514-refs_approved-20260305.md)
-
-### その他（2026-02-27）
-
-- **アシスタント画像チャット** (2026-02-27) — チャット応答での画像表示対応
-  [設計](implemented/20260227_assistant-images-in-chat_implemented-20260227.md)
-- **マルチスレッドチャット** (2026-02-27) — バックエンド・フロントエンドの並列チャット処理
-  [設計](implemented/20260227_multi-thread-chat-backend-20260227.md) | [Review](implemented/20260227_review_multi-thread-chat_approved-20260227.md)
-- **チャットマルチタブ永続化** (2026-02-27) — タブごとのセッション状態保持
-  [設計](implemented/20260227_review_chat_multi-tab_persistence_revision2_approved-20260227.md)
-- **スキルディレクトリ構造移行** (2026-02-27) — スキル配置の再構成
-  [設計](implemented/20260227_review_skill-directory-structure-migration_approved-20260227.md)
-- **オープンドメイン画像プロキシ強化** (2026-02-27) — 画像URLのセキュリティ強化
-  [設計](implemented/20260227_review_open-domain-image-proxy-hardening_approved-20260227.md)
+- **ディスク容量管理**: ハウスキーピングジョブによる統一ローテーション。prompt_logs、shortterm、cron_logs、DM archives 等を自動クリーンアップする。
+- **トークン使用量追跡**: LLM 呼び出しの入力/出力トークンを計測・記録する。
+- **LLM API リトライ**: API 呼び出し失敗時の自動リトライで障害耐性を高める。
+- **ファイル書き込みアトミック性**: クラッシュ耐性のあるファイル更新。一時ファイル + リネームで整合性を保証する。
