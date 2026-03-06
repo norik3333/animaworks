@@ -82,7 +82,7 @@ async def test_file_creation_triggers_indexing(temp_anima_dir):
 
     # Check that file was indexed
     assert len(indexer.indexed_files) > 0
-    assert any(fp == test_file for fp, _ in indexer.indexed_files)
+    assert any(fp == test_file.resolve() for fp, _ in indexer.indexed_files)
 
 
 @pytest.mark.asyncio
@@ -123,8 +123,8 @@ def test_queue_file(temp_anima_dir):
     # Queue file manually
     watcher.queue_file(test_file)
 
-    # Check that file is in queue
-    assert test_file in watcher._queue
+    # Check that file is in queue (resolved to match watcher's path normalization)
+    assert test_file.resolve() in watcher._queue
 
 
 def test_memory_type_detection(temp_anima_dir):

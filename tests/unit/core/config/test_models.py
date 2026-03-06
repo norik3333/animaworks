@@ -494,10 +494,17 @@ class TestMatchPatternTable:
 
 class TestResolveExecutionModeWildcard:
     @pytest.fixture(autouse=True)
-    def _clear_models_json(self):
-        """Ensure models.json cache does not leak between tests."""
+    def _clear_models_json(self, monkeypatch):
+        """Ensure models.json cache does not leak between tests.
+
+        Also patches _load_models_json to return {} so the real
+        ~/.animaworks/models.json does not interfere with assertions
+        about config.json model_modes and code-default priorities.
+        """
+        import core.config.models as _m
         from core.config.models import invalidate_models_json_cache
         invalidate_models_json_cache()
+        monkeypatch.setattr(_m, "_load_models_json", lambda: {})
         yield
         invalidate_models_json_cache()
 

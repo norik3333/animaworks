@@ -94,7 +94,7 @@ class FileWatcher:
             extra_watch_dirs: Additional (directory, memory_type) pairs to watch.
                 Used for common_knowledge/ watching with a shared indexer.
         """
-        self.anima_dir = anima_dir
+        self.anima_dir = anima_dir.resolve()
         self.indexer = indexer
         self.knowledge_graph = knowledge_graph
         self.anima_name = anima_name
@@ -183,8 +183,7 @@ class FileWatcher:
         Args:
             file_path: Path to file to index
         """
-        # Update queue with current timestamp
-        self._queue[file_path] = time.time()
+        self._queue[file_path.resolve()] = time.time()
         logger.debug("Queued file: %s (queue size: %d)", file_path, len(self._queue))
 
     async def _process_queue_loop(self) -> None:
@@ -291,6 +290,8 @@ class FileWatcher:
         Returns:
             Memory type or None if not recognized
         """
+        file_path = file_path.resolve()
+
         # Check extra watch dirs first (e.g., common_knowledge/)
         for extra_dir, memory_type in self._extra_watch_dirs:
             try:
