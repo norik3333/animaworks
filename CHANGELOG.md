@@ -7,7 +7,11 @@ adhering to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-03-06
+
 ### Added
+- update demo defaults to en-business preset with real avatar assets
+- add Anima identity (username/icon_url) to slack_send tool
 - add Slack notification icons for all Animas
 - workspace dashboard live status, KPI polling, and activity streams
 - replace tier-based prompt scaling with linear budget allocation
@@ -53,6 +57,10 @@ adhering to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - add gmail inbox, sent, and search subcommands
 
 ### Fixed
+- regenerate female business avatars with correct gender prompt
+- add gender field to demo character sheets and fix prompt generation
+- add missing bubble-actions and voice-controls-slot to workspace CSS/HTML
+- add missing chat avatar styles to workspace CSS
 - always show amber spinner for any running stream entry
 - detect active groups on init so workspace spinners reflect ongoing tasks
 - replace silent except-pass with debug logging in reconciliation
@@ -117,6 +125,7 @@ adhering to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - reduce markdown re-render interval to 30ms / 10 chars
 - fix chat streaming stutter — incremental markdown, ASGI middleware, log reduction
 - fix streaming chat display jank — RAF batching, log reduction, SSE flush
+
 
 ## [0.4.10] - 2026-03-04
 
@@ -664,8 +673,8 @@ memory, and decision-making criteria.
 - Moved model mode patterns from config.json to models.json
 - Tool permissions changed from whitelist to default-allow (blacklist) model
 
-[Unreleased]: https://github.com/xuiltul/animaworks/compare/v0.4.10...HEAD
-[0.4.10]: https://github.com/xuiltul/animaworks/compare/v0.4.9...v0.4.10[0.4.8]: https://github.com/xuiltul/animaworks/compare/v0.4.7...v0.4.8
+[Unreleased]: https://github.com/xuiltul/animaworks/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/xuiltul/animaworks/compare/v0.4.10...v0.5.0
 [0.4.3]: https://github.com/xuiltul/animaworks/compare/v0.4.2...v0.4.3
 [0.4.0]: https://github.com/xuiltul/animaworks/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/xuiltul/animaworks/compare/v0.3.0...v0.3.1
