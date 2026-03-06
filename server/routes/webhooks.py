@@ -184,7 +184,9 @@ def create_webhooks_router() -> APIRouter:
                         )
                     if not _token:
                         _token = get_credential("slack", "slack_webhook", env_var="SLACK_BOT_TOKEN")
-                ctx = _fetch_thread_context(_token or "", channel_id, thread_ts)
+                import asyncio
+
+                ctx = await asyncio.to_thread(_fetch_thread_context, _token or "", channel_id, thread_ts)
                 if ctx:
                     text = ctx + text
 

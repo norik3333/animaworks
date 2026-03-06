@@ -29,6 +29,7 @@ class _FakeMsg:
     external_channel_id: str = ""
     source_message_id: str = ""
     external_user_id: str = ""
+    external_thread_ts: str = ""
 
 
 class TestBuildReplyInstructionSlack:

@@ -512,7 +512,7 @@ class TestSlackSocketModeManagerPerAnima:
             "channel": "C_SUMIRE_CHAN",
             "user": "U_USER",
             "text": "Hello Sumire",
-            "ts": "1.1",
+            "ts": "9999.1",
         }
         await handler_fn(event=event, say=AsyncMock())
 
@@ -520,7 +520,7 @@ class TestSlackSocketModeManagerPerAnima:
         mock_messenger_cls.return_value.receive_external.assert_called_once_with(
             content="Hello Sumire",
             source="slack",
-            source_message_id="1.1",
+            source_message_id="9999.1",
             external_user_id="U_USER",
             external_channel_id="C_SUMIRE_CHAN",
             external_thread_ts="",

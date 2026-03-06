@@ -258,6 +258,7 @@ class TestRouteThreadReply:
             source_message_id="reply.ts",
             external_user_id="U_HUMAN",
             external_channel_id="C001",
+            external_thread_ts="parent.ts",
         )
 
     def test_no_thread_ts_returns_false(self, routing_dir: Path) -> None:

@@ -189,6 +189,7 @@ def route_thread_reply(event: dict, shared_dir: Path) -> bool:
         source_message_id=event.get("ts", ""),
         external_user_id=event.get("user", ""),
         external_channel_id=event.get("channel", ""),
+        external_thread_ts=event.get("thread_ts", ""),
     )
     logger.info(
         "Thread reply routed: thread_ts=%s -> anima=%s",

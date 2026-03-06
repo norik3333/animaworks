@@ -48,7 +48,7 @@ def _build_reply_instruction(m: Any) -> str:
     if m.source == "slack":
         mention = f"<@{m.external_user_id}> " if m.external_user_id else ""
         cmd = f"animaworks-tool slack send '{m.external_channel_id}' '{mention}{{返信内容}}'"
-        thread_id = getattr(m, "external_thread_ts", "") or m.source_message_id
+        thread_id = m.external_thread_ts or m.source_message_id
         if thread_id:
             cmd += f" --thread {thread_id}"
         return f"  [reply_instruction: {cmd}]"

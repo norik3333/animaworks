@@ -317,7 +317,7 @@ class SlackSocketModeManager:
 
             if thread_ts:
                 token = self._get_per_anima_credential("SLACK_BOT_TOKEN", anima_name) or ""
-                ctx = _fetch_thread_context(token, channel_id, thread_ts)
+                ctx = await asyncio.to_thread(_fetch_thread_context, token, channel_id, thread_ts)
                 if ctx:
                     text = ctx + text
 
@@ -351,7 +351,7 @@ class SlackSocketModeManager:
 
             if thread_ts:
                 token = self._get_per_anima_credential("SLACK_BOT_TOKEN", anima_name) or ""
-                ctx = _fetch_thread_context(token, channel_id, thread_ts)
+                ctx = await asyncio.to_thread(_fetch_thread_context, token, channel_id, thread_ts)
                 if ctx:
                     text = ctx + text
 
@@ -418,7 +418,7 @@ class SlackSocketModeManager:
 
             if thread_ts:
                 token = get_credential("slack", "slack_webhook", env_var="SLACK_BOT_TOKEN") or ""
-                ctx = _fetch_thread_context(token, channel_id, thread_ts)
+                ctx = await asyncio.to_thread(_fetch_thread_context, token, channel_id, thread_ts)
                 if ctx:
                     text = ctx + text
 
@@ -462,7 +462,7 @@ class SlackSocketModeManager:
 
             if thread_ts:
                 token = get_credential("slack", "slack_webhook", env_var="SLACK_BOT_TOKEN") or ""
-                ctx = _fetch_thread_context(token, channel_id, thread_ts)
+                ctx = await asyncio.to_thread(_fetch_thread_context, token, channel_id, thread_ts)
                 if ctx:
                     text = ctx + text
 
