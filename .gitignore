@@ -43,8 +43,9 @@ mkdocs.yml
 # Archive (deprecated code)
 archive/
 
-# Documentation (only docs/paper/ and docs/release/ are public)
+# Documentation (only docs/images/, docs/paper/, docs/release/ are public)
 docs/*
+!docs/images/
 !docs/paper/
 !docs/release/
 
