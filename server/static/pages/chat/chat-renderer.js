@@ -74,11 +74,11 @@ export function createChatRenderer(ctx) {
 
   const BOOTSTRAP_STEPS = [
     { key: "chat.bootstrap_step_identity",  delayMs: 0 },
-    { key: "chat.bootstrap_step_workspace", delayMs: 8000 },
-    { key: "chat.bootstrap_step_avatar",    delayMs: 20000 },
-    { key: "chat.bootstrap_step_intro",     delayMs: 45000 },
-    { key: "chat.bootstrap_step_team",      delayMs: 70000 },
-    { key: "chat.bootstrap_step_finish",    delayMs: 90000 },
+    { key: "chat.bootstrap_step_workspace", delayMs: 6000 },
+    { key: "chat.bootstrap_step_avatar",    delayMs: 15000 },
+    { key: "chat.bootstrap_step_intro",     delayMs: 30000 },
+    { key: "chat.bootstrap_step_team",      delayMs: 50000 },
+    { key: "chat.bootstrap_step_finish",    delayMs: 75000 },
   ];
 
   let _bootstrapInterval = null;
@@ -128,16 +128,23 @@ export function createChatRenderer(ctx) {
     const startedAt = anima?._bootstrapStartedAt || (Date.now() - 30000);
     const elapsed = Date.now() - startedAt;
 
-    let currentStep = BOOTSTRAP_STEPS[0];
-    for (const step of BOOTSTRAP_STEPS) {
-      if (elapsed >= step.delayMs) currentStep = step;
+    let stepIdx = 0;
+    for (let i = 0; i < BOOTSTRAP_STEPS.length; i++) {
+      if (elapsed >= BOOTSTRAP_STEPS[i].delayMs) stepIdx = i;
     }
+    const currentStep = BOOTSTRAP_STEPS[stepIdx];
+
+    const dots = BOOTSTRAP_STEPS.map((_, i) =>
+      `<span class="bootstrap-dot${i <= stepIdx ? " bootstrap-dot--active" : ""}${i === stepIdx ? " bootstrap-dot--current" : ""}"></span>`
+    ).join("");
 
     container.innerHTML = `
       <div class="bootstrap-progress">
         <div class="bootstrap-progress-avatar">${_avatarHtml(anima)}</div>
+        <div class="bootstrap-progress-header">${t("chat.bootstrapping")}</div>
         <div class="bootstrap-progress-spinner"><span class="tool-spinner"></span></div>
         <div class="bootstrap-progress-step bootstrap-step-fade">${t(currentStep.key)}</div>
+        <div class="bootstrap-dots">${dots}</div>
       </div>`;
 
     _clearBootstrapInterval();
