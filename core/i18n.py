@@ -1897,6 +1897,49 @@ _STRINGS: dict[str, dict[str, str]] = {
         "ja": "parent_page_id は必須です",
         "en": "parent_page_id is required",
     },
+    # ── activity_report ──
+    "activity_report.invalid_date": {
+        "ja": "日付の形式が不正です（YYYY-MM-DD）",
+        "en": "Invalid date format (YYYY-MM-DD)",
+    },
+    "activity_report.future_date": {
+        "ja": "未来の日付は指定できません",
+        "en": "Future dates are not allowed",
+    },
+    "activity_report.not_found": {
+        "ja": "この日付のレポートはキャッシュされていません",
+        "en": "No cached report found for this date",
+    },
+    "activity_report.llm_system_prompt": {
+        "ja": (
+            "あなたは組織活動レポーターです。\n"
+            "以下のauditデータをもとに、組織の1日の活動をストーリー仕立てのMarkdownでまとめてください。\n\n"
+            "要件:\n"
+            "- 見出し: 日付 + 組織活動レポート\n"
+            "- ハイライト: 最も重要な成果を3-5個\n"
+            "- ロール別セクション: 開発、運用、CS、管理など（活動がある場合のみ）\n"
+            "- 各セクションは「誰が」「何をして」「どんな成果/影響をもたらしたか」を記述\n"
+            "- エラーや問題があれば「課題・注意事項」セクションに記載\n"
+            "- 数値データ（エントリ数、メッセージ数等）を適宜引用して説得力を持たせる\n"
+            "- 日本語で出力"
+        ),
+        "en": (
+            "You are an organisation activity reporter.\n"
+            "Based on the following audit data, create a Markdown narrative summarising the organisation's daily activity.\n\n"
+            "Requirements:\n"
+            "- Heading: date + Organisation Activity Report\n"
+            "- Highlights: 3-5 most important achievements\n"
+            "- Sections by role: Engineering, Operations, CS, Management, etc. (only if activity exists)\n"
+            "- Each section describes WHO did WHAT and WHAT impact it had\n"
+            "- If there were errors or issues, include a 'Issues & Notes' section\n"
+            "- Cite numerical data (entry counts, message counts, etc.) for credibility\n"
+            "- Output in English"
+        ),
+    },
+    "activity_report.llm_user_prompt": {
+        "ja": "以下のauditデータに基づいて組織活動レポートを生成してください。\n\n```json\n{data}\n```",
+        "en": "Generate an organisation activity report based on the following audit data.\n\n```json\n{data}\n```",
+    },
 }
 
 
