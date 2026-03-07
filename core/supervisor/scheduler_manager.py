@@ -208,7 +208,7 @@ class SchedulerManager:
         job_id = f"{self._anima_name}_heartbeat"
         try:
             self.scheduler.remove_job(job_id)
-        except Exception:
+        except KeyError:
             pass
         self._setup_heartbeat()
         logger.info("Heartbeat rescheduled for %s", self._anima_name)
@@ -307,7 +307,7 @@ class SchedulerManager:
         job_id = f"{self._anima_name}_activity_schedule"
         try:
             self.scheduler.remove_job(job_id)
-        except Exception:
+        except KeyError:
             pass
         self._setup_activity_schedule()
         self._apply_current_schedule_level()
