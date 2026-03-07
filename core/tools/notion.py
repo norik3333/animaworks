@@ -300,6 +300,7 @@ class NotionClient:
             "Content-Type": "application/json",
         }
         self._httpx: Any = None
+        self._client: Any = None
 
     def _get_httpx(self) -> Any:
         if self._httpx is None:
@@ -311,6 +312,13 @@ class NotionClient:
                 raise ImportError("notion tool requires 'httpx'. Install with: pip install httpx") from None
         return self._httpx
 
+    def _get_client(self) -> Any:
+        """Return a reusable httpx.Client (lazy singleton)."""
+        if self._client is None:
+            httpx = self._get_httpx()
+            self._client = httpx.Client(timeout=30.0, headers=self._headers)
+        return self._client
+
     def _request(
         self,
         method: str,
@@ -319,7 +327,6 @@ class NotionClient:
         params: dict[str, Any] | None = None,
     ) -> dict | list:
         """Send HTTP request with rate-limit retry and payload validation."""
-        httpx = self._get_httpx()
         url = f"{self.BASE_URL}{endpoint}"
 
         if json_data is not None:
@@ -334,14 +341,13 @@ class NotionClient:
                 )
 
         def _do_request() -> dict | list:
-            with httpx.Client(timeout=30.0) as client:
-                resp = client.request(
-                    method,
-                    url,
-                    headers=self._headers,
-                    json=json_data,
-                    params=params,
-                )
+            client = self._get_client()
+            resp = client.request(
+                method,
+                url,
+                json=json_data,
+                params=params,
+            )
             if resp.status_code == 429:
                 retry_after = float(resp.headers.get("Retry-After", RATE_LIMIT_WAIT_DEFAULT))
                 raise RateLimitError(retry_after, resp)
@@ -611,8 +617,8 @@ def cli_main(argv: list[str] | None = None) -> None:
         parser.print_help()
         sys.exit(0)
 
-    token = _resolve_cli_token()
     try:
+        token = _resolve_cli_token()
         client = NotionClient(token=token)
     except ToolConfigError as exc:
         print(f"Error: {exc}", file=sys.stderr)

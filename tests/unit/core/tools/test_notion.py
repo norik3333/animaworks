@@ -38,23 +38,18 @@ def mock_httpx_client():
     mock_response.json.return_value = {}
     mock_response.raise_for_status = MagicMock()
     mock_instance.request.return_value = mock_response
-
-    with patch("httpx.Client") as mock_client_cls:
-        mock_client_cls.return_value.__enter__.return_value = mock_instance
-        mock_client_cls.return_value.__exit__.return_value = None
-        yield mock_instance, mock_response
+    yield mock_instance, mock_response
 
 
 @pytest.fixture
 def notion_client(mock_httpx_client):
-    """Pre-configured NotionClient with mocked httpx."""
-    mock_instance, mock_response = mock_httpx_client
+    """Pre-configured NotionClient with mocked httpx via _get_client()."""
+    mock_instance, _mock_response = mock_httpx_client
     client = NotionClient(token="test-token")
-    # Inject mocked httpx so _get_httpx returns our mock
     mock_httpx_module = MagicMock()
-    mock_httpx_module.Client.return_value.__enter__.return_value = mock_instance
-    mock_httpx_module.Client.return_value.__exit__.return_value = None
+    mock_httpx_module.Client.return_value = mock_instance
     client._httpx = mock_httpx_module
+    client._client = mock_instance
     return client
 
 
@@ -511,7 +506,7 @@ class TestNotionClient:
     """Tests for NotionClient with mocked httpx."""
 
     def test_search_with_query(self, notion_client: NotionClient) -> None:
-        mock_instance = notion_client._httpx.Client.return_value.__enter__.return_value
+        mock_instance = notion_client._client
         mock_resp = mock_instance.request.return_value
         mock_resp.status_code = 200
         mock_resp.text = '{"results": [], "has_more": false}'
@@ -527,7 +522,7 @@ class TestNotionClient:
         assert body.get("query") == "test query"
 
     def test_get_page_normal(self, notion_client: NotionClient) -> None:
-        mock_instance = notion_client._httpx.Client.return_value.__enter__.return_value
+        mock_instance = notion_client._client
         mock_resp = mock_instance.request.return_value
         mock_resp.status_code = 200
         mock_resp.text = '{"id": "abc123"}'
@@ -544,7 +539,7 @@ class TestNotionClient:
         self,
         notion_client: NotionClient,
     ) -> None:
-        mock_instance = notion_client._httpx.Client.return_value.__enter__.return_value
+        mock_instance = notion_client._client
 
         first_page = {
             "results": [
@@ -584,7 +579,7 @@ class TestNotionClient:
         assert result["blocks_count"] >= 1
 
     def test_get_database_normal(self, notion_client: NotionClient) -> None:
-        mock_instance = notion_client._httpx.Client.return_value.__enter__.return_value
+        mock_instance = notion_client._client
         mock_resp = mock_instance.request.return_value
         mock_resp.status_code = 200
         mock_resp.text = '{"id": "db123", "title": [{"plain_text": "My DB"}]}'
@@ -604,7 +599,7 @@ class TestNotionClient:
         self,
         notion_client: NotionClient,
     ) -> None:
-        mock_instance = notion_client._httpx.Client.return_value.__enter__.return_value
+        mock_instance = notion_client._client
         mock_resp = mock_instance.request.return_value
         mock_resp.status_code = 200
         mock_resp.text = '{"results": []}'
@@ -623,7 +618,7 @@ class TestNotionClient:
         assert body.get("sorts") == [{"property": "Date", "direction": "descending"}]
 
     def test_create_page_with_page_parent(self, notion_client: NotionClient) -> None:
-        mock_instance = notion_client._httpx.Client.return_value.__enter__.return_value
+        mock_instance = notion_client._client
         mock_resp = mock_instance.request.return_value
         mock_resp.status_code = 200
         mock_resp.text = '{"id": "new-page"}'
@@ -643,7 +638,7 @@ class TestNotionClient:
         self,
         notion_client: NotionClient,
     ) -> None:
-        mock_instance = notion_client._httpx.Client.return_value.__enter__.return_value
+        mock_instance = notion_client._client
         mock_resp = mock_instance.request.return_value
         mock_resp.status_code = 200
         mock_resp.text = '{"id": "new-page"}'
@@ -660,7 +655,7 @@ class TestNotionClient:
         assert body["parent"]["database_id"] == "db-123"
 
     def test_update_page_normal(self, notion_client: NotionClient) -> None:
-        mock_instance = notion_client._httpx.Client.return_value.__enter__.return_value
+        mock_instance = notion_client._client
         mock_resp = mock_instance.request.return_value
         mock_resp.status_code = 200
         mock_resp.text = '{"id": "page-1"}'
@@ -677,7 +672,7 @@ class TestNotionClient:
         assert "/pages/page-1" in call[0][1]
 
     def test_create_database_normal(self, notion_client: NotionClient) -> None:
-        mock_instance = notion_client._httpx.Client.return_value.__enter__.return_value
+        mock_instance = notion_client._client
         mock_resp = mock_instance.request.return_value
         mock_resp.status_code = 200
         mock_resp.text = '{"id": "db-new"}'
@@ -706,7 +701,7 @@ class TestErrorHandling:
         self,
         notion_client: NotionClient,
     ) -> None:
-        mock_instance = notion_client._httpx.Client.return_value.__enter__.return_value
+        mock_instance = notion_client._client
         mock_resp = mock_instance.request.return_value
         mock_resp.status_code = 429
         mock_resp.headers = {"Retry-After": "2"}
@@ -719,7 +714,7 @@ class TestErrorHandling:
         assert exc_info.value.response is mock_resp
 
     def test_500_raises_server_error(self, notion_client: NotionClient) -> None:
-        mock_instance = notion_client._httpx.Client.return_value.__enter__.return_value
+        mock_instance = notion_client._client
         mock_resp = mock_instance.request.return_value
         mock_resp.status_code = 500
         mock_resp.text = "Internal Server Error"
@@ -734,7 +729,7 @@ class TestErrorHandling:
         self,
         notion_client: NotionClient,
     ) -> None:
-        mock_instance = notion_client._httpx.Client.return_value.__enter__.return_value
+        mock_instance = notion_client._client
         mock_resp = mock_instance.request.return_value
         mock_resp.status_code = 200
         mock_resp.json.return_value = {}
@@ -995,3 +990,320 @@ class TestExecutionProfile:
     def test_none_are_background_eligible(self) -> None:
         for action, profile in EXECUTION_PROFILE.items():
             assert profile.get("background_eligible") is False, f"{action} should not be background_eligible"
+
+
+# ── TestCliMain ─────────────────────────────────────────────
+
+
+class TestCliMain:
+    """Tests for cli_main() and _run_cli_command()."""
+
+    def test_cli_no_command_shows_help(self, capsys: pytest.CaptureFixture) -> None:
+        from core.tools.notion import cli_main
+
+        with pytest.raises(SystemExit) as exc_info:
+            cli_main([])
+        assert exc_info.value.code == 0
+
+    def test_cli_search(self, capsys: pytest.CaptureFixture) -> None:
+        from core.tools.notion import cli_main
+
+        with (
+            patch("core.tools.notion._resolve_cli_token", return_value="tok"),
+            patch("core.tools.notion.NotionClient") as mock_cls,
+        ):
+            inst = mock_cls.return_value
+            inst.search.return_value = {
+                "results": [
+                    {
+                        "object": "page",
+                        "id": "abc123",
+                        "properties": {
+                            "Name": {
+                                "type": "title",
+                                "title": [{"plain_text": "Test Page"}],
+                            },
+                        },
+                    },
+                    {
+                        "object": "database",
+                        "id": "db123",
+                        "title": [{"plain_text": "Test DB"}],
+                    },
+                ],
+            }
+            cli_main(["search", "test query"])
+        out = capsys.readouterr().out
+        assert "Test Page" in out
+        assert "Test DB" in out
+
+    def test_cli_search_json(self, capsys: pytest.CaptureFixture) -> None:
+        from core.tools.notion import cli_main
+
+        with (
+            patch("core.tools.notion._resolve_cli_token", return_value="tok"),
+            patch("core.tools.notion.NotionClient") as mock_cls,
+        ):
+            inst = mock_cls.return_value
+            inst.search.return_value = {"results": []}
+            cli_main(["search", "-j"])
+        out = capsys.readouterr().out
+        data = json.loads(out)
+        assert "results" in data
+
+    def test_cli_get_page(self, capsys: pytest.CaptureFixture) -> None:
+        from core.tools.notion import cli_main
+
+        with (
+            patch("core.tools.notion._resolve_cli_token", return_value="tok"),
+            patch("core.tools.notion.NotionClient") as mock_cls,
+        ):
+            inst = mock_cls.return_value
+            inst.get_page.return_value = {"id": "abc"}
+            cli_main(["get-page", "abc", "-j"])
+        out = capsys.readouterr().out
+        data = json.loads(out)
+        assert data["id"] == "abc"
+
+    def test_cli_get_page_content_text(self, capsys: pytest.CaptureFixture) -> None:
+        from core.tools.notion import cli_main
+
+        with (
+            patch("core.tools.notion._resolve_cli_token", return_value="tok"),
+            patch("core.tools.notion.NotionClient") as mock_cls,
+        ):
+            inst = mock_cls.return_value
+            inst.get_page_content.return_value = {
+                "page_id": "abc",
+                "markdown": "# Hello",
+                "blocks_count": 1,
+            }
+            cli_main(["get-page-content", "abc"])
+        out = capsys.readouterr().out
+        assert "# Hello" in out
+
+    def test_cli_get_database(self, capsys: pytest.CaptureFixture) -> None:
+        from core.tools.notion import cli_main
+
+        with (
+            patch("core.tools.notion._resolve_cli_token", return_value="tok"),
+            patch("core.tools.notion.NotionClient") as mock_cls,
+        ):
+            inst = mock_cls.return_value
+            inst.get_database.return_value = {"id": "db1"}
+            cli_main(["get-database", "db1", "-j"])
+        out = capsys.readouterr().out
+        data = json.loads(out)
+        assert data["id"] == "db1"
+
+    def test_cli_query(self, capsys: pytest.CaptureFixture) -> None:
+        from core.tools.notion import cli_main
+
+        with (
+            patch("core.tools.notion._resolve_cli_token", return_value="tok"),
+            patch("core.tools.notion.NotionClient") as mock_cls,
+        ):
+            inst = mock_cls.return_value
+            inst.query_database.return_value = {"results": [{"id": "r1"}]}
+            cli_main(["query", "db1", "--filter", '{"property": "Status"}', "-j"])
+        out = capsys.readouterr().out
+        data = json.loads(out)
+        assert len(data["results"]) == 1
+
+    def test_cli_query_text(self, capsys: pytest.CaptureFixture) -> None:
+        from core.tools.notion import cli_main
+
+        with (
+            patch("core.tools.notion._resolve_cli_token", return_value="tok"),
+            patch("core.tools.notion.NotionClient") as mock_cls,
+        ):
+            inst = mock_cls.return_value
+            inst.query_database.return_value = {"results": [{"id": "r1"}]}
+            cli_main(["query", "db1"])
+        out = capsys.readouterr().out
+        assert "r1" in out
+
+    def test_cli_create_page_with_page_parent(self, capsys: pytest.CaptureFixture) -> None:
+        from core.tools.notion import cli_main
+
+        with (
+            patch("core.tools.notion._resolve_cli_token", return_value="tok"),
+            patch("core.tools.notion.NotionClient") as mock_cls,
+        ):
+            inst = mock_cls.return_value
+            inst.create_page.return_value = {"id": "new1"}
+            cli_main(
+                [
+                    "create-page",
+                    "--parent-page-id",
+                    "parent1",
+                    "--properties",
+                    '{"Name": {"title": []}}',
+                ]
+            )
+        out = capsys.readouterr().out
+        assert "Created" in out
+
+    def test_cli_create_page_with_db_parent(self, capsys: pytest.CaptureFixture) -> None:
+        from core.tools.notion import cli_main
+
+        with (
+            patch("core.tools.notion._resolve_cli_token", return_value="tok"),
+            patch("core.tools.notion.NotionClient") as mock_cls,
+        ):
+            inst = mock_cls.return_value
+            inst.create_page.return_value = {"id": "new2"}
+            cli_main(
+                [
+                    "create-page",
+                    "--parent-database-id",
+                    "db1",
+                    "--properties",
+                    '{"Name": {"title": []}}',
+                    "-j",
+                ]
+            )
+        out = capsys.readouterr().out
+        data = json.loads(out)
+        assert data["id"] == "new2"
+
+    def test_cli_create_page_no_parent_exits(self, capsys: pytest.CaptureFixture) -> None:
+        from core.tools.notion import cli_main
+
+        with (
+            patch("core.tools.notion._resolve_cli_token", return_value="tok"),
+            patch("core.tools.notion.NotionClient"),
+        ):
+            with pytest.raises(SystemExit) as exc_info:
+                cli_main(["create-page", "--properties", "{}"])
+            assert exc_info.value.code == 1
+
+    def test_cli_update_page(self, capsys: pytest.CaptureFixture) -> None:
+        from core.tools.notion import cli_main
+
+        with (
+            patch("core.tools.notion._resolve_cli_token", return_value="tok"),
+            patch("core.tools.notion.NotionClient") as mock_cls,
+        ):
+            inst = mock_cls.return_value
+            inst.update_page.return_value = {"id": "abc"}
+            cli_main(["update-page", "abc", "--properties", '{"Status": {}}'])
+        out = capsys.readouterr().out
+        assert "Updated" in out
+
+    def test_cli_create_database(self, capsys: pytest.CaptureFixture) -> None:
+        from core.tools.notion import cli_main
+
+        with (
+            patch("core.tools.notion._resolve_cli_token", return_value="tok"),
+            patch("core.tools.notion.NotionClient") as mock_cls,
+        ):
+            inst = mock_cls.return_value
+            inst.create_database.return_value = {"id": "db_new"}
+            cli_main(
+                [
+                    "create-database",
+                    "--parent-page-id",
+                    "p1",
+                    "--title",
+                    "My DB",
+                    "--properties",
+                    '{"Name": {"title": {}}}',
+                ]
+            )
+        out = capsys.readouterr().out
+        assert "Created database" in out
+
+    def test_cli_notion_api_error_exits(self, capsys: pytest.CaptureFixture) -> None:
+        from core.tools.notion import cli_main
+
+        with (
+            patch("core.tools.notion._resolve_cli_token", return_value="tok"),
+            patch("core.tools.notion.NotionClient") as mock_cls,
+        ):
+            inst = mock_cls.return_value
+            inst.search.side_effect = NotionAPIError("API failure")
+            with pytest.raises(SystemExit) as exc_info:
+                cli_main(["search", "test"])
+            assert exc_info.value.code == 1
+
+    def test_cli_tool_config_error_exits(self, capsys: pytest.CaptureFixture) -> None:
+        from core.tools.notion import cli_main
+
+        with patch("core.tools.notion._resolve_cli_token", side_effect=ToolConfigError("no token")):
+            with pytest.raises(SystemExit) as exc_info:
+                cli_main(["search", "test"])
+            assert exc_info.value.code == 1
+
+
+# ── TestGetClient ───────────────────────────────────────────
+
+
+class TestGetClient:
+    """Tests for _get_client() lazy singleton."""
+
+    def test_get_client_creates_once(self) -> None:
+        client = NotionClient(token="test-token")
+        mock_httpx_mod = MagicMock()
+        mock_http_client = MagicMock()
+        mock_httpx_mod.Client.return_value = mock_http_client
+        client._httpx = mock_httpx_mod
+
+        c1 = client._get_client()
+        c2 = client._get_client()
+        assert c1 is c2
+        mock_httpx_mod.Client.assert_called_once()
+
+
+# ── TestGetCliGuide ─────────────────────────────────────────
+
+
+class TestGetCliGuide:
+    """Tests for get_cli_guide()."""
+
+    def test_returns_non_empty_string(self) -> None:
+        from core.tools.notion import get_cli_guide
+
+        guide = get_cli_guide()
+        assert isinstance(guide, str)
+        assert "animaworks-tool notion" in guide
+        assert "search" in guide
+
+
+# ── TestBuildPageUrl edge cases ─────────────────────────────
+
+
+class TestBuildPageUrlEdge:
+    """Edge case tests for build_page_url."""
+
+    def test_none_input(self) -> None:
+        assert build_page_url(None) == ""  # type: ignore[arg-type]
+
+
+# ── TestToggleWithChildren ──────────────────────────────────
+
+
+class TestToggleWithChildren:
+    """Tests for toggle block with _children."""
+
+    def test_toggle_with_children(self) -> None:
+        blocks = [
+            {
+                "type": "toggle",
+                "toggle": {
+                    "rich_text": [{"type": "text", "plain_text": "Click me"}],
+                },
+                "_children": [
+                    {
+                        "type": "paragraph",
+                        "paragraph": {
+                            "rich_text": [{"type": "text", "plain_text": "Hidden content"}],
+                        },
+                    },
+                ],
+            },
+        ]
+        md = blocks_to_markdown(blocks)
+        assert "Click me" in md
+        assert "Hidden content" in md
+        assert "<details>" in md
