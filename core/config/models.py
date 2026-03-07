@@ -444,7 +444,9 @@ class AnimaWorksConfig(BaseModel):
     voice: VoiceConfig = VoiceConfig()
     housekeeping: HousekeepingConfig = HousekeepingConfig()
     activity_level: int = Field(
-        default=100, ge=10, le=400,
+        default=100,
+        ge=10,
+        le=400,
         description="Global activity level (10-400%). Scales heartbeat interval and max_turns.",
     )
     ui: UIConfig = UIConfig()

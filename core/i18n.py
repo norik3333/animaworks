@@ -632,7 +632,10 @@ _STRINGS: dict[str, dict[str, str]] = {
         "ja": "Error: プロファイル '{name}' は既に存在します",
         "en": "Error: Profile '{name}' already exists",
     },
-    "cli.profile_not_found": {"ja": "Error: プロファイル '{name}' が見つかりません", "en": "Error: Profile '{name}' not found"},
+    "cli.profile_not_found": {
+        "ja": "Error: プロファイル '{name}' が見つかりません",
+        "en": "Error: Profile '{name}' not found",
+    },
     "cli.profile_removed": {
         "ja": "プロファイル '{name}' を削除しました（登録のみ）",
         "en": "Profile '{name}' removed (registration only)",
@@ -650,7 +653,10 @@ _STRINGS: dict[str, dict[str, str]] = {
         "ja": "プロファイル '{name}' は起動中です。先に停止してください",
         "en": "Profile '{name}' is running. Stop it first",
     },
-    "cli.profile_not_running": {"ja": "プロファイル '{name}' は起動していません", "en": "Profile '{name}' is not running"},
+    "cli.profile_not_running": {
+        "ja": "プロファイル '{name}' は起動していません",
+        "en": "Profile '{name}' is not running",
+    },
     "cli.profile_stopping": {
         "ja": "'{name}' を停止中 (pid={pid})...",
         "en": "Stopping '{name}' (pid={pid})...",

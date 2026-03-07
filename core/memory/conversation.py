@@ -782,6 +782,7 @@ class ConversationMemory:
         import litellm
 
         from core.memory._llm_utils import get_consolidation_llm_kwargs
+
         llm_kw = get_consolidation_llm_kwargs()
         model = llm_kw.pop("model")
         kwargs: dict[str, Any] = llm_kw

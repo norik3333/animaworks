@@ -31,6 +31,7 @@ _credentials_lock = threading.Lock()
 
 # ── Credential export for LiteLLM ───────────────────────────────────────────
 
+
 def ensure_credentials_in_env() -> None:
     """Export config.json credentials to environment variables for LiteLLM auto-detection.
 
@@ -65,6 +66,7 @@ def ensure_credentials_in_env() -> None:
 
 
 # ── Consolidation LLM kwargs ─────────────────────────────────────────────────
+
 
 def get_consolidation_llm_kwargs() -> dict[str, Any]:
     """Build kwargs for consolidation LLM calls (model, api_key, etc.).

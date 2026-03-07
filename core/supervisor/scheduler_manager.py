@@ -165,7 +165,6 @@ class SchedulerManager:
         else:
             # IntervalTrigger for intervals > 60 minutes
             from datetime import datetime
-
             from zoneinfo import ZoneInfo
 
             from apscheduler.triggers.interval import IntervalTrigger as APIntervalTrigger

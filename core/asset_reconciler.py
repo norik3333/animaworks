@@ -520,6 +520,7 @@ async def _synthesize_prompt_via_llm(
         user_prompt_key = "asset_reconciler.llm_user_prompt"
 
     from core.memory._llm_utils import get_consolidation_llm_kwargs
+
     llm_kw = get_consolidation_llm_kwargs()
     llm_model = llm_kw["model"]
     api_key = llm_kw.get("api_key") or os.environ.get(model_config.api_key_env)
