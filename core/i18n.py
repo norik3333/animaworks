@@ -361,6 +361,39 @@ _STRINGS: dict[str, dict[str, str]] = {
         "ja": "{target_name}の監査レポート生成（{hours}h）",
         "en": "Generated audit report for {target_name} ({hours}h)",
     },
+    "handler.audit_tool_line": {
+        "ja": "{name} (全{total}回): ",
+        "en": "{name} ({total} total): ",
+    },
+    # ── core/audit.py (org-wide timeline) ──
+    "audit.timeline_label_heartbeat_end": {"ja": "HB", "en": "HB"},
+    "audit.timeline_label_heartbeat_reflection": {"ja": "振り返り", "en": "Reflection"},
+    "audit.timeline_label_response_sent": {"ja": "応答", "en": "Response"},
+    "audit.timeline_label_cron_executed": {"ja": "Cron", "en": "Cron"},
+    "audit.timeline_label_message_sent": {"ja": "DM", "en": "DM"},
+    "audit.timeline_label_task_exec_end": {"ja": "タスク完了", "en": "Task done"},
+    "audit.timeline_label_issue_resolved": {"ja": "解決", "en": "Resolved"},
+    "audit.timeline_label_error": {"ja": "エラー", "en": "Error"},
+    "audit.org_timeline_title": {
+        "ja": "═══ 組織タイムライン ({date}) — {count}名 ═══",
+        "en": "═══ Org Timeline ({date}) — {count} animas ═══",
+    },
+    "audit.org_timeline_no_activity": {
+        "ja": "(この期間の活動ログはありません)",
+        "en": "(No activity log for this period)",
+    },
+    "audit.org_timeline_tool_header": {
+        "ja": "■ ツール使用サマリー",
+        "en": "■ Tool Usage Summary",
+    },
+    "audit.org_timeline_tool_line": {
+        "ja": "{name} (全{total}回): ",
+        "en": "{name} ({total} total): ",
+    },
+    "audit.org_timeline_footer": {
+        "ja": "─── 統計: 全{count}名 | 活動{total}件 | ツール{tools} | HB{hb} | 応答{resp} | DM{dm} | エラー{err} ───",
+        "en": "─── Stats: {count} animas | {total} events | Tools {tools} | HB {hb} | Responses {resp} | DM {dm} | Errors {err} ───",
+    },
     "handler.tool_creation_keyword": {"ja": "ツール作成", "en": "Tool Creation"},
     # ── anima.py ──
     "anima.bg_task_done": {"ja": "バックグラウンドタスク完了: {tool}", "en": "Background task completed: {tool}"},
@@ -1985,36 +2018,38 @@ _STRINGS: dict[str, dict[str, str]] = {
     "activity_report.llm_system_prompt": {
         "ja": (
             "あなたは組織活動レポーターです。\n"
-            "以下のauditデータをもとに、組織の1日の活動をストーリー仕立てのMarkdownでまとめてください。\n\n"
+            "以下の「組織タイムライン」を読み、1日の活動をストーリー仕立てのMarkdownレポートにまとめてください。\n\n"
+            "タイムラインのフォーマット:\n"
+            "- [HH:MM] 名前 アイコン イベント種別 の形式で時系列に並んでいます\n"
+            "- 末尾にツール使用サマリーと統計があります\n\n"
             "要件:\n"
             "- 見出し: 日付 + 組織活動レポート\n"
             "- ハイライト: 最も重要な成果を3-5個\n"
-            "- ロール別セクション: 開発、運用、CS、管理など（活動がある場合のみ）\n"
-            "- 各セクションは「誰が」「何をして」「どんな成果/影響をもたらしたか」を記述\n"
-            "- key_activitiesフィールドに各Animaの具体的な行動・思考・発言が含まれている。これを積極的に引用してストーリーを構成すること\n"
-            "- 数値データ（type_counts等）は補助情報として使い、key_activitiesの内容を主軸にすること\n"
+            "- ストーリー形式: 時系列に沿って「誰が」「何をして」「どうなったか」を自然な文章で記述\n"
+            "- 関連する出来事（指示→実行→完了など）を因果関係でつなげて読みやすくする\n"
             "- エラーや問題があれば「課題・注意事項」セクションに記載\n"
-            "- 数値データ（エントリ数、メッセージ数等）を適宜引用して説得力を持たせる\n"
+            "- 末尾の統計データを引用して全体像を補足\n"
             "- 日本語で出力"
         ),
         "en": (
             "You are an organisational activity reporter.\n"
-            "Summarise the day's activities as a narrative-style Markdown report based on the audit data below.\n\n"
+            "Read the 'Org Timeline' below and produce a narrative-style Markdown report of the day's activities.\n\n"
+            "Timeline format:\n"
+            "- Each line is [HH:MM] name icon event_type, sorted chronologically\n"
+            "- Tool usage summary and statistics are at the bottom\n\n"
             "Requirements:\n"
             "- Heading: Date + Organisation Activity Report\n"
             "- Highlights: 3-5 most important outcomes\n"
-            "- Sections by role: Development, Operations, CS, Management, etc. (only if activity exists)\n"
-            "- Each section describes \"who\" \"did what\" and \"what outcome/impact it had\"\n"
-            "- The key_activities field contains each Anima's specific actions, thoughts, and messages — use these prominently to build the narrative\n"
-            "- Use numeric data (type_counts etc.) as supporting evidence, with key_activities content as the primary source\n"
-            "- Include an \"Issues & Notes\" section for errors or problems\n"
-            "- Cite numeric data (entry counts, message counts, etc.) to add credibility\n"
+            '- Narrative style: describe chronologically "who" "did what" "with what result" in natural prose\n'
+            "- Connect related events (instruction → execution → completion) with causal links for readability\n"
+            '- Include an "Issues & Notes" section for errors or problems\n'
+            "- Cite the statistics at the bottom to provide the big picture\n"
             "- Output in English"
         ),
     },
     "activity_report.llm_user_prompt": {
-        "ja": "以下のauditデータに基づいて組織活動レポートを生成してください。\n\n```json\n{data}\n```",
-        "en": "Generate an organisation activity report based on the following audit data.\n\n```json\n{data}\n```",
+        "ja": "以下の組織タイムラインに基づいて活動レポートを生成してください。\n\n{data}",
+        "en": "Generate an activity report based on the following org timeline.\n\n{data}",
     },
 }
 

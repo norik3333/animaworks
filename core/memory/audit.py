@@ -350,7 +350,7 @@ class AuditAggregator:
                     continue
                 top = tc.most_common(_MAX_TOOL_SUMMARY)
                 parts = [f"{tn}: {cnt}" for tn, cnt in top]
-                lines.append(f"  {name} (全{total}回): " + " | ".join(parts))
+                lines.append("  " + t("handler.audit_tool_line", name=name, total=total) + " | ".join(parts))
             lines.append("")
 
         total = sum(global_type_counts.values())
@@ -362,8 +362,7 @@ class AuditAggregator:
                 total=total,
                 tools=tool_total,
                 hb=global_type_counts.get("heartbeat_end", 0),
-                resp_sent=global_type_counts.get("response_sent", 0)
-                + global_type_counts.get("cron_executed", 0),
+                resp_sent=global_type_counts.get("response_sent", 0) + global_type_counts.get("cron_executed", 0),
                 dm_sent=global_type_counts.get("message_sent", 0),
                 errors=global_type_counts.get("error", 0),
             )

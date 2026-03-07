@@ -19,6 +19,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
+from core.i18n import t
 from core.paths import get_animas_dir
 
 logger = logging.getLogger(__name__)
@@ -41,6 +42,35 @@ _QUALITATIVE_EVENT_TYPES = frozenset(
 _MAX_KEY_ACTIVITIES = 15
 _KEY_ACTIVITY_TRUNCATE = 200
 _TOP_TOOLS_LIMIT = 10
+_TIMELINE_CONTENT_TRUNCATE = 300
+
+_TIMELINE_ICONS: dict[str, str] = {
+    "heartbeat_end": "🔄",
+    "heartbeat_reflection": "🪞",
+    "response_sent": "💬",
+    "cron_executed": "⏰",
+    "message_sent": "📨",
+    "task_exec_end": "✅",
+    "issue_resolved": "🎯",
+    "error": "❌",
+}
+
+_TIMELINE_LABEL_KEYS: dict[str, str] = {
+    "heartbeat_end": "audit.timeline_label_heartbeat_end",
+    "heartbeat_reflection": "audit.timeline_label_heartbeat_reflection",
+    "response_sent": "audit.timeline_label_response_sent",
+    "cron_executed": "audit.timeline_label_cron_executed",
+    "message_sent": "audit.timeline_label_message_sent",
+    "task_exec_end": "audit.timeline_label_task_exec_end",
+    "issue_resolved": "audit.timeline_label_issue_resolved",
+    "error": "audit.timeline_label_error",
+}
+
+
+def _get_timeline_label(etype: str) -> str:
+    """Resolve a timeline event label via i18n."""
+    key = _TIMELINE_LABEL_KEYS.get(etype)
+    return t(key) if key else etype
 
 
 # ── Data models ──────────────────────────────────────────────
@@ -249,10 +279,7 @@ def _collect_single_anima(anima_dir: Path, target_date: str) -> AnimaAuditEntry 
             continue
         tool_name = e.get("tool") or (e.get("meta") or {}).get("tool") or "unknown"
         tool_counts[tool_name] += 1
-    top_tools = [
-        {"name": name, "count": count}
-        for name, count in tool_counts.most_common(_TOP_TOOLS_LIMIT)
-    ]
+    top_tools = [{"name": name, "count": count} for name, count in tool_counts.most_common(_TOP_TOOLS_LIMIT)]
 
     return AnimaAuditEntry(
         name=name,
@@ -325,3 +352,119 @@ async def collect_org_audit(
         active_anima_count=active_count,
         disabled_anima_count=disabled_count,
     )
+
+
+# ── Timeline text generation ─────────────────────────────────
+
+
+def _extract_timeline_content(e: dict) -> str:
+    """Extract display content from a raw activity dict."""
+    etype = e.get("type", "")
+    content = e.get("content", "") or ""
+    summary = e.get("summary", "") or ""
+
+    if etype in ("heartbeat_end", "task_exec_end"):
+        return (summary or content)[:_TIMELINE_CONTENT_TRUNCATE]
+    if etype in ("heartbeat_reflection", "response_sent", "issue_resolved"):
+        return content[:_TIMELINE_CONTENT_TRUNCATE]
+    if etype == "cron_executed":
+        return (content or summary)[:_TIMELINE_CONTENT_TRUNCATE]
+    if etype == "message_sent":
+        to_person = e.get("to_person") or "unknown"
+        return f"→ {to_person}: {(content or summary)[:250]}"
+    if etype == "error":
+        text = (summary or content[:100])[:_TIMELINE_CONTENT_TRUNCATE]
+        meta = e.get("meta") or {}
+        phase = meta.get("phase", "")
+        return f"(phase: {phase}) {text}" if phase else text
+    return (summary or content)[:_TIMELINE_CONTENT_TRUNCATE]
+
+
+def generate_org_timeline(target_date: str) -> str:
+    """Generate a unified cross-anima timeline for a specific date.
+
+    Returns plain text suitable for direct LLM consumption or CLI display.
+    """
+    animas_dir = get_animas_dir()
+    if not animas_dir.exists():
+        return ""
+
+    anima_dirs = sorted([d for d in animas_dir.iterdir() if d.is_dir() and (d / "status.json").exists()])
+
+    tagged: list[tuple[str, dict]] = []
+    per_anima_tool_counts: dict[str, Counter[str]] = {}
+    per_anima_total_tools: Counter[str] = Counter()
+    global_type_counts: Counter[str] = Counter()
+
+    for anima_dir in anima_dirs:
+        name = anima_dir.name
+        log_dir = anima_dir / "activity_log"
+        raw_entries = _load_entries_for_date(log_dir, target_date)
+        per_anima_tool_counts[name] = Counter()
+        for e in raw_entries:
+            etype = e.get("type", "unknown")
+            global_type_counts[etype] += 1
+            if etype == "tool_use":
+                tool_name = e.get("tool") or (e.get("meta") or {}).get("tool") or "unknown"
+                per_anima_tool_counts[name][tool_name] += 1
+                per_anima_total_tools[name] += 1
+            elif etype in _QUALITATIVE_EVENT_TYPES:
+                tagged.append((name, e))
+
+    tagged.sort(key=lambda x: x[1].get("ts", ""))
+
+    active_names = [d.name for d in anima_dirs]
+    lines: list[str] = [
+        t("audit.org_timeline_title", date=target_date, count=len(active_names)),
+        "",
+    ]
+
+    if not tagged and not any(per_anima_total_tools.values()):
+        lines.append(t("audit.org_timeline_no_activity"))
+        return "\n".join(lines)
+
+    for name, e in tagged:
+        ts = _ts_to_hhmm(e.get("ts", ""))
+        etype = e.get("type", "")
+        icon = _TIMELINE_ICONS.get(etype, "📝")
+        label = _get_timeline_label(etype)
+        content = _extract_timeline_content(e)
+        lines.append(f"[{ts}] {name} {icon} {label}")
+        if content:
+            for cl in content.split("\n")[:3]:
+                lines.append(f"  {cl}")
+        lines.append("")
+
+    has_tools = any(c for c in per_anima_tool_counts.values() if c)
+    if has_tools:
+        lines.append(t("audit.org_timeline_tool_header"))
+        for name in sorted(per_anima_tool_counts):
+            tc = per_anima_tool_counts[name]
+            total = per_anima_total_tools[name]
+            if total == 0:
+                continue
+            top = tc.most_common(10)
+            parts = [f"{tn}: {cnt}" for tn, cnt in top]
+            lines.append("  " + t("audit.org_timeline_tool_line", name=name, total=total) + " | ".join(parts))
+        lines.append("")
+
+    total = sum(global_type_counts.values())
+    tool_total = sum(per_anima_total_tools.values())
+    hb = global_type_counts.get("heartbeat_end", 0)
+    resp = global_type_counts.get("response_sent", 0) + global_type_counts.get("cron_executed", 0)
+    dm = global_type_counts.get("message_sent", 0)
+    err = global_type_counts.get("error", 0)
+    lines.append(
+        t(
+            "audit.org_timeline_footer",
+            count=len(active_names),
+            total=total,
+            tools=tool_total,
+            hb=hb,
+            resp=resp,
+            dm=dm,
+            err=err,
+        )
+    )
+
+    return "\n".join(lines)

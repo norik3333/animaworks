@@ -6,6 +6,7 @@ from __future__ import annotations
 
 """Activity Report API — organisation-wide audit + LLM narrative generation."""
 
+import asyncio
 import hashlib
 import json
 import logging
@@ -117,8 +118,8 @@ def _available_models() -> list[dict[str, str]]:
     return models
 
 
-async def _generate_narrative(audit_data: dict[str, Any], model: str) -> str | None:
-    """Generate LLM narrative from structured audit data."""
+async def _generate_narrative(timeline_text: str, model: str) -> str | None:
+    """Generate LLM narrative from unified timeline text."""
     try:
         from core.memory._llm_utils import one_shot_completion
     except ImportError:
@@ -126,7 +127,7 @@ async def _generate_narrative(audit_data: dict[str, Any], model: str) -> str | N
         return None
 
     system_prompt = t("activity_report.llm_system_prompt")
-    user_prompt = t("activity_report.llm_user_prompt", data=json.dumps(audit_data, ensure_ascii=False, indent=2))
+    user_prompt = t("activity_report.llm_user_prompt", data=timeline_text)
 
     try:
         return await one_shot_completion(
@@ -190,18 +191,22 @@ def create_activity_report_router() -> APIRouter:
                 cached["cached"] = True
                 return JSONResponse(cached)
 
-        from core.audit import collect_org_audit
+        from core.audit import collect_org_audit, generate_org_timeline
 
-        report = await collect_org_audit(req.date)
+        report, timeline_text = await asyncio.gather(
+            collect_org_audit(req.date),
+            asyncio.get_event_loop().run_in_executor(None, generate_org_timeline, req.date),
+        )
         structured = report.to_dict()
 
         narrative_md: str | None = None
-        if report.total_entries > 0 and model:
-            narrative_md = await _generate_narrative(structured, model)
+        if timeline_text.strip() and model:
+            narrative_md = await _generate_narrative(timeline_text, model)
 
         result: dict[str, Any] = {
             "date": req.date,
             "structured": structured,
+            "timeline": timeline_text,
             "narrative_md": narrative_md,
             "model_used": model,
             "cached": False,
