@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -25,6 +26,7 @@ _PROVIDER_ENV_MAP: dict[str, str] = {
 }
 
 _credentials_exported: bool = False
+_credentials_lock = threading.Lock()
 
 
 # ── Credential export for LiteLLM ───────────────────────────────────────────
@@ -32,31 +34,34 @@ _credentials_exported: bool = False
 def ensure_credentials_in_env() -> None:
     """Export config.json credentials to environment variables for LiteLLM auto-detection.
 
-    Runs at most once per process. Uses a module-level flag to avoid repeated work.
+    Runs at most once per process.  Thread-safe via double-checked locking.
     Silently returns if config loading fails.
     """
     global _credentials_exported
     if _credentials_exported:
         return
+    with _credentials_lock:
+        if _credentials_exported:
+            return
 
-    try:
-        from core.config import load_config
+        try:
+            from core.config import load_config
 
-        cfg = load_config()
-    except Exception:
-        return
+            cfg = load_config()
+        except Exception:
+            return
 
-    for provider, cred in cfg.credentials.items():
-        if not cred.api_key:
-            continue
-        env_key = _PROVIDER_ENV_MAP.get(provider)
-        if env_key is None:
-            continue
-        if not os.environ.get(env_key):
-            os.environ[env_key] = cred.api_key
-            logger.debug("Exported credential for %s to %s", provider, env_key)
+        for provider, cred in cfg.credentials.items():
+            if not cred.api_key:
+                continue
+            env_key = _PROVIDER_ENV_MAP.get(provider)
+            if env_key is None:
+                continue
+            if not os.environ.get(env_key):
+                os.environ[env_key] = cred.api_key
+                logger.debug("Exported credential for %s to %s", provider, env_key)
 
-    _credentials_exported = True
+        _credentials_exported = True
 
 
 # ── Consolidation LLM kwargs ─────────────────────────────────────────────────
@@ -88,5 +93,7 @@ def get_consolidation_llm_kwargs() -> dict[str, Any]:
             api_key = os.environ.get(env_key) or None
     if api_key:
         kwargs["api_key"] = api_key
+    if cred and cred.base_url:
+        kwargs["api_base"] = cred.base_url
 
     return kwargs

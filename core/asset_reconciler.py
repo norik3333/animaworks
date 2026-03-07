@@ -536,8 +536,8 @@ async def _synthesize_prompt_via_llm(
     }
     if api_key:
         kwargs["api_key"] = api_key
-    if model_config.api_base_url:
-        kwargs["api_base"] = model_config.api_base_url
+    if llm_kw.get("api_base"):
+        kwargs["api_base"] = llm_kw["api_base"]
 
     try:
         import litellm

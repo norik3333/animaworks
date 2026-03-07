@@ -785,7 +785,6 @@ class ConversationMemory:
         llm_kw = get_consolidation_llm_kwargs()
         model = llm_kw.pop("model")
         kwargs: dict[str, Any] = llm_kw
-        self._apply_provider_kwargs(model, kwargs)
         response = cast(
             Any,
             await litellm.acompletion(
