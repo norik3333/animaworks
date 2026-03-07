@@ -2833,13 +2833,13 @@
 .demo-suggest-header h3 {
   font-size: 1.2rem;
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--aw-color-text-primary);
   margin: 0 0 0.25rem;
 }
 
 .demo-suggest-header p {
   font-size: 0.85rem;
-  color: var(--text-tertiary);
+  color: var(--aw-color-text-muted);
   margin: 0;
 }
 
@@ -2852,22 +2852,22 @@
 }
 
 .demo-suggest-card {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
+  background: var(--aw-color-bg-secondary);
+  border: 1px solid var(--aw-color-border);
   border-radius: 10px;
   padding: 0.9rem 1rem;
   cursor: pointer;
   text-align: left;
   font-size: 0.88rem;
-  color: var(--text-primary);
+  color: var(--aw-color-text-primary);
   line-height: 1.45;
   transition: border-color 0.15s, background 0.15s;
 }
 
 .demo-suggest-card:hover,
 .demo-suggest-card:active {
-  border-color: var(--accent-primary);
-  background: var(--bg-hover, var(--bg-secondary));
+  border-color: var(--aw-color-accent);
+  background: var(--aw-color-bg-hover, var(--aw-color-bg-secondary));
 }
 
 /* ── Demo Prompt Chips ───────────────────── */
@@ -2887,9 +2887,9 @@
   padding: 0.3rem 0.75rem;
   border-radius: 999px;
   font-size: 0.78rem;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  color: var(--text-secondary);
+  background: var(--aw-color-bg-secondary);
+  border: 1px solid var(--aw-color-border);
+  color: var(--aw-color-text-secondary);
   cursor: pointer;
   white-space: nowrap;
   transition: border-color 0.15s, color 0.15s;
@@ -2897,8 +2897,8 @@
 
 .chat-prompt-chip:hover,
 .chat-prompt-chip:active {
-  border-color: var(--accent-primary);
-  color: var(--text-primary);
+  border-color: var(--aw-color-accent);
+  color: var(--aw-color-text-primary);
 }
 
 @media (max-width: 640px) {
