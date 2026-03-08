@@ -193,16 +193,17 @@ class TestBuilderKnowledgeInjection:
     """Tests for Distilled Knowledge section in build_system_prompt."""
 
     def test_knowledge_injected_into_prompt(self, memory, anima_dir, data_dir):
-        """Knowledge content appears in system prompt."""
-        _write_knowledge(anima_dir, "test-topic", "Important knowledge here", 0.8)
+        """Knowledge summary appears in system prompt (list format, not full heading)."""
+        _write_knowledge(anima_dir, "test-topic", "# Topic Heading\n\nDetailed body.\nMore detail.", 0.8)
 
         from core.prompt.builder import build_system_prompt
 
         result = build_system_prompt(memory)
 
         assert "## Distilled Knowledge" in result.system_prompt
-        assert "### test-topic" in result.system_prompt
-        assert "Important knowledge here" in result.system_prompt
+        assert "- **test-topic**: Topic Heading" in result.system_prompt
+        assert "### test-topic" not in result.system_prompt
+        assert "Detailed body." not in result.system_prompt
 
     def test_injected_files_tracked(self, memory, anima_dir, data_dir):
         """BuildResult tracks which files were injected."""
@@ -225,21 +226,17 @@ class TestBuilderKnowledgeInjection:
         assert result.overflow_files == []
 
     def test_budget_overflow(self, memory, anima_dir, data_dir):
-        """Files exceeding budget go to overflow_files."""
-        # Create a large knowledge file that exceeds 10% of context window
-        # claude-sonnet-4 context = 200,000; budget = 20,000 tokens
-        # 20,000 tokens * 3 chars/token = 60,000 chars
-        large_content = "X" * 70_000  # exceeds budget
-        _write_knowledge(anima_dir, "huge", large_content, 0.9)
-        _write_knowledge(anima_dir, "small", "Small content", 0.5)
+        """Many files exceeding summary budget go to overflow_files."""
+        for i in range(30):
+            _write_knowledge(anima_dir, f"know-{i:02d}", f"Content {i}", 0.5)
 
         from core.prompt.builder import build_system_prompt
 
         result = build_system_prompt(memory)
 
-        # huge should be injected (highest confidence, fits first)
-        # small may or may not fit depending on remaining budget
-        assert "huge" in result.injected_knowledge_files or "huge" in result.overflow_files
+        total = len(result.injected_knowledge_files) + len(result.overflow_files)
+        assert total == 30
+        assert len(result.overflow_files) > 0
 
     def test_confidence_ordering_in_injection(self, memory, anima_dir, data_dir):
         """Procedures injected first, then knowledge by confidence. Both tracked separately."""
@@ -251,15 +248,13 @@ class TestBuilderKnowledgeInjection:
 
         result = build_system_prompt(memory)
 
-        # Procedures in injected_procedures, knowledge in injected_knowledge_files
         assert len(result.injected_procedures) == 1
         assert len(result.injected_knowledge_files) == 2
         assert result.overflow_files == []
-        # Check ordering: procedures first, then knowledge (high-conf before low-conf)
         prompt = result.system_prompt
-        mid_pos = prompt.index("### mid-conf")
-        high_pos = prompt.index("### high-conf")
-        low_pos = prompt.index("### low-conf")
+        mid_pos = prompt.index("- **mid-conf**:")
+        high_pos = prompt.index("- **high-conf**:")
+        low_pos = prompt.index("- **low-conf**:")
         assert mid_pos < high_pos < low_pos
 
 

@@ -1,4 +1,4 @@
-"""Unit tests for distilled knowledge injection in builder.py."""
+"""Unit tests for distilled knowledge summary injection in builder.py."""
 # AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: Apache-2.0
@@ -6,12 +6,13 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
-import pytest
-
-from core.prompt.builder import BuildResult, build_system_prompt
-
+from core.prompt.builder import (
+    BuildResult,
+    _extract_entry_summary,
+    build_system_prompt,
+)
 
 # ── Helpers ──────────────────────────────────────────────
 
@@ -40,7 +41,6 @@ def _make_mock_memory(anima_dir: Path, data_dir: Path) -> MagicMock:
     memory.list_shared_users.return_value = []
     memory.collect_distilled_knowledge.return_value = []
     memory.collect_distilled_knowledge_separated.return_value = ([], [])
-    # read_model_config for context window resolution
     model_cfg = MagicMock()
     model_cfg.model = "claude-sonnet-4-6"
     model_cfg.supervisor = None
@@ -48,50 +48,79 @@ def _make_mock_memory(anima_dir: Path, data_dir: Path) -> MagicMock:
     return memory
 
 
-# ── Distilled entries injection ──────────────────────────
+def _entry(name: str, content: str, confidence: float, *, description: str = "") -> dict:
+    """Build a DK entry dict."""
+    return {
+        "name": name,
+        "content": content,
+        "description": description,
+        "confidence": confidence,
+        "path": f"/tmp/test/{name}.md",
+        "mtime": 0.0,
+    }
 
 
-class TestDistilledEntriesInjected:
-    def test_distilled_entries_injected(self, tmp_path: Path, data_dir: Path) -> None:
-        """collect_distilled_knowledge_separated entries appear in system prompt as 'Distilled Knowledge'."""
+# ── _extract_entry_summary ───────────────────────────────
+
+
+class TestExtractEntrySummary:
+    def test_uses_description_when_present(self) -> None:
+        entry = _entry("foo", "# Heading\nBody.", 0.5, description="My description")
+        assert _extract_entry_summary(entry) == "My description"
+
+    def test_falls_back_to_heading(self) -> None:
+        entry = _entry("foo", "# Deploy Guide\nBody text.", 0.5)
+        assert _extract_entry_summary(entry) == "Deploy Guide"
+
+    def test_falls_back_to_first_paragraph(self) -> None:
+        entry = _entry("foo", "Body without heading.", 0.5)
+        assert _extract_entry_summary(entry) == "Body without heading."
+
+    def test_falls_back_to_name(self) -> None:
+        entry = _entry("deploy-procedure", "", 0.5)
+        assert _extract_entry_summary(entry) == "deploy procedure"
+
+
+# ── Summary injection format ──────────────────────────────
+
+
+class TestSummaryInjectionFormat:
+    def test_summary_list_format(self, tmp_path: Path, data_dir: Path) -> None:
+        """DK entries are injected as '- **name**: summary' list items."""
         anima_dir = tmp_path / "animas" / "alice"
         anima_dir.mkdir(parents=True)
         (anima_dir / "identity.md").write_text("I am Alice", encoding="utf-8")
 
         memory = _make_mock_memory(anima_dir, data_dir)
-
-        # Mock collect_distilled_knowledge_separated: (procedures_list, knowledge_list)
         memory.collect_distilled_knowledge_separated.return_value = (
-            [
-                {
-                    "name": "deploy-procedure",
-                    "content": "Deploy using docker compose up.",
-                    "confidence": 0.7,
-                    "path": "/tmp/procedures/deploy-procedure.md",
-                },
-            ],
-            [
-                {
-                    "name": "python-basics",
-                    "content": "Python is a dynamically typed language.",
-                    "confidence": 0.9,
-                    "path": "/tmp/knowledge/python-basics.md",
-                },
-            ],
+            [_entry("deploy-procedure", "Deploy using docker compose up.", 0.7, description="Docker deploy steps")],
+            [_entry("python-basics", "Python is dynamic.", 0.9, description="Python language overview")],
         )
 
         result = build_system_prompt(memory)
         assert isinstance(result, BuildResult)
-        assert "## Distilled Knowledge" in result
-        assert "python-basics" in result
-        assert "Python is a dynamically typed language" in result
-        assert "deploy-procedure" in result
-        assert "Deploy using docker compose up" in result
+        assert "- **deploy-procedure**: Docker deploy steps" in result
+        assert "- **python-basics**: Python language overview" in result
+
+    def test_no_full_content_in_prompt(self, tmp_path: Path, data_dir: Path) -> None:
+        """Full body content must NOT appear in the prompt."""
+        anima_dir = tmp_path / "animas" / "alice"
+        anima_dir.mkdir(parents=True)
+        (anima_dir / "identity.md").write_text("I am Alice", encoding="utf-8")
+
+        memory = _make_mock_memory(anima_dir, data_dir)
+        memory.collect_distilled_knowledge_separated.return_value = (
+            [_entry("proc", "FULL_BODY_SHOULD_NOT_APPEAR", 0.7, description="Short desc")],
+            [],
+        )
+
+        result = build_system_prompt(memory)
+        assert "FULL_BODY_SHOULD_NOT_APPEAR" not in result.system_prompt
 
 
 class TestDistilledEntriesEmpty:
     def test_distilled_entries_empty(self, tmp_path: Path, data_dir: Path) -> None:
-        """Empty list -> no 'Distilled Knowledge' section."""
+        """Empty list -> no DK sections."""
         anima_dir = tmp_path / "animas" / "alice"
         anima_dir.mkdir(parents=True)
         (anima_dir / "identity.md").write_text("I am Alice", encoding="utf-8")
@@ -101,48 +130,31 @@ class TestDistilledEntriesEmpty:
 
         result = build_system_prompt(memory)
         assert "## Distilled Knowledge" not in result
+        assert "## Procedures" not in result
+
+
+# ── Overflow ──────────────────────────────────────────────
 
 
 class TestOverflowFilesInBuildResult:
     def test_overflow_files_in_build_result(self, tmp_path: Path, data_dir: Path) -> None:
-        """Files exceeding budget are returned in BuildResult.overflow_files."""
+        """Entries exceeding budget appear in BuildResult.overflow_files."""
         anima_dir = tmp_path / "animas" / "alice"
         anima_dir.mkdir(parents=True)
         (anima_dir / "identity.md").write_text("I am Alice", encoding="utf-8")
 
         memory = _make_mock_memory(anima_dir, data_dir)
-
-        # Create entries where one is too large for the budget
-        small_content = "Critical information."
-        large_content = "B" * 900_000  # ~300k tokens, exceeds any 10% budget
-
-        memory.collect_distilled_knowledge_separated.return_value = (
-            [],
-            [
-                {
-                    "name": "small-knowledge",
-                    "content": small_content,
-                    "confidence": 0.95,
-                    "path": "/tmp/knowledge/small-knowledge.md",
-                },
-                {
-                    "name": "huge-knowledge",
-                    "content": large_content,
-                    "confidence": 0.1,
-                    "path": "/tmp/knowledge/huge-knowledge.md",
-                },
-            ],
-        )
+        many_entries = [_entry(f"know-{i}", f"content {i}", 0.5, description=f"desc {i}") for i in range(50)]
+        memory.collect_distilled_knowledge_separated.return_value = ([], many_entries)
 
         result = build_system_prompt(memory)
         assert isinstance(result, BuildResult)
-        # The huge file should overflow
-        assert "huge-knowledge" in result.overflow_files
+        assert len(result.overflow_files) > 0
 
 
 class TestAutoComputeWhenNoEntries:
     def test_auto_compute_when_no_entries(self, tmp_path: Path, data_dir: Path) -> None:
-        """Builder auto-computes distilled knowledge from memory."""
+        """Builder calls collect_distilled_knowledge_separated."""
         anima_dir = tmp_path / "animas" / "alice"
         anima_dir.mkdir(parents=True)
         (anima_dir / "identity.md").write_text("I am Alice", encoding="utf-8")
@@ -150,57 +162,58 @@ class TestAutoComputeWhenNoEntries:
         memory = _make_mock_memory(anima_dir, data_dir)
         memory.collect_distilled_knowledge_separated.return_value = (
             [],
-            [
-                {
-                    "name": "auto-computed",
-                    "content": "Auto computed knowledge",
-                    "confidence": 0.8,
-                    "path": "/tmp/knowledge/auto-computed.md",
-                },
-            ],
+            [_entry("auto-computed", "Auto content", 0.8, description="Auto desc")],
         )
 
         result = build_system_prompt(memory)
         assert isinstance(result, BuildResult)
-        # collect_distilled_knowledge_separated should have been called
         memory.collect_distilled_knowledge_separated.assert_called_once()
         assert "auto-computed" in result
-        assert "Auto computed knowledge" in result
+        assert "Auto desc" in result
+
+
+# ── Ordering ──────────────────────────────────────────────
 
 
 class TestConfidenceSortingInOutput:
     def test_confidence_sorting_in_output(self, tmp_path: Path, data_dir: Path) -> None:
-        """Entries are injected in the order returned by collect_distilled_knowledge_separated."""
+        """Entries are injected in confidence-descending order."""
         anima_dir = tmp_path / "animas" / "alice"
         anima_dir.mkdir(parents=True)
         (anima_dir / "identity.md").write_text("I am Alice", encoding="utf-8")
 
         memory = _make_mock_memory(anima_dir, data_dir)
-
-        # Return entries in confidence-descending order (as collect_distilled_knowledge_separated does)
         memory.collect_distilled_knowledge_separated.return_value = (
             [],
             [
-                {
-                    "name": "high-conf",
-                    "content": "HIGH_CONFIDENCE_CONTENT",
-                    "confidence": 0.9,
-                    "path": "/tmp/knowledge/high-conf.md",
-                },
-                {
-                    "name": "low-conf",
-                    "content": "LOW_CONFIDENCE_CONTENT",
-                    "confidence": 0.3,
-                    "path": "/tmp/knowledge/low-conf.md",
-                },
+                _entry("high-conf", "high content", 0.9, description="HIGH_DESC"),
+                _entry("low-conf", "low content", 0.3, description="LOW_DESC"),
             ],
         )
 
         result = build_system_prompt(memory)
-        # Both should appear
-        assert "HIGH_CONFIDENCE_CONTENT" in result
-        assert "LOW_CONFIDENCE_CONTENT" in result
-        # High confidence should appear before low confidence
-        high_pos = result.system_prompt.index("HIGH_CONFIDENCE_CONTENT")
-        low_pos = result.system_prompt.index("LOW_CONFIDENCE_CONTENT")
+        assert "HIGH_DESC" in result
+        assert "LOW_DESC" in result
+        high_pos = result.system_prompt.index("HIGH_DESC")
+        low_pos = result.system_prompt.index("LOW_DESC")
         assert high_pos < low_pos
+
+
+# ── Separate budgets ─────────────────────────────────────
+
+
+class TestSeparateBudgets:
+    def test_procedure_budget_does_not_starve_knowledge(self, tmp_path: Path, data_dir: Path) -> None:
+        """Procedure overflow does not consume knowledge budget."""
+        anima_dir = tmp_path / "animas" / "alice"
+        anima_dir.mkdir(parents=True)
+        (anima_dir / "identity.md").write_text("I am Alice", encoding="utf-8")
+
+        memory = _make_mock_memory(anima_dir, data_dir)
+        many_procs = [_entry(f"proc-{i}", f"c{i}", 0.5, description=f"d{i}") for i in range(100)]
+        know_entry = _entry("important-know", "kc", 0.9, description="Important knowledge")
+        memory.collect_distilled_knowledge_separated.return_value = (many_procs, [know_entry])
+
+        result = build_system_prompt(memory)
+        assert "important-know" in result.system_prompt
+        assert "Important knowledge" in result.system_prompt

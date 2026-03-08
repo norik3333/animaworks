@@ -538,9 +538,10 @@ class MemoryManager:
     ) -> tuple[list[dict], list[dict]]:
         """Collect knowledge and procedures as separate lists.
 
-        Returns (procedures, knowledge), each sorted by confidence descending.
-        Procedures are separated because they are actionable and should be
-        injected into system prompts with higher priority.
+        Returns (procedures, knowledge), each sorted by
+        (confidence desc, mtime desc).
+        Each entry includes ``description`` (from frontmatter) and ``mtime``
+        for priority ranking.
         """
         procedures: list[dict] = []
         knowledge: list[dict] = []
@@ -566,8 +567,10 @@ class MemoryManager:
                         "path": str(f),
                         "name": f.stem,
                         "content": body,
+                        "description": meta.get("description", ""),
                         "confidence": confidence,
                         "source_type": source_type,
+                        "mtime": f.stat().st_mtime,
                     }
                     if source_type == "procedures":
                         procedures.append(entry)
@@ -578,6 +581,6 @@ class MemoryManager:
                         "Failed to read %s for knowledge injection",
                         f,
                     )
-        procedures.sort(key=lambda d: d["confidence"], reverse=True)
-        knowledge.sort(key=lambda d: d["confidence"], reverse=True)
+        procedures.sort(key=lambda d: (d["confidence"], d.get("mtime", 0)), reverse=True)
+        knowledge.sort(key=lambda d: (d["confidence"], d.get("mtime", 0)), reverse=True)
         return procedures, knowledge

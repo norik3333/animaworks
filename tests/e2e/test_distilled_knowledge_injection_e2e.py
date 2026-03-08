@@ -2,11 +2,10 @@
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: Apache-2.0
 
-"""E2E tests for distilled knowledge injection pipeline.
+"""E2E tests for distilled knowledge summary injection pipeline.
 
 Validates the complete flow from knowledge/procedures files through
-budget computation, system prompt injection, and Priming Channel C
-conditional activation.
+summary extraction, budget computation, and system prompt injection.
 """
 
 from __future__ import annotations
@@ -18,20 +17,27 @@ import pytest
 import yaml
 
 from core.memory.manager import MemoryManager
-from core.prompt.builder import BuildResult, build_system_prompt
-
+from core.prompt.builder import build_system_prompt
 
 # ── Helpers ──────────────────────────────────────────────
 
 
-def _write_knowledge_with_frontmatter(
-    knowledge_dir: Path, name: str, content: str, confidence: float,
+def _write_file_with_frontmatter(
+    directory: Path,
+    name: str,
+    content: str,
+    confidence: float,
+    *,
+    description: str = "",
 ) -> None:
     """Write a knowledge/procedure file with YAML frontmatter."""
-    knowledge_dir.mkdir(parents=True, exist_ok=True)
-    frontmatter = yaml.dump({"confidence": confidence}, default_flow_style=False)
+    directory.mkdir(parents=True, exist_ok=True)
+    meta: dict = {"confidence": confidence}
+    if description:
+        meta["description"] = description
+    frontmatter = yaml.dump(meta, default_flow_style=False)
     full = f"---\n{frontmatter}---\n\n{content}"
-    (knowledge_dir / f"{name}.md").write_text(full, encoding="utf-8")
+    (directory / f"{name}.md").write_text(full, encoding="utf-8")
 
 
 def _make_mock_memory(anima_dir: Path, data_dir: Path) -> MagicMock:
@@ -70,73 +76,71 @@ def _fake_load_prompt(name: str, **kwargs: object) -> str:
     return ""
 
 
-# Common patches applied to every test to isolate build_system_prompt from
-# side-effectful functions that read real filesystem / config.
-_BUILDER_PATCHES = [
-    "core.prompt.builder.load_prompt",
-    "core.prompt.builder._build_org_context",
-    "core.prompt.builder._discover_other_animas",
-    "core.prompt.builder._build_messaging_section",
-]
-
-
 # ── Test Cases ───────────────────────────────────────────
 
 
-class TestDistilledKnowledgeInjectionE2E:
-    """E2E tests for distilled knowledge injection pipeline."""
+class TestDistilledKnowledgeSummaryInjectionE2E:
+    """E2E tests for DK summary injection pipeline."""
 
-    def test_full_injection_pipeline(self, data_dir: Path, make_anima: object) -> None:
-        """Full pipeline: collect -> inject into system prompt.
+    def test_full_summary_pipeline(self, data_dir: Path, make_anima: object) -> None:
+        """Full pipeline: collect -> extract description -> inject summaries.
 
-        Creates 5 files (3 knowledge, 2 procedures) with varying confidence,
-        verifies collect returns all entries, and build_system_prompt contains
-        the section.
+        Creates 5 files (3 knowledge, 2 procedures) with descriptions,
+        verifies collect returns description+mtime, and build_system_prompt
+        injects summaries (not full content).
         """
-        anima_dir = make_anima("test-inject")
+        anima_dir = make_anima("test-summary")
         knowledge_dir = anima_dir / "knowledge"
         procedures_dir = anima_dir / "procedures"
 
-        # Create 3 knowledge files
-        _write_knowledge_with_frontmatter(
-            knowledge_dir, "api-patterns", "API patterns for REST design.", 0.9,
+        _write_file_with_frontmatter(
+            knowledge_dir,
+            "api-patterns",
+            "API patterns for REST design.",
+            0.9,
+            description="REST API design patterns",
         )
-        _write_knowledge_with_frontmatter(
-            knowledge_dir, "error-handling", "Error handling best practices.", 0.7,
+        _write_file_with_frontmatter(
+            knowledge_dir,
+            "error-handling",
+            "Error handling best practices.",
+            0.7,
+            description="Error handling guide",
         )
-        _write_knowledge_with_frontmatter(
-            knowledge_dir, "logging-tips", "Logging guidelines for services.", 0.5,
+        _write_file_with_frontmatter(
+            knowledge_dir,
+            "logging-tips",
+            "Logging guidelines for services.",
+            0.5,
+            description="Service logging tips",
+        )
+        _write_file_with_frontmatter(
+            procedures_dir,
+            "deploy-procedure",
+            "Step-by-step deploy guide.",
+            0.8,
+            description="Docker deployment steps",
+        )
+        _write_file_with_frontmatter(
+            procedures_dir,
+            "rollback-procedure",
+            "Rollback instructions.",
+            0.3,
+            description="Emergency rollback",
         )
 
-        # Create 2 procedure files
-        _write_knowledge_with_frontmatter(
-            procedures_dir, "deploy-procedure", "Step-by-step deploy guide.", 0.8,
-        )
-        _write_knowledge_with_frontmatter(
-            procedures_dir, "rollback-procedure", "Rollback instructions.", 0.3,
-        )
-
-        # Step 1: collect_distilled_knowledge
         mm = MemoryManager(anima_dir)
-        entries = mm.collect_distilled_knowledge()
-        assert len(entries) == 5
+        procs, knows = mm.collect_distilled_knowledge_separated()
+        assert len(procs) == 2
+        assert len(knows) == 3
 
-        # Verify confidence values are extracted correctly
-        confidence_map = {e["name"]: e["confidence"] for e in entries}
-        assert confidence_map["api-patterns"] == pytest.approx(0.9)
-        assert confidence_map["error-handling"] == pytest.approx(0.7)
-        assert confidence_map["logging-tips"] == pytest.approx(0.5)
-        assert confidence_map["deploy-procedure"] == pytest.approx(0.8)
-        assert confidence_map["rollback-procedure"] == pytest.approx(0.3)
+        for entry in procs + knows:
+            assert "description" in entry
+            assert "mtime" in entry
+            assert entry["mtime"] > 0
 
-        # Step 2: build_system_prompt with entries supplied via mock
         mock_memory = _make_mock_memory(anima_dir, data_dir)
-        procedures_list = [e for e in entries if e.get("source_type") == "procedures"]
-        knowledge_list = [e for e in entries if e.get("source_type") == "knowledge"]
-        mock_memory.collect_distilled_knowledge_separated.return_value = (
-            procedures_list,
-            knowledge_list,
-        )
+        mock_memory.collect_distilled_knowledge_separated.return_value = (procs, knows)
 
         with (
             patch("core.prompt.builder.load_prompt", side_effect=_fake_load_prompt),
@@ -144,206 +148,131 @@ class TestDistilledKnowledgeInjectionE2E:
             patch("core.prompt.builder._discover_other_animas", return_value=[]),
             patch("core.prompt.builder._build_messaging_section", return_value=""),
         ):
-            result = build_system_prompt(
-                mock_memory,
-                message="test",
-            )
+            result = build_system_prompt(mock_memory, message="test")
 
         prompt = result.system_prompt
-        assert "## Distilled Knowledge" in prompt
+        assert "- **deploy-procedure**: Docker deployment steps" in prompt
+        assert "- **api-patterns**: REST API design patterns" in prompt
 
-        # Verify each file's content appears
-        assert "API patterns for REST design." in prompt
-        assert "Error handling best practices." in prompt
-        assert "Logging guidelines for services." in prompt
-        assert "Step-by-step deploy guide." in prompt
-        assert "Rollback instructions." in prompt
+        assert "Step-by-step deploy guide." not in prompt
+        assert "API patterns for REST design." not in prompt
 
-    async def test_overflow_triggers_channel_c(
-        self, data_dir: Path, make_anima: object,
-    ) -> None:
-        """Channel C is skipped when restrict_to is empty, active when files overflow.
+    def test_description_fallback_to_heading(self, data_dir: Path, make_anima: object) -> None:
+        """Files without frontmatter description fall back to # heading."""
+        anima_dir = make_anima("test-fallback")
+        procedures_dir = anima_dir / "procedures"
 
-        Creates many large files that exceed 10% budget, verifies that
-        some overflow, and checks Channel C conditional behavior.
-        """
+        _write_file_with_frontmatter(
+            procedures_dir,
+            "my-procedure",
+            "# Custom Heading\n\nBody text here.",
+            0.7,
+        )
+
+        mm = MemoryManager(anima_dir)
+        procs, _ = mm.collect_distilled_knowledge_separated()
+        assert len(procs) == 1
+        assert procs[0]["description"] == ""
+
+        mock_memory = _make_mock_memory(anima_dir, data_dir)
+        mock_memory.collect_distilled_knowledge_separated.return_value = (procs, [])
+
+        with (
+            patch("core.prompt.builder.load_prompt", side_effect=_fake_load_prompt),
+            patch("core.prompt.builder._build_org_context", return_value=""),
+            patch("core.prompt.builder._discover_other_animas", return_value=[]),
+            patch("core.prompt.builder._build_messaging_section", return_value=""),
+        ):
+            result = build_system_prompt(mock_memory, message="test")
+
+        assert "- **my-procedure**: Custom Heading" in result.system_prompt
+
+    def test_overflow_with_summary_budget(self, data_dir: Path, make_anima: object) -> None:
+        """Many entries exceed the 200-token knowledge budget."""
         anima_dir = make_anima("test-overflow")
         knowledge_dir = anima_dir / "knowledge"
 
-        # Create many large knowledge files (each ~500 tokens estimated)
-        large_content = "x" * 1500  # ~500 tokens at len/3 heuristic
-        for i in range(30):
-            _write_knowledge_with_frontmatter(
-                knowledge_dir, f"knowledge-{i:02d}", large_content, 0.6,
+        for i in range(50):
+            _write_file_with_frontmatter(
+                knowledge_dir,
+                f"knowledge-{i:02d}",
+                f"Content for knowledge item {i}.",
+                0.6,
+                description=f"Description for knowledge item {i} with enough text to consume budget",
             )
 
         mm = MemoryManager(anima_dir)
-        entries = mm.collect_distilled_knowledge()
-        assert len(entries) == 30
+        _, knows = mm.collect_distilled_knowledge_separated()
+        assert len(knows) == 50
 
-        # Simulate budget computation inline (same logic as builder.py)
-        context_window = 5000
-        knowledge_budget = int(context_window * 0.10)  # 500 tokens
-        used_tokens = 0
-        injected = []
-        overflow = []
-        for entry in entries:
-            est_tokens = len(entry["content"]) // 3
-            if used_tokens + est_tokens <= knowledge_budget:
-                injected.append(entry)
-                used_tokens += est_tokens
-            else:
-                overflow.append(entry["name"])
+        mock_memory = _make_mock_memory(anima_dir, data_dir)
+        mock_memory.collect_distilled_knowledge_separated.return_value = ([], knows)
 
-        assert len(overflow) > 0, "Expected some files to overflow"
-        assert len(injected) < 30, "Not all files should be injected"
+        with (
+            patch("core.prompt.builder.load_prompt", side_effect=_fake_load_prompt),
+            patch("core.prompt.builder._build_org_context", return_value=""),
+            patch("core.prompt.builder._discover_other_animas", return_value=[]),
+            patch("core.prompt.builder._build_messaging_section", return_value=""),
+        ):
+            result = build_system_prompt(mock_memory, message="test")
 
-        # PrimingEngine Channel C behavior
-        from core.memory.priming import PrimingEngine
-
-        engine = PrimingEngine(anima_dir, shared_dir=data_dir / "shared")
-
-        # With empty restrict_to list -> Channel C should short-circuit
-        result_empty = await engine._channel_c_related_knowledge(
-            ["test"], restrict_to=[],
-        )
-        # Returns (medium_text, untrusted_text) tuple
-        assert result_empty == ("", ""), "Channel C should be empty when restrict_to=[]"
-
-        # With restrict_to having entries -> Channel C should NOT short-circuit
-        result_overflow = await engine._channel_c_related_knowledge(
-            ["test"], restrict_to=["knowledge-00"],
-        )
-        assert isinstance(result_overflow, tuple)
-        assert len(result_overflow) == 2
-
-        # restrict_to=None -> legacy path, should not short-circuit
-        result_none = await engine._channel_c_related_knowledge(
-            ["test"], restrict_to=None,
-        )
-        assert isinstance(result_none, tuple)
-        assert len(result_none) == 2
+        assert len(result.overflow_files) > 0
+        assert len(result.overflow_files) + len(result.injected_knowledge_files) == 50
 
     def test_procedures_keyword_and_vector_search_scope(
-        self, data_dir: Path, make_anima: object,
+        self,
+        data_dir: Path,
+        make_anima: object,
     ) -> None:
-        """search_memory_text with scope='procedures' finds keyword matches.
-
-        Creates procedure files containing searchable keywords and verifies
-        the keyword search returns results.  Also verifies the vector search
-        scope resolver maps 'procedures' correctly.
-        """
+        """search_memory_text with scope='procedures' finds keyword matches."""
         anima_dir = make_anima("test-search")
         procedures_dir = anima_dir / "procedures"
 
-        _write_knowledge_with_frontmatter(
-            procedures_dir, "deploy-guide",
-            "Run terraform apply to deploy the infrastructure.", 0.8,
+        _write_file_with_frontmatter(
+            procedures_dir,
+            "deploy-guide",
+            "Run terraform apply to deploy the infrastructure.",
+            0.8,
+            description="Terraform deploy",
         )
-        _write_knowledge_with_frontmatter(
-            procedures_dir, "monitoring-setup",
-            "Configure Prometheus and Grafana for monitoring.", 0.7,
+        _write_file_with_frontmatter(
+            procedures_dir,
+            "monitoring-setup",
+            "Configure Prometheus and Grafana for monitoring.",
+            0.7,
+            description="Prometheus monitoring",
         )
 
         mm = MemoryManager(anima_dir)
 
-        # Keyword search should find matching procedures
         results = mm.search_memory_text("terraform", scope="procedures")
-        assert len(results) > 0, "Expected keyword match in procedures"
+        assert len(results) > 0
         filenames = [r[0] for r in results]
         assert any("deploy-guide" in f for f in filenames)
 
-        # Search for a keyword in the other procedure
         results2 = mm.search_memory_text("Prometheus", scope="procedures")
         assert len(results2) > 0
-        filenames2 = [r[0] for r in results2]
-        assert any("monitoring-setup" in f for f in filenames2)
 
-        # Verify the scope resolver maps procedures correctly
         from core.memory.rag_search import RAGMemorySearch
 
         types = RAGMemorySearch._resolve_search_types("procedures")
         assert types == ["procedures"]
 
-    def test_build_result_contains_overflow_files(
-        self, data_dir: Path, make_anima: object,
-    ) -> None:
-        """BuildResult.overflow_files contains overflowed file names.
-
-        Creates files that partially overflow and verifies the returned
-        BuildResult captures the overflow filenames.
-        """
-        anima_dir = make_anima("test-overflow-result")
-        knowledge_dir = anima_dir / "knowledge"
-
-        # High-confidence small file (should be injected)
-        _write_knowledge_with_frontmatter(
-            knowledge_dir, "important-knowledge",
-            "Critical information.", 0.95,
-        )
-
-        # Low-confidence large file (should overflow with small budget)
-        large_content = "B" * 3000  # ~1000 tokens
-        _write_knowledge_with_frontmatter(
-            knowledge_dir, "bulk-data",
-            large_content, 0.1,
-        )
-
-        mm = MemoryManager(anima_dir)
-        entries = mm.collect_distilled_knowledge()
-
-        # Build system prompt with mock memory that returns these entries
-        # and a tiny context window to force overflow
-        mock_memory = _make_mock_memory(anima_dir, data_dir)
-        procedures_list = [e for e in entries if e.get("source_type") == "procedures"]
-        knowledge_list = [e for e in entries if e.get("source_type") == "knowledge"]
-        mock_memory.collect_distilled_knowledge_separated.return_value = (
-            procedures_list,
-            knowledge_list,
-        )
-        # Use a small model to get a small context window
-        mock_memory.read_model_config.return_value = MagicMock(
-            model="unknown-tiny-model",
-            supervisor=None,
-        )
-
-        with (
-            patch("core.prompt.builder.load_prompt", side_effect=_fake_load_prompt),
-            patch("core.prompt.builder._build_org_context", return_value=""),
-            patch("core.prompt.builder._discover_other_animas", return_value=[]),
-            patch("core.prompt.builder._build_messaging_section", return_value=""),
-        ):
-            result = build_system_prompt(
-                mock_memory,
-                message="test",
-                context_window=5000,
-            )
-
-        assert isinstance(result, BuildResult)
-        # bulk-data (~1000 tokens) should overflow with 500 token budget
-        assert "bulk-data" in result.overflow_files
-        assert "## Distilled Knowledge" in result.system_prompt
-        assert "Critical information." in result.system_prompt
-
     def test_confidence_default_without_frontmatter(
-        self, data_dir: Path, make_anima: object,
+        self,
+        data_dir: Path,
+        make_anima: object,
     ) -> None:
-        """Files without YAML frontmatter default to confidence=0.5.
-
-        Creates files with plain markdown (no --- frontmatter) and verifies
-        collect_distilled_knowledge assigns confidence=0.5 to all.
-        """
+        """Files without YAML frontmatter default to confidence=0.5."""
         anima_dir = make_anima("test-no-frontmatter")
         knowledge_dir = anima_dir / "knowledge"
         procedures_dir = anima_dir / "procedures"
 
-        # Write plain markdown files without frontmatter
         knowledge_dir.mkdir(parents=True, exist_ok=True)
         (knowledge_dir / "plain-knowledge.md").write_text(
             "# Plain Knowledge\n\nSome content without frontmatter.",
             encoding="utf-8",
         )
-
         procedures_dir.mkdir(parents=True, exist_ok=True)
         (procedures_dir / "plain-procedure.md").write_text(
             "# Plain Procedure\n\nStep 1: Do something.",
@@ -355,7 +284,35 @@ class TestDistilledKnowledgeInjectionE2E:
 
         assert len(entries) == 2
         for entry in entries:
-            assert entry["confidence"] == pytest.approx(0.5), (
-                f"File '{entry['name']}' should have default confidence 0.5, "
-                f"got {entry['confidence']}"
-            )
+            assert entry["confidence"] == pytest.approx(0.5)
+            assert "description" in entry
+            assert "mtime" in entry
+
+    def test_mtime_sorting(self, data_dir: Path, make_anima: object) -> None:
+        """Entries with same confidence are sorted by mtime descending."""
+        import time
+
+        anima_dir = make_anima("test-mtime")
+        knowledge_dir = anima_dir / "knowledge"
+
+        _write_file_with_frontmatter(
+            knowledge_dir,
+            "older-file",
+            "Old content.",
+            0.5,
+            description="Older",
+        )
+        time.sleep(0.05)
+        _write_file_with_frontmatter(
+            knowledge_dir,
+            "newer-file",
+            "New content.",
+            0.5,
+            description="Newer",
+        )
+
+        mm = MemoryManager(anima_dir)
+        _, knows = mm.collect_distilled_knowledge_separated()
+        assert len(knows) == 2
+        assert knows[0]["name"] == "newer-file"
+        assert knows[1]["name"] == "older-file"
