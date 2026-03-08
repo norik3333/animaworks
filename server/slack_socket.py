@@ -492,7 +492,7 @@ class SlackSocketModeManager:
         """Suppress Bolt 404 for Slack events we intentionally don't handle."""
 
         @app.error
-        async def _handle_bolt_error(error, body) -> BoltResponse | None:  # noqa: ARG001
+        async def _handle_bolt_error(error, body) -> BoltResponse | None:
             if isinstance(error, BoltUnhandledRequestError):
                 logger.debug(
                     "Ignoring unhandled Slack event: %s",
