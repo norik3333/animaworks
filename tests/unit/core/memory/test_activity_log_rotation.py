@@ -3,12 +3,13 @@ from __future__ import annotations
 """Tests for activity log rotation and tool_result recording."""
 
 import json
-from datetime import date, timedelta
+from datetime import timedelta
 from pathlib import Path
 
 import pytest
 
 from core.memory.activity import ActivityLogger
+from core.time_utils import today_local
 
 
 # ── Helpers ────────────────────────────────────────────────────────
@@ -74,7 +75,7 @@ class TestToolResultFormat:
 class TestRotationTime:
     def test_deletes_old_files(self, tmp_path: Path) -> None:
         log_dir = tmp_path / "activity_log"
-        today = date.today()
+        today = today_local()
         old_date = (today - timedelta(days=10)).isoformat()
         recent_date = (today - timedelta(days=2)).isoformat()
         today_str = today.isoformat()
@@ -93,7 +94,7 @@ class TestRotationTime:
 
     def test_preserves_today(self, tmp_path: Path) -> None:
         log_dir = tmp_path / "activity_log"
-        today_str = date.today().isoformat()
+        today_str = today_local().isoformat()
         _make_log_file(log_dir, today_str, 500)
 
         al = ActivityLogger(tmp_path)
@@ -110,7 +111,7 @@ class TestRotationTime:
 class TestRotationSize:
     def test_deletes_oldest_when_over_limit(self, tmp_path: Path) -> None:
         log_dir = tmp_path / "activity_log"
-        today = date.today()
+        today = today_local()
 
         # Create 3 files, each ~600 bytes, total ~1800 bytes
         dates = [
@@ -130,7 +131,7 @@ class TestRotationSize:
 
     def test_preserves_today_file(self, tmp_path: Path) -> None:
         log_dir = tmp_path / "activity_log"
-        today_str = date.today().isoformat()
+        today_str = today_local().isoformat()
         _make_log_file(log_dir, today_str, 2_000_000)
 
         al = ActivityLogger(tmp_path)
@@ -147,7 +148,7 @@ class TestRotationSize:
 class TestRotationBoth:
     def test_applies_time_then_size(self, tmp_path: Path) -> None:
         log_dir = tmp_path / "activity_log"
-        today = date.today()
+        today = today_local()
 
         # Old file (should be deleted by time)
         old_date = (today - timedelta(days=30)).isoformat()
@@ -191,7 +192,7 @@ class TestRotationEdgeCases:
 class TestRotateAll:
     def test_rotates_multiple_animas(self, tmp_path: Path) -> None:
         animas_dir = tmp_path / "animas"
-        today = date.today()
+        today = today_local()
         old_date = (today - timedelta(days=30)).isoformat()
 
         for name in ["alice", "bob"]:
