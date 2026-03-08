@@ -235,19 +235,21 @@ class TestDistilledKnowledgeTierBudget:
                 {
                     "name": "test_knowledge",
                     "content": "knowledge content here",
+                    "description": "Knowledge overview",
                     "confidence": 0.8,
                     "path": "/tmp/knowledge/test_knowledge.md",
+                    "mtime": 0.0,
                 },
             ],
         )
         with patch("core.prompt.builder.load_prompt", return_value="section"):
             result = build_system_prompt(memory, execution_mode="a", context_window=200_000)
         assert "Distilled Knowledge" in result
-        assert "knowledge content here" in result
+        assert "- **test_knowledge**: Knowledge overview" in result
 
     def test_small_window_limits_dk(self, tmp_path, data_dir):
-        """At 8K context, knowledge_budget is very small (250 tokens).
-        Large DK content should be in overflow."""
+        """At 8K context, knowledge summary budget is very small.
+        Even a summary line can overflow."""
         memory = _make_mock_memory(tmp_path, data_dir)
         memory.collect_distilled_knowledge_separated.return_value = (
             [],
@@ -255,8 +257,10 @@ class TestDistilledKnowledgeTierBudget:
                 {
                     "name": "big",
                     "content": "x" * 5000,
+                    "description": "A " * 100,
                     "confidence": 0.8,
                     "path": "/tmp/k/big.md",
+                    "mtime": 0.0,
                 },
             ],
         )

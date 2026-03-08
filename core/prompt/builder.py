@@ -147,25 +147,31 @@ _CONVERSATION_RESERVATION_PCT = 0.10
 _MIN_SYSTEM_BUDGET = 2000
 
 
+_SUMMARY_MAX_CHARS = 200
+
+
 def _extract_entry_summary(entry: dict) -> str:
     """Extract a 1-line summary for a DK entry.
 
-    Priority: frontmatter ``description`` → first ``# `` heading →
-    first non-empty paragraph → file name with hyphens replaced.
+    Priority: frontmatter ``description`` → first ATX heading →
+    first non-empty, non-heading line → file name with hyphens replaced.
+    Result is capped at :data:`_SUMMARY_MAX_CHARS`.
     """
-    desc = str(entry.get("description", "")).strip()
+    desc = (entry.get("description") or "").strip()
     if desc:
-        return desc
-    content = entry.get("content", "")
+        return desc[:_SUMMARY_MAX_CHARS]
+    content = entry.get("content") or ""
     for line in content.splitlines():
         stripped = line.strip()
-        if stripped.startswith("# "):
-            return stripped.lstrip("# ").strip()
+        if stripped.startswith("#"):
+            heading = stripped.lstrip("#").strip()
+            if heading:
+                return heading[:_SUMMARY_MAX_CHARS]
     for line in content.splitlines():
         stripped = line.strip()
         if stripped and not stripped.startswith("#") and not stripped.startswith("---"):
-            return stripped
-    return entry.get("name", "").replace("-", " ").replace("_", " ")
+            return stripped[:_SUMMARY_MAX_CHARS]
+    return (entry.get("name") or "").replace("-", " ").replace("_", " ")
 
 
 @dataclass

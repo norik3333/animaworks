@@ -525,10 +525,10 @@ class MemoryManager:
     # ── Distilled Knowledge Collection ───────────────────
 
     def collect_distilled_knowledge(self) -> list[dict]:
-        """Collect all knowledge/ and procedures/ files with confidence metadata.
+        """Collect all knowledge/ and procedures/ files with metadata.
 
-        Returns list of dicts sorted by confidence descending:
-            {path, name, content, confidence, source_type}
+        Returns list of dicts sorted by (confidence, mtime) descending:
+            {path, name, content, description, confidence, source_type, mtime}
         """
         procedures, knowledge = self.collect_distilled_knowledge_separated()
         return procedures + knowledge
