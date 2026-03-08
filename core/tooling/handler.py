@@ -548,7 +548,7 @@ class ToolHandler(
 
             permitted = parse_permitted_tools(permissions_text)
         except Exception:
-            pass
+            logger.debug("Failed to parse permissions for gated action check; defaulting to empty set")
 
         from core.tooling.permissions import is_action_gated
 
