@@ -26,8 +26,9 @@ from core.tools.web_search import (
 
 
 @pytest.fixture(autouse=True)
-def _set_brave_api_key(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setenv("BRAVE_API_KEY", "test-brave-key-123")
+def _set_brave_api_key():
+    with patch("core.tools.web_search.get_credential", return_value="test-brave-key-123"):
+        yield
 
 
 def _make_brave_response(results: list[dict] | None = None) -> httpx.Response:
@@ -93,10 +94,10 @@ class TestSearch:
         params = mock_get.call_args.kwargs["params"]
         assert "freshness" not in params
 
-    def test_missing_api_key_raises(self, monkeypatch: pytest.MonkeyPatch):
-        monkeypatch.delenv("BRAVE_API_KEY", raising=False)
-        with pytest.raises(ToolConfigError):
-            search("test")
+    def test_missing_api_key_raises(self):
+        with patch("core.tools.web_search.get_credential", side_effect=ToolConfigError("no key")):
+            with pytest.raises(ToolConfigError):
+                search("test")
 
     def test_http_error_propagated(self):
         error_resp = httpx.Response(
