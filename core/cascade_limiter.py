@@ -106,6 +106,8 @@ class ConversationDepthLimiter:
 
         for e in entries:
             try:
+                if e.to_person == sender:
+                    continue
                 ts = ensure_aware(datetime.fromisoformat(e.ts))
                 if ts >= daily_cutoff:
                     daily_count += 1

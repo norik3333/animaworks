@@ -324,6 +324,81 @@ class TestUnifiedBudgetChannelPost:
         assert result is not True  # constructor override: 3/hour
 
 
+class TestSelfMessageExclusion:
+    """Test that self-addressed messages are excluded from global outbound count."""
+
+    def test_self_messages_not_counted(self, tmp_path: Path, _patch_config):
+        """to_person == sender のエントリはカウントされない。"""
+        anima_dir = tmp_path / "animas" / "sanae"
+        anima_dir.mkdir(parents=True)
+        entries = [
+            _make_dm_entry("message_sent", "sanae", "sanae", "TaskExec完了通知"),
+            _make_dm_entry("message_sent", "sanae", "sanae", "TaskExec完了通知2"),
+            _make_dm_entry("message_sent", "sanae", "sanae", "TaskExec完了通知3"),
+            _make_dm_entry("message_sent", "sanae", "ritsu", "【報告】Batch 1完了"),
+        ]
+        _write_activity_entries(anima_dir, entries)
+
+        limiter = ConversationDepthLimiter(max_per_hour=3, max_per_day=5)
+        result = limiter.check_global_outbound("sanae", anima_dir)
+        assert result is True  # only 1 non-self message, well under limit
+
+    def test_self_messages_excluded_but_others_counted(self, tmp_path: Path, _patch_config):
+        """自分宛は除外されるが、他者宛はカウントされる。"""
+        anima_dir = tmp_path / "animas" / "alice"
+        anima_dir.mkdir(parents=True)
+        entries = [
+            _make_dm_entry("message_sent", "alice", "alice", "self-msg"),
+            _make_dm_entry("message_sent", "alice", "alice", "self-msg"),
+            _make_dm_entry("message_sent", "alice", "bob", "report"),
+            _make_dm_entry("message_sent", "alice", "charlie", "report"),
+            _make_dm_entry("message_sent", "alice", "dave", "report"),
+        ]
+        _write_activity_entries(anima_dir, entries)
+
+        limiter = ConversationDepthLimiter(max_per_hour=3, max_per_day=5)
+        result = limiter.check_global_outbound("alice", anima_dir)
+        assert result is not True  # 3 non-self messages = hourly limit hit
+
+    def test_channel_post_still_counted(self, tmp_path: Path, _patch_config):
+        """channel_post（to_person空）は従来通りカウントされる。"""
+        anima_dir = tmp_path / "animas" / "alice"
+        anima_dir.mkdir(parents=True)
+        entries = [
+            _make_dm_entry("message_sent", "alice", "alice", "self-msg"),
+        ] + [
+            {"ts": now_jst().isoformat(), "type": "channel_post", "content": "board", "channel": "general"}
+            for _ in range(3)
+        ]
+        _write_activity_entries(anima_dir, entries)
+
+        limiter = ConversationDepthLimiter(max_per_hour=3, max_per_day=5)
+        result = limiter.check_global_outbound("alice", anima_dir)
+        assert result is not True  # 3 channel_posts counted, self-msg excluded
+
+    def test_realistic_sanae_scenario(self, tmp_path: Path, _patch_config):
+        """実データ再現: 50通中33通が自分宛 → 修正前は50通でブロック、修正後は17通で上限内。"""
+        anima_dir = tmp_path / "animas" / "sanae"
+        anima_dir.mkdir(parents=True)
+        now = now_jst()
+        self_entries = [
+            _make_dm_entry("message_sent", "sanae", "sanae", f"TaskExec完了{i}")
+            for i in range(33)
+        ]
+        real_entries = [
+            _make_dm_entry(
+                "message_sent", "sanae", "ritsu", f"報告{i}",
+                ts=(now - timedelta(minutes=i * 5)).isoformat(),
+            )
+            for i in range(17)
+        ]
+        _write_activity_entries(anima_dir, self_entries + real_entries)
+
+        limiter = ConversationDepthLimiter(max_per_hour=50, max_per_day=50)
+        result = limiter.check_global_outbound("sanae", anima_dir)
+        assert result is True  # 17 real msgs < 50/day (self-msgs excluded)
+
+
 class TestModuleSingleton:
     """Test the factory function returns correct type."""
 
