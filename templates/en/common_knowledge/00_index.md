@@ -188,3 +188,17 @@ read_memory_file(path="common_knowledge/troubleshooting/common-issues.md")
 ```
 read_memory_file(path="common_knowledge/00_index.md")
 ```
+
+---
+
+## Usecase Guides (usecases/)
+| File | Description |
+|------|-------------|
+| usecase-overview.md | Overview & what AnimaWorks can do |
+| usecase-communication.md | External communication & messaging |
+| usecase-development.md | Development support & code review |
+| usecase-monitoring.md | Infrastructure & system monitoring |
+| usecase-secretary.md | Secretary tasks & schedule management |
+| usecase-research.md | Research & information gathering |
+| usecase-customer-support.md | Customer support operations |
+| usecase-knowledge.md | Knowledge management & documentation |
