@@ -118,6 +118,20 @@ def _available_models() -> list[dict[str, str]]:
     return models
 
 
+_MAX_TIMELINE_CHARS = 250_000
+
+
+def _truncate_timeline(text: str) -> str:
+    """Truncate timeline text to fit within LLM context window."""
+    if len(text) <= _MAX_TIMELINE_CHARS:
+        return text
+    truncated = text[:_MAX_TIMELINE_CHARS]
+    last_nl = truncated.rfind("\n")
+    if last_nl > 0:
+        truncated = truncated[:last_nl]
+    return truncated + "\n\n... (以降省略 / truncated) ..."
+
+
 async def _generate_narrative(timeline_text: str, model: str) -> str | None:
     """Generate LLM narrative from unified timeline text."""
     try:
@@ -126,8 +140,9 @@ async def _generate_narrative(timeline_text: str, model: str) -> str | None:
         logger.info("one_shot_completion not available; skipping narrative generation")
         return None
 
+    safe_text = _truncate_timeline(timeline_text)
     system_prompt = t("activity_report.llm_system_prompt")
-    user_prompt = t("activity_report.llm_user_prompt", data=timeline_text)
+    user_prompt = t("activity_report.llm_user_prompt", data=safe_text)
 
     try:
         return await one_shot_completion(
