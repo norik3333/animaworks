@@ -766,7 +766,10 @@ class MemoryIndexer:
                 if field in fm:
                     metadata[field] = int(fm[field])
             if "confidence" in fm:
-                metadata["confidence"] = float(fm["confidence"])
+                try:
+                    metadata["confidence"] = float(fm["confidence"])
+                except (ValueError, TypeError):
+                    pass
             if "last_used" in fm and fm["last_used"]:
                 metadata["last_used"] = str(fm["last_used"])
 
