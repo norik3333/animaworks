@@ -291,7 +291,7 @@ async def test_channel_c_top_k(temp_anima_dir):
 
 @pytest.mark.asyncio
 async def test_channel_c_query_includes_message(temp_anima_dir):
-    """Channel C query must prepend message[:200] when message is provided."""
+    """Channel C uses dual queries: message-context + keyword-only."""
     engine = PrimingEngine(temp_anima_dir)
 
     from unittest.mock import MagicMock, patch
@@ -304,11 +304,12 @@ async def test_channel_c_query_includes_message(temp_anima_dir):
     with patch.object(engine, "_get_or_create_retriever", return_value=mock_retriever):
         await engine._channel_c_related_knowledge(["Issue", "裏", "実装"], message=msg)
 
-    call_kwargs = mock_retriever.search.call_args
-    actual_query = call_kwargs.kwargs.get("query") or call_kwargs[1].get("query")
-    assert actual_query is not None
-    assert actual_query.startswith(msg[:200])
-    assert "Issue" in actual_query
+    calls = mock_retriever.search.call_args_list
+    assert len(calls) == 2, f"Expected 2 dual queries, got {len(calls)}"
+    q1 = calls[0].kwargs.get("query") or calls[0][1].get("query")
+    q2 = calls[1].kwargs.get("query") or calls[1][1].get("query")
+    assert q1.startswith(msg[:200])
+    assert "Issue" in q2
 
 
 @pytest.mark.asyncio

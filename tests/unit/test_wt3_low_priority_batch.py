@@ -328,35 +328,32 @@ class TestForgettingThresholds:
 
 
 class TestPrimingRegexCompiledConstants:
-    """Fix N6: _RE_KATAKANA and _RE_WORDS are pre-compiled regex patterns."""
+    """Fix N6: _RE_UNICODE_WORDS is a pre-compiled regex pattern."""
 
     def test_priming_regex_compiled_constants(self):
-        """Module-level regex constants should be compiled re.Pattern objects."""
-        from core.memory.priming import _RE_KATAKANA, _RE_WORDS
+        """Module-level regex constant should be a compiled re.Pattern object."""
+        from core.memory.priming import _RE_UNICODE_WORDS
 
-        assert isinstance(_RE_KATAKANA, re.Pattern), (
-            "_RE_KATAKANA should be a compiled regex Pattern"
-        )
-        assert isinstance(_RE_WORDS, re.Pattern), (
-            "_RE_WORDS should be a compiled regex Pattern"
+        assert isinstance(_RE_UNICODE_WORDS, re.Pattern), (
+            "_RE_UNICODE_WORDS should be a compiled regex Pattern"
         )
 
-    def test_re_katakana_matches_katakana(self):
-        """_RE_KATAKANA should match katakana sequences of 2+ characters."""
-        from core.memory.priming import _RE_KATAKANA
+    def test_re_unicode_words_matches_mixed_text(self):
+        """_RE_UNICODE_WORDS should match alphanumeric and CJK word tokens."""
+        from core.memory.priming import _RE_UNICODE_WORDS
 
-        assert _RE_KATAKANA.findall("テスト") == ["テスト"]
-        assert _RE_KATAKANA.findall("ア") == []  # Single char: no match
-        assert _RE_KATAKANA.findall("アイウ") == ["アイウ"]
-
-    def test_re_words_matches_mixed_text(self):
-        """_RE_WORDS should match alphanumeric and CJK word tokens."""
-        from core.memory.priming import _RE_WORDS
-
-        tokens = _RE_WORDS.findall("Hello 世界 test123")
+        tokens = _RE_UNICODE_WORDS.findall("Hello 世界 test123")
         assert "Hello" in tokens
         assert "世界" in tokens
         assert "test123" in tokens
+
+    def test_re_unicode_words_matches_katakana(self):
+        """_RE_UNICODE_WORDS should match katakana sequences."""
+        from core.memory.priming import _RE_UNICODE_WORDS
+
+        tokens = _RE_UNICODE_WORDS.findall("テスト マレーシア")
+        assert "テスト" in tokens
+        assert "マレーシア" in tokens
 
 
 class TestExtractKeywordsTruncatesLongInput:

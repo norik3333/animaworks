@@ -56,11 +56,79 @@ _BUDGET_RELATED_EPISODES = 500
 # Rough characters-per-token for Japanese/English mixed text
 _CHARS_PER_TOKEN = 4
 
-# Pre-compiled regex patterns for keyword extraction (avoids ReDoS risk)
-_RE_KATAKANA = re.compile(r"[\u30A0-\u30FF]{2,}")
-_RE_WORDS = re.compile(r"[\w\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]+")
+# Pre-compiled regex pattern for language-agnostic keyword extraction
+_RE_UNICODE_WORDS = re.compile(r"[\w]+", re.UNICODE)
 # Maximum message length to process for keyword extraction
 _MAX_KEYWORD_INPUT_LEN = 5000
+
+# Minimal stopwords: only clear function words that pass the length filter.
+# Intentionally small — dual-query strategy reduces dependence on keyword quality.
+_MINIMAL_STOPWORDS = frozenset(
+    {
+        "the",
+        "and",
+        "for",
+        "are",
+        "but",
+        "not",
+        "you",
+        "all",
+        "can",
+        "her",
+        "was",
+        "one",
+        "our",
+        "out",
+        "has",
+        "had",
+        "with",
+        "from",
+        "this",
+        "that",
+        "they",
+        "been",
+        "have",
+        "will",
+        "would",
+        "could",
+        "should",
+        "about",
+        "which",
+        "their",
+        "there",
+        "these",
+        "those",
+        "being",
+        "through",
+        "during",
+        "before",
+        "after",
+        "into",
+        "の",
+        "に",
+        "は",
+        "を",
+        "が",
+        "で",
+        "と",
+        "も",
+        "や",
+        "へ",
+        "より",
+        "から",
+        "まで",
+        "など",
+        "について",
+        "している",
+        "できる",
+        "ために",
+        "として",
+        "における",
+        "これ",
+        "それ",
+        "あれ",
+    }
+)
 
 
 # ── Data structures ────────────────────────────────────────────
@@ -786,12 +854,8 @@ class PrimingEngine:
                 logger.debug("Channel C: Retriever unavailable")
                 return ("", "")
 
-            kw_part = " ".join(keywords[:5]) if keywords else ""
-            if message:
-                query = f"{message[:200]} {kw_part}".strip()
-            elif kw_part:
-                query = kw_part
-            else:
+            queries = self._build_dual_queries(message, keywords)
+            if not queries:
                 logger.debug("Channel C: No keywords and no message")
                 return ("", "")
             anima_name = self.anima_dir.name
@@ -805,10 +869,10 @@ class PrimingEngine:
             except Exception:
                 pass
 
-            # Vector search (personal + shared common_knowledge)
-            results = retriever.search(
-                query=query,
-                anima_name=anima_name,
+            results = self._search_and_merge(
+                retriever,
+                queries,
+                anima_name,
                 memory_type="knowledge",
                 top_k=5,
                 include_shared=True,
@@ -1013,12 +1077,8 @@ class PrimingEngine:
             if retriever is None:
                 return ""
 
-            kw_part = " ".join(keywords[:5]) if keywords else ""
-            if message:
-                query = f"{message[:200]} {kw_part}".strip()
-            elif kw_part:
-                query = kw_part
-            else:
+            queries = self._build_dual_queries(message, keywords)
+            if not queries:
                 return ""
             anima_name = self.anima_dir.name
 
@@ -1031,9 +1091,10 @@ class PrimingEngine:
             except Exception:
                 pass
 
-            results = retriever.search(
-                query=query,
-                anima_name=anima_name,
+            results = self._search_and_merge(
+                retriever,
+                queries,
+                anima_name,
                 memory_type="episodes",
                 top_k=3,
                 min_score=_min_score,
@@ -1374,108 +1435,112 @@ class PrimingEngine:
         logger.debug("Message type: %s -> budget: %d", msg_type, budget)
         return budget
 
-    # ── Helpers ──────────────────────────────────────────────────
+    # ── Dual-query helpers ────────────────────────────────────────
+
+    @staticmethod
+    def _build_dual_queries(message: str, keywords: list[str]) -> list[str]:
+        """Build dual queries: message-context + keyword-only.
+
+        Returns 1–2 queries.  Avoids issuing a duplicate when the keyword
+        query is identical to the message query.
+        """
+        queries: list[str] = []
+        msg_query = message[:300].strip() if message else ""
+        kw_query = " ".join(keywords[:5]).strip() if keywords else ""
+
+        if msg_query:
+            queries.append(msg_query)
+        if kw_query and kw_query != msg_query:
+            queries.append(kw_query)
+
+        return queries
+
+    def _search_and_merge(
+        self,
+        retriever: MemoryRetriever,
+        queries: list[str],
+        anima_name: str,
+        *,
+        memory_type: str,
+        top_k: int,
+        include_shared: bool = False,
+        min_score: float | None = None,
+    ) -> list:
+        """Execute multiple queries and merge by max-score deduplication."""
+        best: dict[str, object] = {}
+
+        for query in queries:
+            results = retriever.search(
+                query=query,
+                anima_name=anima_name,
+                memory_type=memory_type,
+                top_k=top_k,
+                include_shared=include_shared,
+                min_score=min_score,
+            )
+            for r in results:
+                existing = best.get(r.doc_id)
+                if existing is None or r.score > existing.score:  # type: ignore[union-attr]
+                    best[r.doc_id] = r
+
+        return sorted(best.values(), key=lambda r: r.score, reverse=True)[:top_k]  # type: ignore[union-attr]
+
+    # ── Keyword extraction ─────────────────────────────────────
 
     def _extract_keywords(self, message: str) -> list[str]:
-        """Extract keywords from message with 3-stage extraction.
+        """Language-agnostic keyword extraction.
 
-        1. Proper noun patterns (katakana sequences, capitalized English words)
-        2. Known entity matching (knowledge/ filenames)
-        3. General keywords (stopword-filtered)
+        1. Known entity matching (knowledge/ filenames — top priority)
+        2. Unicode-aware tokenization
+        3. Character-category min-length filter + minimal stopwords
+        4. Length-descending sort (longer = more specific)
 
         Input is truncated to ``_MAX_KEYWORD_INPUT_LEN`` to bound regex cost.
-        Patterns are pre-compiled module-level constants.
         """
-        # Truncate oversized input to bound regex processing time
         text = message[:_MAX_KEYWORD_INPUT_LEN] if len(message) > _MAX_KEYWORD_INPUT_LEN else message
 
-        # Remove common Japanese particles and English stopwords
-        stopwords = {
-            "の",
-            "に",
-            "は",
-            "を",
-            "が",
-            "で",
-            "と",
-            "から",
-            "まで",
-            "も",
-            "や",
-            "へ",
-            "より",
-            "など",
-            "について",
-            "the",
-            "a",
-            "an",
-            "and",
-            "or",
-            "but",
-            "in",
-            "on",
-            "at",
-            "to",
-            "for",
-            "of",
-            "with",
-            "by",
-            "from",
-            "up",
-            "about",
-            "into",
-            "through",
-            "during",
-            "it",
-            "is",
-            "are",
-            "was",
-            "were",
-            "be",
-            "been",
-            "being",
-            "have",
-            "has",
-            "had",
-            "do",
-            "does",
-            "did",
-            "will",
-            "would",
-            "should",
-            "could",
-        }
-
-        # 1. Proper nouns: katakana sequences (2+ chars)
-        katakana_words = _RE_KATAKANA.findall(text)
-
-        # 2. Known entities: match against knowledge/ filenames
         known_entities: set[str] = set()
         if self.knowledge_dir.is_dir():
             known_entities = {f.stem.lower() for f in self.knowledge_dir.glob("*.md")}
 
-        # Split on whitespace and punctuation, keep alphanumeric + Japanese
-        words = _RE_WORDS.findall(text)
+        tokens = _RE_UNICODE_WORDS.findall(text)
 
-        # Filter stopwords and short words
-        general_keywords = [w for w in words if len(w) >= 1 and w.lower() not in stopwords]
+        filtered = [t for t in tokens if self._meets_min_length(t) and t.lower() not in _MINIMAL_STOPWORDS]
 
-        # Entity matches from general keywords
-        entity_matches = [w for w in general_keywords if w.lower() in known_entities]
+        entity_matches = [t for t in filtered if t.lower() in known_entities]
+        entity_set = {t.lower() for t in entity_matches}
 
-        # Sort general keywords by length (longer = more specific)
-        general_keywords.sort(key=len, reverse=True)
+        general = [t for t in filtered if t.lower() not in entity_set]
+        general.sort(key=len, reverse=True)
 
-        # Combine: entity_matches + katakana_words + general keywords (deduplicated)
         seen: set[str] = set()
         combined: list[str] = []
-        for w in entity_matches + katakana_words + general_keywords:
+        for w in entity_matches + general:
             w_lower = w.lower()
             if w_lower not in seen:
                 seen.add(w_lower)
                 combined.append(w)
 
         return combined[:10]
+
+    @staticmethod
+    def _meets_min_length(token: str) -> bool:
+        """Check minimum length based on Unicode character category.
+
+        CJK characters carry meaning even as a single character (e.g. 裏, 金, 型).
+        Latin and other scripts need at least 3 characters to be meaningful.
+        """
+        for c in token:
+            cp = ord(c)
+            if (
+                0x4E00 <= cp <= 0x9FFF
+                or 0x3040 <= cp <= 0x309F
+                or 0x30A0 <= cp <= 0x30FF
+                or 0xAC00 <= cp <= 0xD7AF
+                or 0x0E00 <= cp <= 0x0E7F
+            ):
+                return len(token) >= 1
+        return len(token) >= 3
 
     def _truncate_head(self, text: str, max_tokens: int) -> str:
         """Truncate text keeping the head (front), cutting from the tail.

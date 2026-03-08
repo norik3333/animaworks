@@ -50,7 +50,7 @@ class TestChannelFEpisodes:
     async def test_channel_f_calls_retriever_with_episodes_type(
         self, temp_anima_dir: Path,
     ) -> None:
-        """Channel F must search with memory_type='episodes' and top_k=3."""
+        """Channel F uses dual queries with memory_type='episodes' and top_k=3."""
         engine = PrimingEngine(temp_anima_dir)
 
         mock_retriever = MagicMock()
@@ -59,16 +59,16 @@ class TestChannelFEpisodes:
         with patch.object(engine, "_get_or_create_retriever", return_value=mock_retriever):
             await engine._channel_f_episodes(["deploy", "エラー"], message="デプロイでエラーが出た")
 
-        mock_retriever.search.assert_called_once()
-        call_kwargs = mock_retriever.search.call_args
-        assert call_kwargs.kwargs.get("memory_type") == "episodes"
-        assert call_kwargs.kwargs.get("top_k") == 3
+        assert mock_retriever.search.call_count == 2, "Dual query should issue 2 searches"
+        for call in mock_retriever.search.call_args_list:
+            assert call.kwargs.get("memory_type") == "episodes"
+            assert call.kwargs.get("top_k") == 3
 
     @pytest.mark.asyncio
     async def test_channel_f_query_includes_message(
         self, temp_anima_dir: Path,
     ) -> None:
-        """Channel F query prepends message[:200] to keywords."""
+        """Channel F dual query: first is message-context, second is keyword-only."""
         engine = PrimingEngine(temp_anima_dir)
 
         mock_retriever = MagicMock()
@@ -78,10 +78,12 @@ class TestChannelFEpisodes:
         with patch.object(engine, "_get_or_create_retriever", return_value=mock_retriever):
             await engine._channel_f_episodes(["deploy"], message=msg)
 
-        call_kwargs = mock_retriever.search.call_args
-        actual_query = call_kwargs.kwargs.get("query")
-        assert actual_query.startswith(msg[:200])
-        assert "deploy" in actual_query
+        calls = mock_retriever.search.call_args_list
+        assert len(calls) == 2
+        q1 = calls[0].kwargs.get("query")
+        q2 = calls[1].kwargs.get("query")
+        assert q1.startswith(msg[:200])
+        assert q2 == "deploy"
 
     @pytest.mark.asyncio
     async def test_channel_f_fallback_to_message_when_no_keywords(
