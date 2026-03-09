@@ -270,7 +270,6 @@ class TestExecuteContextTracking:
         _install_litellm_mock(mock)
         with patch("litellm.acompletion", mock), \
              patch("core.execution.litellm_loop.build_system_prompt", return_value="sys"), \
-             patch("core.execution._session.inject_shortterm", return_value="sys+st"), \
              patch("core.execution._session.load_prompt", return_value="continue"):
             result = await executor.execute(
                 "test", system_prompt="sys", tracker=tracker, shortterm=shortterm,
@@ -467,7 +466,6 @@ class TestSessionChainingExecutionMode:
 
         with patch("litellm.acompletion", mock), \
              patch("core.execution.litellm_loop.build_system_prompt", build_spy), \
-             patch("core.execution._session.inject_shortterm", return_value="sys+st"), \
              patch("core.execution._session.load_prompt", return_value="continue"):
             await executor.execute(
                 "test", system_prompt="sys", tracker=tracker, shortterm=shortterm,
