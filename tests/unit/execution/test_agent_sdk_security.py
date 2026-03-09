@@ -84,11 +84,12 @@ class TestCheckA1FileAccess:
         assert result is not None
         assert "protected file" in result
 
-    def test_write_to_own_identity_allowed(self, anima_dir: Path):
-        """identity.md is intentionally editable — Animas can evolve."""
+    def test_write_to_own_identity_blocked(self, anima_dir: Path):
+        """identity.md is protected — personality baseline stays fixed."""
         path = str(anima_dir / "identity.md")
         result = _check_a1_file_access(path, anima_dir, write=True)
-        assert result is None
+        assert result is not None
+        assert "protected file" in result
 
     def test_write_to_own_bootstrap_blocked(self, anima_dir: Path):
         path = str(anima_dir / "bootstrap.md")
