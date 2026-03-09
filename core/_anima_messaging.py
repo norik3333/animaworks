@@ -118,8 +118,7 @@ class MessagingMixin:
                         resolved_file = bootstrap_file.with_suffix(".md.auto_resolved")
                         bootstrap_file.rename(resolved_file)
                         logger.warning(
-                            "[%s] bootstrap.md was NOT deleted by agent; "
-                            "auto-renamed to %s to prevent loop",
+                            "[%s] bootstrap.md was NOT deleted by agent; auto-renamed to %s to prevent loop",
                             self.name,
                             resolved_file.name,
                         )

@@ -152,12 +152,9 @@ class ProcessSupervisor(HealthMixin, ReconcileMixin, SchedulerMixin):
         """Load persisted bootstrap retry counts from disk."""
         try:
             if self._bootstrap_retries_file.exists():
-                import json
                 data = json.loads(self._bootstrap_retries_file.read_text())
                 if isinstance(data, dict):
-                    self._bootstrap_retry_counts = {
-                        k: int(v) for k, v in data.items()
-                    }
+                    self._bootstrap_retry_counts = {k: int(v) for k, v in data.items()}
                     logger.info(
                         "Loaded bootstrap retry counts: %s",
                         self._bootstrap_retry_counts,
@@ -168,10 +165,7 @@ class ProcessSupervisor(HealthMixin, ReconcileMixin, SchedulerMixin):
     def _save_bootstrap_retries(self) -> None:
         """Persist bootstrap retry counts to disk."""
         try:
-            import json
-            self._bootstrap_retries_file.write_text(
-                json.dumps(self._bootstrap_retry_counts, indent=2)
-            )
+            self._bootstrap_retries_file.write_text(json.dumps(self._bootstrap_retry_counts, indent=2))
         except Exception:
             logger.warning("Failed to save bootstrap retries file", exc_info=True)
 
@@ -316,10 +310,6 @@ class ProcessSupervisor(HealthMixin, ReconcileMixin, SchedulerMixin):
         finally:
             self._starting.discard(anima_name)
 
-    def is_bootstrapping(self, anima_name: str) -> bool:
-        """Check if an anima is currently bootstrapping."""
-        return anima_name in self._bootstrapping
-
     async def _run_bootstrap(self, anima_name: str) -> None:
         """Run bootstrap for an anima in the background.
 
@@ -428,10 +418,9 @@ class ProcessSupervisor(HealthMixin, ReconcileMixin, SchedulerMixin):
             self._bootstrapping.discard(anima_name)
             if success:
                 self._bootstrap_retry_counts.pop(anima_name, None)
-                self._save_bootstrap_retries()
             else:
                 self._bootstrap_retry_counts[anima_name] = retry_count + 1
-                self._save_bootstrap_retries()
+            self._save_bootstrap_retries()
             if was_bootstrapping:
                 handle = self.processes.get(anima_name)
                 if not handle or handle.state != ProcessState.RUNNING:
