@@ -166,6 +166,13 @@ class HealthMixin:
         if success:
             if is_busy:
                 handle.stats.missed_pings = 0
+                # Skip hang detection during bootstrap (LLM may take a long time)
+                if self.is_bootstrapping(anima_name):
+                    logger.debug(
+                        "Skipping hang detection for %s (bootstrapping)",
+                        anima_name,
+                    )
+                    return
                 last_progress_iso = ping_result.get("last_progress_at")
                 if last_progress_iso:
                     from datetime import datetime as _dt

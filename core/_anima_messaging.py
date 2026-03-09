@@ -111,6 +111,19 @@ class MessagingMixin:
                     result = await self.agent.run_cycle(prompt, trigger="bootstrap")
                     self._last_activity = now_local()
 
+                    # Safety net: if bootstrap.md still exists after the cycle,
+                    # rename it to prevent re-triggering on next restart.
+                    bootstrap_file = self.anima_dir / "bootstrap.md"
+                    if bootstrap_file.exists():
+                        resolved_file = bootstrap_file.with_suffix(".md.auto_resolved")
+                        bootstrap_file.rename(resolved_file)
+                        logger.warning(
+                            "[%s] bootstrap.md was NOT deleted by agent; "
+                            "auto-renamed to %s to prevent loop",
+                            self.name,
+                            resolved_file.name,
+                        )
+
                     logger.info(
                         "[%s] run_bootstrap END duration_ms=%d",
                         self.name,
