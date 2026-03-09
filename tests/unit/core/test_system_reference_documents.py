@@ -905,6 +905,7 @@ _EXPECTED_FILES = [
     "operations/mode-s-auth-guide.md",
     "operations/model-guide.md",
     "operations/project-setup.md",
+    "operations/task-board-guide.md",
     "operations/task-management.md",
     "operations/tool-usage-overview.md",
     "operations/voice-chat-guide.md",

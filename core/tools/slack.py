@@ -37,6 +37,11 @@ EXECUTION_PROFILE: dict[str, dict[str, object]] = {
     "send": {"expected_seconds": 10, "background_eligible": False},
     "search": {"expected_seconds": 30, "background_eligible": False},
     "unreplied": {"expected_seconds": 30, "background_eligible": False},
+    # gated: requires explicit "slack_channel_post: yes" in permissions.md.
+    # Per-anima credential resolution and trust level follow the same
+    # external-tool infrastructure as other slack_* actions.
+    "channel_post": {"expected_seconds": 10, "background_eligible": False, "gated": True},
+    "channel_update": {"expected_seconds": 10, "background_eligible": False, "gated": True},
 }
 
 WebClient: Any = None
@@ -161,6 +166,84 @@ def md_to_slack_mrkdwn(text: str) -> str:
         text = text.replace(f"\x00PH{i}\x00", ph)
 
     return text
+
+
+def taskboard_md_to_slack(md_text: str) -> str:
+    """Convert task-board.md to Slack-optimised mrkdwn.
+
+    Markdown tables are converted to bullet-list format for readability
+    in Slack.  Sections after "✅ 今週完了" are replaced with a short
+    footer pointing readers to the source file.
+    """
+    lines = md_text.strip().split("\n")
+    out: list[str] = []
+    in_completed = False
+
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+
+        if "✅ 今週完了" in line or "✅ Completed" in line:
+            in_completed = True
+            i += 1
+            continue
+        if in_completed:
+            i += 1
+            continue
+
+        # Table separator rows
+        if re.match(r"^\|[-|\s:]+\|$", line.strip()):
+            i += 1
+            continue
+
+        # Table header rows
+        if re.match(r"^\|\s*#\s*\|", line.strip()) or re.match(r"^\|\s*(タスク|Task)\s*\|", line.strip()):
+            i += 1
+            continue
+        if re.match(r"^\|\s*(KR|#)\s*\|", line.strip()):
+            i += 1
+            continue
+
+        # Table data rows → bullet items
+        if line.strip().startswith("|") and line.strip().endswith("|"):
+            cells = [c.strip() for c in line.strip().strip("|").split("|")]
+            cells = [c for c in cells if c and c != "—"]
+            if cells:
+                tag = cells[0]
+                rest = cells[1:]
+                if len(rest) >= 2:
+                    task = rest[0]
+                    owner = rest[1]
+                    extras = [x for x in rest[2:] if x]
+                    suffix = ""
+                    if extras:
+                        suffix = " | " + " | ".join(extras)
+                    out.append(f"  • {tag}: {task}（{owner}）{suffix}")
+                else:
+                    out.append(f"  • {' | '.join(cells)}")
+            i += 1
+            continue
+
+        # Horizontal rules
+        if re.match(r"^-{3,}\s*$", line.strip()):
+            out.append("")
+            i += 1
+            continue
+
+        # Section headers
+        m = re.match(r"^#{1,3}\s+(.+)$", line)
+        if m:
+            out.append(f"*{m.group(1)}*")
+            i += 1
+            continue
+
+        converted = re.sub(r"\*\*(.+?)\*\*", r"*\1*", line)
+        out.append(converted)
+        i += 1
+
+    out.append("")
+    out.append("_Full board: `shared/task-board.md`_")
+    return "\n".join(out)
 
 
 def clean_slack_markup(text: str, cache: dict | None = None) -> str:
@@ -390,9 +473,15 @@ class SlackClient:
         response = self._call("chat_postMessage", **kwargs)
         return response
 
-    def add_reaction(
-        self, channel_id: str, emoji: str, ts: str
-    ) -> dict:
+    def update_message(self, channel_id: str, ts: str, text: str) -> dict:
+        """Update an existing message via chat.update (silent, no notification)."""
+        return self._call("chat_update", channel=channel_id, ts=ts, text=text)
+
+    def pins_add(self, channel_id: str, ts: str) -> dict:
+        """Pin a message in a channel via pins.add."""
+        return self._call("pins_add", channel=channel_id, timestamp=ts)
+
+    def add_reaction(self, channel_id: str, emoji: str, ts: str) -> dict:
         """Add an emoji reaction to a message via reactions.add."""
         return self._call(
             "reactions_add",
@@ -873,8 +962,64 @@ class MessageCache(BaseMessageCache):
 
 
 def get_tool_schemas() -> list[dict]:
-    """Return Anthropic tool_use schemas for Slack tools."""
-    return []
+    """Return Anthropic tool_use schemas for Slack tools.
+
+    ``slack_channel_post`` / ``slack_channel_update`` are gated actions:
+    they require ``slack_channel_post: yes`` / ``slack_channel_update: yes``
+    in permissions.md.  Per-anima credential resolution, trust level, and
+    tool guide filtering are handled by the existing external-tool
+    infrastructure (no special-casing needed).
+    """
+    return [
+        {
+            "name": "slack_channel_post",
+            "description": (
+                "Post a message to an actual Slack channel via Bot Token API. "
+                "Returns the message ts for future updates via slack_channel_update. "
+                "Use this for external Slack channels (not internal Board)."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "channel_id": {
+                        "type": "string",
+                        "description": "Slack channel ID (e.g. C0AJ4J5KK46)",
+                    },
+                    "text": {
+                        "type": "string",
+                        "description": "Message text (Markdown will be converted to Slack mrkdwn)",
+                    },
+                },
+                "required": ["channel_id", "text"],
+            },
+        },
+        {
+            "name": "slack_channel_update",
+            "description": (
+                "Update an existing Slack message by ts. "
+                "The message is silently replaced (no notification). "
+                "Use this for live dashboards like task-board."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "channel_id": {
+                        "type": "string",
+                        "description": "Slack channel ID",
+                    },
+                    "ts": {
+                        "type": "string",
+                        "description": "Message timestamp to update (from slack_channel_post result)",
+                    },
+                    "text": {
+                        "type": "string",
+                        "description": "New message text",
+                    },
+                },
+                "required": ["channel_id", "ts", "text"],
+            },
+        },
+    ]
 
 
 # ============================================================
@@ -1284,6 +1429,29 @@ def dispatch(name: str, args: dict[str, Any]) -> Any:
             args["emoji"],
             args["message_ts"],
         )
+    # Gated actions — per-anima credential resolution and gating are
+    # handled by the standard external-tool infrastructure:
+    #   ToolHandler injects anima_dir → _resolve_slack_token reads
+    #   SLACK_BOT_TOKEN__<name> → falls back to shared token.
+    #   ExternalToolDispatcher._check_gated() blocks unless
+    #   "slack_channel_post: yes" is in permissions.md.
+    if name == "slack_channel_post":
+        client = SlackClient(token=_resolve_slack_token(args))
+        slack_text = md_to_slack_mrkdwn(args["text"])
+        username, icon_url = _resolve_slack_identity(args)
+        resp = client.post_message(
+            args["channel_id"],
+            slack_text,
+            username=username,
+            icon_url=icon_url,
+        )
+        ts = resp.get("ts", "") if isinstance(resp, dict) else ""
+        return {"status": "ok", "channel": args["channel_id"], "ts": ts}
+    if name == "slack_channel_update":
+        client = SlackClient(token=_resolve_slack_token(args))
+        slack_text = md_to_slack_mrkdwn(args["text"])
+        client.update_message(args["channel_id"], args["ts"], slack_text)
+        return {"status": "ok", "channel": args["channel_id"], "ts": args["ts"]}
     raise ValueError(f"Unknown tool: {name}")
 
 

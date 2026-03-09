@@ -334,8 +334,10 @@ class TestSlackClient:
 
 
 class TestGetToolSchemas:
-    def test_returns_empty_list(self):
-        """External tool modules return empty schema lists (schemas from dispatch layer)."""
+    def test_returns_gated_action_schemas(self):
+        """get_tool_schemas returns schemas for gated channel actions."""
         schemas = get_tool_schemas()
         assert isinstance(schemas, list)
-        assert schemas == []
+        names = {s["name"] for s in schemas}
+        assert "slack_channel_post" in names
+        assert "slack_channel_update" in names
