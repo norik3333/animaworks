@@ -457,6 +457,15 @@ class PrimingEngine:
         }
     )
 
+    # Event types to exclude from chat priming — cron task results should not
+    # leak into chat sessions (prevents Anima from discussing cron output
+    # during user conversations).
+    _CHAT_NOISE_TYPES = frozenset(
+        {
+            "cron_executed",
+        }
+    )
+
     async def _channel_b_recent_activity(
         self,
         sender_name: str,
@@ -485,6 +494,10 @@ class PrimingEngine:
 
         if is_background and entries:
             entries = [e for e in entries if e.type not in self._HEARTBEAT_NOISE_TYPES]
+        elif entries:
+            # Chat sessions: filter out cron results to prevent Anima from
+            # discussing scheduled task output during user conversations.
+            entries = [e for e in entries if e.type not in self._CHAT_NOISE_TYPES]
 
         # Always read shared channels for cross-Anima visibility
         channel_entries = self._read_shared_channels(limit_per_channel=5)
