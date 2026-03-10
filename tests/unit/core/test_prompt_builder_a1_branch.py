@@ -5,10 +5,8 @@
 
 from __future__ import annotations
 
-import re
 
-import pytest
-from unittest.mock import patch, MagicMock, call
+from unittest.mock import patch, MagicMock
 from pathlib import Path
 
 from core.paths import TEMPLATES_DIR

@@ -16,12 +16,12 @@ from __future__ import annotations
 
 import inspect
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from pathlib import Path
 
 import pytest
 
-from core.memory.conversation import ConversationMemory, ConversationTurn, ToolRecord
+from core.memory.conversation import ConversationMemory, ToolRecord
 from core.memory.consolidation import ConsolidationEngine
 from core.time_utils import now_local as now_jst
 

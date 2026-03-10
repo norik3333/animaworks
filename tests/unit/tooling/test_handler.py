@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -18,7 +18,6 @@ from core.tooling.handler import (
     _NEEDS_SHELL_RE,
     _error_result,
     _EPISODE_FILENAME_RE,
-    _PROTECTED_FILES,
     _is_protected_write,
     _validate_episode_path,
     _READ_FILE_SAFETY_NOTICE,
@@ -445,7 +444,7 @@ class TestFileOperations:
         long_line = "A" * 600
         (anima_dir / "long.txt").write_text(long_line, encoding="utf-8")
         result = handler.handle("read_file", {"path": str(anima_dir / "long.txt")})
-        assert f"…(+100 chars)" in result
+        assert "…(+100 chars)" in result
         assert "A" * _READ_MAX_LINE_CHARS in result
 
     def test_read_file_empty_file(self, handler: ToolHandler, anima_dir: Path):

@@ -55,7 +55,7 @@ def main():
         size="small"
     )
     print()
-    print(f"✓ Memory base generated:")
+    print("✓ Memory base generated:")
     print(f"  - Domain: {memory_base.domain}")
     print(f"  - Size: {memory_base.size}")
     print(f"  - Total files: {memory_base.total_files}")
@@ -112,7 +112,7 @@ def main():
     print("Step 5: Saving annotations...")
     print("-" * 70)
     saved_gt_path = gt_manager.save_annotations(annotation_set)
-    print(f"✓ Saved annotations to:")
+    print("✓ Saved annotations to:")
     print(f"  {saved_gt_path}")
     print()
 

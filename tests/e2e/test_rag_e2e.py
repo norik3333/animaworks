@@ -13,9 +13,8 @@ Install with: pip install 'animaworks[rag]'
 
 import asyncio
 import os
-from datetime import datetime, timedelta
+from datetime import timedelta
 from core.time_utils import now_jst, today_local
-from pathlib import Path
 
 import pytest
 

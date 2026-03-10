@@ -1,8 +1,6 @@
 """Unit tests for core/i18n.py."""
 from __future__ import annotations
 
-import pytest
-from unittest.mock import patch
 
 
 class TestTranslationFunction:
@@ -66,7 +64,7 @@ class TestTranslationFunction:
                 missing.append(f"{key}: missing 'ja'")
             if "en" not in translations:
                 missing.append(f"{key}: missing 'en'")
-        assert not missing, f"Missing translations:\n" + "\n".join(missing)
+        assert not missing, "Missing translations:\n" + "\n".join(missing)
 
     def test_no_empty_translations(self):
         """No translation value should be empty string."""

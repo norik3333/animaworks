@@ -12,7 +12,6 @@ and connection isolation between concurrent requests.
 from __future__ import annotations
 
 import asyncio
-import json
 import pytest
 from collections.abc import AsyncIterator
 from pathlib import Path
@@ -21,14 +20,12 @@ from typing import Union
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from core.supervisor.ipc import (
-    IPC_BUFFER_LIMIT,
-    IPC_CHUNK_MAX,
     IPCClient,
     IPCRequest,
     IPCResponse,
     IPCServer,
 )
-from core.supervisor.process_handle import ProcessHandle, ProcessState
+from core.supervisor.process_handle import ProcessHandle
 
 
 # ── Helpers ──────────────────────────────────────────────────

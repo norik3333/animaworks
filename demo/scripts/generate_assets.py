@@ -236,10 +236,10 @@ def _generate_with_clients(
     # ── Step 2: Bust-up ──
     bustup_path = assets_dir / bustup_name
     if bustup_path.exists() and bustup_path.stat().st_size > 100:
-        print(f"    bustup: exists, skipping")
+        print("    bustup: exists, skipping")
     else:
         if not os.environ.get("FAL_KEY"):
-            print(f"    bustup: SKIP (no FAL_KEY)")
+            print("    bustup: SKIP (no FAL_KEY)")
         else:
             from core.tools._image_clients import (
                 FluxKontextClient,
@@ -247,7 +247,7 @@ def _generate_with_clients(
                 _REALISTIC_BUSTUP_PROMPT,
             )
 
-            print(f"    bustup: generating with Flux Kontext...")
+            print("    bustup: generating with Flux Kontext...")
             kontext = FluxKontextClient()
             bustup_prompt = _REALISTIC_BUSTUP_PROMPT if style == "realistic" else _BUSTUP_PROMPT
             bustup_bytes = kontext.generate_from_reference(
@@ -262,14 +262,14 @@ def _generate_with_clients(
     # ── Step 3: Chibi ──
     chibi_path = assets_dir / chibi_name
     if chibi_path.exists() and chibi_path.stat().st_size > 100:
-        print(f"    chibi: exists, skipping")
+        print("    chibi: exists, skipping")
     else:
         if not os.environ.get("FAL_KEY"):
-            print(f"    chibi: SKIP (no FAL_KEY)")
+            print("    chibi: SKIP (no FAL_KEY)")
         else:
             from core.tools._image_clients import FluxKontextClient
 
-            print(f"    chibi: generating with Flux Kontext...")
+            print("    chibi: generating with Flux Kontext...")
             kontext = FluxKontextClient()
             chibi_bytes = kontext.generate_from_reference(
                 reference_image=fullbody_bytes,

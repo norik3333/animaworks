@@ -297,7 +297,6 @@ class TestCascadeLimiterEventNames:
         return d
 
     def test_counts_legacy_dm_entries(self, anima_dir: Path) -> None:
-        from core.time_utils import now_iso
         activity = ActivityLogger(anima_dir)
         for _ in range(3):
             activity.log("dm_sent", content="hi", to_person="bob")

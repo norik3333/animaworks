@@ -6,11 +6,10 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
 from pathlib import Path
 
 from core.time_utils import today_local
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -22,7 +21,6 @@ from core.memory.conversation import (
     _CHARS_PER_TOKEN,
     _MAX_DISPLAY_TURNS,
     _MAX_RESPONSE_CHARS_IN_HISTORY,
-    _MAX_TURNS_BEFORE_COMPRESS,
 )
 from core.schemas import ModelConfig
 

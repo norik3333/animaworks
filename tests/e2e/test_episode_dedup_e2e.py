@@ -53,7 +53,7 @@ class TestFireAndForgetRemoved:
                     fire_and_forget_lines.append(f"Line {i}: {line.strip()}")
 
         assert fire_and_forget_lines == [], (
-            f"Fire-and-forget finalize_session calls found in anima.py:\n"
+            "Fire-and-forget finalize_session calls found in anima.py:\n"
             + "\n".join(fire_and_forget_lines)
         )
 

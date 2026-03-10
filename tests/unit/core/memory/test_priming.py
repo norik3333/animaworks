@@ -130,7 +130,7 @@ async def test_priming_all_channels(temp_anima_dir, temp_shared_dir):
     assert result.estimated_tokens() > 0
     assert result.estimated_tokens() < 2500  # Should be under budget
 
-    print(f"\nPriming result:")
+    print("\nPriming result:")
     print(f"  Sender profile: {len(result.sender_profile)} chars")
     print(f"  Episodes: {len(result.recent_activity)} chars")
     print(f"  Knowledge: {len(result.related_knowledge)} chars")
@@ -169,7 +169,7 @@ async def test_priming_empty_result(temp_anima_dir, temp_shared_dir):
     assert not result.sender_profile
     assert result.recent_activity  # Today's episodes should still be loaded
 
-    print(f"\nEmpty sender priming result:")
+    print("\nEmpty sender priming result:")
     print(f"  Sender profile: {len(result.sender_profile)} chars")
     print(f"  Episodes: {len(result.recent_activity)} chars")
 
@@ -333,7 +333,6 @@ async def test_channel_c_query_keyword_only_when_no_message(temp_anima_dir):
 
 if __name__ == "__main__":
     # Run tests manually
-    import sys
 
     async def run_tests():
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -362,7 +361,7 @@ if __name__ == "__main__":
             engine = PrimingEngine(anima_dir)
             result = await engine.prime_memories("テストメッセージ", "human")
 
-            print(f"Priming test result:")
+            print("Priming test result:")
             print(f"  Episodes: {len(result.recent_activity)} chars")
             print(f"  Knowledge: {len(result.related_knowledge)} chars")
             print(f"  Tokens: {result.estimated_tokens()}")

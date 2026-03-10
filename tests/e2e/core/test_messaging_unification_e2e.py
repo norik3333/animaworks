@@ -136,7 +136,6 @@ class TestFormatForPrimingIntegration:
 
     def test_mixed_entries_render_with_unified_labels(self, data_dir: Path) -> None:
         from core.time_utils import now_iso, now_jst
-        import time
 
         anima_dir = data_dir / "animas" / "alice"
         today = now_jst().date().isoformat()

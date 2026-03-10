@@ -9,7 +9,7 @@ import importlib
 
 import pytest
 
-from core.background import BackgroundTaskManager, _DEFAULT_ELIGIBLE_TOOLS
+from core.background import BackgroundTaskManager
 from core.tools._base import get_eligible_tools_from_profiles, load_execution_profiles
 
 

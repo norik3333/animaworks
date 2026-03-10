@@ -9,7 +9,6 @@ fallback path works when no activity_log entries exist.
 """
 from __future__ import annotations
 
-from datetime import timedelta
 from pathlib import Path
 from unittest.mock import patch
 

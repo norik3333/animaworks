@@ -9,7 +9,6 @@ from contextlib import ExitStack
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 from core.prompt.builder import build_system_prompt
 

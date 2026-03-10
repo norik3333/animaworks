@@ -7,7 +7,6 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 
 from core.schemas import CycleResult, EXTERNAL_PLATFORM_SOURCES
 from core.tooling.handler import active_session_type

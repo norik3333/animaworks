@@ -27,7 +27,6 @@ from core.tooling.handler_base import _validate_skill_format
 def _build_handler(tmp_path: Path):
     """Build a minimal MemoryToolsMixin-like object for write testing."""
     from core.memory import MemoryManager
-    from core.memory.activity import ActivityLogger
     from core.messenger import Messenger
     from core.tooling.handler import ToolHandler
 

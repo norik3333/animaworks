@@ -24,7 +24,6 @@ from datetime import timedelta
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
 
 from core.background import _rotate_dm_logs_sync
 from core.time_utils import now_jst

@@ -15,9 +15,7 @@ from __future__ import annotations
 import json
 from datetime import timedelta
 from pathlib import Path
-from unittest.mock import patch
 
-import pytest
 
 from core.memory.conversation import (
     ConversationMemory,
@@ -502,7 +500,7 @@ class TestPromptLogRotation:
     def test_old_files_deleted_recent_kept(self, tmp_path: Path):
         """Log files older than _PROMPT_LOG_RETENTION_DAYS are deleted."""
         import core._agent_prompt_log as _prompt_log_mod
-        from core.agent import _rotate_prompt_logs, _PROMPT_LOG_RETENTION_DAYS
+        from core.agent import _rotate_prompt_logs
 
         log_dir = tmp_path / "prompt_logs"
         log_dir.mkdir()

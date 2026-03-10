@@ -16,7 +16,6 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock
 
-import pytest
 
 from core.memory.activity import ActivityLogger
 

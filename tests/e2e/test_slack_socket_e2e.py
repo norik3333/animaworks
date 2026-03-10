@@ -9,10 +9,8 @@ Tests the handler logic end-to-end using real filesystem and Messenger
 from __future__ import annotations
 
 import json
-from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 
 from core.config.models import (
     AnimaWorksConfig,
@@ -50,7 +48,7 @@ def _make_socket_manager(data_dir, anima_mapping, monkeypatch):
     # Patch get_credential to return test tokens
     monkeypatch.setattr(
         "server.slack_socket.get_credential",
-        lambda name, tool, **kw: f"xoxb-test" if "bot" in (kw.get("env_var") or "").lower() else "xapp-test",
+        lambda name, tool, **kw: "xoxb-test" if "bot" in (kw.get("env_var") or "").lower() else "xapp-test",
     )
 
     # Capture event handler registrations instead of connecting to Slack

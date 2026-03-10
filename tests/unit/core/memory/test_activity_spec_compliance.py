@@ -6,9 +6,7 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
-import pytest
 
 from core.memory.activity import ActivityEntry, ActivityLogger
 from core.time_utils import now_jst

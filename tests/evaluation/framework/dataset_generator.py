@@ -8,10 +8,9 @@ Generates realistic memory bases and conversation scenarios for testing.
 """
 from __future__ import annotations
 
-import json
 import random
 import yaml
-from datetime import datetime, timedelta
+from datetime import timedelta
 from core.time_utils import now_jst
 from pathlib import Path
 from typing import Literal
@@ -654,7 +653,7 @@ Write in Japanese if the domain is business, otherwise use English."""
                 message = f"What happened on {date}?"
                 relevant_paths = [file.path]
             else:
-                message = f"What were the key events in recent days?"
+                message = "What were the key events in recent days?"
                 relevant_paths = [f.path for f in relevant_files]
 
             turns.append(ConversationTurn(
@@ -680,7 +679,7 @@ Write in Japanese if the domain is business, otherwise use English."""
                 message = f"Tell me about {topic}."
                 relevant_paths = [file.path]
             else:
-                message = f"What else can you tell me about this topic?"
+                message = "What else can you tell me about this topic?"
                 relevant_paths = [f.path for f in relevant_files[:i]]
 
             turns.append(ConversationTurn(
@@ -690,7 +689,7 @@ Write in Japanese if the domain is business, otherwise use English."""
 
         # Second half: reasoning
         for i in range(5, 10):
-            message = f"Based on what we discussed, what conclusions can we draw?"
+            message = "Based on what we discussed, what conclusions can we draw?"
             relevant_paths = [f.path for f in relevant_files]
 
             turns.append(ConversationTurn(

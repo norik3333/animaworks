@@ -11,7 +11,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-import pytest
 
 from core.execution.agent_sdk import (
     _finalize_pending_records,

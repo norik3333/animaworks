@@ -616,7 +616,6 @@ class TestConsecutiveTTSFailures:
     @pytest.mark.asyncio
     async def test_success_resets_counter(self) -> None:
         from core.voice.session import VoiceSession
-        from core.voice.tts_base import TTSSynthesisError
 
         ws = AsyncMock()
         stt = MagicMock()

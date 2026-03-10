@@ -9,7 +9,6 @@ Problem B: Per-anima ChromaDB creates truly isolated vector stores
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 import pytest

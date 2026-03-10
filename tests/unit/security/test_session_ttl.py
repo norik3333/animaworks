@@ -17,7 +17,6 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
 
 from core.auth.manager import (
     create_session,
@@ -166,7 +165,6 @@ class TestChangePasswordRevokesSession:
 
     def _create_test_app(self, data_dir: Path):
         import json
-        from unittest.mock import MagicMock
         from server.app import create_app
 
         animas_dir = data_dir / "animas"

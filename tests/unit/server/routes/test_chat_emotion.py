@@ -9,7 +9,7 @@ import json
 
 import pytest
 
-from server.routes.chat import extract_emotion, _format_sse, _handle_chunk
+from server.routes.chat import extract_emotion, _handle_chunk
 
 
 # ── extract_emotion ──────────────────────────────────────

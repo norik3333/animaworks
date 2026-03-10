@@ -12,7 +12,6 @@ from pathlib import Path
 import pytest
 
 from core.supervisor.manager import ProcessSupervisor
-from core.supervisor.process_handle import ProcessState
 
 
 @pytest.mark.asyncio

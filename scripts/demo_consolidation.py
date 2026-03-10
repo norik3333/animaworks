@@ -178,7 +178,7 @@ async def main():
         return
 
     print("\n=== Demo Complete ===")
-    print(f"\nYou can view the knowledge files at:")
+    print("\nYou can view the knowledge files at:")
     print(f"  {anima_dir / 'knowledge'}")
 
 

@@ -14,7 +14,6 @@ import json
 import time
 from pathlib import Path
 
-import pytest
 
 from core.messenger import InboxItem, Message
 

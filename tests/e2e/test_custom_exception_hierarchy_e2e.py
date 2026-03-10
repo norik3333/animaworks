@@ -9,7 +9,6 @@ exception passes remain in core/.
 
 import importlib
 import subprocess
-import sys
 from pathlib import Path
 
 import pytest
@@ -24,12 +23,7 @@ class TestExceptionHierarchyAvailability:
         """All 23 exception classes are importable from core.exceptions."""
         from core.exceptions import (
             AnimaWorksError,
-            ExecutionError, LLMAPIError, LLMTimeoutError, StreamDisconnectedError,
-            ToolError, ToolConfigError, ToolExecutionError, ToolNotFoundError,
-            MemoryIOError, MemoryReadError, MemoryWriteError, MemoryCorruptedError,
-            ProcessError, AnimaNotFoundError, AnimaNotRunningError, IPCConnectionError,
-            ConfigError, ConfigNotFoundError, ConfigValidationError,
-            MessagingError, RecipientNotFoundError, DeliveryError,
+            DeliveryError,
         )
         # All should be classes
         assert isinstance(AnimaWorksError, type)

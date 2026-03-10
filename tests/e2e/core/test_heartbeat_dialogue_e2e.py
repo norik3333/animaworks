@@ -13,14 +13,13 @@ Tests cross-context flows WITHOUT mocking file-system operations:
 from __future__ import annotations
 
 import json
-from datetime import datetime
 from core.time_utils import now_jst, today_local
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from core.memory.conversation import ConversationMemory, ConversationTurn
+from core.memory.conversation import ConversationMemory
 from core.memory.manager import MemoryManager
 from core.messenger import Messenger
 from core.schemas import CycleResult, ModelConfig

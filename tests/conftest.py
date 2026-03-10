@@ -9,7 +9,6 @@ mock/live switching for all test modules.
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 import signal

@@ -24,7 +24,7 @@ activity log recording quality, and fix priming data loss:
 """
 
 import json
-from datetime import datetime, timedelta
+from datetime import timedelta
 from core.time_utils import now_jst
 from pathlib import Path
 from unittest.mock import MagicMock, patch

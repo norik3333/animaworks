@@ -8,13 +8,11 @@ from __future__ import annotations
 
 """Integration tests for Phase 3: RAG index update + success/failure tracking."""
 
-from datetime import datetime
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
-from core.schemas import SkillMeta
 
 
 # ── Fixtures ──────────────────────────────────────────────

@@ -859,7 +859,7 @@ class MockVectorStoreWithSourceFilter:
         return [
             SearchResult(
                 document=Document(
-                    id=f"anima/knowledge/fallback.md#0",
+                    id="anima/knowledge/fallback.md#0",
                     content="Fallback content from vector search",
                     embedding=embedding,
                     metadata={"source_file": "knowledge/fallback.md"},

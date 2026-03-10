@@ -7,7 +7,6 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-import pytest
 
 from core.tooling.permissions import (
     _load_execution_profile,

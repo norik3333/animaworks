@@ -6,7 +6,6 @@ import json
 from datetime import timedelta
 from pathlib import Path
 
-import pytest
 
 from core.memory.activity import ActivityLogger
 from core.time_utils import today_local

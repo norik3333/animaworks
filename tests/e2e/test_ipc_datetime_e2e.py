@@ -10,7 +10,6 @@ in streaming responses, verifying the actual crash path is fixed.
 
 from __future__ import annotations
 
-import asyncio
 import json
 from collections.abc import AsyncIterator
 from datetime import datetime

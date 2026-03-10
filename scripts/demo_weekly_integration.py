@@ -278,11 +278,11 @@ async def main():
         # Check if compressed
         content = episode_file.read_text(encoding="utf-8")
         if "[COMPRESSED:" in content:
-            print(f"    → Compressed")
+            print("    → Compressed")
         elif "[IMPORTANT]" in content:
-            print(f"    → Important (not compressed)")
+            print("    → Important (not compressed)")
         else:
-            print(f"    → Recent (not compressed)")
+            print("    → Recent (not compressed)")
 
     # ── Step 7: Show sample merged content ────────────────────────────
     print()

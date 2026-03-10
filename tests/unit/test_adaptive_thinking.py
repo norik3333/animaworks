@@ -5,7 +5,7 @@ from __future__ import annotations
 """Unit tests for adaptive thinking helpers, resolve_max_tokens, and schema extensions."""
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 

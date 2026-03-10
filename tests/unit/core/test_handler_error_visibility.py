@@ -19,7 +19,6 @@ import logging
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 
 # ── Change 1: resolve_recipient exception -> RecipientResolutionError ──

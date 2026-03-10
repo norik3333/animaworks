@@ -6,8 +6,6 @@ from __future__ import annotations
 """Unit tests for core.tooling.skill_creator."""
 
 import yaml
-import pytest
-from pathlib import Path
 
 from core.tooling.skill_creator import create_skill_directory, _validate_filename
 

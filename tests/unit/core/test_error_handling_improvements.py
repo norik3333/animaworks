@@ -6,9 +6,7 @@ behavior for both normal and error paths.
 """
 from __future__ import annotations
 
-import json
 from pathlib import Path
-from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from core.time_utils import today_local
@@ -16,13 +14,10 @@ from core.time_utils import today_local
 import pytest
 
 from core.exceptions import (
-    AnimaWorksError,
     ConfigError,
-    ConfigNotFoundError,
     ExecutionError,
     LLMAPIError,
     MemoryWriteError,
-    ProcessError,
     ToolExecutionError,
 )
 

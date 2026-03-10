@@ -20,7 +20,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from core.supervisor.process_handle import ProcessHandle, ProcessState, ProcessStats
-from core.supervisor.manager import ProcessSupervisor, HealthConfig, RestartPolicy
+from core.supervisor.manager import ProcessSupervisor, HealthConfig
 
 
 class TestStreamingTimestamp:
@@ -137,7 +137,6 @@ class TestKeepaliveProducerStop:
     @pytest.mark.asyncio
     async def test_keepalive_stops_when_producer_done(self):
         """Keepalive should stop when producer_task is done."""
-        from core.supervisor.ipc import IPCResponse
 
         queue: asyncio.Queue = asyncio.Queue()
         last_chunk_time_holder = [0.0]

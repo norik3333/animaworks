@@ -18,7 +18,6 @@ from __future__ import annotations
 import asyncio
 import json
 import re
-from datetime import datetime, timedelta
 from core.time_utils import now_jst
 from pathlib import Path
 from unittest.mock import MagicMock, patch

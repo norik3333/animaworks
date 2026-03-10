@@ -92,7 +92,6 @@ class TestModeBMock:
 
         # Simulate post-call knowledge extraction (formerly done by old AssistedExecutor)
         knowledge_text = "France's capital is Paris — useful geographic fact."
-        from datetime import datetime
         topic = now_jst().strftime("learned_%Y%m%d_%H%M%S")
         agent.memory.write_knowledge(topic, knowledge_text)
 

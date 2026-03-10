@@ -12,9 +12,7 @@ Verifies that:
 
 from __future__ import annotations
 
-from pathlib import Path
 
-import pytest
 
 from core.memory.manager import MemoryManager
 from core.prompt.builder import build_system_prompt

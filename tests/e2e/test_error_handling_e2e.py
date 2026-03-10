@@ -11,11 +11,10 @@ from __future__ import annotations
 
 import asyncio
 import json
-import os
 import stat
 from pathlib import Path
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, PropertyMock
+from unittest.mock import AsyncMock, MagicMock
 
 import httpx
 import pytest

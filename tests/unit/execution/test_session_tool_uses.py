@@ -22,7 +22,6 @@ from core.execution._session import handle_session_chaining
 from core.memory.shortterm import (
     SessionState,
     ShortTermMemory,
-    _MAX_RESPONSE_CHARS,
 )
 from core.prompt.builder import BuildResult
 

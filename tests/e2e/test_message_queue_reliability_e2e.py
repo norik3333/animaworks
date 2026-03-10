@@ -15,8 +15,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from core.messenger import InboxItem, Messenger
-from core.schemas import Message
+from core.messenger import Messenger
 
 
 @pytest.fixture

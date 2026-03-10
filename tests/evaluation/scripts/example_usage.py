@@ -117,7 +117,7 @@ async def run_single_participant_example():
         priming_budget=2000,
     )
 
-    print(f"\nConfiguration:")
+    print("\nConfiguration:")
     print(f"  Experiment ID: {config.experiment_id}")
     print(f"  Condition: {config.condition} ({config.search_config.method.value})")
     print(f"  Priming enabled: {config.search_config.priming_enabled}")
@@ -145,11 +145,11 @@ async def run_single_participant_example():
     print("\n✓ Setup validated")
 
     # Run single participant
-    print(f"\nRunning participant 1...")
+    print("\nRunning participant 1...")
     summary = await experiment.run_participant(participant_id=1)
 
-    print(f"\n✓ Participant complete!")
-    print(f"\nSummary:")
+    print("\n✓ Participant complete!")
+    print("\nSummary:")
     for key, value in summary.items():
         print(f"  {key}: {value}")
 

@@ -17,7 +17,6 @@ from __future__ import annotations
 import argparse
 import re
 import subprocess
-import sys
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -261,8 +260,8 @@ def main() -> None:
     if release_version:
         update_pyproject_version(release_version)
         print(f"Updated {PYPROJECT} version to {release_version}")
-        print(f"\nNext steps:")
-        print(f"  git add CHANGELOG.md pyproject.toml")
+        print("\nNext steps:")
+        print("  git add CHANGELOG.md pyproject.toml")
         print(f"  git commit -m 'release: v{release_version}'")
         print(f"  git tag v{release_version}")
 

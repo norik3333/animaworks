@@ -206,7 +206,7 @@ def _call_llm(prompt: str, label: str) -> str:
     import shutil
 
     if not shutil.which("cursor-agent"):
-        print(f"ERROR: 'cursor-agent' not found in PATH.", file=sys.stderr)
+        print("ERROR: 'cursor-agent' not found in PATH.", file=sys.stderr)
         sys.exit(1)
 
     cmd = ["cursor-agent", "-p", "--model", LLM_MODEL, prompt]

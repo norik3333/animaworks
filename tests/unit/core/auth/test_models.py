@@ -6,7 +6,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-from core.time_utils import now_jst
 
 import pytest
 from pydantic import ValidationError

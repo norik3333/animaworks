@@ -15,8 +15,6 @@ import pytest
 
 pytestmark = pytest.mark.asyncio
 
-import core.tools
-from core.execution.base import ExecutionResult
 from core.prompt.context import ContextTracker
 from core.schemas import ModelConfig
 from core.memory.shortterm import ShortTermMemory

@@ -17,9 +17,7 @@ Covers:
 """
 
 import json
-from pathlib import Path
 
-import pytest
 
 
 class TestInboxReadCounts:

@@ -9,7 +9,6 @@ import os
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
 
 from core.schemas import ModelConfig
 from core.execution.base import BaseExecutor

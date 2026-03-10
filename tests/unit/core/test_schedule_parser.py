@@ -8,14 +8,12 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-import pytest
 
 from core.schedule_parser import (
     parse_cron_md,
     parse_schedule,
     parse_heartbeat_config,
 )
-from core.schemas import CronTask
 
 
 # ── parse_cron_md tests ───────────────────────────────────

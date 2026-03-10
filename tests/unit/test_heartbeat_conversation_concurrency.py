@@ -11,7 +11,6 @@ short-term memory separation, board fanout context variable, and
 replied_to session separation.
 """
 
-import asyncio
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 

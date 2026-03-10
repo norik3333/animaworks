@@ -8,7 +8,6 @@ speciality annotations in the organization tree builder.
 """
 from __future__ import annotations
 
-import pytest
 from unittest.mock import MagicMock
 
 

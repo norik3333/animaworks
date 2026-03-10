@@ -6,12 +6,11 @@
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from cli.commands.remake_cmd import ALL_STEPS, _run, register
+from cli.commands.remake_cmd import _run, register
 
 
 # ── register() ─────────────────────────────────────────────

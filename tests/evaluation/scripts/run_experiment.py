@@ -30,7 +30,7 @@ import re
 import sys
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import timedelta
 from core.time_utils import now_jst
 from pathlib import Path
 from typing import Any
@@ -50,19 +50,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 EXPERIMENT_DATA_DIR = PROJECT_ROOT / "tests" / "evaluation" / "_experiment_data"
 os.environ["ANIMAWORKS_DATA_DIR"] = str(EXPERIMENT_DATA_DIR)
 
-from tests.evaluation.framework.config import (
-    Domain,
-    ExperimentConfig,
-    MemorySize,
-    SearchMethod,
-)
 from tests.evaluation.framework.dataset_generator import DatasetGenerator
-from tests.evaluation.framework.metrics import (
-    MetricsCollector,
-    SearchMetrics,
-    StatisticalAggregator,
-    TokenCounter,
-)
 from tests.evaluation.framework.schemas import MemoryBase, MemoryFile, Scenario
 
 # ── Logging configuration ────────────────────────────────────────────────────
@@ -921,7 +909,6 @@ def _run_h3_consolidation_experiment(
     Returns:
         H3 hypothesis test results
     """
-    from tests.evaluation.framework.analysis import StatisticalAnalyzer
 
     logger.info("Running H3 consolidation experiment (measurement-based)...")
 
@@ -1556,15 +1543,15 @@ def generate_figures(
     effect_colors_list = []
 
     if h1 and "effect_size" in h1:
-        effect_names.append(f"H1: Spreading\n(Cohen's d)")
+        effect_names.append("H1: Spreading\n(Cohen's d)")
         effect_values.append(h1["effect_size"])
         effect_colors_list.append(condition_colors["B"])
     if h2 and "effect_size" in h2:
-        effect_names.append(f"H2: Latency\n(Cohen's d)")
+        effect_names.append("H2: Latency\n(Cohen's d)")
         effect_values.append(h2["effect_size"])
         effect_colors_list.append(condition_colors["B"])
     if h3 and "effect_size" in h3:
-        effect_names.append(f"H3: Consolidation\n(Cohen's d)")
+        effect_names.append("H3: Consolidation\n(Cohen's d)")
         effect_values.append(h3["effect_size"])
         effect_colors_list.append(condition_colors["A"])
 

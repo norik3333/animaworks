@@ -8,16 +8,15 @@ messenger last_post_by, cascade_limiter file-based, and priming outbound section
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from core.memory import MemoryManager
-from core.memory.activity import ActivityEntry, ActivityLogger
 from core.messenger import Messenger
-from core.time_utils import now_iso, now_jst
+from core.time_utils import now_jst
 from core.tooling.handler import ToolHandler
 
 

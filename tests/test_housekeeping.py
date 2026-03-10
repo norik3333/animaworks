@@ -6,14 +6,12 @@ from __future__ import annotations
 
 """Tests for core.memory.housekeeping and related modules."""
 
-import asyncio
 import os
 import time
 from datetime import timedelta
 from pathlib import Path
 
 from core.time_utils import today_local
-from unittest.mock import patch
 
 import pytest
 

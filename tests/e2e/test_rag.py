@@ -137,7 +137,6 @@ def temp_vector_store(temp_anima_dir):
 
 def test_chromadb_create_collection(temp_vector_store):
     """Test creating a ChromaDB collection."""
-    from core.memory.rag.store import ChromaVectorStore
 
     store = temp_vector_store
     store.create_collection("test_knowledge", dimension=384)
@@ -365,7 +364,7 @@ def test_memory_retriever_vector_search(temp_anima_dir, temp_vector_store):
 
 def test_temporal_decay(temp_anima_dir, temp_vector_store):
     """Test temporal decay scoring."""
-    from datetime import datetime, timedelta
+    from datetime import timedelta
     from core.memory.rag.retriever import MemoryRetriever, RetrievalResult
 
     indexer = None

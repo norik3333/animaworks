@@ -7,9 +7,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from unittest.mock import MagicMock
 
-import pytest
 from httpx import ASGITransport, AsyncClient
 
 from server.routes.config_routes import _mask_secrets

@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -44,7 +44,6 @@ from core.execution.agent_sdk import (  # noqa: E402
     _tool_result_content_len,
 )
 from core.execution.base import ExecutionResult  # noqa: E402
-from core.prompt.context import CHARS_PER_TOKEN  # noqa: E402
 
 
 # ── Fixtures ─────────────────────────────────────────────────

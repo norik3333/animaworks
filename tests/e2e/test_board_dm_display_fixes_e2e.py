@@ -17,7 +17,6 @@ import logging
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from core.time_utils import today_local
 from httpx import ASGITransport, AsyncClient
 

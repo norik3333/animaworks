@@ -8,11 +8,9 @@ Tests actual bash command execution with the output guard wrapper to verify
 file saving, truncation, and cleanup behavior.
 """
 
-import os
 import subprocess
 from pathlib import Path
 
-import pytest
 
 from core.execution.agent_sdk import (
     _BASH_HEAD_BYTES,

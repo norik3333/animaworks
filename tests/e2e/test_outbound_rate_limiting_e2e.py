@@ -18,9 +18,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from core.memory import MemoryManager
-from core.memory.activity import ActivityLogger
 from core.messenger import Messenger
-from core.time_utils import now_iso, now_jst
+from core.time_utils import now_jst
 from core.tooling.handler import ToolHandler
 
 

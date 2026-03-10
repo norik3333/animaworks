@@ -8,8 +8,7 @@ AgentCore.update_model_config(), IPC handler, and CLI command.
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 

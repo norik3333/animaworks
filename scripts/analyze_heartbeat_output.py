@@ -167,7 +167,7 @@ def main() -> int:
             for fn, mt in s["pending_files"]:
                 print(f"    pending (12h): {fn} @ {mt}")
         if not s["current_task"] and not s["pending_files"] and s["heartbeat_tasks_12h"] == 0 and name in heartbeat_tokens:
-            print(f"    (no state changes in 12h)")
+            print("    (no state changes in 12h)")
 
     # 3. Pending files created in last 12h
     print("\n## 3. PENDING FILES CREATED IN LAST 12h")

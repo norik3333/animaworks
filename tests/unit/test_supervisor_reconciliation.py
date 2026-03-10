@@ -8,13 +8,11 @@ Unit tests for ProcessSupervisor reconciliation feature.
 
 from __future__ import annotations
 
-import asyncio
 import json
 import pytest
-from datetime import datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 from core.supervisor.manager import (
     ProcessSupervisor,
@@ -22,7 +20,7 @@ from core.supervisor.manager import (
     HealthConfig,
     ReconciliationConfig,
 )
-from core.supervisor.process_handle import ProcessHandle, ProcessState
+from core.supervisor.process_handle import ProcessHandle
 
 
 @pytest.fixture

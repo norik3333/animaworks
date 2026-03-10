@@ -8,10 +8,8 @@ Tests the PreToolUse updatedInput generation for Bash, Read, Grep, and Glob
 tools to prevent context bloat in Agent SDK sessions.
 """
 
-import shutil
 from pathlib import Path
 
-import pytest
 
 from core.execution.agent_sdk import (
     _BASH_HEAD_BYTES,

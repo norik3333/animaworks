@@ -6,7 +6,6 @@
 
 from __future__ import annotations
 
-import pytest
 
 from server.routes.chat import MAX_CHAT_MESSAGE_SIZE
 

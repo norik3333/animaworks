@@ -10,16 +10,13 @@ Issue: 20260218_episode-dedup-state-autoupdate-resolution-propagation
 """
 
 import json
-import re
-from datetime import datetime, timedelta
+from datetime import timedelta
 from core.time_utils import now_jst, today_local
-from pathlib import Path
 
 import pytest
 
 from core.memory.conversation import (
     ConversationMemory,
-    ConversationState,
     ConversationTurn,
     ParsedSessionSummary,
     SESSION_GAP_MINUTES,

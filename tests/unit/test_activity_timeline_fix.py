@@ -6,8 +6,6 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime
-from core.time_utils import now_jst
 from pathlib import Path
 
 import pytest

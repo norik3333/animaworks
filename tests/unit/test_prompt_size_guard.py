@@ -9,15 +9,11 @@ max_buffer_size configuration, and stderr.log rotation.
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 
 from core.memory.conversation import (
     ConversationMemory,
-    ConversationState,
     ConversationTurn,
     _MAX_HUMAN_CHARS_IN_HISTORY,
     _MAX_RESPONSE_CHARS_IN_HISTORY,

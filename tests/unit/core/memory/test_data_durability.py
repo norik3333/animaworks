@@ -18,13 +18,12 @@ Covers:
 """
 
 import json
-import os
 from pathlib import Path
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 
 import pytest
 
-from core.memory.streaming_journal import StreamingJournal, JournalRecovery
+from core.memory.streaming_journal import StreamingJournal
 from core.schemas import ModelConfig
 
 

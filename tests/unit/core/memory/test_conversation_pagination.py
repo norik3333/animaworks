@@ -18,7 +18,6 @@ backward retrieves progressively older turns.
 
 from __future__ import annotations
 
-from pathlib import Path
 
 import pytest
 

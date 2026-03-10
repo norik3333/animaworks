@@ -16,7 +16,6 @@ Covers:
 
 from dataclasses import dataclass
 
-import pytest
 
 from core._anima_inbox import _build_reply_instruction
 

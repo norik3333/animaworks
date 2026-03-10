@@ -13,11 +13,10 @@ Tests cover three code changes:
 
 import sqlite3
 from pathlib import Path
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
-from core.schemas import Message
 
 
 # ── Test 1: board_mention is no longer exempt from depth check ────

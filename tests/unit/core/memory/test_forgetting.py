@@ -16,7 +16,7 @@ Tests cover:
 - Integration with ConsolidationEngine (daily + weekly hooks)
 """
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 from core.time_utils import now_jst
 from pathlib import Path
 from typing import Any
@@ -25,9 +25,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from core.memory.forgetting import (
-    DOWNSCALING_ACCESS_THRESHOLD,
-    DOWNSCALING_DAYS_THRESHOLD,
-    FORGETTING_LOW_ACTIVATION_DAYS,
     ForgettingEngine,
 )
 

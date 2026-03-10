@@ -5,10 +5,8 @@
 
 from __future__ import annotations
 
-import json
 from core.time_utils import now_jst
 import logging
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -75,7 +73,7 @@ class TestFrontendLogEndpoints:
     @pytest.fixture()
     def app(self, tmp_path):
         """Create a minimal FastAPI app with system routes for testing."""
-        from server.routes.system import create_system_router, _get_frontend_logger
+        from server.routes.system import create_system_router
         import server.routes.system as sys_module
 
         # Reset the frontend logger so it gets re-created with tmp_path
@@ -146,7 +144,6 @@ class TestFrontendLogEndpoints:
 
     def test_view_frontend_logs_with_filter(self, client, tmp_path):
         """GET with level filter should filter entries."""
-        from datetime import datetime
 
         log_dir = tmp_path / "logs" / "frontend"
         log_dir.mkdir(parents=True, exist_ok=True)
@@ -168,7 +165,6 @@ class TestFrontendLogEndpoints:
 
     def test_view_frontend_logs_with_module_filter(self, client, tmp_path):
         """GET with module filter should filter entries."""
-        from datetime import datetime
 
         log_dir = tmp_path / "logs" / "frontend"
         log_dir.mkdir(parents=True, exist_ok=True)

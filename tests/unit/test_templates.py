@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
 
 
 TEMPLATES_DIR = Path(__file__).parent.parent.parent / "templates" / "ja" / "prompts"

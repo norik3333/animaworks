@@ -12,12 +12,10 @@ from __future__ import annotations
 
 import json
 import time
-from datetime import datetime
 from core.time_utils import now_jst
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from httpx import ASGITransport, AsyncClient
 
 from core.memory.activity import ActivityLogger

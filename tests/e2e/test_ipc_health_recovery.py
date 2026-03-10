@@ -133,7 +133,7 @@ async def test_health_check_detects_failed_state():
         handle.state = ProcessState.FAILED
 
         # Set started_at far enough back to pass startup grace period
-        from datetime import datetime, timedelta
+        from datetime import timedelta
         handle.stats.started_at = now_jst() - timedelta(seconds=60)
 
         supervisor.processes["test-anima"] = handle

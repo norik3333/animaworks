@@ -8,9 +8,6 @@ Verifies the full AgentCore integration with CodexSDKExecutor using
 mocked Codex SDK.  No real Codex CLI or API key required.
 """
 
-import asyncio
-from pathlib import Path
-from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest

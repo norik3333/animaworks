@@ -20,7 +20,6 @@ import sqlite3
 from core.tooling.prompt_db import (
     DEFAULT_DESCRIPTIONS,
     DEFAULT_GUIDES,
-    SECTION_CONDITIONS,
 )
 
 

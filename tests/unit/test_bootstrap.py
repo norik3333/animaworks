@@ -13,18 +13,16 @@ Tests cover:
 
 from __future__ import annotations
 
-import asyncio
 import json
 from core.time_utils import now_jst
 from pathlib import Path
-from tempfile import TemporaryDirectory
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from httpx import ASGITransport, AsyncClient
 
 from core.schemas import CycleResult
-from core.supervisor.ipc import IPCRequest, IPCResponse
+from core.supervisor.ipc import IPCResponse
 from core.tooling.handler import active_session_type
 from core.supervisor.manager import (
     HealthConfig,

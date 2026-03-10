@@ -12,7 +12,6 @@ Verifies end-to-end adaptive thinking parameter flow through AgentCore:
 """
 
 import json
-from pathlib import Path
 
 import pytest
 

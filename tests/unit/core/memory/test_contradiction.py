@@ -9,7 +9,6 @@ from __future__ import annotations
 
 """Tests for knowledge contradiction detection and resolution."""
 
-import shutil
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -19,7 +18,6 @@ import yaml
 from core.memory.contradiction import (
     ContradictionDetector,
     ContradictionPair,
-    ContradictionResult,
 )
 
 
@@ -1261,7 +1259,7 @@ class TestRAGFilter:
 
     def test_search_excludes_superseded_by_default(self) -> None:
         """search() passes valid_until filter when include_superseded=False."""
-        from unittest.mock import MagicMock, patch
+        from unittest.mock import MagicMock
 
         from core.memory.rag.retriever import MemoryRetriever
 

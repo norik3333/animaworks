@@ -7,7 +7,6 @@ Phase 2: per-thread locks, interrupt events, status slots
 Phase 3: codex_thread_id / agent SDK session path separation
 """
 
-import asyncio
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 

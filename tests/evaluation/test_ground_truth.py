@@ -13,12 +13,10 @@ import pytest
 from pathlib import Path
 from tests.evaluation.framework import (
     AnnotationSet,
-    ConversationTurn,
     DatasetGenerator,
     GroundTruth,
     GroundTruthManager,
-    RelevantMemory,
-    Scenario
+    RelevantMemory
 )
 
 

@@ -500,7 +500,6 @@ class TestDeprecatedCommands:
 class TestClearPycache:
     def test_clear_pycache(self, tmp_path):
         """Verify _clear_pycache removes __pycache__ directories."""
-        import shutil
 
         from cli.commands.server import _clear_pycache
 

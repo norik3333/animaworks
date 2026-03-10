@@ -11,7 +11,6 @@ These tests verify the complete server stack including:
 
 from __future__ import annotations
 
-import asyncio
 from pathlib import Path
 
 import pytest

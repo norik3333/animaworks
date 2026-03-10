@@ -20,9 +20,8 @@ Benchmark results: tests/performance/BENCHMARK_RESULTS.md
 import asyncio
 import statistics
 import time
-from datetime import datetime, timedelta
+from datetime import timedelta
 from core.time_utils import now_jst
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -341,7 +340,7 @@ async def test_memory_usage_baseline(anima_dir_with_data, memory_tracker):
         final_mem = memory_tracker.current_usage_mb()
         mem_increase = final_mem - initial_mem
 
-        print(f"\n=== Memory Usage ===")
+        print("\n=== Memory Usage ===")
         print(f"Initial:  {initial_mem:.2f} MB")
         print(f"Final:    {final_mem:.2f} MB")
         print(f"Increase: {mem_increase:.2f} MB")
@@ -403,7 +402,7 @@ async def test_concurrent_priming(tmp_path):
 
     total_time = end - start
 
-    print(f"\n=== Concurrent Priming ===")
+    print("\n=== Concurrent Priming ===")
     print(f"Total time: {total_time*1000:.2f} ms")
     print(f"Average per anima: {total_time/len(engines)*1000:.2f} ms")
 
@@ -606,7 +605,7 @@ async def test_empty_cache_vs_warm_cache(anima_dir_with_data):
 
         mean_warm = statistics.mean(warm_times)
 
-        print(f"\n=== Cache Performance ===")
+        print("\n=== Cache Performance ===")
         print(f"Cold cache: {cold_time*1000:.2f} ms")
         print(f"Warm cache (mean): {mean_warm*1000:.2f} ms")
         print(f"Speedup: {cold_time/mean_warm:.2f}x")
@@ -658,7 +657,7 @@ async def test_budget_allocation_performance(anima_dir_with_data):
         mean_small = statistics.mean(small_budget_times)
         mean_large = statistics.mean(large_budget_times)
 
-        print(f"\n=== Budget Allocation Performance ===")
+        print("\n=== Budget Allocation Performance ===")
         print(f"Small budget (500 tokens):  {mean_small*1000:.2f} ms")
         print(f"Large budget (3000 tokens): {mean_large*1000:.2f} ms")
         print(f"Ratio: {mean_large/mean_small:.2f}x")

@@ -12,7 +12,6 @@ for memory performance evaluation.
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -152,12 +151,12 @@ def main():
     logger.info(f"  F-statistic: {h2_result['f_statistic']:.3f}")
     logger.info(f"  p-value: {h2_result['p_value']:.6f}")
     logger.info(f"  Effect size (η²): {h2_result['eta_squared']:.3f}")
-    logger.info(f"  Mean Precision:")
+    logger.info("  Mean Precision:")
     for method, precision in h2_result["mean_precision"].items():
         logger.info(f"    {method}: {precision:.3f}")
     logger.info(f"  Significant: {h2_result['significant']} (α=0.05)")
 
-    logger.info(f"  Post-hoc (Tukey HSD):")
+    logger.info("  Post-hoc (Tukey HSD):")
     for pair, result in h2_result["tukey_results"].items():
         if result["reject"]:
             logger.info(f"    {pair}: SIGNIFICANT (p={result['p_adj']:.4f})")
@@ -175,7 +174,7 @@ def main():
     if "auto_consolidation" in h3_result["odds_ratios"]:
         or_value = h3_result["odds_ratios"]["auto_consolidation"]
         p_value = h3_result["p_values"]["auto_consolidation"]
-        logger.info(f"  Auto-consolidation:")
+        logger.info("  Auto-consolidation:")
         logger.info(f"    Odds Ratio: {or_value:.3f}")
         logger.info(f"    p-value: {p_value:.6f}")
         logger.info(f"    Interpretation: {or_value:.1f}x higher odds of retention")
@@ -185,9 +184,9 @@ def main():
 
     power_result = analyzer.calculate_power_analysis(effect_size=0.5, alpha=0.05, power=0.80)
 
-    logger.info(f"  For medium effect size (d=0.5):")
+    logger.info("  For medium effect size (d=0.5):")
     logger.info(f"    Required n per group: {power_result['required_n_per_group']}")
-    logger.info(f"    Our sample size: 30 per group ✓")
+    logger.info("    Our sample size: 30 per group ✓")
 
     # 2.5. Inter-Rater Reliability Demo
     logger.info("\n[Inter-Rater Reliability] Example calculation...")
@@ -200,11 +199,11 @@ def main():
     logger.info(f"  Cohen's κ: {kappa:.3f}")
 
     if kappa > 0.80:
-        logger.info(f"  Interpretation: Excellent agreement")
+        logger.info("  Interpretation: Excellent agreement")
     elif kappa > 0.60:
-        logger.info(f"  Interpretation: Good agreement")
+        logger.info("  Interpretation: Good agreement")
     else:
-        logger.info(f"  Interpretation: Moderate agreement")
+        logger.info("  Interpretation: Moderate agreement")
 
     # ── Step 3: Visualization ─────────────────────────────────────────
 

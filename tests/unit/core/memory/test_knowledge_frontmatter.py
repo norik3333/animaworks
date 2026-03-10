@@ -9,10 +9,7 @@ from __future__ import annotations
 
 """Tests for knowledge frontmatter read/write and legacy migration."""
 
-import shutil
-from datetime import datetime
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 

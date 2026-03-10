@@ -7,12 +7,12 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from core.supervisor.ipc import IPCResponse
-from core.supervisor.process_handle import ProcessHandle, ProcessState
+from core.supervisor.process_handle import ProcessHandle
 
 
 @pytest.fixture
