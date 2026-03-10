@@ -10,12 +10,14 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from pydantic import ValidationError
 
 from server.routes.assets import ExpressionGenerateRequest
 
 
 def _make_test_app(animas_dir: Path):
     from fastapi import FastAPI
+
     from server.routes.assets import create_assets_router
 
     app = FastAPI()
@@ -34,20 +36,28 @@ class TestExpressionGenerateRequest:
         req = ExpressionGenerateRequest(expression="smile")
         assert req.expression == "smile"
 
-    @pytest.mark.parametrize("expr", [
-        "neutral", "smile", "laugh", "troubled",
-        "surprised", "thinking", "embarrassed",
-    ])
+    @pytest.mark.parametrize(
+        "expr",
+        [
+            "neutral",
+            "smile",
+            "laugh",
+            "troubled",
+            "surprised",
+            "thinking",
+            "embarrassed",
+        ],
+    )
     def test_all_valid_expressions(self, expr):
         req = ExpressionGenerateRequest(expression=expr)
         assert req.expression == expr
 
     def test_invalid_expression_rejected(self):
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             ExpressionGenerateRequest(expression="angry")
 
     def test_invalid_random_string_rejected(self):
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             ExpressionGenerateRequest(expression="foobar")
 
 
