@@ -102,6 +102,9 @@ scripts/test_mobile_chat_screenshots.py
 scripts/test_mobile_chat_ui.py
 scripts/verify_template_placeholders.py
 
+# Skill archives
+*.skill
+
 # Private-only static assets
 server/static/files/
 server/static/finance/
