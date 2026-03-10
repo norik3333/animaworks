@@ -291,10 +291,10 @@ class TestLiteLLMAdaptiveThinking:
         assert kwargs["thinking"] == {"type": "enabled", "budget_tokens": 10000}
         assert kwargs["temperature"] == 1
 
-    def test_non_claude_gets_think_param(self, anima_dir, tool_handler, memory):
+    def test_ollama_gets_think_param(self, anima_dir, tool_handler, memory):
         from core.execution.litellm_loop import LiteLLMExecutor
         cfg = ModelConfig(
-            model="openai/gpt-4o", thinking=True, api_key="k",
+            model="ollama/qwen3:14b", thinking=True, api_key="k",
         )
         ex = LiteLLMExecutor(
             model_config=cfg, anima_dir=anima_dir,
@@ -303,6 +303,7 @@ class TestLiteLLMAdaptiveThinking:
         kwargs = ex._build_llm_kwargs()
         assert kwargs.get("think") is True
         assert "thinking" not in kwargs
+        assert "extra_body" not in kwargs
 
     def test_bedrock_gets_reasoning_effort(self, anima_dir, tool_handler, memory):
         from core.execution.litellm_loop import LiteLLMExecutor
@@ -345,3 +346,58 @@ class TestLiteLLMAdaptiveThinking:
         kwargs = ex._build_llm_kwargs()
         assert kwargs["enable_thinking"] is False
         assert "reasoning_effort" not in kwargs
+
+    def test_openai_gets_extra_body_enable_thinking_true(self, anima_dir, tool_handler, memory):
+        from core.execution.litellm_loop import LiteLLMExecutor
+        cfg = ModelConfig(
+            model="openai/qwen3.5-9b", thinking=True, api_key="k",
+        )
+        ex = LiteLLMExecutor(
+            model_config=cfg, anima_dir=anima_dir,
+            tool_handler=tool_handler, tool_registry=[], memory=memory,
+        )
+        kwargs = ex._build_llm_kwargs()
+        assert kwargs["extra_body"]["enable_thinking"] is True
+        assert "think" not in kwargs
+        assert "thinking" not in kwargs
+        assert "enable_thinking" not in kwargs  # top-level, not extra_body
+
+    def test_openai_gets_extra_body_enable_thinking_false(self, anima_dir, tool_handler, memory):
+        from core.execution.litellm_loop import LiteLLMExecutor
+        cfg = ModelConfig(
+            model="openai/qwen3.5-9b", thinking=False, api_key="k",
+        )
+        ex = LiteLLMExecutor(
+            model_config=cfg, anima_dir=anima_dir,
+            tool_handler=tool_handler, tool_registry=[], memory=memory,
+        )
+        kwargs = ex._build_llm_kwargs()
+        assert kwargs["extra_body"]["enable_thinking"] is False
+        assert "think" not in kwargs
+
+    def test_openai_thinking_none_no_extra_body(self, anima_dir, tool_handler, memory):
+        from core.execution.litellm_loop import LiteLLMExecutor
+        cfg = ModelConfig(
+            model="openai/qwen3.5-9b", api_key="k",
+        )
+        ex = LiteLLMExecutor(
+            model_config=cfg, anima_dir=anima_dir,
+            tool_handler=tool_handler, tool_registry=[], memory=memory,
+        )
+        kwargs = ex._build_llm_kwargs()
+        assert "extra_body" not in kwargs
+        assert "think" not in kwargs
+
+    def test_openai_gpt_with_thinking_uses_extra_body(self, anima_dir, tool_handler, memory):
+        """Non-Qwen openai/* models also use extra_body when thinking is set."""
+        from core.execution.litellm_loop import LiteLLMExecutor
+        cfg = ModelConfig(
+            model="openai/gpt-4o", thinking=True, api_key="k",
+        )
+        ex = LiteLLMExecutor(
+            model_config=cfg, anima_dir=anima_dir,
+            tool_handler=tool_handler, tool_registry=[], memory=memory,
+        )
+        kwargs = ex._build_llm_kwargs()
+        assert kwargs["extra_body"]["enable_thinking"] is True
+        assert "think" not in kwargs
