@@ -42,6 +42,9 @@ from pathlib import Path
 
 from core.exceptions import ExecutionError, LLMAPIError, MemoryWriteError  # noqa: F401
 from core.execution import _sdk_session
+from core.execution._sdk_patch import apply_sdk_transport_patch
+
+apply_sdk_transport_patch()
 from core.execution._sdk_hooks import (  # noqa: F401
     _build_pre_compact_hook,
     _build_pre_tool_hook,
