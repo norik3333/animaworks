@@ -235,3 +235,78 @@ class TestGroupIntoSessions:
         assert len(sessions) == 2
         assert sessions[0]["trigger"] == "task"
         assert sessions[1]["trigger"] == "task"
+
+    def test_trigger_change_splits_session(self) -> None:
+        """Heartbeat followed by chat within 10min -> separate sessions."""
+        messages = [
+            {
+                "ts": "2026-03-10T08:00:00+09:00",
+                "role": "system",
+                "content": "定期巡回開始",
+                "from_person": "",
+                "tool_calls": [],
+                "_trigger": "heartbeat",
+            },
+            {
+                "ts": "2026-03-10T08:03:00+09:00",
+                "role": "system",
+                "content": "定期巡回完了",
+                "from_person": "",
+                "tool_calls": [],
+                "_trigger": "heartbeat",
+            },
+            {
+                "ts": "2026-03-10T08:05:00+09:00",
+                "role": "human",
+                "content": "こんにちは",
+                "from_person": "human",
+                "tool_calls": [],
+            },
+            {
+                "ts": "2026-03-10T08:06:00+09:00",
+                "role": "assistant",
+                "content": "はい、お手伝いします",
+                "from_person": "",
+                "tool_calls": [],
+            },
+        ]
+        sessions = ActivityLogger._group_into_sessions(messages, gap_minutes=10)
+        assert len(sessions) == 2
+        assert sessions[0]["trigger"] == "heartbeat"
+        assert len(sessions[0]["messages"]) == 2
+        assert sessions[1]["trigger"] == "chat"
+        assert len(sessions[1]["messages"]) == 2
+        assert sessions[1]["messages"][0]["role"] == "human"
+
+    def test_chat_then_cron_splits_session(self) -> None:
+        """Chat followed by cron within 10min -> separate sessions."""
+        messages = [
+            {
+                "ts": "2026-03-10T08:00:00+09:00",
+                "role": "human",
+                "content": "テスト",
+                "from_person": "human",
+                "tool_calls": [],
+            },
+            {
+                "ts": "2026-03-10T08:01:00+09:00",
+                "role": "assistant",
+                "content": "応答",
+                "from_person": "",
+                "tool_calls": [],
+            },
+            {
+                "ts": "2026-03-10T08:04:00+09:00",
+                "role": "system",
+                "content": "Chatworkメンション監視",
+                "from_person": "",
+                "tool_calls": [],
+                "_trigger": "cron",
+            },
+        ]
+        sessions = ActivityLogger._group_into_sessions(messages, gap_minutes=10)
+        assert len(sessions) == 2
+        assert sessions[0]["trigger"] == "chat"
+        assert len(sessions[0]["messages"]) == 2
+        assert sessions[1]["trigger"] == "cron"
+        assert len(sessions[1]["messages"]) == 1

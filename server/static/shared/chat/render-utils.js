@@ -378,15 +378,12 @@ export function renderCollapsibleSession(sessions, type, opts) {
   const allMessages = sessions.flatMap((s) => s.messages || []);
   if (allMessages.length === 0) return "";
 
-  const icons = { heartbeat: "❤", cron: "⏰", task: "🔨" };
-  const icon = icons[type] || "⚙️";
-
   const startTs = sessions[0]?.session_start;
   const endTs = sessions[sessions.length - 1]?.session_end;
   const timeLabel = startTs ? smartTimestamp(startTs) : "";
   const timeRange =
     startTs && endTs && startTs !== endTs
-      ? `${smartTimestamp(startTs)} 〜 ${smartTimestamp(endTs)}`
+      ? `${smartTimestamp(startTs)} \u301C ${smartTimestamp(endTs)}`
       : timeLabel;
 
   let headerLabel = "";
@@ -418,7 +415,7 @@ export function renderCollapsibleSession(sessions, type, opts) {
     `<div class="bg-session-group bg-session-group--${type}">` +
     `<div class="bg-session-header bg-session-header--${type}">` +
     `<span class="bg-session-chevron">\u25B6</span>` +
-    `<span class="bg-session-label">${icon} ${escapeHtml(headerLabel)}</span>` +
+    `<span class="bg-session-label">${escapeHtml(headerLabel)}</span>` +
     `<span class="bg-session-time">${escapeHtml(timeRange)}</span>` +
     `</div>` +
     `<div class="bg-session-body" style="display:none;">${bodyHtml}</div>` +

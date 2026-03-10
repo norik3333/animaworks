@@ -2416,6 +2416,9 @@
 
 .bg-session-group {
   margin: 8px 0;
+  width: fit-content;
+  max-width: 70%;
+  min-width: 200px;
 }
 
 .bg-session-header {
@@ -2447,7 +2450,7 @@
 }
 
 .bg-session-label {
-  font-weight: 600;
+  font-weight: 500;
   white-space: nowrap;
 }
 
@@ -2497,24 +2500,24 @@
   white-space: nowrap;
 }
 
-/* ── Type-specific header colors ── */
+/* ── Type-specific header colors (subtle tints) ── */
 
 .bg-session-header--heartbeat {
-  background: var(--aw-color-success-bg-alt);
-  border: 1px solid var(--aw-color-success-border);
-  color: var(--aw-color-success-text, #68d391);
+  background: color-mix(in srgb, var(--aw-color-success-text, #68d391) 5%, transparent);
+  border: 1px solid color-mix(in srgb, var(--aw-color-success-text, #68d391) 15%, transparent);
+  color: var(--aw-color-text-muted);
 }
 
 .bg-session-header--cron {
-  background: var(--aw-color-info-bg-alt);
-  border: 1px solid var(--aw-color-info-border);
-  color: var(--aw-color-info-text, #63b3ed);
+  background: color-mix(in srgb, var(--aw-color-info-text, #63b3ed) 5%, transparent);
+  border: 1px solid color-mix(in srgb, var(--aw-color-info-text, #63b3ed) 15%, transparent);
+  color: var(--aw-color-text-muted);
 }
 
 .bg-session-header--task {
-  background: color-mix(in srgb, var(--aw-color-accent) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--aw-color-accent) 40%, transparent);
-  color: var(--aw-color-accent, #b794f4);
+  background: color-mix(in srgb, var(--aw-color-accent, #b794f4) 5%, transparent);
+  border: 1px solid color-mix(in srgb, var(--aw-color-accent, #b794f4) 15%, transparent);
+  color: var(--aw-color-text-muted);
 }
 
 /* ── History Loading More (Infinite Scroll) ── */

@@ -388,7 +388,15 @@ class ConversationMixin:
         messages: list[dict[str, Any]],
         gap_minutes: int,
     ) -> list[dict[str, Any]]:
-        """Group messages into sessions based on time gaps."""
+        """Group messages into sessions based on time gaps and trigger changes.
+
+        Sessions are split when either:
+        - The time gap between consecutive messages exceeds *gap_minutes*, or
+        - The trigger type changes (e.g. heartbeat → chat, chat → cron).
+
+        This ensures background sessions (heartbeat/cron/task) never contain
+        chat messages and vice versa.
+        """
         if not messages:
             return []
 
@@ -399,12 +407,14 @@ class ConversationMixin:
 
         for msg in messages:
             msg_trigger = msg.pop("_trigger", None)
-            if msg_trigger:
-                current_trigger = msg_trigger
+            effective_trigger = msg_trigger or "chat"
 
             if current_msgs:
                 prev_ts = current_msgs[-1]["ts"]
-                if time_diff(prev_ts, msg["ts"]) >= gap_seconds:
+                trigger_changed = effective_trigger != current_trigger
+                time_gap = time_diff(prev_ts, msg["ts"]) >= gap_seconds
+
+                if trigger_changed or time_gap:
                     sessions.append(
                         {
                             "session_start": current_msgs[0]["ts"],
@@ -414,8 +424,8 @@ class ConversationMixin:
                         }
                     )
                     current_msgs = []
-                    current_trigger = msg_trigger or "chat"
 
+            current_trigger = effective_trigger
             current_msgs.append(msg)
 
         if current_msgs:

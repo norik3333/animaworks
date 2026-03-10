@@ -257,26 +257,31 @@ export function createChatRenderer(ctx) {
     const opts = _renderOpts();
     let sessionsHtml = "";
     let si = 0;
+
+    const _bgOnly = (s) => s.messages?.length > 0 && s.messages.every(m => m.role === "system");
+
     while (si < hs.sessions.length) {
       const session = hs.sessions[si];
       const trigger = session.trigger || "chat";
 
-      if (trigger === "heartbeat") {
+      if (trigger === "heartbeat" && _bgOnly(session)) {
         sessionsHtml += _sharedRenderCollapsibleSession([session], "heartbeat", opts);
         si++;
-      } else if (trigger === "cron") {
+      } else if (trigger === "cron" && _bgOnly(session)) {
         const cronGroup = [session];
-        while (si + 1 < hs.sessions.length && (hs.sessions[si + 1].trigger || "chat") === "cron") {
+        while (si + 1 < hs.sessions.length
+          && (hs.sessions[si + 1].trigger || "chat") === "cron"
+          && _bgOnly(hs.sessions[si + 1])) {
           si++;
           cronGroup.push(hs.sessions[si]);
         }
         sessionsHtml += _sharedRenderCollapsibleSession(cronGroup, "cron", opts);
         si++;
-      } else if (trigger === "task") {
+      } else if (trigger === "task" && _bgOnly(session)) {
         sessionsHtml += _sharedRenderCollapsibleSession([session], "task", opts);
         si++;
       } else {
-        sessionsHtml += renderSessionDivider(session, si === 0 && trigger === "chat");
+        sessionsHtml += renderSessionDivider(session, si === 0);
         if (session.messages) {
           for (const msg of session.messages) sessionsHtml += renderHistoryMessage(msg);
         }
