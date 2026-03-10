@@ -103,7 +103,11 @@ def strip_thinking_tags(text: str) -> tuple[str, str]:
     """
     m = _THINK_TAG_RE.match(text)
     if m:
-        return m.group(1), text[m.end() :]
+        raw = m.group(1)
+        stripped = raw.lstrip()
+        if stripped.startswith("<think>"):
+            raw = stripped[len("<think>") :]
+        return raw, text[m.end() :]
     return "", text
 
 
@@ -145,7 +149,11 @@ class StreamingThinkFilter:
             parts = self._buffer.split("</think>", 1)
             response = parts[1].lstrip("\n")
             self._buffer = ""
-            return (parts[0], response)
+            thinking_raw = parts[0]
+            stripped_t = thinking_raw.lstrip()
+            if stripped_t.startswith("<think>"):
+                thinking_raw = stripped_t[len("<think>"):]
+            return (thinking_raw, response)
         if len(self._buffer) > _MAX_THINK_BUFFER:
             text = self._buffer
             self._buffer = ""

@@ -201,6 +201,7 @@ async function _processStream(res, callbacks, setResponseId, setLastEventId, sig
               summary: data.summary || null,
               emotion: data.emotion || "neutral",
               images: data.images || data.artifacts || [],
+              thinkingSummary: data.thinking_summary || null,
             });
             break;
           }

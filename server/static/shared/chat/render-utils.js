@@ -205,12 +205,16 @@ export function renderHistoryMessage(msg, opts) {
     const content = rawText ? renderMarkdown(rawText, opts.animaName) : "";
     const toolHtml = renderToolCalls(msg.tool_calls, { escapeHtml, truncateLen: truncLen });
     const imagesHtml = renderImages(msg.images, { animaName: opts.animaName });
+    let thinkingHtml = "";
+    if (msg.thinking_text) {
+      thinkingHtml = `<details class="thinking-block"><summary class="thinking-summary">\u{1F4AD} Thinking</summary><pre class="thinking-content">${escapeHtml(msg.thinking_text)}</pre></details>`;
+    }
     const toLabel = msg.to_person
       ? `<div style="font-size:0.72rem; opacity:0.7; margin-bottom:2px;">→ ${escapeHtml(msg.to_person)}</div>`
       : "";
     const actionsHtml = _bubbleActionsHtml(rawText);
     const dataAttr = rawText ? ` data-raw-text="${_escapeAttr(rawText)}"` : "";
-    const bubble = `<div class="chat-bubble assistant"${dataAttr}>${actionsHtml}${toLabel}${content}${imagesHtml}${toolHtml}${tsHtml}</div>`;
+    const bubble = `<div class="chat-bubble assistant"${dataAttr}>${actionsHtml}${toLabel}${thinkingHtml}${content}${imagesHtml}${toolHtml}${tsHtml}</div>`;
     return _wrapRow("assistant", bubble, _renderAvatar(opts.animaName, avatarMap));
   }
 
@@ -491,6 +495,8 @@ export function renderLiveBubble(msg, opts) {
   let thinkingHtml = "";
   if (msg.thinking && msg.thinkingText) {
     thinkingHtml = `<div class="thinking-inline-preview">${escapeHtml(msg.thinkingText)}</div>`;
+  } else if (!msg.thinking && msg.thinkingText && !msg.streaming) {
+    thinkingHtml = `<details class="thinking-block"><summary class="thinking-summary">\u{1F4AD} Thinking</summary><pre class="thinking-content">${escapeHtml(msg.thinkingText)}</pre></details>`;
   }
 
   const streamingCursor = '<span class="streaming-cursor">▌</span>';
@@ -719,9 +725,17 @@ function _patchSubordinateZone(container, msg, opts) {
 function _renderThinkingZoneContent(msg, opts) {
   const { escapeHtml } = opts;
   const visibleThinking = msg._displayThinkingText || msg.thinkingText;
+
+  // ストリーミング中: インラインプレビュー
   if (msg.thinking && visibleThinking) {
     return `<div class="thinking-inline-preview">${escapeHtml(visibleThinking)}</div>`;
   }
+
+  // 完了後: 折りたたみブロック（thinkingTextが残っている場合）
+  if (!msg.thinking && msg.thinkingText && msg.streaming === false) {
+    return `<details class="thinking-block"><summary class="thinking-summary">\u{1F4AD} Thinking</summary><pre class="thinking-content">${escapeHtml(msg.thinkingText)}</pre></details>`;
+  }
+
   return "";
 }
 

@@ -305,6 +305,9 @@ def _handle_chunk(
         clean_text, emotion = extract_emotion(response_text)
         cycle_result["summary"] = clean_text
         cycle_result["emotion"] = emotion
+        thinking_raw = cycle_result.pop("thinking_text", "") or ""
+        cycle_result.pop("tool_call_records", None)
+        cycle_result["thinking_summary"] = thinking_raw[:500] if thinking_raw else None
         return _format_sse("done", cycle_result), clean_text
 
     if event_type == "error":
@@ -372,6 +375,9 @@ def _chunk_to_event(chunk: dict[str, Any]) -> tuple[str, dict[str, Any]] | None:
         clean_text, emotion = extract_emotion(response_text)
         cycle_result["summary"] = clean_text
         cycle_result["emotion"] = emotion
+        thinking_raw = cycle_result.pop("thinking_text", "") or ""
+        cycle_result.pop("tool_call_records", None)
+        cycle_result["thinking_summary"] = thinking_raw[:500] if thinking_raw else None
         return "done", cycle_result
     if event_type == "error":
         payload = {"message": chunk.get("message", "Unknown error")}

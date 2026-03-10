@@ -658,7 +658,11 @@ class AssistedExecutor(BaseExecutor):
                 )
                 choice = response.choices[0]
                 content = choice.message.content or ""
-                _, content = strip_thinking_tags(content)
+                thinking, content = strip_thinking_tags(content)
+                if thinking:
+                    yield {"type": "thinking_start"}
+                    yield {"type": "thinking_delta", "text": thinking}
+                    yield {"type": "thinking_end"}
                 if hasattr(response, "usage") and response.usage:
                     _usage_acc_bs.input_tokens += response.usage.prompt_tokens or 0
                     _usage_acc_bs.output_tokens += response.usage.completion_tokens or 0

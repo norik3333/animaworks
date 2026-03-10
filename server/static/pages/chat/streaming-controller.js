@@ -454,7 +454,7 @@ export function createStreamingController(ctx) {
           }
           finalizeStreamError(streamingMsg, errorMsg);
         },
-        onDone: ({ summary, images: doneImages }) => {
+        onDone: ({ summary, images: doneImages, thinkingSummary }) => {
           if (_textAnimator) _textAnimator.flush();
           if (_thinkingAnimator) { _thinkingAnimator.flush(); _thinkingAnimator = null; }
           if (!streamingMsg) return;
@@ -463,6 +463,9 @@ export function createStreamingController(ctx) {
           delete streamingMsg._displayText;
           delete streamingMsg._displayThinkingText;
           streamingMsg.images = doneImages || [];
+          if (!streamingMsg.thinkingText && thinkingSummary) {
+            streamingMsg.thinkingText = thinkingSummary;
+          }
           streamingMsg.streaming = false;
           streamingMsg.activeTool = null;
           streamingMsg.heartbeatRelay = false; streamingMsg.heartbeatText = ""; streamingMsg.afterHeartbeatRelay = false;
@@ -619,7 +622,7 @@ export function createStreamingController(ctx) {
           if (_resumeThinkingAnimator) { _resumeThinkingAnimator.flush(); _resumeThinkingAnimator = null; }
           if (streamingMsg) { streamingMsg.text += `\n${t("chat.error_prefix")} ${errorMsg}`; delete streamingMsg._displayText; delete streamingMsg._displayThinkingText; streamingMsg.streaming = false; if (state.selectedAnima === animaName) ctx.controllers.renderer.renderChat(smartScroll()); }
         },
-        onDone: ({ summary, images }) => {
+        onDone: ({ summary, images, thinkingSummary }) => {
           if (_resumeAnimator) _resumeAnimator.flush();
           if (_resumeThinkingAnimator) { _resumeThinkingAnimator.flush(); _resumeThinkingAnimator = null; }
           if (streamingMsg) {
@@ -627,6 +630,9 @@ export function createStreamingController(ctx) {
             delete streamingMsg._displayText;
             delete streamingMsg._displayThinkingText;
             streamingMsg.images = images || [];
+            if (!streamingMsg.thinkingText && thinkingSummary) {
+              streamingMsg.thinkingText = thinkingSummary;
+            }
             streamingMsg.streaming = false; streamingMsg.activeTool = null;
             if (state.selectedAnima === animaName) ctx.controllers.renderer.renderChat(smartScroll());
             ctx.controllers.renderer.markResponseComplete(animaName, tid);
