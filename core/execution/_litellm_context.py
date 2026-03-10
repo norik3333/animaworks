@@ -91,6 +91,9 @@ class ContextMixin:
                     else:
                         kwargs["thinking"] = {"type": "enabled", "budget_tokens": 10000}
                     kwargs["temperature"] = 1
+            elif model.startswith("openai/"):
+                kwargs.setdefault("extra_body", {})
+                kwargs["extra_body"]["enable_thinking"] = self._model_config.thinking
             else:
                 kwargs["think"] = self._model_config.thinking
         elif self._model_config.model.startswith("ollama/"):
