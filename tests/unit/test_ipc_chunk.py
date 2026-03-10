@@ -170,9 +170,7 @@ async def test_first_chunk_uses_generous_timeout():
     # The fast response should be read without hitting any timeout
     chunks = []
     with patch("asyncio.open_unix_connection", side_effect=mock_open_unix):
-        async for chunk in client.send_request_stream(
-            IPCRequest(id="1", method="test"), timeout=30.0
-        ):
+        async for chunk in client.send_request_stream(IPCRequest(id="1", method="test"), timeout=30.0):
             chunks.append(chunk)
 
     assert len(chunks) == 1
@@ -203,9 +201,7 @@ async def test_first_chunk_timeout_respects_higher_value():
     # With timeout=300.0, effective first_chunk_timeout = max(300.0, 120.0) = 300.0
     chunks = []
     with patch("asyncio.open_unix_connection", side_effect=mock_open_unix):
-        async for chunk in client.send_request_stream(
-            IPCRequest(id="2", method="test"), timeout=300.0
-        ):
+        async for chunk in client.send_request_stream(IPCRequest(id="2", method="test"), timeout=300.0):
             chunks.append(chunk)
 
     assert len(chunks) == 1
@@ -238,9 +234,7 @@ async def test_subsequent_chunks_use_normal_timeout():
 
     chunks = []
     with patch("asyncio.open_unix_connection", side_effect=mock_open_unix):
-        async for chunk in client.send_request_stream(
-            IPCRequest(id="3", method="stream_test"), timeout=30.0
-        ):
+        async for chunk in client.send_request_stream(IPCRequest(id="3", method="stream_test"), timeout=30.0):
             chunks.append(chunk)
 
     # All three responses should be received
@@ -280,14 +274,12 @@ async def test_first_chunk_timeout_fires_on_no_data():
         captured_timeouts.append(timeout)
         # Cancel the coroutine to avoid it dangling
         coro.close()
-        raise asyncio.TimeoutError()
+        raise TimeoutError()
 
     with patch("asyncio.open_unix_connection", side_effect=mock_open_unix):
         with patch.object(asyncio, "wait_for", side_effect=mock_wait_for):
             with pytest.raises(asyncio.TimeoutError):
-                async for _ in client.send_request_stream(
-                    IPCRequest(id="4", method="slow"), timeout=30.0
-                ):
+                async for _ in client.send_request_stream(IPCRequest(id="4", method="slow"), timeout=30.0):
                     pass  # pragma: no cover
 
     # The first (and only) call should use first_chunk_timeout = max(30.0, 120.0) = 120.0
@@ -334,15 +326,13 @@ async def test_subsequent_chunk_timeout_value():
         else:
             # Second call: capture and raise
             coro.close()
-            raise asyncio.TimeoutError()
+            raise TimeoutError()
 
     with patch("asyncio.open_unix_connection", side_effect=mock_open_unix):
         with patch.object(asyncio, "wait_for", side_effect=mock_wait_for):
             chunks = []
             with pytest.raises(asyncio.TimeoutError):
-                async for chunk in client.send_request_stream(
-                    IPCRequest(id="5", method="stream"), timeout=30.0
-                ):
+                async for chunk in client.send_request_stream(IPCRequest(id="5", method="stream"), timeout=30.0):
                     chunks.append(chunk)
 
     # First chunk received successfully
@@ -353,5 +343,5 @@ async def test_subsequent_chunk_timeout_value():
     # - First call (chunk_count==0): max(30.0, 120.0) = 120.0
     # - Second call (chunk_count==1): normal timeout = 30.0
     assert len(captured_timeouts) == 2
-    assert captured_timeouts[0] == 120.0   # first_chunk_timeout
-    assert captured_timeouts[1] == 30.0    # normal timeout
+    assert captured_timeouts[0] == 120.0  # first_chunk_timeout
+    assert captured_timeouts[1] == 30.0  # normal timeout

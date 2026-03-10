@@ -56,7 +56,7 @@ class TestChatErrorHandling:
 
     async def test_chat_timeout_returns_504(self):
         sup = _make_supervisor(
-            send_request=AsyncMock(side_effect=asyncio.TimeoutError()),
+            send_request=AsyncMock(side_effect=TimeoutError()),
         )
         app = _make_test_app(supervisor=sup)
         transport = ASGITransport(app=app)
@@ -66,7 +66,7 @@ class TestChatErrorHandling:
 
     async def test_greet_timeout_returns_504(self):
         sup = _make_supervisor(
-            send_request=AsyncMock(side_effect=asyncio.TimeoutError()),
+            send_request=AsyncMock(side_effect=TimeoutError()),
         )
         app = _make_test_app(supervisor=sup)
         transport = ASGITransport(app=app)
@@ -103,10 +103,12 @@ def _parse_sse_events(body: str) -> list[dict]:
                 data_lines.append(line[6:])
         if data_lines:
             try:
-                events.append({
-                    "event": event_name,
-                    "data": json.loads("\n".join(data_lines)),
-                })
+                events.append(
+                    {
+                        "event": event_name,
+                        "data": json.loads("\n".join(data_lines)),
+                    }
+                )
             except json.JSONDecodeError:
                 pass
     return events
@@ -173,15 +175,18 @@ class TestStreamErrorCodes:
 
     async def test_stream_error_chunk_propagates_code(self):
         """Error chunks from IPC with 'code' field should be propagated to SSE."""
+
         async def _stream_with_error_chunk(*args, **kwargs):
             yield IPCResponse(
                 id="test",
                 stream=True,
-                chunk=json.dumps({
-                    "type": "error",
-                    "code": "LLM_ERROR",
-                    "message": "Model overloaded",
-                }),
+                chunk=json.dumps(
+                    {
+                        "type": "error",
+                        "code": "LLM_ERROR",
+                        "message": "Model overloaded",
+                    }
+                ),
             )
 
         sup = _make_supervisor()

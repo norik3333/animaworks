@@ -29,7 +29,7 @@ def _make_test_app(supervisor=None):
 class TestTriggerErrorHandling:
     async def test_trigger_timeout_returns_504(self):
         sup = MagicMock()
-        sup.send_request = AsyncMock(side_effect=asyncio.TimeoutError())
+        sup.send_request = AsyncMock(side_effect=TimeoutError())
         app = _make_test_app(supervisor=sup)
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:

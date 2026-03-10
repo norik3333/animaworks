@@ -71,9 +71,7 @@ class TestSessionResumeTimeout:
         path.parent.mkdir(parents=True, exist_ok=True)
         from datetime import datetime, timedelta, timezone
 
-        old_ts = (
-            datetime.now(timezone.utc) - timedelta(minutes=SESSION_RESUME_TIMEOUT_MIN + 5)
-        ).isoformat()
+        old_ts = (datetime.now(timezone.utc) - timedelta(minutes=SESSION_RESUME_TIMEOUT_MIN + 5)).isoformat()
         path.write_text(
             json.dumps({"session_id": "sess-old", "timestamp": old_ts}),
             encoding="utf-8",
@@ -91,15 +89,15 @@ class TestSessionResumeTimeout:
         path.parent.mkdir(parents=True, exist_ok=True)
         from datetime import datetime, timedelta, timezone
 
-        old_ts = (
-            datetime.now(timezone.utc) - timedelta(minutes=SESSION_RESUME_TIMEOUT_MIN + 1)
-        )
+        old_ts = datetime.now(timezone.utc) - timedelta(minutes=SESSION_RESUME_TIMEOUT_MIN + 1)
         # Write naive (no tz info) — simulates pre-fix files
         path.write_text(
-            json.dumps({
-                "session_id": "sess-naive",
-                "timestamp": old_ts.replace(tzinfo=None).isoformat(),
-            }),
+            json.dumps(
+                {
+                    "session_id": "sess-naive",
+                    "timestamp": old_ts.replace(tzinfo=None).isoformat(),
+                }
+            ),
             encoding="utf-8",
         )
         assert _load_session_id(anima_dir, "chat") is None
@@ -126,9 +124,7 @@ class TestSessionResumeTimeout:
         path.parent.mkdir(parents=True, exist_ok=True)
         from datetime import datetime, timedelta, timezone
 
-        old_ts = (
-            datetime.now(timezone.utc) - timedelta(minutes=SESSION_RESUME_TIMEOUT_MIN + 1)
-        ).isoformat()
+        old_ts = (datetime.now(timezone.utc) - timedelta(minutes=SESSION_RESUME_TIMEOUT_MIN + 1)).isoformat()
         path.write_text(
             json.dumps({"session_id": "hb-old", "timestamp": old_ts}),
             encoding="utf-8",
@@ -307,11 +303,13 @@ class TestResumeTimeoutGuard:
         _save_session_id(anima_dir, "stale-session-001", "chat")
 
         messages = [
-            MockStreamEvent({
-                "type": "content_block_delta",
-                "delta": {"type": "text_delta", "text": "hello"},
-                "index": 0,
-            }),
+            MockStreamEvent(
+                {
+                    "type": "content_block_delta",
+                    "delta": {"type": "text_delta", "text": "hello"},
+                    "index": 0,
+                }
+            ),
             MockAssistantMessage([MockTextBlock("hello")]),
             MockResultMessage(usage={"input_tokens": 100, "output_tokens": 50}),
         ]
@@ -341,26 +339,26 @@ class TestResumeTimeoutGuard:
 
         # asyncio.wait_for should have been called with RESUME_TIMEOUT_SEC
         from core.execution.agent_sdk import RESUME_TIMEOUT_SEC
+
         timeout_values = [c["timeout"] for c in wait_for_calls]
         assert RESUME_TIMEOUT_SEC in timeout_values, (
-            f"Expected wait_for to be called with {RESUME_TIMEOUT_SEC}s timeout, "
-            f"but got timeouts: {timeout_values}"
+            f"Expected wait_for to be called with {RESUME_TIMEOUT_SEC}s timeout, but got timeouts: {timeout_values}"
         )
 
     @pytest.mark.asyncio
-    async def test_no_wait_for_when_no_session_to_resume(
-        self, model_config: ModelConfig, anima_dir: Path
-    ) -> None:
+    async def test_no_wait_for_when_no_session_to_resume(self, model_config: ModelConfig, anima_dir: Path) -> None:
         """When no session ID exists, asyncio.wait_for is NOT called for resume guard."""
         from tests.helpers.mocks import MockResultMessage, MockStreamEvent, MockAssistantMessage, MockTextBlock
 
         # No session file → fresh session path (no resume)
         messages = [
-            MockStreamEvent({
-                "type": "content_block_delta",
-                "delta": {"type": "text_delta", "text": "fresh"},
-                "index": 0,
-            }),
+            MockStreamEvent(
+                {
+                    "type": "content_block_delta",
+                    "delta": {"type": "text_delta", "text": "fresh"},
+                    "index": 0,
+                }
+            ),
             MockAssistantMessage([MockTextBlock("fresh")]),
             MockResultMessage(usage={"input_tokens": 50, "output_tokens": 20}),
         ]
@@ -390,16 +388,14 @@ class TestResumeTimeoutGuard:
 
         # No wait_for should have been called for resume timeout
         from core.execution.agent_sdk import RESUME_TIMEOUT_SEC
+
         resume_timeout_calls = [c for c in wait_for_calls if c["timeout"] == RESUME_TIMEOUT_SEC]
         assert resume_timeout_calls == [], (
-            "Expected no wait_for resume guard on fresh session, "
-            f"but got: {resume_timeout_calls}"
+            f"Expected no wait_for resume guard on fresh session, but got: {resume_timeout_calls}"
         )
 
     @pytest.mark.asyncio
-    async def test_clear_session_id_called_on_resume_timeout(
-        self, model_config: ModelConfig, anima_dir: Path
-    ) -> None:
+    async def test_clear_session_id_called_on_resume_timeout(self, model_config: ModelConfig, anima_dir: Path) -> None:
         """When resume times out, _clear_session_id is called and falls back to
         fresh session."""
         from core.execution.agent_sdk import _save_session_id
@@ -409,11 +405,13 @@ class TestResumeTimeoutGuard:
 
         # After timeout, fresh session produces events normally
         fresh_messages = [
-            MockStreamEvent({
-                "type": "content_block_delta",
-                "delta": {"type": "text_delta", "text": "recovered"},
-                "index": 0,
-            }),
+            MockStreamEvent(
+                {
+                    "type": "content_block_delta",
+                    "delta": {"type": "text_delta", "text": "recovered"},
+                    "index": 0,
+                }
+            ),
             MockAssistantMessage([MockTextBlock("recovered")]),
             MockResultMessage(usage={"input_tokens": 100, "output_tokens": 50}),
         ]
@@ -431,9 +429,10 @@ class TestResumeTimeoutGuard:
         async def _timeout_on_first_then_succeed(coro, timeout=None, **kwargs):
             """Raise TimeoutError on the first call (resume), succeed thereafter."""
             from core.execution.agent_sdk import RESUME_TIMEOUT_SEC
+
             if timeout == RESUME_TIMEOUT_SEC and call_count[0] == 0:
                 call_count[0] += 1
-                raise asyncio.TimeoutError("resume timed out")
+                raise TimeoutError("resume timed out")
             return await coro
 
         with _patch_sdk_for_streaming(fresh_messages):
@@ -459,9 +458,6 @@ class TestResumeTimeoutGuard:
 
         # _clear_session_id should have been called for the chat session type
         assert len(clear_calls) >= 1, (
-            "Expected _clear_session_id to be called on resume timeout, "
-            f"but got: {clear_calls}"
+            f"Expected _clear_session_id to be called on resume timeout, but got: {clear_calls}"
         )
-        assert "chat" in clear_calls, (
-            f"Expected 'chat' session to be cleared, got: {clear_calls}"
-        )
+        assert "chat" in clear_calls, f"Expected 'chat' session to be cleared, got: {clear_calls}"

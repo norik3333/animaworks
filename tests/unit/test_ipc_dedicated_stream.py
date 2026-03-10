@@ -79,23 +79,21 @@ async def test_stream_uses_dedicated_connection():
 
         async def handler(
             request: IPCRequest,
-        ) -> Union[IPCResponse, AsyncIterator[IPCResponse]]:
+        ) -> IPCResponse | AsyncIterator[IPCResponse]:
             if request.method == "stream_test":
+
                 async def _gen() -> AsyncIterator[IPCResponse]:
                     for c in chunks:
-                        yield IPCResponse(
-                            id=request.id, stream=True, chunk=c
-                        )
+                        yield IPCResponse(id=request.id, stream=True, chunk=c)
                     yield IPCResponse(
                         id=request.id,
                         stream=True,
                         done=True,
                         result={"total": len(chunks)},
                     )
+
                 return _gen()
-            return IPCResponse(
-                id=request.id, result={"pong": True}
-            )
+            return IPCResponse(id=request.id, result={"pong": True})
 
         server = IPCServer(socket_path, handler)
 
@@ -159,14 +157,11 @@ async def test_stream_dedicated_connection_closes_on_completion():
 
         async def handler(
             request: IPCRequest,
-        ) -> Union[IPCResponse, AsyncIterator[IPCResponse]]:
+        ) -> IPCResponse | AsyncIterator[IPCResponse]:
             async def _gen() -> AsyncIterator[IPCResponse]:
-                yield IPCResponse(
-                    id=request.id, stream=True, chunk="data"
-                )
-                yield IPCResponse(
-                    id=request.id, stream=True, done=True, result={"ok": True}
-                )
+                yield IPCResponse(id=request.id, stream=True, chunk="data")
+                yield IPCResponse(id=request.id, stream=True, done=True, result={"ok": True})
+
             return _gen()
 
         server = IPCServer(socket_path, handler)
@@ -232,9 +227,7 @@ async def test_stream_dedicated_connection_closes_on_cancel():
         return mock_reader, mock_writer
 
     with patch("asyncio.open_unix_connection", side_effect=mock_open_unix):
-        stream_gen = client.send_request_stream(
-            IPCRequest(id="cancel_001", method="slow_stream"), timeout=5.0
-        )
+        stream_gen = client.send_request_stream(IPCRequest(id="cancel_001", method="slow_stream"), timeout=5.0)
         async for response in stream_gen:
             assert response.chunk == "first"
             break  # Cancel after first chunk
@@ -270,7 +263,7 @@ async def test_stream_dedicated_connection_closes_on_timeout():
     async def mock_wait_for(coro, *, timeout):
         # Close the coroutine to avoid RuntimeWarning
         coro.close()
-        raise asyncio.TimeoutError()
+        raise TimeoutError()
 
     with patch("asyncio.open_unix_connection", side_effect=mock_open_unix):
         with patch.object(asyncio, "wait_for", side_effect=mock_wait_for):
@@ -516,13 +509,14 @@ async def test_concurrent_ping_and_stream():
 
         async def handler(
             request: IPCRequest,
-        ) -> Union[IPCResponse, AsyncIterator[IPCResponse]]:
+        ) -> IPCResponse | AsyncIterator[IPCResponse]:
             if request.method == "ping":
                 return IPCResponse(
                     id=request.id,
                     result={"status": "ok"},
                 )
             elif request.method == "stream_long":
+
                 async def _gen() -> AsyncIterator[IPCResponse]:
                     for i in range(num_stream_chunks):
                         await asyncio.sleep(0.05)
@@ -537,6 +531,7 @@ async def test_concurrent_ping_and_stream():
                         done=True,
                         result={"total": num_stream_chunks},
                     )
+
                 return _gen()
 
             return IPCResponse(
@@ -565,9 +560,7 @@ async def test_concurrent_ping_and_stream():
                         method="stream_long",
                         params={"stream": True},
                     )
-                    async for response in client.send_request_stream(
-                        req, timeout=10.0
-                    ):
+                    async for response in client.send_request_stream(req, timeout=10.0):
                         if response.done:
                             stream_result = response.result
                         elif response.chunk:
@@ -585,10 +578,7 @@ async def test_concurrent_ping_and_stream():
                             params={},
                         )
                         resp = await client.send_request(req, timeout=5.0)
-                        ping_results.append(
-                            resp.result is not None
-                            and resp.result.get("status") == "ok"
-                        )
+                        ping_results.append(resp.result is not None and resp.result.get("status") == "ok")
                 except Exception as e:
                     errors.append(e)
 
@@ -658,12 +648,8 @@ async def test_ready_check_uses_unique_id():
     first_id = captured_requests[0].id
 
     # Verify ID format: starts with "ping_", not the old fixed "ready_check"
-    assert first_id.startswith("ping_"), (
-        f"Expected ID to start with 'ping_', got '{first_id}'"
-    )
-    assert first_id != "ready_check", (
-        "Expected unique ID, not the old fixed 'ready_check'"
-    )
+    assert first_id.startswith("ping_"), f"Expected ID to start with 'ping_', got '{first_id}'"
+    assert first_id != "ready_check", "Expected unique ID, not the old fixed 'ready_check'"
     assert captured_requests[0].method == "ping"
 
     # Call _wait_for_ready again with a fresh capture to verify uniqueness
@@ -674,9 +660,7 @@ async def test_ready_check_uses_unique_id():
     second_id = captured_requests[0].id
 
     assert second_id.startswith("ping_")
-    assert second_id != first_id, (
-        f"Expected unique IDs across calls, but both were '{first_id}'"
-    )
+    assert second_id != first_id, f"Expected unique IDs across calls, but both were '{first_id}'"
 
 
 # ── Test 12: Concurrent unary requests don't interfere ─────────
@@ -718,16 +702,12 @@ async def test_concurrent_unary_requests_no_interference():
                 return await client.send_request(req, timeout=10.0)
 
             # Fire all 5 requests concurrently
-            results = await asyncio.gather(
-                *(do_request(rid) for rid in request_ids)
-            )
+            results = await asyncio.gather(*(do_request(rid) for rid in request_ids))
 
             # Verify all 5 returned the correct response with matching IDs
             for i, response in enumerate(results):
                 expected_id = request_ids[i]
-                assert response.id == expected_id, (
-                    f"Response {i}: expected id={expected_id}, got id={response.id}"
-                )
+                assert response.id == expected_id, f"Response {i}: expected id={expected_id}, got id={response.id}"
                 assert response.result is not None
                 assert response.result["echo_id"] == expected_id
                 assert response.error is None
@@ -778,9 +758,7 @@ async def test_send_request_opens_connection_per_call():
                     assert resp.result == {"ok": True}
 
             # Each send_request should have opened its own connection
-            assert open_call_count == 3, (
-                f"Expected 3 open_unix_connection calls, got {open_call_count}"
-            )
+            assert open_call_count == 3, f"Expected 3 open_unix_connection calls, got {open_call_count}"
 
             await client.close()
 
@@ -828,14 +806,10 @@ async def test_connect_only_tests_connectivity():
             await asyncio.sleep(0.1)
 
             # Exactly one connection should have been made
-            assert len(server_writers) == 1, (
-                f"Expected 1 connection, got {len(server_writers)}"
-            )
+            assert len(server_writers) == 1, f"Expected 1 connection, got {len(server_writers)}"
 
             # The connection should already be closed (connect() closes it)
-            assert server_writers[0].is_closing(), (
-                "connect() should close the connection after verifying connectivity"
-            )
+            assert server_writers[0].is_closing(), "connect() should close the connection after verifying connectivity"
 
             await client.close()
 

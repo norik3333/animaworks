@@ -108,7 +108,7 @@ class TestWatcherLoop:
 
         async def stop_after_first(coro, *, timeout):
             executor._shutdown_event.set()
-            raise asyncio.TimeoutError
+            raise TimeoutError
 
         with patch("core.supervisor.pending_executor.asyncio.wait_for", side_effect=stop_after_first):
             await executor.watcher_loop()
@@ -127,7 +127,7 @@ class TestWatcherLoop:
 
         async def stop_after_first(coro, *, timeout):
             executor._shutdown_event.set()
-            raise asyncio.TimeoutError
+            raise TimeoutError
 
         with patch("core.supervisor.pending_executor.asyncio.wait_for", side_effect=stop_after_first):
             await executor.watcher_loop()

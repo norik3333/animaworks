@@ -56,22 +56,18 @@ async def test_streaming_with_cycle_result_datetime():
 
         async def handler(
             request: IPCRequest,
-        ) -> Union[IPCResponse, AsyncIterator[IPCResponse]]:
+        ) -> IPCResponse | AsyncIterator[IPCResponse]:
             async def _gen() -> AsyncIterator[IPCResponse]:
                 # Stream text chunks
                 yield IPCResponse(
                     id=request.id,
                     stream=True,
-                    chunk=json.dumps(
-                        {"type": "text_delta", "text": "Hello "}, ensure_ascii=False
-                    ),
+                    chunk=json.dumps({"type": "text_delta", "text": "Hello "}, ensure_ascii=False),
                 )
                 yield IPCResponse(
                     id=request.id,
                     stream=True,
-                    chunk=json.dumps(
-                        {"type": "text_delta", "text": "from IPC"}, ensure_ascii=False
-                    ),
+                    chunk=json.dumps({"type": "text_delta", "text": "from IPC"}, ensure_ascii=False),
                 )
                 # Final response with cycle_result containing datetime
                 yield IPCResponse(
@@ -144,14 +140,12 @@ async def test_streaming_with_model_dump_json_mode():
 
         async def handler(
             request: IPCRequest,
-        ) -> Union[IPCResponse, AsyncIterator[IPCResponse]]:
+        ) -> IPCResponse | AsyncIterator[IPCResponse]:
             async def _gen() -> AsyncIterator[IPCResponse]:
                 yield IPCResponse(
                     id=request.id,
                     stream=True,
-                    chunk=json.dumps(
-                        {"type": "text_delta", "text": "Fixed"}, ensure_ascii=False
-                    ),
+                    chunk=json.dumps({"type": "text_delta", "text": "Fixed"}, ensure_ascii=False),
                 )
                 yield IPCResponse(
                     id=request.id,
