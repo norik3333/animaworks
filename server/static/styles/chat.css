@@ -1049,6 +1049,7 @@
   border-radius: 3px;
   font-size: 0.85em;
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  word-break: break-word;
 }
 .chat-bubble.assistant pre {
   background: var(--aw-color-code-bg);
@@ -1060,6 +1061,8 @@
   font-size: 0.82em;
   line-height: 1.5;
   max-width: 100%;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 .chat-bubble.assistant pre code {
   background: none;
