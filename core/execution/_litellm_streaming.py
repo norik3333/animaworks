@@ -83,10 +83,7 @@ class StreamingMixin:
         # NOTE: This is an Anthropic-specific requirement.  Other providers
         # (Qwen, OpenAI, etc.) do not need this and may leak the dummy
         # content into model-visible context.
-        _thinking_enabled = (
-            llm_kwargs.get("thinking")
-            or llm_kwargs.get("reasoning_effort")
-        )
+        _thinking_enabled = llm_kwargs.get("thinking") or llm_kwargs.get("reasoning_effort")
         if _thinking_enabled:
             _patched = 0
             for msg in messages:
@@ -331,12 +328,11 @@ class StreamingMixin:
                     )
                 elif iter_text and len(iter_text) < 30:
                     logger.info(
-                        "A stream short response: chars=%d, chunks=%d, "
-                        "content=%.100r, think_filter_state=%s",
+                        "A stream short response: chars=%d, chunks=%d, content=%.100r, think_filter_state=%s",
                         len(iter_text),
                         _chunk_count,
                         iter_text,
-                        _think_filter._state if hasattr(_think_filter, '_state') else 'N/A',
+                        _think_filter._state if hasattr(_think_filter, "_state") else "N/A",
                     )
                 if iter_text:
                     all_response_text.append(iter_text)
