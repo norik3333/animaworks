@@ -16,7 +16,6 @@ from core.time_utils import now_jst
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
 from httpx import ASGITransport, AsyncClient
 
 
@@ -266,12 +265,11 @@ class TestActivityEndpointE2E:
 
     async def test_activity_with_anima_returns_200(self, tmp_path):
         """Activity endpoint with an anima should return 200 with activity_log data."""
-        from datetime import datetime
 
         animas_dir = tmp_path / "animas"
         anima_dir = _create_anima_on_disk(animas_dir, "alice")
 
-        # Write activity_log data (use local time to match ActivityLogger's date.today())
+        # Write activity_log data (use local time to match ActivityLogger's today_local())
         now = now_jst()
         log_dir = anima_dir / "activity_log"
         log_dir.mkdir(parents=True, exist_ok=True)
@@ -298,7 +296,6 @@ class TestActivityEndpointE2E:
 
     async def test_activity_from_activity_log(self, tmp_path):
         """Activity reads from activity_log JSONL files and returns new format."""
-        from datetime import datetime
 
         animas_dir = tmp_path / "animas"
         anima_dir = _create_anima_on_disk(animas_dir, "alice")

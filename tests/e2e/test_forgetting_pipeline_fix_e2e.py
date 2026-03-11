@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 # AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: Apache-2.0
@@ -15,7 +16,6 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 
 # ── Test 1: Stage 2 — _sync_merged_source_files ──────────────────
 
@@ -124,7 +124,8 @@ class TestCompleteForgettingOrder:
     """Verify complete_forgetting() deletes vectors FIRST, then archives files."""
 
     def test_complete_forgetting_skips_archive_on_vector_failure(
-        self, tmp_path: Path,
+        self,
+        tmp_path: Path,
     ) -> None:
         """If vector deletion fails, source files should NOT be archived."""
         from core.memory.forgetting import ForgettingEngine
@@ -145,22 +146,24 @@ class TestCompleteForgettingOrder:
         engine._get_vector_store = lambda: mock_store
 
         # Mock _get_all_chunks to return a forgettable chunk
-        original_get_all_chunks = engine._get_all_chunks
+        _original_get_all_chunks = engine._get_all_chunks  # noqa: F841
 
         def fake_get_all_chunks(collection_name: str):
             if "knowledge" in collection_name:
-                return [{
-                    "id": "chunk1",
-                    "metadata": {
-                        "memory_type": "knowledge",
-                        "activation_level": "low",
-                        "low_activation_since": "2025-01-01T00:00:00",
-                        "access_count": 0,
-                        "source_file": "knowledge/test.md",
-                        "importance": "",
-                    },
-                    "content": "test content",
-                }]
+                return [
+                    {
+                        "id": "chunk1",
+                        "metadata": {
+                            "memory_type": "knowledge",
+                            "activation_level": "low",
+                            "low_activation_since": "2025-01-01T00:00:00",
+                            "access_count": 0,
+                            "source_file": "knowledge/test.md",
+                            "importance": "",
+                        },
+                        "content": "test content",
+                    }
+                ]
             return []
 
         engine._get_all_chunks = fake_get_all_chunks
@@ -168,13 +171,12 @@ class TestCompleteForgettingOrder:
         result = engine.complete_forgetting()
 
         # Source file should still exist (not archived) because vector delete failed
-        assert source.exists(), (
-            "Source file should NOT be archived when vector deletion fails"
-        )
+        assert source.exists(), "Source file should NOT be archived when vector deletion fails"
         assert result["forgotten_chunks"] == 0
 
     def test_complete_forgetting_archives_after_successful_delete(
-        self, tmp_path: Path,
+        self,
+        tmp_path: Path,
     ) -> None:
         """When vector deletion succeeds, source files are archived."""
         from core.memory.forgetting import ForgettingEngine
@@ -193,18 +195,20 @@ class TestCompleteForgettingOrder:
 
         def fake_get_all_chunks(collection_name: str):
             if "knowledge" in collection_name:
-                return [{
-                    "id": "chunk1",
-                    "metadata": {
-                        "memory_type": "knowledge",
-                        "activation_level": "low",
-                        "low_activation_since": "2025-01-01T00:00:00",
-                        "access_count": 0,
-                        "source_file": "knowledge/test.md",
-                        "importance": "",
-                    },
-                    "content": "test content",
-                }]
+                return [
+                    {
+                        "id": "chunk1",
+                        "metadata": {
+                            "memory_type": "knowledge",
+                            "activation_level": "low",
+                            "low_activation_since": "2025-01-01T00:00:00",
+                            "access_count": 0,
+                            "source_file": "knowledge/test.md",
+                            "importance": "",
+                        },
+                        "content": "test content",
+                    }
+                ]
             return []
 
         engine._get_all_chunks = fake_get_all_chunks
@@ -212,9 +216,7 @@ class TestCompleteForgettingOrder:
         result = engine.complete_forgetting()
 
         # Source file should be archived (moved)
-        assert not source.exists(), (
-            "Source file should be archived after successful vector deletion"
-        )
+        assert not source.exists(), "Source file should be archived after successful vector deletion"
         assert result["forgotten_chunks"] == 1
         assert "knowledge/test.md" in result["archived_files"]
 
@@ -225,7 +227,8 @@ class TestCompleteForgettingOrder:
         assert len(archived) == 1
 
     def test_complete_forgetting_delete_then_archive_ordering(
-        self, tmp_path: Path,
+        self,
+        tmp_path: Path,
     ) -> None:
         """Verify that delete_documents is called before _archive_source_file."""
         from core.memory.forgetting import ForgettingEngine
@@ -257,18 +260,20 @@ class TestCompleteForgettingOrder:
 
         def fake_get_all_chunks(collection_name: str):
             if "knowledge" in collection_name:
-                return [{
-                    "id": "chunk1",
-                    "metadata": {
-                        "memory_type": "knowledge",
-                        "activation_level": "low",
-                        "low_activation_since": "2025-01-01T00:00:00",
-                        "access_count": 0,
-                        "source_file": "knowledge/ordered.md",
-                        "importance": "",
-                    },
-                    "content": "content",
-                }]
+                return [
+                    {
+                        "id": "chunk1",
+                        "metadata": {
+                            "memory_type": "knowledge",
+                            "activation_level": "low",
+                            "low_activation_since": "2025-01-01T00:00:00",
+                            "access_count": 0,
+                            "source_file": "knowledge/ordered.md",
+                            "importance": "",
+                        },
+                        "content": "content",
+                    }
+                ]
             return []
 
         engine._get_all_chunks = fake_get_all_chunks
@@ -287,7 +292,9 @@ class TestMonthlyForgettingSchedule:
     """Verify ProcessSupervisor._setup_system_crons registers monthly forgetting."""
 
     def test_setup_system_crons_registers_monthly(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """ProcessSupervisor._setup_system_crons registers monthly forgetting job."""
         from core.supervisor.manager import ProcessSupervisor
@@ -313,13 +320,12 @@ class TestMonthlyForgettingSchedule:
         job_ids = [call.kwargs.get("id") for call in calls]
 
         monthly_found = "system_monthly_forgetting" in job_ids
-        assert monthly_found, (
-            f"Monthly forgetting job should be registered. "
-            f"Registered jobs: {job_ids}"
-        )
+        assert monthly_found, f"Monthly forgetting job should be registered. Registered jobs: {job_ids}"
 
     def test_setup_system_crons_monthly_disabled(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """When monthly_enabled=False, the monthly forgetting job is NOT registered."""
         from core.supervisor.manager import ProcessSupervisor
@@ -344,6 +350,8 @@ class TestMonthlyForgettingSchedule:
             mock_consolidation.weekly_enabled = True
             mock_consolidation.weekly_time = "sun:03:00"
             mock_consolidation.monthly_time = "1:04:00"
+            mock_consolidation.indexing_enabled = True
+            mock_consolidation.indexing_time = "04:00"
             mock_cfg.consolidation = mock_consolidation
             mock_config.return_value = mock_cfg
             supervisor._setup_system_crons()
@@ -352,12 +360,13 @@ class TestMonthlyForgettingSchedule:
         job_ids = [call.kwargs.get("id") for call in calls]
 
         assert "system_monthly_forgetting" not in job_ids, (
-            f"Monthly forgetting job should NOT be registered when disabled. "
-            f"Registered jobs: {job_ids}"
+            f"Monthly forgetting job should NOT be registered when disabled. Registered jobs: {job_ids}"
         )
 
     def test_setup_system_crons_registers_all_three(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """All three system crons (daily, weekly, monthly) are registered by default."""
         from core.supervisor.manager import ProcessSupervisor
@@ -387,6 +396,4 @@ class TestMonthlyForgettingSchedule:
             "system_monthly_forgetting",
         ]
         for expected_id in expected_ids:
-            assert expected_id in job_ids, (
-                f"{expected_id} should be registered. Registered: {job_ids}"
-            )
+            assert expected_id in job_ids, f"{expected_id} should be registered. Registered: {job_ids}"

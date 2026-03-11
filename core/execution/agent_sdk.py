@@ -42,6 +42,9 @@ from pathlib import Path
 
 from core.exceptions import ExecutionError, LLMAPIError, MemoryWriteError  # noqa: F401
 from core.execution import _sdk_session
+from core.execution._sdk_patch import apply_sdk_transport_patch
+
+apply_sdk_transport_patch()
 from core.execution._sdk_hooks import (  # noqa: F401
     _build_pre_compact_hook,
     _build_pre_tool_hook,
@@ -77,8 +80,14 @@ from core.execution._sdk_security import (  # noqa: F401
 from core.execution._sdk_session import (  # noqa: F401
     _CONTEXT_AUTOCOMPACT_SAFETY,
     _PROMPT_FILE_THRESHOLD,
+    _RESUMABLE_SESSION_TYPES,
     _SDK_MAX_BUFFER_SIZE,
     RESUME_TIMEOUT_SEC,
+    SESSION_TYPE_CHAT,
+    SESSION_TYPE_CRON,
+    SESSION_TYPE_HEARTBEAT,
+    SESSION_TYPE_INBOX,
+    SESSION_TYPE_TASK,
     _build_sdk_query_input,
     _cleanup_prompt_files,
     _cleanup_tool_outputs,
@@ -86,9 +95,9 @@ from core.execution._sdk_session import (  # noqa: F401
     _image_prompt_messages,
     _is_debug_superuser,
     _load_session_id,
+    _resolve_session_type,
     _save_session_id,
     _session_file,
-    clear_session_ids,
 )
 from core.execution._sdk_stream import (  # noqa: F401
     _finalize_pending_records,
@@ -108,7 +117,7 @@ from core.schemas import ImageData, ModelConfig
 
 logger = logging.getLogger("animaworks.execution.agent_sdk")
 
-__all__ = ["AgentSDKExecutor", "StreamDisconnectedError", "clear_session_ids"]
+__all__ = ["AgentSDKExecutor", "StreamDisconnectedError"]
 
 
 # ── AgentSDKExecutor ─────────────────────────────────────────
@@ -441,7 +450,7 @@ class AgentSDKExecutor(BaseExecutor):
 
             if isinstance(message, ResultMessage):
                 result_message = message
-                if message.session_id:
+                if message.session_id and session_type in _RESUMABLE_SESSION_TYPES:
                     _save_session_id(self._anima_dir, message.session_id, session_type, thread_id=thread_id)
                 if tracker:
                     tracker.update_from_result_message(message.usage)
@@ -535,8 +544,12 @@ class AgentSDKExecutor(BaseExecutor):
             "force_chain": False,
         }
 
-        session_type = "heartbeat" if trigger in ("heartbeat",) or (trigger and trigger.startswith("cron:")) else "chat"
-        session_id_to_resume = _load_session_id(self._anima_dir, session_type, thread_id=thread_id)
+        session_type = _resolve_session_type(trigger)
+        session_id_to_resume = (
+            _load_session_id(self._anima_dir, session_type, thread_id=thread_id)
+            if session_type in _RESUMABLE_SESSION_TYPES
+            else None
+        )
 
         options, prompt_file = self._build_sdk_options(
             system_prompt,
@@ -701,11 +714,12 @@ class AgentSDKExecutor(BaseExecutor):
             "force_chain": False,
         }
 
-        # Derive session_type from trigger so heartbeat/cron resume their own
-        # SDK session (current_session_heartbeat.json) rather than the chat
-        # session (current_session_chat.json).  Mirrors the logic in execute().
-        session_type = "heartbeat" if trigger in ("heartbeat",) or (trigger and trigger.startswith("cron:")) else "chat"
-        session_id_to_resume = _load_session_id(self._anima_dir, session_type, thread_id=thread_id)
+        session_type = _resolve_session_type(trigger)
+        session_id_to_resume = (
+            _load_session_id(self._anima_dir, session_type, thread_id=thread_id)
+            if session_type in _RESUMABLE_SESSION_TYPES
+            else None
+        )
 
         options, prompt_file = self._build_sdk_options(
             system_prompt,
@@ -836,7 +850,7 @@ class AgentSDKExecutor(BaseExecutor):
 
                 elif isinstance(message, ResultMessage):
                     result_message = message
-                    if message.session_id:
+                    if message.session_id and session_type in _RESUMABLE_SESSION_TYPES:
                         _save_session_id(self._anima_dir, message.session_id, session_type, thread_id=thread_id)
                     # Do NOT call tracker.update_from_result_message() here.
                     # ResultMessage.usage.input_tokens is a cumulative sum across
@@ -1013,22 +1027,25 @@ class AgentSDKExecutor(BaseExecutor):
     ) -> bool:
         """Send /compact to an idle SDK session to trigger compaction.
 
-        Resumes the session with ``skip_timeout_check=True`` and sends
-        ``/compact`` as the query.  The SDK compresses the transcript and
-        the same session_id is preserved for future resume.
+        Resumes the session and sends ``/compact`` as the query.  The SDK
+        compresses the transcript and the same session_id is preserved for
+        future resume.  On failure the session file is **preserved** so
+        that the next regular chat can still resume from the old state.
 
         Returns:
             True if compaction succeeded, False otherwise.
         """
-        session_id = _load_session_id(
-            anima_dir,
+        session_id = _load_session_id(anima_dir, session_type, thread_id)
+        if not session_id:
+            logger.info("No session to compact for %s/%s/%s", session_type, anima_dir.name, thread_id)
+            return False
+
+        logger.info(
+            "Starting idle compaction (session=%s, type=%s, thread=%s)",
+            session_id,
             session_type,
             thread_id,
-            skip_timeout_check=True,
         )
-        if not session_id:
-            logger.info("No session to compact for %s/%s", session_type, thread_id)
-            return False
 
         try:
             from claude_code_sdk import ClaudeAgentOptions
@@ -1040,6 +1057,7 @@ class AgentSDKExecutor(BaseExecutor):
                 resume=session_id,
             )
 
+            found_session_id = False
             async with asyncio.timeout(RESUME_TIMEOUT_SEC):
                 async with ClaudeSDKClient(options=options) as client:
                     await client.query("/compact")
@@ -1052,32 +1070,38 @@ class AgentSDKExecutor(BaseExecutor):
                                 thread_id,
                             )
                             logger.info(
-                                "Idle compaction completed (session=%s, type=%s)",
+                                "Idle compaction completed (session=%s, type=%s, thread=%s)",
                                 message.session_id,
                                 session_type,
+                                thread_id,
                             )
-                            return True
-                        if hasattr(message, "content"):
-                            break
+                            found_session_id = True
 
-            return False
+            if not found_session_id:
+                logger.warning(
+                    "Idle compaction did not receive session_id for %s/%s/%s",
+                    anima_dir.name,
+                    session_type,
+                    thread_id,
+                )
+            return found_session_id
         except ImportError:
-            logger.debug("claude_code_sdk not available; skipping /compact")
+            logger.info("claude_code_sdk not available; skipping /compact")
             return False
         except TimeoutError:
             logger.warning(
-                "Idle compaction timed out for %s/%s; clearing session",
+                "Idle compaction timed out for %s/%s/%s; session preserved for next resume",
+                anima_dir.name,
                 session_type,
                 thread_id,
             )
-            _clear_session_id(anima_dir, session_type, thread_id)
             return False
         except Exception:
             logger.warning(
-                "Idle compaction failed for %s/%s; clearing session",
+                "Idle compaction failed for %s/%s/%s; session preserved for next resume",
+                anima_dir.name,
                 session_type,
                 thread_id,
                 exc_info=True,
             )
-            _clear_session_id(anima_dir, session_type, thread_id)
             return False

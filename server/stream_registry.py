@@ -174,10 +174,10 @@ class ResponseStream:
             self._seq_counter - 1,
         )
         seen_seq = self._notify_seq
-        deadline = asyncio.get_event_loop().time() + timeout
+        deadline = asyncio.get_running_loop().time() + timeout
         try:
             while self._notify_seq == seen_seq:
-                remaining = deadline - asyncio.get_event_loop().time()
+                remaining = deadline - asyncio.get_running_loop().time()
                 if remaining <= 0:
                     logger.debug(
                         "[SSE-WAIT] timeout stream=%s after=%.1fs complete=%s",

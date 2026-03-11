@@ -5,11 +5,9 @@
 
 from __future__ import annotations
 
-import asyncio
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from httpx import ASGITransport, AsyncClient
 
 from core.supervisor.ipc import IPCResponse
@@ -57,7 +55,7 @@ class TestChatErrorHandling:
 
     async def test_chat_timeout_returns_504(self):
         sup = _make_supervisor(
-            send_request=AsyncMock(side_effect=asyncio.TimeoutError()),
+            send_request=AsyncMock(side_effect=TimeoutError()),
         )
         app = _make_test_app(supervisor=sup)
         transport = ASGITransport(app=app)
@@ -67,7 +65,7 @@ class TestChatErrorHandling:
 
     async def test_greet_timeout_returns_504(self):
         sup = _make_supervisor(
-            send_request=AsyncMock(side_effect=asyncio.TimeoutError()),
+            send_request=AsyncMock(side_effect=TimeoutError()),
         )
         app = _make_test_app(supervisor=sup)
         transport = ASGITransport(app=app)
@@ -104,10 +102,12 @@ def _parse_sse_events(body: str) -> list[dict]:
                 data_lines.append(line[6:])
         if data_lines:
             try:
-                events.append({
-                    "event": event_name,
-                    "data": json.loads("\n".join(data_lines)),
-                })
+                events.append(
+                    {
+                        "event": event_name,
+                        "data": json.loads("\n".join(data_lines)),
+                    }
+                )
             except json.JSONDecodeError:
                 pass
     return events
@@ -117,7 +117,7 @@ class TestStreamErrorCodes:
     async def test_stream_anima_not_found_has_code(self):
         async def _raise_key_error(*args, **kwargs):
             raise KeyError("alice")
-            yield  # noqa: unreachable
+            yield  # noqa
 
         sup = _make_supervisor()
         sup.send_request_stream = _raise_key_error
@@ -136,7 +136,7 @@ class TestStreamErrorCodes:
     async def test_stream_generic_error_has_code(self):
         async def _raise_generic(*args, **kwargs):
             raise ValueError("something broke")
-            yield  # noqa: unreachable
+            yield  # noqa
 
         sup = _make_supervisor()
         sup.send_request_stream = _raise_generic
@@ -156,7 +156,7 @@ class TestStreamErrorCodes:
     async def test_stream_timeout_has_code(self):
         async def _raise_timeout(*args, **kwargs):
             raise TimeoutError("timed out")
-            yield  # noqa: unreachable
+            yield  # noqa
 
         sup = _make_supervisor()
         sup.send_request_stream = _raise_timeout
@@ -174,15 +174,18 @@ class TestStreamErrorCodes:
 
     async def test_stream_error_chunk_propagates_code(self):
         """Error chunks from IPC with 'code' field should be propagated to SSE."""
+
         async def _stream_with_error_chunk(*args, **kwargs):
             yield IPCResponse(
                 id="test",
                 stream=True,
-                chunk=json.dumps({
-                    "type": "error",
-                    "code": "LLM_ERROR",
-                    "message": "Model overloaded",
-                }),
+                chunk=json.dumps(
+                    {
+                        "type": "error",
+                        "code": "LLM_ERROR",
+                        "message": "Model overloaded",
+                    }
+                ),
             )
 
         sup = _make_supervisor()

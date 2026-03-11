@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -132,9 +132,7 @@ class TestPeriodicReconciliation:
         after startup (e.g., bootstrap that just ran and failed).
         """
         from core.asset_reconciler import (
-            REQUIRED_ASSETS,
             find_animas_with_missing_assets,
-            reconcile_anima_assets,
         )
 
         animas_dir = data_dir / "animas"

@@ -5,7 +5,6 @@
 
 from __future__ import annotations
 
-import pytest
 from apscheduler.triggers.cron import CronTrigger
 
 from core.schedule_parser import (

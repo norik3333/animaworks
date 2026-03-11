@@ -1,196 +1,216 @@
-# Common Knowledge 目次・キーワード索引
+# Common Knowledge — 目次・クイックガイド
 
 AnimaWorks の全 Anima が共有するリファレンスドキュメントの目次。
-
-困ったとき・手順が不明なときは、まずこのファイルを読んで該当ドキュメントを特定し、
+困ったとき・手順が不明なときは、このファイルで該当ドキュメントを特定し、
 `read_memory_file(path="common_knowledge/...")` で詳細を参照すること。
+
+> 💡 詳細な技術リファレンス（構成ファイル仕様・モデル設定・認証設定等）は `reference/` に移動しました。
+> 目次: `reference/00_index.md`
 
 ---
 
-## 困ったときはまずここを読む
+## 困ったときのクイックガイド
 
-以下のフローで該当ドキュメントを見つける:
+### コミュニケーション
 
-1. **メッセージの送り方がわからない**
-   → `communication/messaging-guide.md` を読む
+| 困りごと | 参照先 |
+|---------|--------|
+| メッセージの送り方がわからない | `communication/messaging-guide.md` |
+| Board（共有チャネル）の使い方がわからない | `communication/board-guide.md` |
+| 指示の出し方・報告の仕方がわからない | `communication/instruction-patterns.md` / `communication/reporting-guide.md` |
+| メッセージ送信が制限された | `communication/sending-limits.md` |
+| 人間への通知方法がわからない | `communication/call-human-guide.md` |
+| Slack ボットトークンの設定がわからない | `reference/communication/slack-bot-token-guide.md` ※技術リファレンス |
 
-1.5. **Board（共有チャネル）の使い方がわからない**
-   → `communication/board-guide.md` を読む
+### 組織・階層
 
-2. **指示の出し方・報告の仕方がわからない**
-   → `communication/instruction-patterns.md` または `communication/reporting-guide.md` を読む
+| 困りごと | 参照先 |
+|---------|--------|
+| 組織構造・誰に連絡すべきかわからない | `reference/organization/structure.md` ※技術リファレンス |
+| 役割と責任範囲を確認したい | `organization/roles.md` |
+| 階層間の通信ルールがわからない | `organization/hierarchy-rules.md` |
 
-3. **組織構造・誰に連絡すべきかわからない**
-   → `organization/structure.md` を読む
+### タスク・運用
 
-4. **ツールの使い方・呼び出し方がわからない**
-   → `operations/tool-usage-overview.md` を読む
+| 困りごと | 参照先 |
+|---------|--------|
+| タスク管理の方法がわからない | `operations/task-management.md` |
+| タスクボード（人間向けダッシュボード）を使いたい | `operations/task-board-guide.md` |
+| ハートビートやcronの設定がわからない | `operations/heartbeat-cron-guide.md` |
+| 長時間ツールの実行方法がわからない | `operations/background-tasks.md` |
+| プロジェクト設定を変更したい | `reference/operations/project-setup.md` ※技術リファレンス |
 
-4.5. **ツールやコマンドが使えない / エラーが出る**
-   → `troubleshooting/common-issues.md` を読む
+### ツール・モデル・技術
 
-5. **タスクがブロックされた / 判断に迷う**
-   → `troubleshooting/escalation-flowchart.md` を読む
+| 困りごと | 参照先 |
+|---------|--------|
+| ツールの使い方・呼び出し方がわからない | `operations/tool-usage-overview.md` |
+| モデルの選び方・変更方法がわからない | `reference/operations/model-guide.md` ※技術リファレンス |
+| Mode S の認証方式を変えたい | `reference/operations/mode-s-auth-guide.md` ※技術リファレンス |
+| 音声チャットの設定・使い方がわからない | `reference/operations/voice-chat-guide.md` ※技術リファレンス |
 
-6. **ハートビートやcronの設定方法がわからない**
-   → `operations/heartbeat-cron-guide.md` を読む
+### 自分自身の理解
 
-6.5. **長時間ツールの実行方法がわからない**
-   → `operations/background-tasks.md` を読む
+| 困りごと | 参照先 |
+|---------|--------|
+| Animaとは何か知りたい | `anatomy/what-is-anima.md` |
+| 自分の構成ファイルの役割を知りたい | `reference/anatomy/anima-anatomy.md` ※技術リファレンス |
+| 記憶の仕組み・種類を知りたい | `anatomy/memory-system.md` |
 
-7. **タスク管理の方法がわからない**
-   → `operations/task-management.md` を読む
+### トラブルシューティング
 
-7.5. **音声チャットの設定・使い方がわからない**
-   → `operations/voice-chat-guide.md` を読む
+| 困りごと | 参照先 |
+|---------|--------|
+| ツールやコマンドが使えない / エラーが出る | `troubleshooting/common-issues.md` |
+| タスクがブロックされた / 判断に迷う | `troubleshooting/escalation-flowchart.md` |
+| Gmail ツールの認証設定がうまくいかない | `reference/troubleshooting/gmail-credential-setup.md` ※技術リファレンス |
 
-7.6. **Mode S の認証方式（API直接 / Max plan / Bedrock）を変えたい**
-   → `operations/mode-s-auth-guide.md` を読む
+### セキュリティ
 
-7.7. **モデルの選び方・変更方法がわからない / 実行モードの仕組みを知りたい**
-   → `operations/model-guide.md` を読む
+| 困りごと | 参照先 |
+|---------|--------|
+| 外部データの信頼性が気になる | `security/prompt-injection-awareness.md` |
 
-8. **メッセージ送信が制限された / 送信制限について知りたい**
-   → `communication/sending-limits.md` を読む
+### 活用例
 
-9. **外部データの信頼性が気になる / プロンプトインジェクション対策**
-   → `security/prompt-injection-awareness.md` を読む
+| 困りごと | 参照先 |
+|---------|--------|
+| AnimaWorksで何ができるか知りたい | `usecases/usecase-overview.md` |
 
-10. **上記に該当しない**
-   → `search_memory(query="キーワード", scope="common_knowledge")` で検索する
+**上記に該当しない場合** → `search_memory(query="キーワード", scope="common_knowledge")` で検索する
 
 ---
 
 ## ドキュメント一覧
 
+### anatomy/ — Animaの構成要素
+
+| ファイル | 概要 |
+|---------|------|
+| `what-is-anima.md` | Animaとは何か（概念・設計思想・ライフサイクル・実行パス） |
+| `anima-anatomy.md` | → `reference/anatomy/anima-anatomy.md` に移動。構成ファイル完全ガイド |
+| `memory-system.md` | 記憶システムガイド（記憶の種類・Priming・Consolidation・Forgetting・ツール使い分け） |
+
 ### organization/ — 組織・構造
 
 | ファイル | 概要 |
 |---------|------|
-| `organization/structure.md` | 組織構造の仕組み（supervisor による階層定義、上司・部下・同僚の決定方法） |
-| `organization/roles.md` | 役割と責任範囲（トップレベル / 中間管理 / 実行 Anima の責務、speciality の意味） |
-| `organization/hierarchy-rules.md` | 階層間のルール（通信経路、直属 vs 他部署、緊急時の例外） |
+| `structure.md` | → `reference/organization/structure.md` に移動。組織構造の仕組み |
+| `roles.md` | 役割と責任範囲（トップレベル / 中間管理 / 実行 Anima の責務） |
+| `hierarchy-rules.md` | 階層間のルール（通信経路、スーパーバイザーツール、緊急時の例外） |
 
 ### communication/ — コミュニケーション
 
 | ファイル | 概要 |
 |---------|------|
-| `communication/messaging-guide.md` | メッセージ送受信の完全ガイド（send_message のパラメータ、スレッド管理、送信制限、1ラウンドルール） |
-| `communication/board-guide.md` | Board（共有チャネル）ガイド（post_channel / read_channel / read_dm_history の使い分け、投稿ルール） |
-| `communication/instruction-patterns.md` | 指示の出し方パターン集（明確な指示の書き方、委任パターン、進捗確認） |
-| `communication/reporting-guide.md` | 報告・エスカレーションの方法（報告タイミング、フォーマット、緊急 vs 定期） |
-| `communication/sending-limits.md` | 送信制限の詳細（3層レート制限、30/h・100/day 上限、カスケード検出、対処法） |
-| `communication/slack-bot-token-guide.md` | Slack ボットトークン設定ガイド（共有 vs Per-Anima トークン、命名規則、絶対に守るべきルール） |
+| `messaging-guide.md` | メッセージ送受信の完全ガイド（send_message のパラメータ、スレッド管理、1ラウンドルール） |
+| `board-guide.md` | Board（共有チャネル）ガイド（post_channel / read_channel の使い分け、投稿ルール） |
+| `instruction-patterns.md` | 指示の出し方パターン集（明確な指示の書き方、委任パターン、進捗確認） |
+| `reporting-guide.md` | 報告・エスカレーションの方法（報告タイミング、フォーマット、緊急 vs 定期） |
+| `sending-limits.md` | 送信制限の詳細（3層レート制限、30/h・100/day 上限、カスケード検出、対処法） |
+| `call-human-guide.md` | 人間への通知ガイド（call_human の使い方、返信の受け取り、通知チャネル設定） |
+| `slack-bot-token-guide.md` | → `reference/communication/slack-bot-token-guide.md` に移動。Slack ボットトークン設定ガイド |
 
 ### operations/ — 運用・タスク管理
 
 | ファイル | 概要 |
 |---------|------|
-| `operations/project-setup.md` | プロジェクト設定方法（config.json 構造、Anima 追加、モデル設定、権限設定） |
-| `operations/task-management.md` | タスク管理の方法（current_task.md / pending.md の使い方、状態遷移、優先順位） |
-| `operations/heartbeat-cron-guide.md` | 定期実行の設定と運用（ハートビートの仕組み、cron タスク定義、自己更新） |
-| `operations/tool-usage-overview.md` | ツール使用の概要（S/A/B モード別のツール体系、内部/外部/スーパーバイザーツール、呼び出し方法） |
-| `operations/background-tasks.md` | バックグラウンドタスク実行ガイド（submit の使い方、判断基準、結果の受け取り方） |
-| `operations/voice-chat-guide.md` | 音声チャットガイド（STT/TTS設定、WebSocketプロトコル、Per-Anima声設定、トラブルシューティング） |
-| `operations/mode-s-auth-guide.md` | Mode S 認証モード設定ガイド（API直接/Bedrock/Vertex AI/Max plan の切り替え、Anima単位設定） |
-| `operations/model-guide.md` | モデル選択・設定ガイド（実行モード、対応モデル一覧、models.json、credential設定、コンテキストウィンドウ） |
+| `project-setup.md` | → `reference/operations/project-setup.md` に移動。プロジェクト設定方法 |
+| `task-management.md` | タスク管理（current_task.md / pending.md の使い方、状態遷移、優先順位） |
+| `task-board-guide.md` | タスクボード（人間向けダッシュボード）の仕組みと運用方法 |
+| `heartbeat-cron-guide.md` | 定期実行の設定と運用（ハートビートの仕組み、cron タスク定義、自己更新） |
+| `tool-usage-overview.md` | ツール使用の概要（S/A/B モード別のツール体系、内部/外部ツール、呼び出し方法） |
+| `background-tasks.md` | バックグラウンドタスク実行ガイド（submit の使い方、判断基準、結果の受け取り方） |
+| `model-guide.md` | → `reference/operations/model-guide.md` に移動。モデル選択・設定ガイド |
+| `mode-s-auth-guide.md` | → `reference/operations/mode-s-auth-guide.md` に移動。Mode S 認証モード設定ガイド |
+| `voice-chat-guide.md` | → `reference/operations/voice-chat-guide.md` に移動。音声チャットガイド |
 
 ### security/ — セキュリティ
 
 | ファイル | 概要 |
 |---------|------|
-| `security/prompt-injection-awareness.md` | プロンプトインジェクション防御ガイド（信頼レベル、境界タグ、untrusted データの処理ルール） |
+| `prompt-injection-awareness.md` | プロンプトインジェクション防御ガイド（信頼レベル、境界タグ、untrusted データの処理ルール） |
 
 ### troubleshooting/ — トラブルシューティング
 
 | ファイル | 概要 |
 |---------|------|
-| `troubleshooting/common-issues.md` | よくある問題と対処法（メッセージ不達、送信制限、ブロック、記憶検索、権限、ツール、コンテキスト） |
-| `troubleshooting/escalation-flowchart.md` | 困ったときの判断フローチャート（問題分類、緊急度判定、エスカレーション先、テンプレート） |
-| `troubleshooting/gmail-credential-setup.md` | Gmail Tool認証設定ガイド（token.json配置手順、pickle変換、client_id不一致問題） |
+| `common-issues.md` | よくある問題と対処法（メッセージ不達、送信制限、権限、ツール、コンテキスト） |
+| `escalation-flowchart.md` | 困ったときの判断フローチャート（問題分類、緊急度判定、エスカレーション先） |
+| `gmail-credential-setup.md` | → `reference/troubleshooting/gmail-credential-setup.md` に移動。Gmail Tool認証設定ガイド |
+
+### usecases/ — ユースケースガイド
+
+| ファイル | 概要 |
+|---------|------|
+| `usecase-overview.md` | ユースケースガイド概要（AnimaWorksでできること・始め方・全テーマ一覧） |
+| `usecase-communication.md` | コミュニケーション自動化（チャット・メール監視、エスカレーション、定期連絡） |
+| `usecase-development.md` | ソフトウェア開発支援（コードレビュー、CI/CD監視、Issue実装、バグ調査） |
+| `usecase-monitoring.md` | インフラ・サービス監視（死活監視、リソース監視、SSL証明書、ログ分析） |
+| `usecase-secretary.md` | 秘書・事務サポート（スケジュール管理、連絡調整、日報作成、リマインダー） |
+| `usecase-research.md` | 調査・リサーチ・分析（Web検索、競合分析、市場調査、レポート作成） |
+| `usecase-knowledge.md` | ナレッジ管理・ドキュメント整備（手順書作成、FAQ構築、教訓の蓄積） |
+| `usecase-customer-support.md` | カスタマーサポート（一次対応、FAQ自動回答、エスカレーション管理） |
 
 ---
 
 ## キーワード索引
 
-該当するキーワードから、参照すべきドキュメントを見つける。
-
 | キーワード | 参照先 |
 |-----------|--------|
-| メッセージ, 送信, 返信, スレッド, inbox | `communication/messaging-guide.md` |
-| send_message, reply_to, thread_id | `communication/messaging-guide.md` |
-| Board, チャネル, 共有, general, ops | `communication/board-guide.md` |
-| post_channel, read_channel, read_dm_history | `communication/board-guide.md` |
-| DM履歴, やり取り, 過去の会話 | `communication/board-guide.md` |
+| メッセージ, send_message, 送信, 返信, スレッド, inbox | `communication/messaging-guide.md` |
+| Board, チャネル, post_channel, read_channel | `communication/board-guide.md` |
+| DM履歴, read_dm_history, 過去の会話 | `communication/board-guide.md` |
 | 指示, 委任, タスク依頼, デリゲーション | `communication/instruction-patterns.md` |
-| 報告, 日報, サマリー, 完了報告 | `communication/reporting-guide.md` |
-| エスカレーション, 相談, 仲介 | `communication/reporting-guide.md`, `troubleshooting/escalation-flowchart.md` |
-| 組織, supervisor, 上司, 部下, 同僚 | `organization/structure.md` |
+| 報告, 日報, サマリー, 完了報告, エスカレーション | `communication/reporting-guide.md` |
+| レート制限, 送信制限, 30通, 100通, 1ラウンドルール | `communication/sending-limits.md` |
+| call_human, 人間通知, 人間に連絡, 通知チャネル | `communication/call-human-guide.md` |
+| Slack, ボットトークン, SLACK_BOT_TOKEN, not_in_channel | `reference/communication/slack-bot-token-guide.md` |
+| 組織, supervisor, 上司, 部下, 同僚 | `reference/organization/structure.md` |
 | 役割, 責任, speciality, 専門 | `organization/roles.md` |
-| 階層, ルール, 権限, 通信経路 | `organization/hierarchy-rules.md` |
-| 設定, config, ホットリロード, 設定反映 | `operations/project-setup.md` |
-| モデル, models, 実行モード, モデル変更, モデル一覧, models.json, プロバイダ | `operations/model-guide.md` |
-| モデル選択, コンテキストウィンドウ, credential, set-model, models list | `operations/model-guide.md` |
-| background_model, バックグラウンドモデル, コスト最適化, set-background-model | `operations/model-guide.md` |
-| background_credential, Heartbeatモデル, Cronモデル, Inboxモデル | `operations/model-guide.md` |
-| Anima追加, テンプレート, identity | `operations/project-setup.md` |
-| タスク, 進捗, ブロック, 優先順位 | `operations/task-management.md` |
-| current_task, pending, 状態管理 | `operations/task-management.md` |
+| 階層, 通信経路, org_dashboard, ping_subordinate | `organization/hierarchy-rules.md` |
+| delegate_task, タスク委譲, task_tracker | `organization/hierarchy-rules.md`, `operations/task-management.md` |
+| タスク, current_task, pending, 進捗, 優先順位 | `operations/task-management.md` |
+| add_task, タスクキュー, plan_tasks, TaskExec | `operations/task-management.md` |
+| タスクボード, ダッシュボード, 人間向け | `operations/task-board-guide.md` |
+| 設定, config, status.json, SSoT, reload | `reference/operations/project-setup.md` |
 | ハートビート, heartbeat, 定期チェック | `operations/heartbeat-cron-guide.md` |
 | cron, スケジュール, 定時タスク | `operations/heartbeat-cron-guide.md` |
-| 問題, エラー, 困った, 動かない | `troubleshooting/common-issues.md` |
-| Gmail, gmail_unread, token.json, OAuth, credential | `troubleshooting/gmail-credential-setup.md` |
-| 権限, permission, アクセス拒否 | `troubleshooting/common-issues.md` |
-| ツール, use_tool, skill, 見つからない | `troubleshooting/common-issues.md` |
-| 記憶, search_memory, 検索, 見つからない | `troubleshooting/common-issues.md` |
-| フローチャート, 判断, 迷い, どうすべき | `troubleshooting/escalation-flowchart.md` |
-| 緊急, 至急, セキュリティ | `troubleshooting/escalation-flowchart.md` |
-| コンテキスト, 上限, セッション継続 | `troubleshooting/common-issues.md` |
-| バックグラウンド, submit, 長時間, ブロック, background | `operations/background-tasks.md` |
-| animaworks-tool, 外部ツール, Bash, CLI | `operations/tool-usage-overview.md`, `operations/background-tasks.md` |
-| MCP, mcp__aw__, Sモード, ツール呼び出し | `operations/tool-usage-overview.md` |
-| skill, スキルツール, 手順書取得, procedures | `operations/tool-usage-overview.md` |
-| 実行モード, S-mode, A-mode, B-mode | `operations/tool-usage-overview.md` |
-| レート制限, 送信制限, 30通, 100通, outbound limit | `communication/sending-limits.md` |
-| Slack, ボットトークン, SLACK_BOT_TOKEN, Per-Anima, not_in_channel | `communication/slack-bot-token-guide.md` |
-| 1ラウンドルール, 往復, ループ, カスケード | `communication/messaging-guide.md`, `communication/sending-limits.md` |
+| ツール, animaworks-tool, MCP, mcp__aw__, skill | `operations/tool-usage-overview.md` |
+| 実行モード, S-mode, A-mode, B-mode, C-mode | `operations/tool-usage-overview.md` |
+| バックグラウンド, submit, 長時間ツール | `operations/background-tasks.md` |
+| モデル, models.json, credential, set-model, コンテキストウィンドウ | `reference/operations/model-guide.md` |
+| background_model, バックグラウンドモデル, コスト最適化 | `reference/operations/model-guide.md` |
+| Mode S, 認証, API直接, Bedrock, Vertex AI, Max plan | `reference/operations/mode-s-auth-guide.md` |
+| 音声, voice, STT, TTS, VOICEVOX, ElevenLabs | `reference/operations/voice-chat-guide.md` |
+| WebSocket, /ws/voice, barge-in, VAD, PTT | `reference/operations/voice-chat-guide.md` |
+| Anima, 自分, 構成, 設計, ライフサイクル | `anatomy/what-is-anima.md` |
+| identity, injection, 人格, 行動指針, 不変, 可変 | `reference/anatomy/anima-anatomy.md` |
+| permissions.md, bootstrap, heartbeat.md, cron.md | `reference/anatomy/anima-anatomy.md` |
+| 記憶, memory, episodes, knowledge, procedures | `anatomy/memory-system.md` |
+| Priming, RAG, Consolidation, Forgetting, 忘却 | `anatomy/memory-system.md` |
+| search_memory, write_memory_file, 記憶検索 | `anatomy/memory-system.md` |
 | プロンプトインジェクション, trust, untrusted, 境界タグ | `security/prompt-injection-awareness.md` |
-| delegate_task, タスク委譲, task_tracker | `operations/task-management.md`, `organization/hierarchy-rules.md` |
-| add_task, タスクキュー, TaskQueue | `operations/task-management.md` |
-| pending, TaskExec, 3パス, 実行パス | `operations/task-management.md`, `operations/heartbeat-cron-guide.md` |
-| org_dashboard, ping_subordinate, スーパーバイザーツール | `organization/hierarchy-rules.md` |
-| set_subordinate_background_model, 部下のモデル変更 | `organization/hierarchy-rules.md` |
-| status.json, SSoT, reload, リロード | `operations/project-setup.md` |
-| anima info, anima list, anima set-model, models list, models info | `operations/model-guide.md` |
-| ブロックコマンド, 実行できないコマンド, blocked | `operations/project-setup.md`, `troubleshooting/common-issues.md` |
-| ティア, tiered, プロンプト短縮, T1, T2, T3, T4 | `troubleshooting/common-issues.md` |
-| 音声, voice, マイク, STT, TTS, 音声チャット | `operations/voice-chat-guide.md` |
-| VOICEVOX, ElevenLabs, Style-BERT-VITS2, SBV2 | `operations/voice-chat-guide.md` |
-| voice_id, 声, 話者, speaker, 音声設定 | `operations/voice-chat-guide.md` |
-| WebSocket, /ws/voice, barge-in, VAD, PTT | `operations/voice-chat-guide.md` |
-| Mode S, 認証, API直接, Max plan, Bedrock, Vertex AI, credential, _build_env | `operations/mode-s-auth-guide.md` |
-| Agent SDK, 環境変数, ANTHROPIC_API_KEY, CLAUDE_CODE_USE_BEDROCK | `operations/mode-s-auth-guide.md` |
+| エラー, 問題, 動かない, 権限, ブロックコマンド | `troubleshooting/common-issues.md` |
+| フローチャート, 判断, 迷い, 緊急, セキュリティ | `troubleshooting/escalation-flowchart.md` |
+| Gmail, token.json, OAuth, pickle | `reference/troubleshooting/gmail-credential-setup.md` |
+| ティア, tiered, T1, T2, T3, T4 | `troubleshooting/common-issues.md` |
+| ユースケース, 活用例, 何ができる | `usecases/usecase-overview.md` |
 
 ---
 
 ## 使い方
 
-### 検索で見つける場合
-
 ```
+# キーワードで検索
 search_memory(query="メッセージ 送信", scope="common_knowledge")
-```
 
-検索結果に該当ファイルのパスが表示されるので、`read_memory_file` で読む。
+# パスを直接指定
+read_memory_file(path="common_knowledge/communication/messaging-guide.md")
 
-### パスを直接指定する場合
+# 技術リファレンスを参照
+read_memory_file(path="reference/anatomy/anima-anatomy.md")
 
-```
-read_memory_file(path="common_knowledge/troubleshooting/common-issues.md")
-```
-
-### このファイル自体を参照する場合
-
-```
+# このファイル自体を参照
 read_memory_file(path="common_knowledge/00_index.md")
 ```

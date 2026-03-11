@@ -6,20 +6,13 @@ Unit tests for ground truth management.
 
 Tests annotation creation, storage, and inter-annotator agreement calculation.
 """
+
 from __future__ import annotations
 
 import json
 import pytest
 from pathlib import Path
-from tests.evaluation.framework import (
-    AnnotationSet,
-    ConversationTurn,
-    DatasetGenerator,
-    GroundTruth,
-    GroundTruthManager,
-    RelevantMemory,
-    Scenario
-)
+from tests.evaluation.framework import AnnotationSet, DatasetGenerator, GroundTruth, GroundTruthManager, RelevantMemory
 
 
 @pytest.fixture
@@ -37,28 +30,15 @@ def gt_manager(temp_gt_dir):
 @pytest.fixture
 def sample_memory_base(tmp_path):
     """Generate a small sample memory base for testing."""
-    generator = DatasetGenerator(
-        output_dir=tmp_path / "datasets",
-        use_llm=False
-    )
-    return generator.generate_memory_base(
-        domain="business",
-        size="small"
-    )
+    generator = DatasetGenerator(output_dir=tmp_path / "datasets", use_llm=False)
+    return generator.generate_memory_base(domain="business", size="small")
 
 
 @pytest.fixture
 def sample_scenarios(sample_memory_base):
     """Generate sample scenarios for testing."""
-    generator = DatasetGenerator(
-        output_dir=Path("/tmp/test_datasets"),
-        use_llm=False
-    )
-    return generator.generate_scenarios(
-        domain="business",
-        memory_base=sample_memory_base,
-        total_count=5
-    )
+    generator = DatasetGenerator(output_dir=Path("/tmp/test_datasets"), use_llm=False)
+    return generator.generate_scenarios(domain="business", memory_base=sample_memory_base, total_count=5)
 
 
 # ── Annotation Creation Tests ────────────────────────────────────────────────
@@ -67,9 +47,7 @@ def sample_scenarios(sample_memory_base):
 def test_create_annotations(gt_manager, sample_scenarios, sample_memory_base):
     """Test creating annotations from scenarios."""
     annotation_set = gt_manager.create_annotations(
-        scenarios=sample_scenarios,
-        memory_base=sample_memory_base,
-        annotator_id="test_annotator"
+        scenarios=sample_scenarios, memory_base=sample_memory_base, annotator_id="test_annotator"
     )
 
     assert isinstance(annotation_set, AnnotationSet)
@@ -84,9 +62,7 @@ def test_create_annotations(gt_manager, sample_scenarios, sample_memory_base):
 def test_annotation_has_metadata(gt_manager, sample_scenarios, sample_memory_base):
     """Test that annotation set includes metadata."""
     annotation_set = gt_manager.create_annotations(
-        scenarios=sample_scenarios,
-        memory_base=sample_memory_base,
-        annotator_id="test_annotator"
+        scenarios=sample_scenarios, memory_base=sample_memory_base, annotator_id="test_annotator"
     )
 
     assert "created_at" in annotation_set.metadata
@@ -98,9 +74,7 @@ def test_annotation_has_metadata(gt_manager, sample_scenarios, sample_memory_bas
 def test_ground_truth_structure(gt_manager, sample_scenarios, sample_memory_base):
     """Test structure of individual ground truth annotations."""
     annotation_set = gt_manager.create_annotations(
-        scenarios=sample_scenarios,
-        memory_base=sample_memory_base,
-        annotator_id="test_annotator"
+        scenarios=sample_scenarios, memory_base=sample_memory_base, annotator_id="test_annotator"
     )
 
     # Get first annotation
@@ -120,9 +94,7 @@ def test_ground_truth_structure(gt_manager, sample_scenarios, sample_memory_base
 def test_relevant_memory_structure(gt_manager, sample_scenarios, sample_memory_base):
     """Test structure of RelevantMemory objects."""
     annotation_set = gt_manager.create_annotations(
-        scenarios=sample_scenarios,
-        memory_base=sample_memory_base,
-        annotator_id="test_annotator"
+        scenarios=sample_scenarios, memory_base=sample_memory_base, annotator_id="test_annotator"
     )
 
     # Find an annotation with relevant memories
@@ -141,9 +113,7 @@ def test_relevant_memory_structure(gt_manager, sample_scenarios, sample_memory_b
 def test_save_annotations(gt_manager, sample_scenarios, sample_memory_base):
     """Test saving annotations to JSON file."""
     annotation_set = gt_manager.create_annotations(
-        scenarios=sample_scenarios,
-        memory_base=sample_memory_base,
-        annotator_id="annotator1"
+        scenarios=sample_scenarios, memory_base=sample_memory_base, annotator_id="annotator1"
     )
 
     saved_path = gt_manager.save_annotations(annotation_set)
@@ -156,15 +126,10 @@ def test_save_annotations(gt_manager, sample_scenarios, sample_memory_base):
 def test_save_annotations_custom_filename(gt_manager, sample_scenarios, sample_memory_base):
     """Test saving annotations with custom filename."""
     annotation_set = gt_manager.create_annotations(
-        scenarios=sample_scenarios,
-        memory_base=sample_memory_base,
-        annotator_id="annotator1"
+        scenarios=sample_scenarios, memory_base=sample_memory_base, annotator_id="annotator1"
     )
 
-    saved_path = gt_manager.save_annotations(
-        annotation_set,
-        filename="custom_annotations.json"
-    )
+    saved_path = gt_manager.save_annotations(annotation_set, filename="custom_annotations.json")
 
     assert saved_path.name == "custom_annotations.json"
 
@@ -173,9 +138,7 @@ def test_load_annotations(gt_manager, sample_scenarios, sample_memory_base):
     """Test loading annotations from JSON file."""
     # Create and save annotations
     annotation_set = gt_manager.create_annotations(
-        scenarios=sample_scenarios,
-        memory_base=sample_memory_base,
-        annotator_id="annotator1"
+        scenarios=sample_scenarios, memory_base=sample_memory_base, annotator_id="annotator1"
     )
 
     saved_path = gt_manager.save_annotations(annotation_set)
@@ -191,9 +154,7 @@ def test_save_load_roundtrip(gt_manager, sample_scenarios, sample_memory_base):
     """Test that save/load preserves all data."""
     # Create annotations
     original_set = gt_manager.create_annotations(
-        scenarios=sample_scenarios,
-        memory_base=sample_memory_base,
-        annotator_id="annotator1"
+        scenarios=sample_scenarios, memory_base=sample_memory_base, annotator_id="annotator1"
     )
 
     # Save and load
@@ -223,15 +184,11 @@ def test_calculate_agreement_identical(gt_manager, sample_scenarios, sample_memo
     """Test agreement calculation with identical annotations."""
     # Create identical annotations
     annotation_set1 = gt_manager.create_annotations(
-        scenarios=sample_scenarios,
-        memory_base=sample_memory_base,
-        annotator_id="annotator1"
+        scenarios=sample_scenarios, memory_base=sample_memory_base, annotator_id="annotator1"
     )
 
     annotation_set2 = gt_manager.create_annotations(
-        scenarios=sample_scenarios,
-        memory_base=sample_memory_base,
-        annotator_id="annotator2"
+        scenarios=sample_scenarios, memory_base=sample_memory_base, annotator_id="annotator2"
     )
 
     agreement = gt_manager.calculate_agreement(annotation_set1, annotation_set2)
@@ -246,27 +203,20 @@ def test_calculate_agreement_disjoint(gt_manager, sample_scenarios, sample_memor
     """Test agreement calculation with completely different annotations."""
     # Create first annotation set
     annotation_set1 = gt_manager.create_annotations(
-        scenarios=sample_scenarios,
-        memory_base=sample_memory_base,
-        annotator_id="annotator1"
+        scenarios=sample_scenarios, memory_base=sample_memory_base, annotator_id="annotator1"
     )
 
     # Create second annotation set (manually modify to be different)
     annotation_set2 = gt_manager.create_annotations(
-        scenarios=sample_scenarios,
-        memory_base=sample_memory_base,
-        annotator_id="annotator2"
+        scenarios=sample_scenarios, memory_base=sample_memory_base, annotator_id="annotator2"
     )
 
     # Manually swap relevant/irrelevant for all annotations
-    for query_id, gt in annotation_set2.annotations.items():
+    for _query_id, gt in annotation_set2.annotations.items():
         # Swap relevant and irrelevant: what was relevant becomes irrelevant and vice versa
         original_relevant = gt.relevant_memories
         original_irrelevant = gt.irrelevant_memories
-        gt.relevant_memories = [
-            RelevantMemory(file_path=p, relevance="high")
-            for p in original_irrelevant
-        ]
+        gt.relevant_memories = [RelevantMemory(file_path=p, relevance="high") for p in original_irrelevant]
         gt.irrelevant_memories = [rm.file_path for rm in original_relevant]
 
     agreement = gt_manager.calculate_agreement(annotation_set1, annotation_set2)
@@ -280,18 +230,10 @@ def test_agreement_with_empty_overlap(gt_manager):
     """Test agreement calculation with no overlapping queries."""
     # Create two annotation sets with different query IDs
     set1 = AnnotationSet(annotator_id="annotator1")
-    set1.add_annotation("query_1", GroundTruth(
-        query="test1",
-        scenario_id="s1",
-        turn_index=0
-    ))
+    set1.add_annotation("query_1", GroundTruth(query="test1", scenario_id="s1", turn_index=0))
 
     set2 = AnnotationSet(annotator_id="annotator2")
-    set2.add_annotation("query_2", GroundTruth(
-        query="test2",
-        scenario_id="s2",
-        turn_index=0
-    ))
+    set2.add_annotation("query_2", GroundTruth(query="test2", scenario_id="s2", turn_index=0))
 
     agreement = gt_manager.calculate_agreement(set1, set2)
 
@@ -307,21 +249,14 @@ def test_agreement_with_empty_overlap(gt_manager):
 def test_save_agreement_report(gt_manager, sample_scenarios, sample_memory_base):
     """Test saving agreement report to file."""
     annotation_set1 = gt_manager.create_annotations(
-        scenarios=sample_scenarios,
-        memory_base=sample_memory_base,
-        annotator_id="annotator1"
+        scenarios=sample_scenarios, memory_base=sample_memory_base, annotator_id="annotator1"
     )
 
     annotation_set2 = gt_manager.create_annotations(
-        scenarios=sample_scenarios,
-        memory_base=sample_memory_base,
-        annotator_id="annotator2"
+        scenarios=sample_scenarios, memory_base=sample_memory_base, annotator_id="annotator2"
     )
 
-    report_path = gt_manager.save_agreement_report(
-        annotation_set1,
-        annotation_set2
-    )
+    report_path = gt_manager.save_agreement_report(annotation_set1, annotation_set2)
 
     assert report_path.exists()
     assert report_path.suffix == ".json"
@@ -357,19 +292,10 @@ def test_high_relevance_files(sample_memory_base):
         scenario_id="s1",
         turn_index=0,
         relevant_memories=[
-            RelevantMemory(
-                file_path=sample_memory_base.knowledge_files[0].path,
-                relevance="high"
-            ),
-            RelevantMemory(
-                file_path=sample_memory_base.knowledge_files[1].path,
-                relevance="medium"
-            ),
-            RelevantMemory(
-                file_path=sample_memory_base.knowledge_files[2].path,
-                relevance="high"
-            ),
-        ]
+            RelevantMemory(file_path=sample_memory_base.knowledge_files[0].path, relevance="high"),
+            RelevantMemory(file_path=sample_memory_base.knowledge_files[1].path, relevance="medium"),
+            RelevantMemory(file_path=sample_memory_base.knowledge_files[2].path, relevance="high"),
+        ],
     )
 
     high_rel = gt.high_relevance_files
@@ -383,9 +309,7 @@ def test_full_annotation_workflow(gt_manager, sample_scenarios, sample_memory_ba
     """Test complete annotation workflow."""
     # Step 1: Create annotations
     annotation_set = gt_manager.create_annotations(
-        scenarios=sample_scenarios,
-        memory_base=sample_memory_base,
-        annotator_id="annotator1"
+        scenarios=sample_scenarios, memory_base=sample_memory_base, annotator_id="annotator1"
     )
 
     # Step 2: Save annotations
@@ -398,9 +322,7 @@ def test_full_annotation_workflow(gt_manager, sample_scenarios, sample_memory_ba
 
     # Step 4: Create second annotator's set
     annotation_set2 = gt_manager.create_annotations(
-        scenarios=sample_scenarios,
-        memory_base=sample_memory_base,
-        annotator_id="annotator2"
+        scenarios=sample_scenarios, memory_base=sample_memory_base, annotator_id="annotator2"
     )
 
     gt_manager.save_annotations(annotation_set2)
@@ -418,11 +340,7 @@ def test_annotation_set_operations(gt_manager):
     """Test AnnotationSet add/get operations."""
     annotation_set = AnnotationSet(annotator_id="test")
 
-    gt1 = GroundTruth(
-        query="query1",
-        scenario_id="s1",
-        turn_index=0
-    )
+    gt1 = GroundTruth(query="query1", scenario_id="s1", turn_index=0)
 
     # Add annotation
     annotation_set.add_annotation("q1", gt1)

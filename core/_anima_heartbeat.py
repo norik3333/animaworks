@@ -22,7 +22,7 @@ from core.memory.streaming_journal import StreamingJournal
 from core.messenger import InboxItem
 from core.paths import load_prompt
 from core.schemas import CycleResult
-from core.time_utils import now_iso, now_jst
+from core.time_utils import now_iso, now_local
 
 logger = logging.getLogger("animaworks.anima")
 
@@ -175,11 +175,16 @@ class HeartbeatMixin:
         conv = ConversationMemory(self.anima_dir, self.model_config)
         return conv.build_structured_messages(prompt_text)
 
-    def _build_background_context_parts(self) -> list[str]:
+    def _build_background_context_parts(self, include_dialogue: bool = True) -> list[str]:
         """Build shared context parts for background-auto sessions (heartbeat/cron).
 
         Collects: recovery note, background task notifications, heartbeat
         history, reflections, dialogue context, subordinate check.
+
+        Args:
+            include_dialogue: If True, inject recent chat dialogue turns.
+                Set to False for cron tasks to prevent chat context leaking
+                into scheduled task execution.
         """
         parts: list[str] = []
 
@@ -216,27 +221,29 @@ class HeartbeatMixin:
             parts.append(load_prompt("fragments/recent_reflections") + "\n\n" + reflection_text)
 
         # Inject recent dialogue context for cross-session continuity
-        try:
-            conv_mem = ConversationMemory(self.anima_dir, self.model_config)
-            state = conv_mem.load()
-            recent_turns = state.turns[-5:] if state.turns else []
-            if recent_turns:
-                conv_lines = []
-                for turn in recent_turns:
-                    snippet = turn.content[:200]
-                    conv_lines.append(f"- [{turn.role}] {snippet}")
-                conv_summary = "\n".join(conv_lines)
-                parts.append(
-                    t("agent.recent_dialogue_header")
-                    + "\n\n"
-                    + t("agent.recent_dialogue_intro")
-                    + "\n"
-                    + t("agent.recent_dialogue_consider")
-                    + "\n\n"
-                    + conv_summary
-                )
-        except Exception:
-            logger.debug("[%s] Failed to load dialogue context", self.name, exc_info=True)
+        # Skipped for cron tasks to prevent chat context leaking into scheduled execution
+        if include_dialogue:
+            try:
+                conv_mem = ConversationMemory(self.anima_dir, self.model_config)
+                state = conv_mem.load()
+                recent_turns = state.turns[-5:] if state.turns else []
+                if recent_turns:
+                    conv_lines = []
+                    for turn in recent_turns:
+                        snippet = turn.content[:200]
+                        conv_lines.append(f"- [{turn.role}] {snippet}")
+                    conv_summary = "\n".join(conv_lines)
+                    parts.append(
+                        t("agent.recent_dialogue_header")
+                        + "\n\n"
+                        + t("agent.recent_dialogue_intro")
+                        + "\n"
+                        + t("agent.recent_dialogue_consider")
+                        + "\n\n"
+                        + conv_summary
+                    )
+            except Exception:
+                logger.debug("[%s] Failed to load dialogue context", self.name, exc_info=True)
 
         # ── Subordinate management check for animas with subordinates ──
         try:
@@ -304,8 +311,8 @@ class HeartbeatMixin:
         if command_output:
             parts.append(load_prompt("fragments/command_output", output=command_output))
 
-        # Shared background context (same as heartbeat)
-        parts.extend(self._build_background_context_parts())
+        # Shared background context (without dialogue — cron tasks must not inherit chat context)
+        parts.extend(self._build_background_context_parts(include_dialogue=False))
 
         return "\n\n".join(parts)
 
@@ -402,7 +409,7 @@ class HeartbeatMixin:
                     summary=accumulated_text or "(no result)",
                 )
 
-            self._last_activity = now_jst()
+            self._last_activity = now_local()
 
             # Activity log: heartbeat end
             self._activity.log("heartbeat_end", summary=result.summary)
@@ -416,7 +423,7 @@ class HeartbeatMixin:
 
             # A-3: Record important heartbeat actions to episodes
             if result.summary and "HEARTBEAT_OK" not in result.summary:
-                ts = now_jst().strftime("%H:%M")
+                ts = now_local().strftime("%H:%M")
                 episode_entry = t(
                     "anima.heartbeat_episode",
                     ts=ts,

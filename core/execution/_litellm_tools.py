@@ -101,13 +101,24 @@ def _convert_litellm_tool_calls(
     ``.id`` attributes into the same dict format produced by
     ``parse_accumulated_tool_calls()`` so that both token-level and
     iteration-level paths can share ``_process_streaming_tool_calls()``.
+
+    Uses :func:`_repair_json_arguments` as a fallback when the
+    accumulated argument string is not valid JSON.
     """
+    from core.execution._streaming import _repair_json_arguments
+
     result: list[dict[str, Any]] = []
     for tc in tool_calls:
         try:
             args = _json.loads(tc.function.arguments)
         except (_json.JSONDecodeError, TypeError):
-            args = None
+            args = _repair_json_arguments(tc.function.arguments or "")
+            if args is None:
+                logger.warning(
+                    "Unrepairable tool-call arguments for %s: %.200s",
+                    tc.function.name,
+                    tc.function.arguments,
+                )
         result.append(
             {
                 "id": tc.id,

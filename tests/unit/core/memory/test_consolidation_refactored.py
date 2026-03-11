@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import pytest
-from pathlib import Path
-from datetime import datetime, timedelta
 from core.time_utils import now_jst
 
 from core.memory.consolidation import ConsolidationEngine

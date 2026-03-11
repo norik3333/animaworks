@@ -11,7 +11,6 @@ import asyncio
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from httpx import ASGITransport, AsyncClient
 
 from core.supervisor.ipc import IPCResponse

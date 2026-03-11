@@ -9,9 +9,7 @@ to a temp file and passed via --system-prompt-file instead of --system-prompt.
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 import pytest
 

@@ -8,12 +8,12 @@ from __future__ import annotations
 import pytest
 
 from core.execution._streaming import (
+    _repair_json_arguments,
     accumulate_tool_call_chunks,
     parse_accumulated_tool_calls,
     stream_error_boundary,
 )
 from core.execution.base import StreamDisconnectedError
-
 
 # ── Fake objects for LiteLLM delta simulation ─────────────────
 
@@ -61,29 +61,44 @@ class TestAccumulateToolCallChunksSingleTool:
         acc: dict[int, dict] = {}
 
         # First chunk: name + id
-        accumulate_tool_call_chunks(acc, [
-            FakeDeltaToolCall(index=0, id="call_1", function=FakeFunction(name="read_file")),
-        ])
+        accumulate_tool_call_chunks(
+            acc,
+            [
+                FakeDeltaToolCall(index=0, id="call_1", function=FakeFunction(name="read_file")),
+            ],
+        )
         # Second chunk: partial arguments
-        accumulate_tool_call_chunks(acc, [
-            FakeDeltaToolCall(index=0, function=FakeFunction(arguments='{"path":')),
-        ])
+        accumulate_tool_call_chunks(
+            acc,
+            [
+                FakeDeltaToolCall(index=0, function=FakeFunction(arguments='{"path":')),
+            ],
+        )
         # Third chunk: rest of arguments
-        accumulate_tool_call_chunks(acc, [
-            FakeDeltaToolCall(index=0, function=FakeFunction(arguments=' "/tmp/f"}')),
-        ])
+        accumulate_tool_call_chunks(
+            acc,
+            [
+                FakeDeltaToolCall(index=0, function=FakeFunction(arguments=' "/tmp/f"}')),
+            ],
+        )
 
         assert acc[0]["arguments"] == '{"path": "/tmp/f"}'
 
     def test_returns_name_only_on_first_encounter(self) -> None:
         acc: dict[int, dict] = {}
 
-        new1 = accumulate_tool_call_chunks(acc, [
-            FakeDeltaToolCall(index=0, id="call_1", function=FakeFunction(name="search")),
-        ])
-        new2 = accumulate_tool_call_chunks(acc, [
-            FakeDeltaToolCall(index=0, function=FakeFunction(arguments='{"q":"x"}')),
-        ])
+        new1 = accumulate_tool_call_chunks(
+            acc,
+            [
+                FakeDeltaToolCall(index=0, id="call_1", function=FakeFunction(name="search")),
+            ],
+        )
+        new2 = accumulate_tool_call_chunks(
+            acc,
+            [
+                FakeDeltaToolCall(index=0, function=FakeFunction(arguments='{"q":"x"}')),
+            ],
+        )
 
         assert new1 == ["search"]
         assert new2 == []
@@ -96,21 +111,33 @@ class TestAccumulateToolCallChunksMultipleTools:
         acc: dict[int, dict] = {}
 
         # First tool
-        new1 = accumulate_tool_call_chunks(acc, [
-            FakeDeltaToolCall(index=0, id="call_A", function=FakeFunction(name="read_file")),
-        ])
+        new1 = accumulate_tool_call_chunks(
+            acc,
+            [
+                FakeDeltaToolCall(index=0, id="call_A", function=FakeFunction(name="read_file")),
+            ],
+        )
         # Second tool
-        new2 = accumulate_tool_call_chunks(acc, [
-            FakeDeltaToolCall(index=1, id="call_B", function=FakeFunction(name="write_file")),
-        ])
+        new2 = accumulate_tool_call_chunks(
+            acc,
+            [
+                FakeDeltaToolCall(index=1, id="call_B", function=FakeFunction(name="write_file")),
+            ],
+        )
         # Arguments for first
-        accumulate_tool_call_chunks(acc, [
-            FakeDeltaToolCall(index=0, function=FakeFunction(arguments='{"a":1}')),
-        ])
+        accumulate_tool_call_chunks(
+            acc,
+            [
+                FakeDeltaToolCall(index=0, function=FakeFunction(arguments='{"a":1}')),
+            ],
+        )
         # Arguments for second
-        accumulate_tool_call_chunks(acc, [
-            FakeDeltaToolCall(index=1, function=FakeFunction(arguments='{"b":2}')),
-        ])
+        accumulate_tool_call_chunks(
+            acc,
+            [
+                FakeDeltaToolCall(index=1, function=FakeFunction(arguments='{"b":2}')),
+            ],
+        )
 
         assert len(acc) == 2
         assert acc[0]["name"] == "read_file"
@@ -128,17 +155,23 @@ class TestAccumulateToolCallChunksReturnsNewToolNames:
         acc: dict[int, dict] = {}
 
         # First encounter
-        new = accumulate_tool_call_chunks(acc, [
-            FakeDeltaToolCall(index=0, id="c1", function=FakeFunction(name="tool_a")),
-            FakeDeltaToolCall(index=1, id="c2", function=FakeFunction(name="tool_b")),
-        ])
+        new = accumulate_tool_call_chunks(
+            acc,
+            [
+                FakeDeltaToolCall(index=0, id="c1", function=FakeFunction(name="tool_a")),
+                FakeDeltaToolCall(index=1, id="c2", function=FakeFunction(name="tool_b")),
+            ],
+        )
         assert sorted(new) == ["tool_a", "tool_b"]
 
         # Subsequent chunks for same indices — no new names
-        new2 = accumulate_tool_call_chunks(acc, [
-            FakeDeltaToolCall(index=0, function=FakeFunction(arguments="{}")),
-            FakeDeltaToolCall(index=1, function=FakeFunction(arguments="{}")),
-        ])
+        new2 = accumulate_tool_call_chunks(
+            acc,
+            [
+                FakeDeltaToolCall(index=0, function=FakeFunction(arguments="{}")),
+                FakeDeltaToolCall(index=1, function=FakeFunction(arguments="{}")),
+            ],
+        )
         assert new2 == []
 
 
@@ -147,17 +180,23 @@ class TestAccumulateToolCallChunksEmptyName:
 
     def test_empty_name_excluded(self) -> None:
         acc: dict[int, dict] = {}
-        new = accumulate_tool_call_chunks(acc, [
-            FakeDeltaToolCall(index=0, id="call_x", function=FakeFunction(name="")),
-        ])
+        new = accumulate_tool_call_chunks(
+            acc,
+            [
+                FakeDeltaToolCall(index=0, id="call_x", function=FakeFunction(name="")),
+            ],
+        )
         assert new == []
         assert acc[0]["name"] == ""
 
     def test_none_name_excluded(self) -> None:
         acc: dict[int, dict] = {}
-        new = accumulate_tool_call_chunks(acc, [
-            FakeDeltaToolCall(index=0, id="call_y", function=FakeFunction(name=None)),
-        ])
+        new = accumulate_tool_call_chunks(
+            acc,
+            [
+                FakeDeltaToolCall(index=0, id="call_y", function=FakeFunction(name=None)),
+            ],
+        )
         assert new == []
         assert acc[0]["name"] == ""
 
@@ -181,8 +220,46 @@ class TestParseAccumulatedToolCallsValidJson:
         assert result[0]["raw_arguments"] is None
 
 
+class TestRepairJsonArguments:
+    """Tests for _repair_json_arguments — malformed JSON recovery."""
+
+    def test_valid_json_returns_parsed(self) -> None:
+        result = _repair_json_arguments('{"command": "docker ps"}')
+        assert result == {"command": "docker ps"}
+
+    def test_duplicate_json_objects_extracts_last(self) -> None:
+        raw = '{"command":"docker ps -a"{"command": "docker ps -a"}'
+        result = _repair_json_arguments(raw)
+        assert result is not None
+        assert result["command"] in ("docker ps -a", "docker ps -a")
+
+    def test_glm_complex_duplicate(self) -> None:
+        raw = (
+            '{"command":"docker ps -a --format \\"table {{.Names}}\\\\t{{.Status}}'
+            "\\\\t{{.Ports}} | grep -E 'ai-schreiber|bitcoin'\\\"\"}"
+            + '{"command": "docker ps -a --format \\"table {{.Names}}\\\\t{{.Status}}'
+            "\\\\t{{.Ports}} | grep -E 'ai-schreiber|bitcoin'\\\"\"}"
+        )
+        result = _repair_json_arguments(raw)
+        assert result is not None
+        assert "command" in result
+
+    def test_truly_broken_returns_none(self) -> None:
+        assert _repair_json_arguments("{not valid at all") is None
+
+    def test_empty_returns_none(self) -> None:
+        assert _repair_json_arguments("") is None
+        assert _repair_json_arguments(None) is None  # type: ignore[arg-type]
+
+    def test_nested_braces(self) -> None:
+        raw = '{"query": "select * from t where a = {1}"}'
+        result = _repair_json_arguments(raw)
+        assert result is not None
+        assert result["query"] == "select * from t where a = {1}"
+
+
 class TestParseAccumulatedToolCallsInvalidJson:
-    """Sets raw_arguments when JSON parse fails."""
+    """Sets raw_arguments when JSON parse fails, or repairs when possible."""
 
     def test_invalid_json_sets_raw_arguments(self) -> None:
         acc = {
@@ -202,6 +279,22 @@ class TestParseAccumulatedToolCallsInvalidJson:
 
         assert result[0]["arguments"] is None
         assert result[0]["raw_arguments"] == ""
+
+    def test_duplicate_json_repaired(self) -> None:
+        """GLM-4.7 duplicate-object pattern is repaired automatically."""
+        acc = {
+            0: {
+                "id": "c1",
+                "name": "execute_command",
+                "arguments": '{"command":"docker ps -a"{"command": "docker ps -a"}',
+            },
+        }
+        result = parse_accumulated_tool_calls(acc)
+
+        assert len(result) == 1
+        assert result[0]["arguments"] is not None
+        assert result[0]["raw_arguments"] is None
+        assert result[0]["arguments"]["command"] == "docker ps -a"
 
 
 class TestParseAccumulatedToolCallsSortedByIndex:
@@ -265,7 +358,8 @@ class TestStreamErrorBoundaryPassesStreamDisconnected:
     async def test_passthrough_stream_disconnected(self) -> None:
         parts = ["some", "data"]
         original = StreamDisconnectedError(
-            "already wrapped", partial_text="original_partial",
+            "already wrapped",
+            partial_text="original_partial",
         )
 
         with pytest.raises(StreamDisconnectedError) as exc_info:

@@ -8,7 +8,6 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
 
 from core.tooling.prompt_db import ToolPromptStore
 from core.tooling.schemas import apply_db_descriptions

@@ -7,9 +7,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import sys
-from io import StringIO
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -24,7 +21,7 @@ from core.config.cli import (
     cmd_config_set,
     cmd_config_dispatch,
 )
-from core.config.models import AnimaWorksConfig, invalidate_cache
+from core.config.models import invalidate_cache
 
 
 # ── _flatten_dict ─────────────────────────────────────────

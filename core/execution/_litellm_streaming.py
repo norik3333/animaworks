@@ -25,7 +25,14 @@ from core.execution._streaming import (
     parse_accumulated_tool_calls,
     stream_error_boundary,
 )
-from core.execution.base import StreamingThinkFilter, TokenUsage, ToolCallRecord, strip_thinking_tags
+from core.execution.base import (
+    RepetitionDetector,
+    StreamingThinkFilter,
+    TokenUsage,
+    ToolCallRecord,
+    strip_thinking_tags,
+    supports_streaming_tool_use,
+)
 from core.execution.reminder import (
     SystemReminderQueue,
     msg_context_threshold,
@@ -36,6 +43,58 @@ from core.prompt.context import ContextTracker
 from core.schemas import ImageData
 
 logger = logging.getLogger("animaworks.execution.litellm_loop")
+
+
+def _try_parse_text_tool_call(text: str, tools: list[dict[str, Any]]) -> tuple[str, str] | None:
+    """Try to parse a Python-style function call from text.
+
+    Some models (e.g. Llama 4 Maverick on Bedrock) occasionally return tool calls
+    embedded in the text content rather than in the structured ``tool_calls`` field::
+
+        read_memory_file(path="shared/users/shizuku/index.md")
+
+    This helper detects such patterns and converts them to ``(tool_name, args_json)``
+    so the caller can treat them as proper tool calls.
+
+    Returns ``(tool_name, arguments_json)`` or ``None`` if no tool call is detected.
+    """
+    import re
+
+    if not tools or not text:
+        return None
+
+    tool_names: set[str] = set()
+    for t in tools:
+        if isinstance(t, dict) and "function" in t:
+            name = t["function"].get("name")
+            if name:
+                tool_names.add(name)
+
+    if not tool_names:
+        return None
+
+    for line in text.strip().splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        m = re.fullmatch(r"(\w+)\(([^)]*)\)", line)
+        if m:
+            func_name = m.group(1)
+            if func_name in tool_names:
+                args: dict[str, Any] = {}
+                for arg_m in re.finditer(r'(\w+)=(?:"([^"]*?)"|\'([^\']*?)\')', m.group(2)):
+                    key = arg_m.group(1)
+                    val = arg_m.group(2) if arg_m.group(2) is not None else arg_m.group(3)
+                    args[key] = val
+                return func_name, _json.dumps(args, ensure_ascii=False)
+
+    return None
+
+
+async def _empty_aiter() -> AsyncGenerator[Any, None]:
+    """Yield nothing — used to skip streaming chunk loop for non-streaming responses."""
+    return
+    yield  # pragma: no cover – makes this an async generator
 
 
 class StreamingMixin:
@@ -74,12 +133,17 @@ class StreamingMixin:
         llm_kwargs = self._build_llm_kwargs()
         max_iterations = max_turns_override or self._model_config.max_turns
         _usage_acc = TokenUsage()
+        _repetition_detector = RepetitionDetector()
+        _repetition_detected = False
 
         # Inject synthetic thinking_blocks into prior assistant messages
         # that have tool_calls but no thinking_blocks.  Without this,
         # LiteLLM drops the thinking param for the entire session because
         # the Anthropic API requires thinking_blocks on every assistant
         # turn with tool_use when extended thinking is enabled.
+        # NOTE: This is an Anthropic-specific requirement.  Other providers
+        # (Qwen, OpenAI, etc.) do not need this and may leak the dummy
+        # content into model-visible context.
         _thinking_enabled = llm_kwargs.get("thinking") or llm_kwargs.get("reasoning_effort")
         if _thinking_enabled:
             _patched = 0
@@ -148,13 +212,33 @@ class StreamingMixin:
                     return
 
                 # Stream the LLM response
+                # Bedrock requires toolConfig in every request that has toolUse/toolResult
+                # in the conversation history — omitting tools causes ValidationException.
+                _has_tool_history_s = any(
+                    msg.get("role") == "tool" or (msg.get("role") == "assistant" and msg.get("tool_calls"))
+                    for msg in messages
+                )
+                _bedrock_needs_tools_s = (
+                    is_final_iteration and _has_tool_history_s and self._model_config.model.startswith("bedrock/")
+                )
+                _has_tools = (not is_final_iteration or _bedrock_needs_tools_s) and bool(tools)
+                _use_stream = True
+                if _has_tools and not supports_streaming_tool_use(self._model_config.model):
+                    _use_stream = False
+                    logger.info(
+                        "A stream: model %s does not support streaming tool use, "
+                        "falling back to non-streaming for this iteration",
+                        self._model_config.model,
+                    )
+
                 call_kwargs: dict[str, Any] = {
                     "messages": messages,
-                    "stream": True,
-                    "stream_options": {"include_usage": True},
+                    "stream": _use_stream,
                     **iter_kwargs,
                 }
-                if not is_final_iteration:
+                if _use_stream:
+                    call_kwargs["stream_options"] = {"include_usage": True}
+                if _has_tools:
                     call_kwargs["tools"] = tools
 
                 response = cast(Any, await litellm.acompletion(**call_kwargs))
@@ -169,8 +253,72 @@ class StreamingMixin:
                 _reasoning_parts: list[str] = []
                 _think_filter = StreamingThinkFilter()
 
-                async for chunk in response:
+                # ── Non-streaming fallback: convert response to streaming events ──
+                if not _use_stream:
+                    msg_obj = response.choices[0].message
+                    if msg_obj.content:
+                        thinking_text, response_text = strip_thinking_tags(msg_obj.content)
+                        if thinking_text:
+                            yield {"type": "thinking_start"}
+                            yield {"type": "thinking_delta", "text": thinking_text}
+                            yield {"type": "thinking_end"}
+                            _reasoning_seen = True
+                            _reasoning_parts.append(thinking_text)
+                        if response_text:
+                            # Detect text-format tool calls.
+                            # Llama 4 Maverick sometimes returns function calls as plain
+                            # text (e.g. `read_memory_file(path="...")`) instead of using
+                            # the structured tool_calls field.  Parse and treat as a real
+                            # tool call so the execution loop can actually run the tool.
+                            _text_tc: tuple[str, str] | None = None
+                            if not msg_obj.tool_calls and iter_tools:
+                                _text_tc = _try_parse_text_tool_call(response_text, iter_tools)
+                            if _text_tc:
+                                _tc_name, _tc_args_json = _text_tc
+                                _tc_id = f"text_call_{iteration}_{id(_tc_name) % 0xFFFF:04x}"
+                                tool_calls_acc[0] = {
+                                    "id": _tc_id,
+                                    "name": _tc_name,
+                                    "arguments": _tc_args_json,
+                                }
+                                yield {"type": "tool_start", "tool_name": _tc_name, "tool_id": _tc_id}
+                                logger.info(
+                                    "A stream: text-format tool call parsed: %s args=%s",
+                                    _tc_name,
+                                    _tc_args_json,
+                                )
+                            else:
+                                iter_text_parts.append(response_text)
+                                yield {"type": "text_delta", "text": response_text}
+                    if msg_obj.tool_calls:
+                        for idx, tc in enumerate(msg_obj.tool_calls):
+                            tc_id = tc.id or f"call_{idx}"
+                            tc_name = tc.function.name
+                            tc_args = tc.function.arguments or "{}"
+                            tool_calls_acc[idx] = {
+                                "id": tc_id,
+                                "name": tc_name,
+                                "arguments": tc_args,
+                            }
+                            yield {"type": "tool_start", "tool_name": tc_name, "tool_id": tc_id}
+                    finish_reason = response.choices[0].finish_reason
+                    if hasattr(response, "usage") and response.usage:
+                        usage_data = {
+                            "input_tokens": response.usage.prompt_tokens or 0,
+                            "output_tokens": response.usage.completion_tokens or 0,
+                        }
+                    _chunk_count = 1
+
+                async for chunk in response if _use_stream else _empty_aiter():
                     _chunk_count += 1
+                    # DEBUG: raw chunk inspection (first 5 chunks)
+                    if _chunk_count <= 5:
+                        logger.info(
+                            "A stream raw chunk #%d: type=%s choices=%s",
+                            _chunk_count,
+                            type(chunk).__name__,
+                            repr(chunk.choices[:1]) if chunk.choices else "[]",
+                        )
                     choice = chunk.choices[0] if chunk.choices else None
                     if choice is None:
                         if hasattr(chunk, "usage") and chunk.usage:
@@ -195,6 +343,18 @@ class StreamingMixin:
                         if response_text:
                             iter_text_parts.append(response_text)
                             yield {"type": "text_delta", "text": response_text}
+                            if _repetition_detector.feed(response_text):
+                                logger.warning(
+                                    "A stream: degenerate repetition detected at iteration=%d, "
+                                    "tokens=%d — truncating response",
+                                    iteration,
+                                    len(_repetition_detector._tokens),
+                                )
+                                _truncation_msg = "\n\n[Response truncated: repetition detected]"
+                                iter_text_parts.append(_truncation_msg)
+                                yield {"type": "text_delta", "text": _truncation_msg}
+                                _repetition_detected = True
+                                break
 
                     # Reasoning content → thinking_delta events
                     reasoning = getattr(delta, "reasoning_content", None)
@@ -298,16 +458,52 @@ class StreamingMixin:
 
                 flushed = _think_filter.flush()
                 if flushed:
-                    iter_text_parts.append(flushed)
-                    yield {"type": "text_delta", "text": flushed}
+                    if _reasoning_seen:
+                        yield {"type": "thinking_delta", "text": flushed}
+                    else:
+                        iter_text_parts.append(flushed)
+                        yield {"type": "text_delta", "text": flushed}
 
                 iter_text = "".join(iter_text_parts)
+                # DEBUG: log thinking vs content for diagnosis
+                if _reasoning_seen or _reasoning_parts:
+                    logger.info(
+                        "A stream thinking debug: reasoning_chars=%d, content_chars=%d, "
+                        "chunks=%d, content_preview=%.100r",
+                        sum(len(p) for p in _reasoning_parts),
+                        len(iter_text),
+                        _chunk_count,
+                        iter_text[:100],
+                    )
+                elif iter_text and len(iter_text) < 30:
+                    logger.info(
+                        "A stream short response: chars=%d, chunks=%d, content=%.100r, think_filter_state=%s",
+                        len(iter_text),
+                        _chunk_count,
+                        iter_text,
+                        _think_filter._state if hasattr(_think_filter, "_state") else "N/A",
+                    )
                 if iter_text:
                     all_response_text.append(iter_text)
 
-                # ── No tool calls: final response ──
-                if not tool_calls_acc:
+                # ── No tool calls (or repetition detected): final response ──
+                if not tool_calls_acc or _repetition_detected:
                     full_text = "\n".join(all_response_text)
+                    # Safety net: strip any residual <think> tags that the
+                    # streaming filter missed (e.g. vLLM returning thinking
+                    # in content without proper <think> opening tag).
+                    _leaked_think, _clean = strip_thinking_tags(full_text)
+                    if _leaked_think:
+                        logger.info(
+                            "A stream: post-stream strip_thinking_tags caught leaked thinking (%d chars)",
+                            len(_leaked_think),
+                        )
+                        full_text = _clean
+                        if not _reasoning_seen:
+                            _reasoning_seen = True
+                            yield {"type": "thinking_start"}
+                        yield {"type": "thinking_delta", "text": _leaked_think}
+                        yield {"type": "thinking_end"}
                     logger.debug(
                         "A stream final response at iteration=%d",
                         iteration,
@@ -329,20 +525,24 @@ class StreamingMixin:
                     ", ".join(tc["name"] for tc in parsed_calls),
                 )
 
-                # Reconstruct assistant message for conversation history
+                # Reconstruct assistant message for conversation history.
+                # When arguments failed to parse, use "{}" instead of the
+                # raw malformed string — sending invalid JSON in the
+                # conversation history causes some backends (e.g. vLLM) to
+                # reject the entire request on the next iteration.
                 assistant_tool_calls = []
                 for tc in parsed_calls:
+                    if tc["arguments"] is not None:
+                        args_str = _json.dumps(tc["arguments"], ensure_ascii=False)
+                    else:
+                        args_str = "{}"
                     assistant_tool_calls.append(
                         {
                             "id": tc["id"],
                             "type": "function",
                             "function": {
                                 "name": tc["name"],
-                                "arguments": (
-                                    _json.dumps(tc["arguments"], ensure_ascii=False)
-                                    if tc["arguments"] is not None
-                                    else tc.get("raw_arguments", "")
-                                ),
+                                "arguments": args_str,
                             },
                         }
                     )
@@ -422,6 +622,7 @@ class StreamingMixin:
         llm_kwargs = self._build_llm_kwargs()
         max_iterations = max_turns_override or self._model_config.max_turns
         _usage_acc_ol = TokenUsage()
+        _repetition_detector = RepetitionDetector()
 
         async with stream_error_boundary(
             all_response_text,
@@ -484,7 +685,16 @@ class StreamingMixin:
                     "messages": messages,
                     **iter_kwargs,
                 }
-                if not is_final_iteration:
+                # Bedrock requires toolConfig in every request that has toolUse/toolResult
+                # in the conversation history — omitting tools causes ValidationException.
+                _has_tool_history_ol = any(
+                    msg.get("role") == "tool" or (msg.get("role") == "assistant" and msg.get("tool_calls"))
+                    for msg in messages
+                )
+                _bedrock_needs_tools_ol = (
+                    is_final_iteration and _has_tool_history_ol and self._model_config.model.startswith("bedrock/")
+                )
+                if not is_final_iteration or _bedrock_needs_tools_ol:
                     call_kwargs["tools"] = tools
 
                 response = cast(Any, await litellm.acompletion(**call_kwargs))
@@ -519,6 +729,24 @@ class StreamingMixin:
                     yield {"type": "thinking_start"}
                     yield {"type": "thinking_delta", "text": thinking}
                     yield {"type": "thinking_end"}
+                if iter_text and _repetition_detector.check_full_text(iter_text):
+                    logger.warning(
+                        "A ollama stream: degenerate repetition detected at iteration=%d — truncating",
+                        iteration,
+                    )
+                    _truncation_msg = "\n\n[Response truncated: repetition detected]"
+                    iter_text += _truncation_msg
+                    all_response_text.append(iter_text)
+                    yield {"type": "text_delta", "text": iter_text}
+                    full_text = "\n".join(all_response_text)
+                    yield {
+                        "type": "done",
+                        "full_text": full_text,
+                        "result_message": None,
+                        "tool_call_records": [asdict(r) for r in all_tool_records],
+                        "usage": _usage_acc_ol.to_dict(),
+                    }
+                    return
                 if iter_text:
                     all_response_text.append(iter_text)
                     yield {"type": "text_delta", "text": iter_text}

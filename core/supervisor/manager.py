@@ -33,7 +33,7 @@ from core.supervisor._mgr_reconcile import ReconcileMixin
 from core.supervisor._mgr_scheduler import SchedulerMixin
 from core.supervisor.ipc import IPCResponse
 from core.supervisor.process_handle import ProcessHandle, ProcessState
-from core.time_utils import ensure_aware, now_jst
+from core.time_utils import ensure_aware, now_local
 
 logger = logging.getLogger(__name__)
 
@@ -121,6 +121,8 @@ class ProcessSupervisor(HealthMixin, ReconcileMixin, SchedulerMixin):
         self._bootstrapping: set[str] = set()
         self._bootstrap_retry_counts: dict[str, int] = {}
         self._bootstrap_max_retries: int = 3
+        self._bootstrap_retries_file = self.animas_dir / ".bootstrap_retries.json"
+        self._load_bootstrap_retries()
 
         # Maximum streaming duration before hang detection (seconds).
         # Defaults to 1800s (30 min) to accommodate long tool executions
@@ -145,6 +147,27 @@ class ProcessSupervisor(HealthMixin, ReconcileMixin, SchedulerMixin):
     def is_scheduler_running(self) -> bool:
         """Return whether the system scheduler is running."""
         return self._scheduler_running
+
+    def _load_bootstrap_retries(self) -> None:
+        """Load persisted bootstrap retry counts from disk."""
+        try:
+            if self._bootstrap_retries_file.exists():
+                data = json.loads(self._bootstrap_retries_file.read_text())
+                if isinstance(data, dict):
+                    self._bootstrap_retry_counts = {k: int(v) for k, v in data.items()}
+                    logger.info(
+                        "Loaded bootstrap retry counts: %s",
+                        self._bootstrap_retry_counts,
+                    )
+        except Exception:
+            logger.warning("Failed to load bootstrap retries file", exc_info=True)
+
+    def _save_bootstrap_retries(self) -> None:
+        """Persist bootstrap retry counts to disk."""
+        try:
+            self._bootstrap_retries_file.write_text(json.dumps(self._bootstrap_retry_counts, indent=2))
+        except Exception:
+            logger.warning("Failed to save bootstrap retries file", exc_info=True)
 
     # ── Process Lifecycle ─────────────────────────────────────────
 
@@ -287,10 +310,6 @@ class ProcessSupervisor(HealthMixin, ReconcileMixin, SchedulerMixin):
         finally:
             self._starting.discard(anima_name)
 
-    def is_bootstrapping(self, anima_name: str) -> bool:
-        """Check if an anima is currently bootstrapping."""
-        return anima_name in self._bootstrapping
-
     async def _run_bootstrap(self, anima_name: str) -> None:
         """Run bootstrap for an anima in the background.
 
@@ -401,6 +420,7 @@ class ProcessSupervisor(HealthMixin, ReconcileMixin, SchedulerMixin):
                 self._bootstrap_retry_counts.pop(anima_name, None)
             else:
                 self._bootstrap_retry_counts[anima_name] = retry_count + 1
+            self._save_bootstrap_retries()
             if was_bootstrapping:
                 handle = self.processes.get(anima_name)
                 if not handle or handle.state != ProcessState.RUNNING:
@@ -670,7 +690,7 @@ class ProcessSupervisor(HealthMixin, ReconcileMixin, SchedulerMixin):
         if not handle:
             return {"status": "not_found"}
 
-        uptime = (now_jst() - ensure_aware(handle.stats.started_at)).total_seconds()
+        uptime = (now_local() - ensure_aware(handle.stats.started_at)).total_seconds()
 
         return {
             "status": "bootstrapping" if self.is_bootstrapping(anima_name) else handle.state.value,

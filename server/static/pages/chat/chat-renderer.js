@@ -11,6 +11,8 @@ import {
   renderLiveBubble,
   renderStreamingBubbleInner,
   updateStreamingZone,
+  renderCollapsibleSession as _sharedRenderCollapsibleSession,
+  bindCollapsibleSessionHandlers as _sharedBindCollapsibleSessionHandlers,
 } from "../../shared/chat/render-utils.js";
 import { createScrollObserver } from "../../shared/chat/scroll-observer.js";
 import { mergePolledHistory } from "../../shared/chat/history-loader.js";
@@ -252,12 +254,38 @@ export function createChatRenderer(ctx) {
 
     const prevScrollHeight = messagesEl.scrollHeight;
 
+    const opts = _renderOpts();
     let sessionsHtml = "";
-    for (let si = 0; si < hs.sessions.length; si++) {
+    let si = 0;
+
+    const _bgOnly = (s) => s.messages?.length > 0 && s.messages.every(m => m.role === "system");
+
+    while (si < hs.sessions.length) {
       const session = hs.sessions[si];
-      sessionsHtml += renderSessionDivider(session, si === 0);
-      if (session.messages) {
-        for (const msg of session.messages) sessionsHtml += renderHistoryMessage(msg);
+      const trigger = session.trigger || "chat";
+
+      if (trigger === "heartbeat" && _bgOnly(session)) {
+        sessionsHtml += _sharedRenderCollapsibleSession([session], "heartbeat", opts);
+        si++;
+      } else if (trigger === "cron" && _bgOnly(session)) {
+        const cronGroup = [session];
+        while (si + 1 < hs.sessions.length
+          && (hs.sessions[si + 1].trigger || "chat") === "cron"
+          && _bgOnly(hs.sessions[si + 1])) {
+          si++;
+          cronGroup.push(hs.sessions[si]);
+        }
+        sessionsHtml += _sharedRenderCollapsibleSession(cronGroup, "cron", opts);
+        si++;
+      } else if (trigger === "task" && _bgOnly(session)) {
+        sessionsHtml += _sharedRenderCollapsibleSession([session], "task", opts);
+        si++;
+      } else {
+        sessionsHtml += renderSessionDivider(session, si === 0);
+        if (session.messages) {
+          for (const msg of session.messages) sessionsHtml += renderHistoryMessage(msg);
+        }
+        si++;
       }
     }
 
@@ -273,13 +301,13 @@ export function createChatRenderer(ctx) {
         if (hs.sessions.length > 0) {
           liveHtml += `<div class="session-divider"><span class="session-divider-label">${t("chat.current_session")}</span></div>`;
         }
-        const opts = _renderOpts();
         liveHtml += history.map(m => renderLiveBubble(m, opts)).join("");
       }
     }
 
     messagesEl.innerHTML = topHtml + sessionsHtml + liveHtml;
     bindToolCallHandlers(messagesEl);
+    _sharedBindCollapsibleSessionHandlers(messagesEl);
     _sharedBindBubbleActionHandlers(messagesEl);
     if (window.lucide) lucide.createIcons({ nodes: [messagesEl] });
     initTextArtifactHandlers();
@@ -306,7 +334,7 @@ export function createChatRenderer(ctx) {
     if (!bubble) return;
 
     updateStreamingZone(bubble, msg, _renderOpts(), zone);
-    if (!_userDetached) {
+    if (!_userDetached && zone !== "thinking") {
       requestAnimationFrame(() => { messagesEl.scrollTop = messagesEl.scrollHeight; });
     }
   }

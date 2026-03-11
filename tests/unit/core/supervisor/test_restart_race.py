@@ -10,14 +10,13 @@ child processes.
 
 from __future__ import annotations
 
-import asyncio
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from core.exceptions import ProcessError
-from core.supervisor.manager import ProcessSupervisor, RestartPolicy, HealthConfig
+from core.supervisor.manager import ProcessSupervisor
 
 
 @pytest.fixture

@@ -9,6 +9,7 @@ Validates:
 - Orphaned processing/ files are recovered to failed/ on startup
 - i18n template for task_fail_notify
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -47,9 +48,11 @@ def _make_executor(tmp_path: Path) -> PendingTaskExecutor:
 
 def _stop_after_first(executor: PendingTaskExecutor):
     """Return a mock for asyncio.wait_for that stops the loop after one iteration."""
+
     async def _mock(coro, *, timeout):
         executor._shutdown_event.set()
-        raise asyncio.TimeoutError
+        raise TimeoutError
+
     return _mock
 
 
@@ -69,8 +72,7 @@ class TestCommandPendingFileLifecycle:
         task = {"task_id": "cmd-1", "tool_name": "test_tool", "subcommand": "", "raw_args": []}
         (pending_dir / "cmd-1.json").write_text(json.dumps(task))
 
-        with patch("core.supervisor.pending_executor.asyncio.wait_for",
-                    side_effect=_stop_after_first(executor)):
+        with patch("core.supervisor.pending_executor.asyncio.wait_for", side_effect=_stop_after_first(executor)):
             await executor.watcher_loop()
 
         assert not (pending_dir / "cmd-1.json").exists()
@@ -94,8 +96,7 @@ class TestCommandPendingFileLifecycle:
 
         executor.execute_pending_task = failing_execute  # type: ignore[assignment]
 
-        with patch("core.supervisor.pending_executor.asyncio.wait_for",
-                    side_effect=_stop_after_first(executor)):
+        with patch("core.supervisor.pending_executor.asyncio.wait_for", side_effect=_stop_after_first(executor)):
             await executor.watcher_loop()
 
         failed_dir = pending_dir / "failed"
@@ -111,8 +112,7 @@ class TestCommandPendingFileLifecycle:
 
         (pending_dir / "bad.json").write_text("{invalid")
 
-        with patch("core.supervisor.pending_executor.asyncio.wait_for",
-                    side_effect=_stop_after_first(executor)):
+        with patch("core.supervisor.pending_executor.asyncio.wait_for", side_effect=_stop_after_first(executor)):
             await executor.watcher_loop()
 
         assert not (pending_dir / "bad.json").exists()
@@ -135,8 +135,7 @@ class TestLLMPendingFileLifecycle:
         (llm_dir / "llm-1.json").write_text(json.dumps(task))
 
         with patch.object(executor, "execute_pending_task", new_callable=AsyncMock):
-            with patch("core.supervisor.pending_executor.asyncio.wait_for",
-                        side_effect=_stop_after_first(executor)):
+            with patch("core.supervisor.pending_executor.asyncio.wait_for", side_effect=_stop_after_first(executor)):
                 await executor.watcher_loop()
 
         assert not (llm_dir / "llm-1.json").exists()
@@ -157,8 +156,7 @@ class TestLLMPendingFileLifecycle:
 
         executor.execute_pending_task = failing_execute  # type: ignore[assignment]
 
-        with patch("core.supervisor.pending_executor.asyncio.wait_for",
-                    side_effect=_stop_after_first(executor)):
+        with patch("core.supervisor.pending_executor.asyncio.wait_for", side_effect=_stop_after_first(executor)):
             await executor.watcher_loop()
 
         failed_dir = llm_dir / "failed"
@@ -210,8 +208,7 @@ class TestRecoverProcessing:
         llm_failed.mkdir(parents=True)
         (llm_processing / "orphan-llm.json").write_text('{"task_id":"ol"}')
 
-        with patch("core.supervisor.pending_executor.asyncio.wait_for",
-                    side_effect=_stop_after_first(executor)):
+        with patch("core.supervisor.pending_executor.asyncio.wait_for", side_effect=_stop_after_first(executor)):
             await executor.watcher_loop()
 
         assert (cmd_failed / "orphan-cmd.json").exists()
@@ -329,6 +326,7 @@ class TestI18nTemplate:
 
     def test_ja_template(self) -> None:
         from core.i18n import t
+
         result = t(
             "pending_executor.task_fail_notify",
             locale="ja",
@@ -342,6 +340,7 @@ class TestI18nTemplate:
 
     def test_en_template(self) -> None:
         from core.i18n import t
+
         result = t(
             "pending_executor.task_fail_notify",
             locale="en",

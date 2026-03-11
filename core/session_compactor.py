@@ -62,6 +62,9 @@ class SessionCompactor:
         if key in self._timers:
             self._timers[key].cancel()
             del self._timers[key]
+            logger.debug("SessionCompactor rescheduled: %s (%.1f min)", key, self._idle_minutes)
+        else:
+            logger.debug("SessionCompactor scheduled: %s (%.1f min)", key, self._idle_minutes)
 
         while len(self._timers) >= _MAX_TIMERS:
             oldest = next(iter(self._timers))
@@ -81,6 +84,7 @@ class SessionCompactor:
     def _fire(self, key: tuple[str, str], callback: Callable[[], None]) -> None:
         """Invoked when timer fires; removes handle and invokes callback."""
         self._timers.pop(key, None)
+        logger.info("SessionCompactor timer fired: %s", key)
         try:
             callback()
         except Exception:
@@ -92,6 +96,7 @@ class SessionCompactor:
         if key in self._timers:
             self._timers[key].cancel()
             del self._timers[key]
+            logger.debug("SessionCompactor cancelled: %s", key)
 
     def cancel_all_for_anima(self, anima_name: str) -> None:
         """Cancel all timers for an anima (e.g. on anima stop)."""
@@ -111,15 +116,25 @@ class SessionCompactor:
 
 
 async def _compact_mode_s(anima: DigitalAnima, thread_id: str) -> bool:
-    """Mode S: SDK compact_session (resume + /compact)."""
+    """Mode S: SDK compact_session (resume + /compact).
+
+    Only chat sessions support idle compaction — background triggers
+    (heartbeat, cron, task, inbox) always start fresh and have no
+    session to compact.
+    """
+    from core.execution._sdk_session import SESSION_TYPE_CHAT
+
+    logger.debug("_compact_mode_s: entry (anima=%s, thread=%s)", anima.name, thread_id)
     executor = anima.agent._executor
     if not hasattr(executor, "compact_session"):
+        logger.debug("_compact_mode_s: executor has no compact_session, skipping")
         return False
     result = await executor.compact_session(
         anima_dir=anima.anima_dir,
-        session_type="chat",
+        session_type=SESSION_TYPE_CHAT,
         thread_id=thread_id,
     )
+    logger.debug("_compact_mode_s: exit (result=%s)", result)
     return result
 
 
@@ -127,9 +142,11 @@ async def _compact_mode_a(anima: DigitalAnima, thread_id: str) -> bool:
     """Mode A: conversation compress_if_needed + finalize_if_session_ended."""
     from core.memory.conversation import ConversationMemory
 
+    logger.debug("_compact_mode_a: entry (anima=%s, thread=%s)", anima.name, thread_id)
     conv = ConversationMemory(anima.anima_dir, anima.agent.model_config, thread_id=thread_id)
     compressed = await conv.compress_if_needed()
     await conv.finalize_if_session_ended()
+    logger.debug("_compact_mode_a: exit (compressed=%s)", compressed)
     return compressed
 
 
@@ -143,8 +160,9 @@ async def _compact_mode_c(anima: DigitalAnima, thread_id: str) -> bool:
     from core.execution.codex_sdk import _clear_thread_id
     from core.memory.conversation import ConversationMemory
     from core.memory.shortterm import SessionState, ShortTermMemory
-    from core.time_utils import now_jst
+    from core.time_utils import now_local
 
+    logger.debug("_compact_mode_c: entry (anima=%s, thread=%s)", anima.name, thread_id)
     conv = ConversationMemory(anima.anima_dir, anima.agent.model_config, thread_id=thread_id)
     await conv.compress_if_needed()
 
@@ -160,7 +178,7 @@ async def _compact_mode_c(anima: DigitalAnima, thread_id: str) -> bool:
     shortterm.save(
         SessionState(
             accumulated_response="\n".join(summary_parts)[:4000],
-            timestamp=now_jst().isoformat(),
+            timestamp=now_local().isoformat(),
             trigger="idle_compaction",
             notes="Auto-saved before Codex thread discard",
         )
@@ -168,6 +186,7 @@ async def _compact_mode_c(anima: DigitalAnima, thread_id: str) -> bool:
 
     _clear_thread_id(anima.anima_dir, "chat", thread_id)
     await conv.finalize_if_session_ended()
+    logger.debug("_compact_mode_c: exit (success)")
     return True
 
 
@@ -182,6 +201,12 @@ async def run_idle_compaction(anima: DigitalAnima, thread_id: str) -> None:
     event on success.
     """
     mode = anima.agent.execution_mode
+    logger.info(
+        "run_idle_compaction: start (anima=%s, mode=%s, thread=%s)",
+        anima.name,
+        mode,
+        thread_id,
+    )
     lock = anima._get_thread_lock(thread_id)
 
     try:
@@ -198,6 +223,11 @@ async def run_idle_compaction(anima: DigitalAnima, thread_id: str) -> None:
         if mode == "s":
             ok = await _compact_mode_s(anima, thread_id)
             if not ok:
+                logger.info(
+                    "Mode S compaction returned False for %s/%s; falling back to Mode A",
+                    anima.name,
+                    thread_id,
+                )
                 await _compact_mode_a(anima, thread_id)
         elif mode == "a":
             await _compact_mode_a(anima, thread_id)
@@ -213,6 +243,12 @@ async def run_idle_compaction(anima: DigitalAnima, thread_id: str) -> None:
     finally:
         lock.release()
 
+    logger.info(
+        "run_idle_compaction: success (anima=%s, mode=%s, thread=%s)",
+        anima.name,
+        mode,
+        thread_id,
+    )
     try:
         from core.memory.activity import ActivityLogger
 
@@ -223,4 +259,4 @@ async def run_idle_compaction(anima: DigitalAnima, thread_id: str) -> None:
             meta={"mode": mode, "thread_id": thread_id},
         )
     except Exception:
-        logger.debug("Failed to log idle_compaction activity", exc_info=True)
+        logger.warning("Failed to log idle_compaction activity", exc_info=True)

@@ -37,10 +37,7 @@ def is_task_creation(entry: dict) -> bool:
     content = entry.get("content", "")
     args = entry.get("meta", {}).get("args", {})
     paths = [content, args.get("file_path", ""), args.get("path", "")]
-    for p in paths:
-        if any(needle in str(p) for needle in TASK_CREATION_PATHS):
-            return True
-    return False
+    return any(any(needle in str(p) for needle in TASK_CREATION_PATHS) for p in paths)
 
 
 def analyze_anima(anima_dir: Path, cutoff: datetime) -> dict | None:

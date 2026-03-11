@@ -13,7 +13,6 @@ import argparse
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 
 # ── Server uvicorn config E2E ─────────────────────────────────

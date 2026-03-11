@@ -8,17 +8,13 @@ All tests use mocks — no Codex CLI binary or API key required.
 """
 
 import asyncio
-import json
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from core.execution.codex_sdk import (
     CodexSDKExecutor,
-    _escape_toml_string,
     _extract_item_text,
     _extract_tool_records,
     _get_thread_id,
@@ -30,7 +26,7 @@ from core.execution.codex_sdk import (
     _usage_to_dict,
     clear_codex_thread_ids,
 )
-from core.execution.base import ExecutionResult, ToolCallRecord
+from core.execution.base import ExecutionResult
 from core.prompt.context import ContextTracker
 
 
@@ -520,7 +516,7 @@ class TestStreamingExecution:
 
 class TestModeResolution:
     def test_resolve_execution_mode_codex_pattern(self):
-        from core.config.models import resolve_execution_mode, load_config
+        from core.config.models import resolve_execution_mode
         with patch("core.config.models.load_config") as mock_load:
             mock_config = MagicMock()
             mock_config.model_modes = {}

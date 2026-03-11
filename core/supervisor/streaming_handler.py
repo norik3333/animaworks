@@ -56,20 +56,19 @@ class StreamingIPCHandler:
         self._anima_name = anima_name
         self._anima_dir = anima_dir
 
-    def _clear_stream_abort_state(self, reason: str) -> None:
-        """Clear session IDs and checkpoint after abnormal stream termination."""
-        try:
-            from core.execution.agent_sdk import clear_session_ids
+    def _clear_stream_abort_state(self, reason: str, thread_id: str = "default") -> None:
+        """Clear checkpoint after abnormal stream termination.
 
-            clear_session_ids(self._anima_dir)
-            logger.info("Session IDs cleared: %s", reason)
-        except Exception as e:
-            logger.warning("Failed to clear session IDs: %s", e)
+        Session ID is intentionally preserved so that the next chat
+        message can resume from the compacted (or pre-compaction) state.
+        Only the streaming checkpoint is cleared.
+        """
+        logger.info("Stream abort: %s (thread=%s) — session ID preserved", reason, thread_id)
         try:
             from core.memory.shortterm import ShortTermMemory
 
-            ShortTermMemory(self._anima_dir).clear_checkpoint()
-            logger.info("Stream checkpoint cleared: %s", reason)
+            ShortTermMemory(self._anima_dir, thread_id=thread_id).clear_checkpoint()
+            logger.info("Stream checkpoint cleared: %s (thread=%s)", reason, thread_id)
         except Exception as e:
             logger.warning("Failed to clear checkpoint: %s", e)
 
@@ -101,6 +100,7 @@ class StreamingIPCHandler:
         images = request.params.get("images") or None
         attachment_paths = request.params.get("attachment_paths") or None
         thread_id = request.params.get("thread_id", "default")
+        source = request.params.get("source", "")
         full_response = ""
 
         # Track bootstrap state to detect completion
@@ -141,6 +141,7 @@ class StreamingIPCHandler:
                     images=images,
                     attachment_paths=attachment_paths,
                     thread_id=thread_id,
+                    source=source,
                 ):
                     event_type = chunk.get("type", "unknown")
 
@@ -224,7 +225,7 @@ class StreamingIPCHandler:
                         )
 
                 # Stream ended without cycle_done — done=False切断パス
-                self._clear_stream_abort_state("stream ended without cycle_done (done=False)")
+                self._clear_stream_abort_state("stream ended without cycle_done (done=False)", thread_id)
                 await _enqueue(
                     IPCResponse(
                         id=request.id,
@@ -239,7 +240,7 @@ class StreamingIPCHandler:
 
             except TimeoutError as e:
                 logger.error("Timeout in streaming process_message: %s", e)
-                self._clear_stream_abort_state("timeout")
+                self._clear_stream_abort_state("timeout", thread_id)
                 await queue.put(
                     IPCResponse(
                         id=request.id,
@@ -254,7 +255,7 @@ class StreamingIPCHandler:
                     "Error in streaming process_message: %s",
                     e,
                 )
-                self._clear_stream_abort_state("exception")
+                self._clear_stream_abort_state("exception", thread_id)
                 await queue.put(
                     IPCResponse(
                         id=request.id,

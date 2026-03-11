@@ -69,6 +69,47 @@ def accumulate_tool_call_chunks(
     return new_tools
 
 
+def _repair_json_arguments(raw: str) -> dict[str, Any] | None:
+    """Attempt to extract valid JSON from a malformed arguments string.
+
+    Some models (e.g. GLM-4.7 on vLLM with thinking enabled) produce
+    duplicate JSON objects concatenated without a separator::
+
+        {"command":"docker ps -a"{"command": "docker ps -a"}
+
+    This helper scans for ``{`` characters and tries ``json.loads``
+    starting from each one, returning the first valid parse result.
+    """
+    if not raw or not raw.strip():
+        return None
+    # Try each '{' as a potential start of a valid JSON object
+    for i in range(len(raw)):
+        if raw[i] != "{":
+            continue
+        candidate = raw[i:]
+        # Try parsing progressively shorter suffixes to find valid JSON
+        depth = 0
+        for j, ch in enumerate(candidate):
+            if ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    try:
+                        parsed = _json.loads(candidate[: j + 1])
+                        if isinstance(parsed, dict):
+                            logger.info(
+                                "Repaired malformed tool-call JSON (offset=%d, len=%d)",
+                                i,
+                                j + 1,
+                            )
+                            return parsed
+                    except (_json.JSONDecodeError, TypeError):
+                        pass
+                    break
+    return None
+
+
 def parse_accumulated_tool_calls(
     tool_calls_acc: dict[int, dict[str, Any]],
 ) -> list[dict[str, Any]]:
@@ -77,6 +118,10 @@ def parse_accumulated_tool_calls(
     Returns a list of dicts with ``id``, ``name``, and ``arguments``
     (parsed from JSON).  Entries with unparseable arguments are
     included with the raw string under ``raw_arguments``.
+
+    When ``json.loads`` fails, :func:`_repair_json_arguments` attempts
+    to extract a valid JSON object from the malformed string (handles
+    duplicate-object concatenation produced by some models).
     """
     result: list[dict[str, Any]] = []
     for _idx in sorted(tool_calls_acc):
@@ -84,7 +129,13 @@ def parse_accumulated_tool_calls(
         try:
             args = _json.loads(entry["arguments"])
         except (_json.JSONDecodeError, TypeError):
-            args = None
+            args = _repair_json_arguments(entry["arguments"])
+            if args is None:
+                logger.warning(
+                    "Unrepairable tool-call arguments for %s: %.200s",
+                    entry.get("name", "?"),
+                    entry["arguments"],
+                )
         result.append(
             {
                 "id": entry["id"],

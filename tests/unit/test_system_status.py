@@ -8,14 +8,13 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import MagicMock
 
-import pytest
 from httpx import ASGITransport, AsyncClient
 
 
 def _make_test_app(
     anima_names: list[str] | None = None,
     scheduler: MagicMock | None | object = ...,
-) -> "FastAPI":  # noqa: F821
+) -> FastAPI:  # noqa: F821
     """Create a minimal FastAPI app with the system router for testing.
 
     Args:

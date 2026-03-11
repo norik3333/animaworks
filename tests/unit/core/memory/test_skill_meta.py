@@ -7,23 +7,23 @@ Covers:
 - MemoryManager._extract_skill_meta()  (core/memory/manager.py)
 - match_skills_by_description()        (core/memory/manager.py)
 """
+
 from __future__ import annotations
 
 from pathlib import Path
 
 import pytest
 
-from core.schemas import SkillMeta
 from core.memory.manager import (
     MemoryManager,
-    match_skills_by_description,
     _extract_bracket_keywords,
     _extract_comma_keywords,
     _match_tier1,
     _match_tier2,
+    match_skills_by_description,
 )
+from core.schemas import SkillMeta
 from core.tooling.handler import _validate_skill_format
-
 
 # ── _extract_skill_meta ──────────────────────────────────
 
@@ -70,15 +70,7 @@ class TestExtractSkillMeta:
         """Legacy format with ## 概要 extracts first line as description."""
         skill_file = tmp_path / "legacy.md"
         skill_file.write_text(
-            "# レガシースキル\n"
-            "\n"
-            "## 概要\n"
-            "\n"
-            "cronジョブの設定と管理を行うスキル\n"
-            "\n"
-            "## 手順\n"
-            "\n"
-            "1. 手順内容\n",
+            "# レガシースキル\n\n## 概要\n\ncronジョブの設定と管理を行うスキル\n\n## 手順\n\n1. 手順内容\n",
             encoding="utf-8",
         )
 
@@ -113,11 +105,7 @@ class TestExtractSkillMeta:
         """is_common flag is correctly set when specified."""
         skill_file = tmp_path / "shared.md"
         skill_file.write_text(
-            "---\n"
-            "name: shared-skill\n"
-            "description: 共有スキル\n"
-            "---\n"
-            "\nContent.\n",
+            "---\nname: shared-skill\ndescription: 共有スキル\n---\n\nContent.\n",
             encoding="utf-8",
         )
 
@@ -157,11 +145,13 @@ class TestMatchSkillsByDescription:
         )
 
     def test_extract_bracket_keywords(
-        self, skill_with_keywords: SkillMeta,
+        self,
+        skill_with_keywords: SkillMeta,
     ) -> None:
         """「」-delimited keywords in description trigger a match."""
         result = match_skills_by_description(
-            "cron設定を確認してください", [skill_with_keywords],
+            "cron設定を確認してください",
+            [skill_with_keywords],
         )
         assert len(result) == 1
         assert result[0].name == "cron_setup"
@@ -188,28 +178,33 @@ class TestMatchSkillsByDescription:
         # 'cron設定' is not a substring of 'cronに追加して' → no match
         # But '定期実行' or 'cron設定' needs to appear in the message
         result = match_skills_by_description(
-            "cron設定をしてください", [skill_with_keywords],
+            "cron設定をしてください",
+            [skill_with_keywords],
         )
         assert len(result) == 1
 
     def test_no_match(self, skill_with_keywords: SkillMeta) -> None:
         """Message with no keyword overlap returns empty list."""
         result = match_skills_by_description(
-            "おはよう", [skill_with_keywords],
+            "おはよう",
+            [skill_with_keywords],
         )
         assert result == []
 
     def test_skills_without_bracket_keywords_never_match(
-        self, skill_without_keywords: SkillMeta,
+        self,
+        skill_without_keywords: SkillMeta,
     ) -> None:
         """Skills whose description lacks 「」 keywords are never matched."""
         result = match_skills_by_description(
-            "汎用的なスキルを使って", [skill_without_keywords],
+            "汎用的なスキルを使って",
+            [skill_without_keywords],
         )
         assert result == []
 
     def test_empty_message_returns_empty(
-        self, skill_with_keywords: SkillMeta,
+        self,
+        skill_with_keywords: SkillMeta,
     ) -> None:
         """Empty message always returns an empty list."""
         result = match_skills_by_description("", [skill_with_keywords])
@@ -243,7 +238,9 @@ class TestMatchTier1CommaKeywords:
         """When both brackets and commas exist, brackets are used (not commas)."""
         p = tmp_path / "skill.md"
         p.write_text("dummy")
-        skill = SkillMeta(name="cron", description="「cron設定」「定期実行」、スケジュール管理", path=p, is_common=False)
+        skill = SkillMeta(
+            name="cron", description="「cron設定」「定期実行」、スケジュール管理", path=p, is_common=False
+        )
         # Match via bracket keyword
         result = match_skills_by_description("cron設定して", [skill])
         assert len(result) == 1
@@ -265,7 +262,8 @@ class TestMatchTier2VocabularyMatch:
         skill = SkillMeta(
             name="document-creator",
             description="Comprehensive document creation, editing, and analysis",
-            path=p, is_common=False,
+            path=p,
+            is_common=False,
         )
         # "document" and "creation" both appear
         result = match_skills_by_description("document creation needed", [skill])
@@ -278,7 +276,8 @@ class TestMatchTier2VocabularyMatch:
         skill = SkillMeta(
             name="document-creator",
             description="Comprehensive document creation, editing, and analysis",
-            path=p, is_common=False,
+            path=p,
+            is_common=False,
         )
         result = match_skills_by_description("give me a document", [skill])
         # Only "document" matches, not enough
@@ -297,11 +296,70 @@ class TestMatchTier2VocabularyMatch:
         skill = SkillMeta(
             name="data-analysis",
             description="データ分析 手順書作成 レポート出力",
-            path=p, is_common=False,
+            path=p,
+            is_common=False,
         )
         # "データ分析" and "手順書作成" both appear as substrings in the message
         result = match_skills_by_description("データ分析の手順書作成をお願いします", [skill])
         assert len(result) == 1
+
+
+# ── Personal-first ordering within tiers ─────────────────
+
+
+class TestPersonalFirstOrdering:
+    """Tests for personal skill prioritization within each tier."""
+
+    def test_personal_before_common_within_tier1(self, tmp_path):
+        """Within Tier 1, personal skills appear before common tools."""
+        p1 = tmp_path / "common.md"
+        p1.write_text("dummy")
+        p2 = tmp_path / "personal.md"
+        p2.write_text("dummy")
+        common = SkillMeta(
+            name="common-tool",
+            description="「deploy」共通ツール",
+            path=p1,
+            is_common=True,
+        )
+        personal = SkillMeta(
+            name="my-deploy",
+            description="「deploy」個人スキル",
+            path=p2,
+            is_common=False,
+        )
+        # Pass common first to verify sort reorders
+        result = match_skills_by_description("deployして", [common, personal])
+        assert len(result) == 2
+        assert result[0].is_common is False
+        assert result[1].is_common is True
+
+    def test_tier_priority_preserved_over_is_common(self, tmp_path):
+        """Tier 1 common skill appears before Tier 2 personal skill."""
+        p1 = tmp_path / "common.md"
+        p1.write_text("dummy")
+        p2 = tmp_path / "personal.md"
+        p2.write_text("dummy")
+        common_tier1 = SkillMeta(
+            name="common-deploy",
+            description="「deployment」共通ツール",
+            path=p1,
+            is_common=True,
+        )
+        personal_tier2 = SkillMeta(
+            name="personal-deploy",
+            description="deployment automation release management guide",
+            path=p2,
+            is_common=False,
+        )
+        result = match_skills_by_description(
+            "deployment automation needed",
+            [common_tier1, personal_tier2],
+        )
+        assert len(result) == 2
+        # Tier 1 match (common) should come before Tier 2 match (personal)
+        assert result[0].name == "common-deploy"
+        assert result[1].name == "personal-deploy"
 
 
 # ── Deduplication across tiers ──────────────────────────
@@ -317,7 +375,8 @@ class TestMatchDeduplication:
         skill = SkillMeta(
             name="deploy",
             description="デプロイ手順「deploy」「デプロイ」を提供する",
-            path=p, is_common=False,
+            path=p,
+            is_common=False,
         )
         result = match_skills_by_description("deployの手順を教えて", [skill])
         assert len(result) == 1  # Not duplicated
@@ -336,7 +395,8 @@ class TestMatchRetrieverParam:
         skill = SkillMeta(
             name="unknown",
             description="何かのスキル",
-            path=p, is_common=False,
+            path=p,
+            is_common=False,
         )
         # No brackets, no comma keywords long enough, single vocab word -> no match
         result = match_skills_by_description("全く関係ない話", [skill], retriever=None)
@@ -349,11 +409,10 @@ class TestMatchRetrieverParam:
         skill = SkillMeta(
             name="unknown",
             description="何かのスキル",
-            path=p, is_common=False,
+            path=p,
+            is_common=False,
         )
-        result = match_skills_by_description(
-            "全く関係ない話", [skill], retriever="not-a-retriever", anima_name="test"
-        )
+        result = match_skills_by_description("全く関係ない話", [skill], retriever="not-a-retriever", anima_name="test")
         assert result == []
 
 
@@ -451,6 +510,7 @@ class TestMatchTier3WithMockRetriever:
     def _make_mock_retriever(self):
         """Create a mock that passes the isinstance(r, MemoryRetriever) check."""
         from unittest.mock import MagicMock
+
         from core.memory.rag.retriever import MemoryRetriever
 
         mock = MagicMock(spec=MemoryRetriever)
@@ -458,8 +518,9 @@ class TestMatchTier3WithMockRetriever:
 
     def test_tier3_score_threshold_filters_low_scores(self, tmp_path):
         """Results below min_score threshold are filtered out."""
-        from core.memory.manager import _match_tier3_vector
         from unittest.mock import MagicMock
+
+        from core.memory.manager import _match_tier3_vector
 
         p = tmp_path / "skill.md"
         p.write_text("dummy")
@@ -467,19 +528,63 @@ class TestMatchTier3WithMockRetriever:
 
         mock_retriever = self._make_mock_retriever()
         mock_result = MagicMock()
-        mock_result.score = 0.3  # Below threshold of 0.88
+        mock_result.score = 0.3  # Below default threshold of 0.75
         mock_result.metadata = {"file_path": str(p)}
         mock_retriever.search.return_value = [mock_result]
 
         result = _match_tier3_vector(
-            "test message", [skill], mock_retriever, "test",
+            "test message",
+            [skill],
+            mock_retriever,
+            "test",
+            min_score=0.75,
         )
         assert result == []  # Filtered by score threshold
 
+    def test_tier3_default_min_score_is_075(self, tmp_path):
+        """Default min_score falls back to 0.75 when None is passed."""
+        from unittest.mock import MagicMock
+
+        from core.memory.manager import _match_tier3_vector
+
+        p = tmp_path / "skill.md"
+        p.write_text("dummy")
+        skill = SkillMeta(name="my-skill", description="x", path=p, is_common=False)
+
+        mock_retriever = self._make_mock_retriever()
+        # Score above 0.75 should pass
+        mock_pass = MagicMock()
+        mock_pass.score = 0.80
+        mock_pass.metadata = {"file_path": str(p)}
+        mock_retriever.search.return_value = [mock_pass]
+
+        result = _match_tier3_vector(
+            "test message",
+            [skill],
+            mock_retriever,
+            "test",
+        )
+        assert len(result) == 1
+
+        # Score below 0.75 should be filtered
+        mock_fail = MagicMock()
+        mock_fail.score = 0.70
+        mock_fail.metadata = {"file_path": str(p)}
+        mock_retriever.search.return_value = [mock_fail]
+
+        result = _match_tier3_vector(
+            "test message",
+            [skill],
+            mock_retriever,
+            "test",
+        )
+        assert result == []
+
     def test_tier3_matches_by_path_stem(self, tmp_path):
         """Tier 3 matches results by file path stem."""
-        from core.memory.manager import _match_tier3_vector
         from unittest.mock import MagicMock
+
+        from core.memory.manager import _match_tier3_vector
 
         p = tmp_path / "deploy-guide.md"
         p.write_text("dummy")
@@ -492,15 +597,19 @@ class TestMatchTier3WithMockRetriever:
         mock_retriever.search.return_value = [mock_result]
 
         result = _match_tier3_vector(
-            "deploy something", [skill], mock_retriever, "test",
+            "deploy something",
+            [skill],
+            mock_retriever,
+            "test",
         )
         assert len(result) == 1
         assert result[0].name == "deploy-guide"
 
     def test_tier3_matches_by_skill_name(self, tmp_path):
         """Tier 3 matches results by skill name when path doesn't match."""
-        from core.memory.manager import _match_tier3_vector
         from unittest.mock import MagicMock
+
+        from core.memory.manager import _match_tier3_vector
 
         p = tmp_path / "deploy.md"
         p.write_text("dummy")
@@ -519,15 +628,19 @@ class TestMatchTier3WithMockRetriever:
         # So this should return empty. Name lookup only works through the
         # path-based matching pipeline.
         result = _match_tier3_vector(
-            "deploy guide", [skill], mock_retriever, "test",
+            "deploy guide",
+            [skill],
+            mock_retriever,
+            "test",
         )
         # empty file_path doesn't match any lookup key
         assert len(result) == 0
 
     def test_tier3_deduplicates_results(self, tmp_path):
         """Duplicate matches from vector search are deduplicated."""
-        from core.memory.manager import _match_tier3_vector
         from unittest.mock import MagicMock
+
+        from core.memory.manager import _match_tier3_vector
 
         p = tmp_path / "deploy-guide.md"
         p.write_text("dummy")
@@ -544,7 +657,10 @@ class TestMatchTier3WithMockRetriever:
         mock_retriever.search.return_value = [r1, r2]
 
         result = _match_tier3_vector(
-            "deploy", [skill], mock_retriever, "test",
+            "deploy",
+            [skill],
+            mock_retriever,
+            "test",
         )
         assert len(result) == 1  # Deduplicated
 

@@ -6,9 +6,10 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+
+from core.time_utils import today_local
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -20,7 +21,6 @@ from core.memory.conversation import (
     _CHARS_PER_TOKEN,
     _MAX_DISPLAY_TURNS,
     _MAX_RESPONSE_CHARS_IN_HISTORY,
-    _MAX_TURNS_BEFORE_COMPRESS,
 )
 from core.schemas import ModelConfig
 
@@ -127,9 +127,7 @@ class TestLoadSave:
         assert s1 is s2
 
     def test_load_malformed_json(self, conv, anima_dir):
-        (anima_dir / "state" / "conversation.json").write_text(
-            "not valid json", encoding="utf-8"
-        )
+        (anima_dir / "state" / "conversation.json").write_text("not valid json", encoding="utf-8")
         state = conv.load()
         assert state.turns == []
 
@@ -178,7 +176,7 @@ class TestTranscript:
     def test_load_transcript_malformed_lines(self, conv, anima_dir):
         (anima_dir / "transcripts" / "2026-01-15.jsonl").write_text(
             '{"role":"human","content":"ok","timestamp":"ts"}\n'
-            'not json\n'
+            "not json\n"
             '{"role":"assistant","content":"ok2","timestamp":"ts2"}\n',
             encoding="utf-8",
         )
@@ -197,9 +195,20 @@ class TestTranscript:
 class TestWriteTranscript:
     def test_basic_write(self, conv, anima_dir):
         conv.write_transcript("human", "Hello world", from_person="admin")
-        today = __import__("datetime").date.today().isoformat()
+        today = today_local().isoformat()
         path = anima_dir / "transcripts" / f"{today}.jsonl"
-        assert path.exists()
+        if not path.exists():
+            import core.time_utils as _tu
+
+            transcript_dir = anima_dir / "transcripts"
+            existing = list(transcript_dir.iterdir()) if transcript_dir.exists() else []
+            raise AssertionError(
+                f"Expected {path} but not found. "
+                f"_app_tz={_tu._app_tz!r}, "
+                f"fallback={_tu._FALLBACK_TZ!r}, "
+                f"today_local()={today_local()!r}, "
+                f"existing_files={existing}"
+            )
         entries = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
         assert len(entries) == 1
         assert entries[0]["role"] == "human"
@@ -212,7 +221,7 @@ class TestWriteTranscript:
         conv.write_transcript("assistant", "A1")
         conv.write_transcript("human", "Q2", from_person="user")
         conv.write_transcript("assistant", "A2")
-        today = __import__("datetime").date.today().isoformat()
+        today = today_local().isoformat()
         path = anima_dir / "transcripts" / f"{today}.jsonl"
         entries = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
         assert len(entries) == 4
@@ -221,35 +230,35 @@ class TestWriteTranscript:
 
     def test_thread_id_included(self, conv, anima_dir):
         conv.write_transcript("human", "threaded", thread_id="thread-123")
-        today = __import__("datetime").date.today().isoformat()
+        today = today_local().isoformat()
         path = anima_dir / "transcripts" / f"{today}.jsonl"
         entry = json.loads(path.read_text(encoding="utf-8").strip())
         assert entry["thread_id"] == "thread-123"
 
     def test_default_thread_id_omitted(self, conv, anima_dir):
         conv.write_transcript("human", "default thread")
-        today = __import__("datetime").date.today().isoformat()
+        today = today_local().isoformat()
         path = anima_dir / "transcripts" / f"{today}.jsonl"
         entry = json.loads(path.read_text(encoding="utf-8").strip())
         assert "thread_id" not in entry
 
     def test_attachments_included(self, conv, anima_dir):
         conv.write_transcript("human", "with image", attachments=["attachments/img.png"])
-        today = __import__("datetime").date.today().isoformat()
+        today = today_local().isoformat()
         path = anima_dir / "transcripts" / f"{today}.jsonl"
         entry = json.loads(path.read_text(encoding="utf-8").strip())
         assert entry["attachments"] == ["attachments/img.png"]
 
     def test_tool_names_included(self, conv, anima_dir):
         conv.write_transcript("assistant", "done", tool_names=["web_search", "read_file"])
-        today = __import__("datetime").date.today().isoformat()
+        today = today_local().isoformat()
         path = anima_dir / "transcripts" / f"{today}.jsonl"
         entry = json.loads(path.read_text(encoding="utf-8").strip())
         assert entry["tool_names"] == ["web_search", "read_file"]
 
     def test_empty_optional_fields_omitted(self, conv, anima_dir):
         conv.write_transcript("assistant", "plain response")
-        today = __import__("datetime").date.today().isoformat()
+        today = today_local().isoformat()
         path = anima_dir / "transcripts" / f"{today}.jsonl"
         entry = json.loads(path.read_text(encoding="utf-8").strip())
         assert "from" not in entry
@@ -267,7 +276,7 @@ class TestWriteTranscript:
     def test_roundtrip_with_load(self, conv, anima_dir):
         conv.write_transcript("human", "question", from_person="admin")
         conv.write_transcript("assistant", "answer")
-        today = __import__("datetime").date.today().isoformat()
+        today = today_local().isoformat()
         messages = conv.load_transcript(today)
         assert len(messages) == 2
         assert messages[0]["role"] == "human"
@@ -278,7 +287,7 @@ class TestWriteTranscript:
     def test_content_not_truncated(self, conv, anima_dir):
         long_content = "x" * 20000
         conv.write_transcript("human", long_content)
-        today = __import__("datetime").date.today().isoformat()
+        today = today_local().isoformat()
         path = anima_dir / "transcripts" / f"{today}.jsonl"
         entry = json.loads(path.read_text(encoding="utf-8").strip())
         assert len(entry["content"]) == 20000
@@ -320,9 +329,7 @@ class TestBuildChatPrompt:
         with patch("core.memory.conversation.load_prompt") as mock_load:
             mock_load.return_value = "prompt text"
             result = conv.build_chat_prompt("Hello", from_person="human")
-            mock_load.assert_called_once_with(
-                "chat_message", from_person="human", content="Hello"
-            )
+            mock_load.assert_called_once_with("chat_message", from_person="human", content="Hello")
 
     def test_with_history(self, conv, anima_dir):
         conv.append_turn("human", "Previous question")
@@ -356,12 +363,8 @@ class TestFormatHistory:
         state = ConversationState(
             anima_name="alice",
             turns=[
-                ConversationTurn(
-                    role="human", content="Q", timestamp="2026-01-15T10:00:00"
-                ),
-                ConversationTurn(
-                    role="assistant", content="A", timestamp="2026-01-15T10:01:00"
-                ),
+                ConversationTurn(role="human", content="Q", timestamp="2026-01-15T10:00:00"),
+                ConversationTurn(role="assistant", content="A", timestamp="2026-01-15T10:01:00"),
             ],
         )
         result = conv._format_history(state)
@@ -374,7 +377,8 @@ class TestFormatHistory:
             anima_name="alice",
             turns=[
                 ConversationTurn(
-                    role="assistant", content=long_response,
+                    role="assistant",
+                    content=long_response,
                     timestamp="2026-01-15T10:00:00",
                 ),
             ],
@@ -398,7 +402,7 @@ class TestNeedsCompression:
         # Content is truncated at _MAX_STORED_CONTENT_CHARS (3000 chars),
         # so each stored turn is ~3050 chars / 4 = ~762 tokens.
         # Need at least 79 turns to exceed 60k tokens. Use 90 turns.
-        for i in range(45):
+        for _i in range(45):
             conv.append_turn("human", "x" * 8000)
             conv.append_turn("assistant", "y" * 8000)
         assert conv.needs_compression() is True
@@ -414,7 +418,7 @@ class TestCompressIfNeeded:
         # Add enough turns to trigger compression.
         # Content is truncated at _MAX_STORED_CONTENT_CHARS (3000 chars),
         # so each stored turn is ~762 tokens. Need 90 turns to exceed 60k threshold.
-        for i in range(45):
+        for _i in range(45):
             conv.append_turn("human", "x" * 8000)
             conv.append_turn("assistant", "y" * 8000)
 
@@ -428,7 +432,7 @@ class TestCompressIfNeeded:
 
     async def test_compression_failure_keeps_turns(self, conv):
         # Add enough turns to trigger compression (same reasoning as above).
-        for i in range(45):
+        for _i in range(45):
             conv.append_turn("human", "x" * 8000)
             conv.append_turn("assistant", "y" * 8000)
 
@@ -491,7 +495,8 @@ class TestNeedsCompressionAutoScale:
         """
         conv = self._make_conv(anima_dir, configured_threshold=0.30)
         with patch(
-            "core.prompt.context.resolve_context_window", return_value=16_000,
+            "core.prompt.context.resolve_context_window",
+            return_value=16_000,
         ):
             # Add turns totalling ~2000 tokens → exceeds 1600 threshold
             self._add_turns_with_tokens(conv, 2000)
@@ -514,7 +519,8 @@ class TestNeedsCompressionAutoScale:
         """
         conv = self._make_conv(anima_dir, configured_threshold=0.30)
         with patch(
-            "core.prompt.context.resolve_context_window", return_value=32_000,
+            "core.prompt.context.resolve_context_window",
+            return_value=32_000,
         ):
             # Add turns totalling ~5500 tokens → exceeds 4800 threshold
             self._add_turns_with_tokens(conv, 5500)
@@ -527,7 +533,8 @@ class TestNeedsCompressionAutoScale:
         """
         conv = self._make_conv(anima_dir, configured_threshold=0.30)
         with patch(
-            "core.prompt.context.resolve_context_window", return_value=128_000,
+            "core.prompt.context.resolve_context_window",
+            return_value=128_000,
         ):
             # 8 turns * ~700 tokens each ≈ 5600 tokens, well below 38400
             self._add_turns_with_tokens(conv, 5600)
@@ -540,7 +547,8 @@ class TestNeedsCompressionAutoScale:
         """
         conv = self._make_conv(anima_dir, configured_threshold=0.05)
         with patch(
-            "core.prompt.context.resolve_context_window", return_value=32_000,
+            "core.prompt.context.resolve_context_window",
+            return_value=32_000,
         ):
             # Add turns totalling ~2000 tokens → exceeds 1600 threshold
             self._add_turns_with_tokens(conv, 2000)
@@ -626,7 +634,8 @@ class TestNeedsCompressionTurnCount:
         for i in range(49):
             conv.append_turn("human" if i % 2 == 0 else "assistant", "short")
         with patch(
-            "core.prompt.context.resolve_context_window", return_value=200_000,
+            "core.prompt.context.resolve_context_window",
+            return_value=200_000,
         ):
             assert conv.needs_compression() is False
 

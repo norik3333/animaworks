@@ -10,7 +10,7 @@ consolidation processes, and performance benchmarks.
 """
 
 import time
-from datetime import datetime, timedelta
+from datetime import timedelta
 from core.time_utils import now_jst
 from pathlib import Path
 from unittest.mock import patch
@@ -360,7 +360,7 @@ async def test_priming_performance_under_200ms(anima_dir: Path):
         p95_latency = latencies[95]
         p99_latency = latencies[99]
 
-        print(f"\n=== Priming Performance Statistics ===")
+        print("\n=== Priming Performance Statistics ===")
         print(f"Mean:   {mean_latency:.2f} ms")
         print(f"Median: {median_latency:.2f} ms")
         print(f"P95:    {p95_latency:.2f} ms")

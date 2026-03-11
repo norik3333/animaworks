@@ -10,14 +10,12 @@ in streaming responses, verifying the actual crash path is fixed.
 
 from __future__ import annotations
 
-import asyncio
 import json
 from collections.abc import AsyncIterator
 from datetime import datetime
 from core.time_utils import now_jst
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Union
 
 import pytest
 
@@ -57,22 +55,18 @@ async def test_streaming_with_cycle_result_datetime():
 
         async def handler(
             request: IPCRequest,
-        ) -> Union[IPCResponse, AsyncIterator[IPCResponse]]:
+        ) -> IPCResponse | AsyncIterator[IPCResponse]:
             async def _gen() -> AsyncIterator[IPCResponse]:
                 # Stream text chunks
                 yield IPCResponse(
                     id=request.id,
                     stream=True,
-                    chunk=json.dumps(
-                        {"type": "text_delta", "text": "Hello "}, ensure_ascii=False
-                    ),
+                    chunk=json.dumps({"type": "text_delta", "text": "Hello "}, ensure_ascii=False),
                 )
                 yield IPCResponse(
                     id=request.id,
                     stream=True,
-                    chunk=json.dumps(
-                        {"type": "text_delta", "text": "from IPC"}, ensure_ascii=False
-                    ),
+                    chunk=json.dumps({"type": "text_delta", "text": "from IPC"}, ensure_ascii=False),
                 )
                 # Final response with cycle_result containing datetime
                 yield IPCResponse(
@@ -145,14 +139,12 @@ async def test_streaming_with_model_dump_json_mode():
 
         async def handler(
             request: IPCRequest,
-        ) -> Union[IPCResponse, AsyncIterator[IPCResponse]]:
+        ) -> IPCResponse | AsyncIterator[IPCResponse]:
             async def _gen() -> AsyncIterator[IPCResponse]:
                 yield IPCResponse(
                     id=request.id,
                     stream=True,
-                    chunk=json.dumps(
-                        {"type": "text_delta", "text": "Fixed"}, ensure_ascii=False
-                    ),
+                    chunk=json.dumps({"type": "text_delta", "text": "Fixed"}, ensure_ascii=False),
                 )
                 yield IPCResponse(
                     id=request.id,

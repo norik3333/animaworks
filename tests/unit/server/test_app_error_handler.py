@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import logging
 
-import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 from starlette.requests import Request

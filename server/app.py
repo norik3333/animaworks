@@ -112,7 +112,7 @@ async def _reconcile_assets_at_startup(animas_dir: Path) -> None:
             enable_3d = cfg.image_gen.enable_3d
             image_style = cfg.image_gen.image_style or "realistic"
         except Exception:
-            pass
+            logger.debug("Failed to load image_gen config for asset reconciliation; using defaults")
 
         results = await reconcile_all_assets(
             animas_dir,
@@ -230,7 +230,9 @@ async def lifespan(app: FastAPI):
         # ── Periodic schedulers (don't depend on running animas) ──
         shared_dir = app.state.shared_dir
 
-        msg_log_scheduler = AsyncIOScheduler(timezone="Asia/Tokyo")
+        from core.time_utils import get_app_timezone
+
+        msg_log_scheduler = AsyncIOScheduler(timezone=get_app_timezone())
 
         # ── Orphan anima detection ───────────────────────
         from core.org_sync import detect_orphan_animas

@@ -9,13 +9,11 @@ ProcessSupervisor, verifying that errors surface correctly in HTTP/SSE responses
 
 from __future__ import annotations
 
-import asyncio
 import json
-import os
 import stat
 from pathlib import Path
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, PropertyMock
+from unittest.mock import AsyncMock, MagicMock
 
 import httpx
 import pytest
@@ -94,7 +92,8 @@ async def client(app):
 
 
 async def test_streaming_chat_error_returns_sse_error_event(
-    client: httpx.AsyncClient, mock_supervisor: MagicMock,
+    client: httpx.AsyncClient,
+    mock_supervisor: MagicMock,
 ):
     """When supervisor.send_request_stream raises mid-stream, the SSE
     response should contain an event: error frame with a code field."""
@@ -133,7 +132,7 @@ async def test_streaming_chat_error_returns_sse_error_event(
         if "event: error" in block:
             for line in block.splitlines():
                 if line.startswith("data: "):
-                    error_data = json.loads(line[len("data: "):])
+                    error_data = json.loads(line[len("data: ") :])
                     break
 
     assert error_data is not None, f"No error data found in SSE body: {body!r}"
@@ -144,12 +143,13 @@ async def test_streaming_chat_error_returns_sse_error_event(
 
 
 async def test_non_streaming_chat_timeout_returns_504(
-    client: httpx.AsyncClient, mock_supervisor: MagicMock,
+    client: httpx.AsyncClient,
+    mock_supervisor: MagicMock,
 ):
     """When supervisor.send_request raises TimeoutError, the response
     should be HTTP 504."""
 
-    mock_supervisor.send_request.side_effect = asyncio.TimeoutError()
+    mock_supervisor.send_request.side_effect = TimeoutError()
 
     resp = await client.post(
         "/api/animas/alice/chat",
@@ -165,7 +165,8 @@ async def test_non_streaming_chat_timeout_returns_504(
 
 
 async def test_memory_episode_io_error_returns_500(
-    client: httpx.AsyncClient, e2e_anima_dir: Path,
+    client: httpx.AsyncClient,
+    e2e_anima_dir: Path,
 ):
     """When an episode file has no read permission, GET episodes/{date}
     should return HTTP 500."""
@@ -193,7 +194,9 @@ async def test_memory_episode_io_error_returns_500(
 
 
 async def test_global_exception_handler(
-    e2e_data_dir: Path, e2e_anima_dir: Path, mock_supervisor: MagicMock,
+    e2e_data_dir: Path,
+    e2e_anima_dir: Path,
+    mock_supervisor: MagicMock,
     monkeypatch: pytest.MonkeyPatch,
 ):
     """Unhandled exceptions in routes should be caught by the global

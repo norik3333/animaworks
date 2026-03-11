@@ -9,10 +9,8 @@ events through to WebSocket broadcast and queue lifecycle.
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 
 from core.tooling.handler import active_session_type
 from server.websocket import WebSocketManager

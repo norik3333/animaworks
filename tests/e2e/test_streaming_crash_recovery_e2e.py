@@ -6,14 +6,13 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime
 from core.time_utils import now_jst
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 import pytest
 
-from core.supervisor.manager import ProcessSupervisor, HealthConfig, RestartPolicy
+from core.supervisor.manager import ProcessSupervisor, HealthConfig
 from core.supervisor.process_handle import ProcessHandle, ProcessState, ProcessStats
 
 

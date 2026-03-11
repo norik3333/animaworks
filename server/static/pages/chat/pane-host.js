@@ -334,7 +334,7 @@ export function createPaneHost(rootContainer) {
       });
     }
 
-    for (const tabId of ["chatTabState", "chatTabActivity", "chatTabHistory"]) {
+    for (const tabId of ["chatTabState", "chatTabActivity", "chatTabHistory", "chatTabHeartbeat", "chatTabCron"]) {
       _addShared(tabId, "click", e => {
         getFocused()?.ctx.controllers.sidebar.switchRightTab(e.target.dataset.tab);
       });

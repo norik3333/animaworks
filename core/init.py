@@ -23,7 +23,7 @@ logger = logging.getLogger("animaworks.init")
 
 # Directories under templates/ that are infrastructure (always copied).
 # anima_templates/ is NOT included — animas are created separately.
-_INFRASTRUCTURE_DIRS = {"prompts", "company", "common_skills", "common_knowledge"}
+_INFRASTRUCTURE_DIRS = {"prompts", "company", "common_skills", "common_knowledge", "reference"}
 
 
 def _ensure_tool_prompt_db(data_dir: Path) -> None:
@@ -142,11 +142,11 @@ def _migrate_memory_prompts_v1(
                 tool_store.set_section("behavior_rules", content, condition)
 
         # Record migration
-        from core.time_utils import now_jst
+        from core.time_utils import now_local
 
         conn.execute(
             "INSERT INTO migrations (key, applied_at) VALUES (?, ?)",
-            ("memory_prompt_v1", now_jst().isoformat()),
+            ("memory_prompt_v1", now_local().isoformat()),
         )
         conn.commit()
         logger.info("Applied migration: memory_prompt_v1")
@@ -194,11 +194,11 @@ def _migrate_praise_loop_prevention_v1(
                     condition = SECTION_CONDITIONS.get(key)
                     tool_store.set_section(key, content, condition)
 
-        from core.time_utils import now_jst
+        from core.time_utils import now_local
 
         conn.execute(
             "INSERT INTO migrations (key, applied_at) VALUES (?, ?)",
-            ("praise_loop_prevention_v1", now_jst().isoformat()),
+            ("praise_loop_prevention_v1", now_local().isoformat()),
         )
         conn.commit()
         logger.info("Applied migration: praise_loop_prevention_v1")
@@ -237,11 +237,11 @@ def _migrate_behavior_rules_must_v1(
                 condition = SECTION_CONDITIONS.get("behavior_rules")
                 tool_store.set_section("behavior_rules", content, condition)
 
-        from core.time_utils import now_jst
+        from core.time_utils import now_local
 
         conn.execute(
             "INSERT INTO migrations (key, applied_at) VALUES (?, ?)",
-            ("behavior_rules_must_v1", now_jst().isoformat()),
+            ("behavior_rules_must_v1", now_local().isoformat()),
         )
         conn.commit()
         logger.info("Applied migration: behavior_rules_must_v1")
@@ -298,11 +298,11 @@ def _migrate_resync_sections_v1(
             except Exception:
                 logger.warning("Failed to read section: %s", filepath)
 
-        from core.time_utils import now_jst
+        from core.time_utils import now_local
 
         conn.execute(
             "INSERT INTO migrations (key, applied_at) VALUES (?, ?)",
-            ("resync_sections_v1", now_jst().isoformat()),
+            ("resync_sections_v1", now_local().isoformat()),
         )
         conn.commit()
         logger.info(
@@ -345,11 +345,11 @@ def _migrate_comm_rules_compress_v1(
             except Exception:
                 logger.warning("Failed to read section: %s", filepath)
 
-        from core.time_utils import now_jst
+        from core.time_utils import now_local
 
         conn.execute(
             "INSERT INTO migrations (key, applied_at) VALUES (?, ?)",
-            ("comm_rules_compress_v1", now_jst().isoformat()),
+            ("comm_rules_compress_v1", now_local().isoformat()),
         )
         conn.commit()
         logger.info(
@@ -428,7 +428,7 @@ def ensure_runtime_dir(*, skip_animas: bool = False) -> Path:
 
 
 # Directories synced incrementally on every startup (new entries only).
-_INCREMENTAL_SYNC_DIRS = {"common_skills", "common_knowledge"}
+_INCREMENTAL_SYNC_DIRS = {"common_skills", "common_knowledge", "reference"}
 
 
 def _sync_shared_templates(data_dir: Path) -> None:
@@ -624,6 +624,7 @@ def _ensure_runtime_only_dirs(data_dir: Path) -> None:
     (data_dir / "tmp" / "attachments").mkdir(parents=True, exist_ok=True)
     (data_dir / "common_skills").mkdir(parents=True, exist_ok=True)
     (data_dir / "common_knowledge").mkdir(parents=True, exist_ok=True)
+    (data_dir / "reference").mkdir(parents=True, exist_ok=True)
 
     # Create initial shared channels
     for channel in ("general", "ops"):

@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch, PropertyMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 

@@ -403,14 +403,7 @@ def main() -> None:
         from core.tools import TOOL_MODULES
 
         all_tools = sorted(TOOL_MODULES.keys())
-        permissions_text = memory.read_permissions()
-
-        if "外部ツール" not in permissions_text:
-            tool_registry = all_tools
-        elif "all: yes" in permissions_text:
-            tool_registry = all_tools
-        else:
-            tool_registry = all_tools  # fallback: default-all
+        tool_registry = all_tools
     except Exception as e:
         print(f"WARN: Could not load tool_registry: {e}")
         tool_registry = []

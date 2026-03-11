@@ -29,7 +29,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from core.time_utils import ensure_aware, now_iso, now_jst
+from core.time_utils import ensure_aware, now_iso, now_local
 
 logger = logging.getLogger("animaworks.consolidation")
 
@@ -171,12 +171,12 @@ class ConsolidationEngine:
         Returns:
             List of episode entries, each with 'date', 'time', 'content'
         """
-        cutoff = now_jst() - timedelta(hours=hours)
+        cutoff = now_local() - timedelta(hours=hours)
         entries: list[dict[str, str]] = []
 
         # Check today and yesterday's episode files
         for day_offset in range(2):
-            target_date = now_jst().date() - timedelta(days=day_offset)
+            target_date = now_local().date() - timedelta(days=day_offset)
             episode_files = sorted(self.episodes_dir.glob(f"{target_date}*.md"))
 
             for episode_file in episode_files:
@@ -356,7 +356,7 @@ class ConsolidationEngine:
                 return ""
 
             # Filter by hours cutoff
-            cutoff = now_jst() - timedelta(hours=hours)
+            cutoff = now_local() - timedelta(hours=hours)
             filtered: list = []
             for e in entries:
                 try:
@@ -560,6 +560,9 @@ class ConsolidationEngine:
             from core.memory.rag.singleton import get_vector_store
 
             vector_store = self._rag_store or get_vector_store(self.anima_name)
+            if vector_store is None:
+                logger.debug("RAG vector store unavailable, skipping index update")
+                return
             indexer = MemoryIndexer(vector_store, self.anima_name, self.anima_dir)
 
             for filename in filenames:
@@ -580,6 +583,9 @@ class ConsolidationEngine:
             from core.memory.rag.singleton import get_vector_store
 
             vector_store = self._rag_store or get_vector_store(self.anima_name)
+            if vector_store is None:
+                logger.debug("RAG vector store unavailable, skipping index rebuild")
+                return
             indexer = MemoryIndexer(vector_store, self.anima_name, self.anima_dir)
 
             # Re-index all knowledge files, respecting per-file origin

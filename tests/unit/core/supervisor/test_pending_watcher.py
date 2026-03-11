@@ -10,12 +10,13 @@ Validates ``watcher_loop()`` and ``execute_pending_task()``:
 - Graceful handling when BackgroundTaskManager is not available
 - Corrupt JSON files are removed with a warning
 """
+
 from __future__ import annotations
 
 import asyncio
 import json
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -95,9 +96,11 @@ class TestPendingTaskWatcherLoop:
 
     def _stop_after_first(self, executor):
         """Return a mock for asyncio.wait_for that stops the loop after one iteration."""
+
         async def _mock(coro, *, timeout):
             executor._shutdown_event.set()
-            raise asyncio.TimeoutError
+            raise TimeoutError
+
         return _mock
 
     async def test_picks_up_pending_and_deletes_file(self, tmp_path: Path) -> None:
@@ -106,8 +109,7 @@ class TestPendingTaskWatcherLoop:
         task_path = _write_pending_task(executor._anima_dir)
         assert task_path.exists()
 
-        with patch("core.supervisor.pending_executor.asyncio.wait_for",
-                    side_effect=self._stop_after_first(executor)):
+        with patch("core.supervisor.pending_executor.asyncio.wait_for", side_effect=self._stop_after_first(executor)):
             await executor.watcher_loop()
 
         assert not task_path.exists()
@@ -124,8 +126,7 @@ class TestPendingTaskWatcherLoop:
 
         executor.execute_pending_task = capture_execute  # type: ignore[assignment]
 
-        with patch("core.supervisor.pending_executor.asyncio.wait_for",
-                    side_effect=self._stop_after_first(executor)):
+        with patch("core.supervisor.pending_executor.asyncio.wait_for", side_effect=self._stop_after_first(executor)):
             await executor.watcher_loop()
 
         assert len(executed_tasks) == 1
@@ -139,8 +140,7 @@ class TestPendingTaskWatcherLoop:
         corrupt_path = pending_dir / "corrupt.json"
         corrupt_path.write_text("{invalid json content", encoding="utf-8")
 
-        with patch("core.supervisor.pending_executor.asyncio.wait_for",
-                    side_effect=self._stop_after_first(executor)):
+        with patch("core.supervisor.pending_executor.asyncio.wait_for", side_effect=self._stop_after_first(executor)):
             await executor.watcher_loop()
 
         assert not corrupt_path.exists()
@@ -161,8 +161,7 @@ class TestPendingTaskWatcherLoop:
 
         executor.execute_pending_task = capture_execute  # type: ignore[assignment]
 
-        with patch("core.supervisor.pending_executor.asyncio.wait_for",
-                    side_effect=self._stop_after_first(executor)):
+        with patch("core.supervisor.pending_executor.asyncio.wait_for", side_effect=self._stop_after_first(executor)):
             await executor.watcher_loop()
 
         for p in paths:
@@ -175,8 +174,7 @@ class TestPendingTaskWatcherLoop:
         pending_dir = executor._anima_dir / "state" / "background_tasks" / "pending"
         assert not pending_dir.exists()
 
-        with patch("core.supervisor.pending_executor.asyncio.wait_for",
-                    side_effect=self._stop_after_first(executor)):
+        with patch("core.supervisor.pending_executor.asyncio.wait_for", side_effect=self._stop_after_first(executor)):
             await executor.watcher_loop()
 
         assert pending_dir.is_dir()
@@ -188,8 +186,7 @@ class TestPendingTaskWatcherLoop:
         async def cancel_wait(coro, *, timeout):
             raise asyncio.CancelledError()
 
-        with patch("core.supervisor.pending_executor.asyncio.wait_for",
-                    side_effect=cancel_wait):
+        with patch("core.supervisor.pending_executor.asyncio.wait_for", side_effect=cancel_wait):
             await executor.watcher_loop()
 
 
@@ -262,7 +259,8 @@ class TestExecutePendingTask:
         await executor.execute_pending_task(task_desc)
 
     async def test_handles_missing_background_manager_gracefully(
-        self, tmp_path: Path,
+        self,
+        tmp_path: Path,
     ) -> None:
         """When BackgroundTaskManager is None, logs warning and returns."""
         executor = _make_executor_with_anima(tmp_path)
@@ -341,7 +339,9 @@ class TestDispatchFn:
     """Tests for the _dispatch_fn closure built inside execute_pending_task."""
 
     async def _capture_dispatch_fn(
-        self, tmp_path: Path, task_desc: dict,
+        self,
+        tmp_path: Path,
+        task_desc: dict,
     ):
         """Run execute_pending_task and return the captured dispatch function."""
         executor = _make_executor_with_anima(tmp_path)
@@ -371,11 +371,14 @@ class TestDispatchFn:
         mock_result.stderr = ""
 
         with patch("subprocess.run", return_value=mock_result) as mock_run:
-            dispatch_fn("image_gen", {
-                "subcommand": "3d",
-                "raw_args": ["3d", "--model", "test"],
-                "anima_dir": str(tmp_path),
-            })
+            dispatch_fn(
+                "image_gen",
+                {
+                    "subcommand": "3d",
+                    "raw_args": ["3d", "--model", "test"],
+                    "anima_dir": str(tmp_path),
+                },
+            )
 
             mock_run.assert_called_once()
             cmd = mock_run.call_args[0][0]
@@ -399,11 +402,14 @@ class TestDispatchFn:
         mock_result.stderr = ""
 
         with patch("subprocess.run", return_value=mock_result) as mock_run:
-            dispatch_fn("local_llm", {
-                "subcommand": "generate",
-                "raw_args": ["generate", "hello"],
-                "anima_dir": str(tmp_path),
-            })
+            dispatch_fn(
+                "local_llm",
+                {
+                    "subcommand": "generate",
+                    "raw_args": ["generate", "hello"],
+                    "anima_dir": str(tmp_path),
+                },
+            )
 
             cmd = mock_run.call_args[0][0]
             # "generate" should appear only once, not twice
@@ -428,16 +434,23 @@ class TestDispatchFn:
         mock_result.stderr = ""
 
         with patch("subprocess.run", return_value=mock_result) as mock_run:
-            dispatch_fn("image_gen", {
-                "subcommand": "3d",
-                "raw_args": ["--prompt", "1girl"],
-                "anima_dir": str(tmp_path),
-            })
+            dispatch_fn(
+                "image_gen",
+                {
+                    "subcommand": "3d",
+                    "raw_args": ["--prompt", "1girl"],
+                    "anima_dir": str(tmp_path),
+                },
+            )
 
             cmd = mock_run.call_args[0][0]
             assert cmd == [
-                "animaworks-tool", "image_gen", "3d",
-                "--prompt", "1girl", "-j",
+                "animaworks-tool",
+                "image_gen",
+                "3d",
+                "--prompt",
+                "1girl",
+                "-j",
             ]
 
     async def test_dispatch_fn_sets_anima_dir_env(self, tmp_path: Path) -> None:
@@ -459,11 +472,14 @@ class TestDispatchFn:
         mock_result.stderr = ""
 
         with patch("subprocess.run", return_value=mock_result) as mock_run:
-            dispatch_fn("transcribe", {
-                "subcommand": "",
-                "raw_args": ["/path/to/audio.wav"],
-                "anima_dir": anima_dir,
-            })
+            dispatch_fn(
+                "transcribe",
+                {
+                    "subcommand": "",
+                    "raw_args": ["/path/to/audio.wav"],
+                    "anima_dir": anima_dir,
+                },
+            )
 
             call_kwargs = mock_run.call_args[1]
             env = call_kwargs.get("env") or mock_run.call_args[1].get("env", {})
@@ -488,11 +504,14 @@ class TestDispatchFn:
 
         with patch("subprocess.run", return_value=mock_result):
             with pytest.raises(RuntimeError, match="Tool image_gen failed"):
-                dispatch_fn("image_gen", {
-                    "subcommand": "3d",
-                    "raw_args": ["3d", "test.png"],
-                    "anima_dir": str(tmp_path),
-                })
+                dispatch_fn(
+                    "image_gen",
+                    {
+                        "subcommand": "3d",
+                        "raw_args": ["3d", "test.png"],
+                        "anima_dir": str(tmp_path),
+                    },
+                )
 
     async def test_dispatch_fn_returns_stdout(self, tmp_path: Path) -> None:
         """_dispatch_fn returns stripped stdout on success."""
@@ -512,9 +531,12 @@ class TestDispatchFn:
         mock_result.stderr = ""
 
         with patch("subprocess.run", return_value=mock_result):
-            result = dispatch_fn("web_search", {
-                "subcommand": "search",
-                "raw_args": ["search", "python asyncio"],
-                "anima_dir": str(tmp_path),
-            })
+            result = dispatch_fn(
+                "web_search",
+                {
+                    "subcommand": "search",
+                    "raw_args": ["search", "python asyncio"],
+                    "anima_dir": str(tmp_path),
+                },
+            )
             assert result == "search results here"

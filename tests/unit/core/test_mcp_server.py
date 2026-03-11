@@ -7,8 +7,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from mcp.types import TextContent, Tool
@@ -16,25 +15,27 @@ from mcp.types import TextContent, Tool
 
 # ── Expected internal tool names (fixed set) ─────────────────────────
 
-EXPECTED_INTERNAL_TOOL_NAMES: frozenset[str] = frozenset({
-    "send_message",
-    "post_channel",
-    "read_channel",
-    "read_dm_history",
-    "add_task",
-    "update_task",
-    "list_tasks",
-    "call_human",
-    "search_memory",
-    "report_procedure_outcome",
-    "report_knowledge_outcome",
-    "check_permissions",
-    "disable_subordinate",
-    "enable_subordinate",
-    "create_skill",
-    "set_subordinate_background_model",
-    "skill",
-})
+EXPECTED_INTERNAL_TOOL_NAMES: frozenset[str] = frozenset(
+    {
+        "send_message",
+        "post_channel",
+        "read_channel",
+        "read_dm_history",
+        "add_task",
+        "update_task",
+        "list_tasks",
+        "call_human",
+        "search_memory",
+        "report_procedure_outcome",
+        "report_knowledge_outcome",
+        "check_permissions",
+        "disable_subordinate",
+        "enable_subordinate",
+        "create_skill",
+        "set_subordinate_background_model",
+        "skill",
+    }
+)
 
 
 # ── TestMcpToolSchemas ───────────────────────────────────────────────
@@ -48,14 +49,14 @@ class TestMcpToolSchemas:
         from core.mcp.server import MCP_TOOLS
 
         actual_names = {t.name for t in MCP_TOOLS}
-        assert EXPECTED_INTERNAL_TOOL_NAMES <= actual_names
+        assert actual_names >= EXPECTED_INTERNAL_TOOL_NAMES
 
     def test_all_expected_internal_tool_names_present(self) -> None:
         """All 14 expected internal tool names are present in MCP_TOOLS."""
         from core.mcp.server import MCP_TOOLS
 
         actual_names = {t.name for t in MCP_TOOLS}
-        assert EXPECTED_INTERNAL_TOOL_NAMES <= actual_names
+        assert actual_names >= EXPECTED_INTERNAL_TOOL_NAMES
 
     def test_discover_tools_not_exposed(self) -> None:
         """discover_tools is no longer in the MCP tool list."""
@@ -69,12 +70,8 @@ class TestMcpToolSchemas:
         from core.mcp.server import MCP_TOOLS
 
         for tool in MCP_TOOLS:
-            assert isinstance(tool.description, str), (
-                f"Tool '{tool.name}' description is not a string"
-            )
-            assert len(tool.description) > 0, (
-                f"Tool '{tool.name}' has an empty description"
-            )
+            assert isinstance(tool.description, str), f"Tool '{tool.name}' description is not a string"
+            assert len(tool.description) > 0, f"Tool '{tool.name}' has an empty description"
 
     def test_each_tool_has_object_input_schema(self) -> None:
         """Every tool has an inputSchema with type 'object'."""
@@ -82,12 +79,9 @@ class TestMcpToolSchemas:
 
         for tool in MCP_TOOLS:
             schema = tool.inputSchema
-            assert isinstance(schema, dict), (
-                f"Tool '{tool.name}' inputSchema is not a dict"
-            )
+            assert isinstance(schema, dict), f"Tool '{tool.name}' inputSchema is not a dict"
             assert schema.get("type") == "object", (
-                f"Tool '{tool.name}' inputSchema type is "
-                f"'{schema.get('type')}', expected 'object'"
+                f"Tool '{tool.name}' inputSchema type is '{schema.get('type')}', expected 'object'"
             )
 
 
@@ -115,8 +109,8 @@ class TestBuildMcpTools:
 
         tools, exposed = _build_mcp_tools()
         actual_names = {t.name for t in tools}
-        assert _EXPOSED_TOOL_NAMES <= actual_names
-        assert _EXPOSED_TOOL_NAMES <= exposed
+        assert actual_names >= _EXPOSED_TOOL_NAMES
+        assert exposed >= _EXPOSED_TOOL_NAMES
 
 
 # ── TestListToolsHandler ─────────────────────────────────────────────
@@ -153,7 +147,7 @@ class TestListToolsHandler:
         from core.tooling.schemas import _supervisor_tools
 
         expected = frozenset(t["name"] for t in _supervisor_tools())
-        assert _SUPERVISOR_TOOL_NAMES == expected
+        assert expected == _SUPERVISOR_TOOL_NAMES
 
     async def test_check_permissions_always_visible(self) -> None:
         """check_permissions is NOT a supervisor tool and is always visible."""
@@ -221,8 +215,10 @@ class TestCallToolHandler:
         """When _get_tool_handler returns None, returns error TextContent."""
         import core.mcp.server as mcp_mod
 
-        with patch.object(mcp_mod, "_get_tool_handler", return_value=None), \
-             patch.object(mcp_mod, "_init_error", "Test init error"):
+        with (
+            patch.object(mcp_mod, "_get_tool_handler", return_value=None),
+            patch.object(mcp_mod, "_init_error", "Test init error"),
+        ):
             result = await mcp_mod.call_tool("send_message", {"to": "x", "content": "y"})
 
         assert len(result) == 1
@@ -237,8 +233,7 @@ class TestCallToolHandler:
         """When handler is None and _init_error is also None, uses fallback message."""
         import core.mcp.server as mcp_mod
 
-        with patch.object(mcp_mod, "_get_tool_handler", return_value=None), \
-             patch.object(mcp_mod, "_init_error", None):
+        with patch.object(mcp_mod, "_get_tool_handler", return_value=None), patch.object(mcp_mod, "_init_error", None):
             result = await mcp_mod.call_tool("send_message", {"to": "x", "content": "y"})
 
         assert len(result) == 1
@@ -329,7 +324,9 @@ class TestGetToolHandler:
         assert "not set" in mcp_mod._init_error
 
     def test_returns_none_when_dir_does_not_exist(
-        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
     ) -> None:
         """When ANIMAWORKS_ANIMA_DIR points to a nonexistent dir, returns None."""
         import core.mcp.server as mcp_mod
@@ -344,7 +341,8 @@ class TestGetToolHandler:
         assert "does not exist" in mcp_mod._init_error
 
     def test_caches_error_on_subsequent_calls(
-        self, monkeypatch: pytest.MonkeyPatch,
+        self,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """After an error, subsequent calls return None without retrying."""
         import core.mcp.server as mcp_mod
@@ -373,7 +371,9 @@ class TestGetToolHandler:
         assert result is sentinel
 
     def test_catches_exception_during_initialisation(
-        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
     ) -> None:
         """If ToolHandler construction fails, the error is cached."""
         import core.mcp.server as mcp_mod
@@ -384,11 +384,14 @@ class TestGetToolHandler:
         monkeypatch.setenv("ANIMAWORKS_ANIMA_DIR", str(anima_dir))
 
         # Patch MemoryManager to explode so we never reach ToolHandler
-        with patch(
-            "core.mcp.server.MemoryManager",
-            side_effect=RuntimeError("memory init failed"),
-            create=True,
-        ), patch.dict("sys.modules", {}, clear=False):
+        with (
+            patch(
+                "core.mcp.server.MemoryManager",
+                side_effect=RuntimeError("memory init failed"),
+                create=True,
+            ),
+            patch.dict("sys.modules", {}, clear=False),
+        ):
             # We need to patch the import inside _get_tool_handler.
             # The function does `from core.memory import MemoryManager`,
             # so patching the name in the server module after import.
@@ -404,7 +407,9 @@ class TestGetToolHandler:
         assert "memory init failed" in mcp_mod._init_error
 
     def test_successful_initialisation(
-        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
     ) -> None:
         """When all dependencies succeed, returns a ToolHandler instance."""
         import core.mcp.server as mcp_mod
@@ -419,15 +424,17 @@ class TestGetToolHandler:
         mock_shared_dir.mkdir()
         mock_tool_handler = MagicMock()
 
-        with patch("core.memory.MemoryManager", return_value=mock_memory), \
-             patch("core.paths.get_shared_dir", return_value=mock_shared_dir), \
-             patch("core.messenger.Messenger", return_value=mock_messenger), \
-             patch("core.tooling.handler.ToolHandler", return_value=mock_tool_handler) as mock_th_cls, \
-             patch("core.config.models.load_config") as mock_load_config, \
-             patch("core.notification.notifier.HumanNotifier") as mock_hn_cls, \
-             patch("core.tools.TOOL_MODULES", {"web_search": None}), \
-             patch("core.tools.discover_common_tools", return_value={}), \
-             patch("core.tools.discover_personal_tools", return_value={}):
+        with (
+            patch("core.memory.MemoryManager", return_value=mock_memory),
+            patch("core.paths.get_shared_dir", return_value=mock_shared_dir),
+            patch("core.messenger.Messenger", return_value=mock_messenger),
+            patch("core.tooling.handler.ToolHandler", return_value=mock_tool_handler) as mock_th_cls,
+            patch("core.config.models.load_config") as mock_load_config,
+            patch("core.notification.notifier.HumanNotifier") as mock_hn_cls,
+            patch("core.tools.TOOL_MODULES", {"web_search": None}),
+            patch("core.tools.discover_common_tools", return_value={}),
+            patch("core.tools.discover_personal_tools", return_value={}),
+        ):
             # HumanNotifier with no channels -> None
             mock_hn_inst = MagicMock()
             mock_hn_inst.channel_count = 0
@@ -448,7 +455,9 @@ class TestGetToolHandler:
         assert call_kwargs["human_notifier"] is None
 
     def test_successful_init_with_human_notifier(
-        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
     ) -> None:
         """When HumanNotifier has channels, it is passed to ToolHandler."""
         import core.mcp.server as mcp_mod
@@ -465,15 +474,17 @@ class TestGetToolHandler:
         mock_hn_inst = MagicMock()
         mock_hn_inst.channel_count = 2  # Has channels
 
-        with patch("core.memory.MemoryManager", return_value=mock_memory), \
-             patch("core.paths.get_shared_dir", return_value=mock_shared_dir), \
-             patch("core.messenger.Messenger", return_value=mock_messenger), \
-             patch("core.tooling.handler.ToolHandler", return_value=mock_tool_handler) as mock_th_cls, \
-             patch("core.config.models.load_config"), \
-             patch("core.notification.notifier.HumanNotifier") as mock_hn_cls, \
-             patch("core.tools.TOOL_MODULES", {}), \
-             patch("core.tools.discover_common_tools", return_value={}), \
-             patch("core.tools.discover_personal_tools", return_value={}):
+        with (
+            patch("core.memory.MemoryManager", return_value=mock_memory),
+            patch("core.paths.get_shared_dir", return_value=mock_shared_dir),
+            patch("core.messenger.Messenger", return_value=mock_messenger),
+            patch("core.tooling.handler.ToolHandler", return_value=mock_tool_handler) as mock_th_cls,
+            patch("core.config.models.load_config"),
+            patch("core.notification.notifier.HumanNotifier") as mock_hn_cls,
+            patch("core.tools.TOOL_MODULES", {}),
+            patch("core.tools.discover_common_tools", return_value={}),
+            patch("core.tools.discover_personal_tools", return_value={}),
+        ):
             mock_hn_cls.from_config.return_value = mock_hn_inst
 
             result = mcp_mod._get_tool_handler()
@@ -483,7 +494,9 @@ class TestGetToolHandler:
         assert call_kwargs["human_notifier"] is mock_hn_inst
 
     def test_human_notifier_failure_is_tolerated(
-        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
     ) -> None:
         """If HumanNotifier init fails, ToolHandler still initialises."""
         import core.mcp.server as mcp_mod
@@ -498,14 +511,16 @@ class TestGetToolHandler:
         mock_shared_dir.mkdir()
         mock_tool_handler = MagicMock()
 
-        with patch("core.memory.MemoryManager", return_value=mock_memory), \
-             patch("core.paths.get_shared_dir", return_value=mock_shared_dir), \
-             patch("core.messenger.Messenger", return_value=mock_messenger), \
-             patch("core.tooling.handler.ToolHandler", return_value=mock_tool_handler) as mock_th_cls, \
-             patch("core.config.models.load_config", side_effect=RuntimeError("no config")), \
-             patch("core.tools.TOOL_MODULES", {}), \
-             patch("core.tools.discover_common_tools", return_value={}), \
-             patch("core.tools.discover_personal_tools", return_value={}):
+        with (
+            patch("core.memory.MemoryManager", return_value=mock_memory),
+            patch("core.paths.get_shared_dir", return_value=mock_shared_dir),
+            patch("core.messenger.Messenger", return_value=mock_messenger),
+            patch("core.tooling.handler.ToolHandler", return_value=mock_tool_handler) as mock_th_cls,
+            patch("core.config.models.load_config", side_effect=RuntimeError("no config")),
+            patch("core.tools.TOOL_MODULES", {}),
+            patch("core.tools.discover_common_tools", return_value={}),
+            patch("core.tools.discover_personal_tools", return_value={}),
+        ):
             result = mcp_mod._get_tool_handler()
 
         assert result is mock_tool_handler
@@ -513,7 +528,9 @@ class TestGetToolHandler:
         assert call_kwargs["human_notifier"] is None
 
     def test_tool_discovery_failure_is_tolerated(
-        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
     ) -> None:
         """If tool discovery fails, ToolHandler still initialises with empty tools."""
         import core.mcp.server as mcp_mod
@@ -528,15 +545,17 @@ class TestGetToolHandler:
         mock_shared_dir.mkdir()
         mock_tool_handler = MagicMock()
 
-        with patch("core.memory.MemoryManager", return_value=mock_memory), \
-             patch("core.paths.get_shared_dir", return_value=mock_shared_dir), \
-             patch("core.messenger.Messenger", return_value=mock_messenger), \
-             patch("core.tooling.handler.ToolHandler", return_value=mock_tool_handler) as mock_th_cls, \
-             patch("core.config.models.load_config"), \
-             patch("core.notification.notifier.HumanNotifier") as mock_hn_cls, \
-             patch("core.tools.TOOL_MODULES", side_effect=ImportError("no tools")), \
-             patch("core.tools.discover_common_tools", return_value={}), \
-             patch("core.tools.discover_personal_tools", return_value={}):
+        with (
+            patch("core.memory.MemoryManager", return_value=mock_memory),
+            patch("core.paths.get_shared_dir", return_value=mock_shared_dir),
+            patch("core.messenger.Messenger", return_value=mock_messenger),
+            patch("core.tooling.handler.ToolHandler", return_value=mock_tool_handler) as mock_th_cls,
+            patch("core.config.models.load_config"),
+            patch("core.notification.notifier.HumanNotifier") as mock_hn_cls,
+            patch("core.tools.TOOL_MODULES", side_effect=ImportError("no tools")),
+            patch("core.tools.discover_common_tools", return_value={}),
+            patch("core.tools.discover_personal_tools", return_value={}),
+        ):
             mock_hn_inst = MagicMock()
             mock_hn_inst.channel_count = 0
             mock_hn_cls.from_config.return_value = mock_hn_inst
@@ -620,7 +639,9 @@ class TestExternalToolsInMcpTools:
     """Tests for external tool schema loading in _build_mcp_tools()."""
 
     def test_use_tool_not_exposed_in_mcp(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """MCP server does NOT expose use_tool (Mode B only)."""
         from core.mcp.server import _build_mcp_tools
@@ -638,7 +659,9 @@ class TestExternalToolsInMcpTools:
         assert "use_tool" not in exposed
 
     def test_unpermitted_tools_excluded(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """External tools not in permissions.md are excluded."""
         from core.mcp.server import _build_mcp_tools
@@ -659,7 +682,9 @@ class TestExternalToolsInMcpTools:
         assert "gmail_send" not in tool_names
 
     def test_external_tool_dispatch_via_call_tool(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """call_tool() dispatches external tools through ToolHandler."""
         import core.mcp.server as mcp_mod
@@ -673,16 +698,16 @@ class TestExternalToolsInMcpTools:
 
         try:
             import asyncio
+
             with patch.object(mcp_mod, "_get_tool_handler", return_value=mock_handler):
-                result = asyncio.run(
-                    mcp_mod.call_tool("chatwork_send", {"room_id": "123", "body": "test"})
-                )
+                result = asyncio.run(mcp_mod.call_tool("chatwork_send", {"room_id": "123", "body": "test"}))
 
             assert len(result) == 1
             assert "ok" in result[0].text
             assert "<tool_result" in result[0].text
             mock_handler.handle.assert_called_once_with(
-                "chatwork_send", {"room_id": "123", "body": "test"},
+                "chatwork_send",
+                {"room_id": "123", "body": "test"},
             )
         finally:
             mcp_mod._EXPOSED_NAMES = original_exposed
@@ -774,8 +799,10 @@ class TestCallToolTrustWrapping:
         assert payload["status"] == "error"
 
         # InitError
-        with patch.object(mcp_mod, "_get_tool_handler", return_value=None), \
-             patch.object(mcp_mod, "_init_error", "init failed"):
+        with (
+            patch.object(mcp_mod, "_get_tool_handler", return_value=None),
+            patch.object(mcp_mod, "_init_error", "init failed"),
+        ):
             result = await mcp_mod.call_tool("send_message", {"to": "x", "content": "y"})
         assert "<tool_result" not in result[0].text
         payload = json.loads(result[0].text)
@@ -852,14 +879,17 @@ class TestHasSubordinatesForAnima:
 
     def setup_method(self) -> None:
         import core.mcp.server as mcp_mod
+
         mcp_mod._is_supervisor = None
 
     def teardown_method(self) -> None:
         import core.mcp.server as mcp_mod
+
         mcp_mod._is_supervisor = None
 
     def test_returns_false_when_env_not_set(
-        self, monkeypatch: pytest.MonkeyPatch,
+        self,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Falls back to False when ANIMAWORKS_ANIMA_DIR is not set."""
         import core.mcp.server as mcp_mod
@@ -868,7 +898,9 @@ class TestHasSubordinatesForAnima:
         assert mcp_mod._has_subordinates_for_anima() is False
 
     def test_returns_true_when_has_subordinates(
-        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
     ) -> None:
         """Returns True when config.json shows subordinates."""
         import core.mcp.server as mcp_mod
@@ -892,7 +924,9 @@ class TestHasSubordinatesForAnima:
         assert result is True
 
     def test_returns_false_when_no_subordinates(
-        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
     ) -> None:
         """Returns False when config.json shows no subordinates."""
         import core.mcp.server as mcp_mod
@@ -916,7 +950,9 @@ class TestHasSubordinatesForAnima:
         assert result is False
 
     def test_caches_result(
-        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
     ) -> None:
         """Result is cached on second call."""
         import core.mcp.server as mcp_mod
@@ -925,7 +961,9 @@ class TestHasSubordinatesForAnima:
         assert mcp_mod._has_subordinates_for_anima() is False
 
     def test_config_read_failure_defaults_to_false(
-        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
     ) -> None:
         """Falls back to False if config.json cannot be read."""
         import core.mcp.server as mcp_mod

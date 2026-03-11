@@ -11,7 +11,6 @@ short-term memory separation, board fanout context variable, and
 replied_to session separation.
 """
 
-import asyncio
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -22,7 +21,7 @@ import pytest
 
 
 @pytest.fixture
-def anima(tmp_path: Path) -> "DigitalAnima":
+def anima(tmp_path: Path) -> DigitalAnima:
     """Create a minimal DigitalAnima with mocked internals."""
     anima_dir = tmp_path / "animas" / "test-anima"
     shared_dir = tmp_path / "shared"
@@ -58,11 +57,12 @@ def anima(tmp_path: Path) -> "DigitalAnima":
         mock_agent_cls.return_value = mock_agent
 
         from core.anima import DigitalAnima
+
         return DigitalAnima(anima_dir, shared_dir)
 
 
 @pytest.fixture
-def handler(tmp_path: Path) -> "ToolHandler":
+def handler(tmp_path: Path) -> ToolHandler:
     """Create a minimal ToolHandler for testing replied_to."""
     anima_dir = tmp_path / "test-anima"
     anima_dir.mkdir(parents=True)
@@ -71,6 +71,7 @@ def handler(tmp_path: Path) -> "ToolHandler":
     with patch("core.tooling.handler.MemoryManager"):
         with patch("core.tooling.handler.Messenger"):
             from core.tooling.handler import ToolHandler
+
             return ToolHandler(
                 anima_dir=anima_dir,
                 memory=MagicMock(),
@@ -85,21 +86,21 @@ def handler(tmp_path: Path) -> "ToolHandler":
 class TestLockSeparation:
     """Verify that conversation and background locks are independent."""
 
-    def test_anima_has_separate_locks(self, anima: "DigitalAnima") -> None:
+    def test_anima_has_separate_locks(self, anima: DigitalAnima) -> None:
         """DigitalAnima should have _conversation_locks dict and _background_lock."""
         assert hasattr(anima, "_conversation_locks")
         assert hasattr(anima, "_background_lock")
         assert anima._get_thread_lock("default") is not anima._background_lock
 
-    def test_no_legacy_lock(self, anima: "DigitalAnima") -> None:
+    def test_no_legacy_lock(self, anima: DigitalAnima) -> None:
         """DigitalAnima should NOT have the old single _lock."""
         assert not hasattr(anima, "_lock")
 
-    def test_no_user_waiting(self, anima: "DigitalAnima") -> None:
+    def test_no_user_waiting(self, anima: DigitalAnima) -> None:
         """DigitalAnima should NOT have _user_waiting event."""
         assert not hasattr(anima, "_user_waiting")
 
-    def test_no_heartbeat_stream_queue(self, anima: "DigitalAnima") -> None:
+    def test_no_heartbeat_stream_queue(self, anima: DigitalAnima) -> None:
         """DigitalAnima should NOT have _heartbeat_stream_queue."""
         assert not hasattr(anima, "_heartbeat_stream_queue")
 
@@ -111,7 +112,7 @@ class TestLockSeparation:
 class TestStatusSlots:
     """Verify status slot system works correctly."""
 
-    def test_initial_status_idle(self, anima: "DigitalAnima") -> None:
+    def test_initial_status_idle(self, anima: DigitalAnima) -> None:
         """Status slots should start with inbox and background as idle."""
         assert anima._status_slots["inbox"] == "idle"
         assert anima._status_slots["background"] == "idle"
@@ -119,7 +120,8 @@ class TestStatusSlots:
         assert anima._task_slots["background"] == ""
 
     def test_primary_status_conversation_priority(
-        self, anima: "DigitalAnima",
+        self,
+        anima: DigitalAnima,
     ) -> None:
         """primary_status should prefer conversation over background."""
         anima._status_slots["conversation:default"] = "thinking"
@@ -127,18 +129,20 @@ class TestStatusSlots:
         assert anima.primary_status == "thinking"
 
     def test_primary_status_background_fallback(
-        self, anima: "DigitalAnima",
+        self,
+        anima: DigitalAnima,
     ) -> None:
         """primary_status should return background when no conversation is active."""
         anima._status_slots["background"] = "checking"
         assert anima.primary_status == "checking"
 
-    def test_primary_status_both_idle(self, anima: "DigitalAnima") -> None:
+    def test_primary_status_both_idle(self, anima: DigitalAnima) -> None:
         """primary_status should return idle when both are idle."""
         assert anima.primary_status == "idle"
 
     def test_status_property_returns_anima_status(
-        self, anima: "DigitalAnima",
+        self,
+        anima: DigitalAnima,
     ) -> None:
         """status property should return AnimaStatus with primary values."""
         anima._status_slots["background"] = "checking"
@@ -155,7 +159,8 @@ class TestConcurrentLockAcquisition:
     """Verify that conversation and background locks can be held simultaneously."""
 
     async def test_both_locks_can_be_held(
-        self, anima: "DigitalAnima",
+        self,
+        anima: DigitalAnima,
     ) -> None:
         """Both locks should be acquirable at the same time."""
         async with anima._get_thread_lock("default"):
@@ -164,7 +169,8 @@ class TestConcurrentLockAcquisition:
                 assert anima._background_lock.locked()
 
     async def test_conversation_does_not_block_background(
-        self, anima: "DigitalAnima",
+        self,
+        anima: DigitalAnima,
     ) -> None:
         """Acquiring conversation lock should not prevent background lock acquisition."""
         acquired = False
@@ -175,7 +181,8 @@ class TestConcurrentLockAcquisition:
         assert acquired
 
     async def test_background_does_not_block_conversation(
-        self, anima: "DigitalAnima",
+        self,
+        anima: DigitalAnima,
     ) -> None:
         """Acquiring background lock should not prevent conversation lock acquisition."""
         acquired = False
@@ -194,10 +201,12 @@ class TestSessionFilesSeparation:
 
     def test_session_file_chat(self) -> None:
         from core.execution.agent_sdk import _session_file
+
         assert _session_file("chat") == "current_session_chat.json"
 
     def test_session_file_heartbeat(self) -> None:
         from core.execution.agent_sdk import _session_file
+
         assert _session_file("heartbeat") == "current_session_heartbeat.json"
 
     def test_load_save_independent(self, tmp_path: Path) -> None:
@@ -267,10 +276,12 @@ class TestSuppressBoardFanoutContextVar:
 
     def test_default_is_false(self) -> None:
         from core.tooling.handler import suppress_board_fanout
+
         assert suppress_board_fanout.get() is False
 
     def test_set_and_reset(self) -> None:
         from core.tooling.handler import suppress_board_fanout
+
         token = suppress_board_fanout.set(True)
         assert suppress_board_fanout.get() is True
         suppress_board_fanout.reset(token)
@@ -284,28 +295,30 @@ class TestSuppressBoardFanoutContextVar:
 class TestRepliedToSessionSeparation:
     """Verify replied_to tracks sessions independently."""
 
-    def test_replied_to_dict_structure(self, handler: "ToolHandler") -> None:
+    def test_replied_to_dict_structure(self, handler: ToolHandler) -> None:
         """_replied_to should be a dict with chat and background keys."""
         assert isinstance(handler._replied_to, dict)
         assert "chat" in handler._replied_to
         assert "background" in handler._replied_to
 
     def test_replied_to_property_returns_union(
-        self, handler: "ToolHandler",
+        self,
+        handler: ToolHandler,
     ) -> None:
         handler._replied_to["chat"].add("alice")
         handler._replied_to["background"].add("bob")
         assert handler.replied_to == {"alice", "bob"}
 
-    def test_reset_specific_session(self, handler: "ToolHandler") -> None:
+    def test_reset_specific_session(self, handler: ToolHandler) -> None:
         handler._replied_to["chat"].add("alice")
         handler._replied_to["background"].add("bob")
         handler.reset_replied_to(session_type="chat")
         assert handler._replied_to["chat"] == set()
         assert handler._replied_to["background"] == {"bob"}
 
-    def test_set_active_session_type(self, handler: "ToolHandler") -> None:
+    def test_set_active_session_type(self, handler: ToolHandler) -> None:
         from core.tooling.handler import active_session_type
+
         token = handler.set_active_session_type("background")
         assert active_session_type.get() == "background"
         active_session_type.reset(token)
@@ -314,4 +327,5 @@ class TestRepliedToSessionSeparation:
     def test_active_session_type_is_contextvar(self) -> None:
         """active_session_type should be a ContextVar with default 'chat'."""
         from core.tooling.handler import active_session_type
+
         assert active_session_type.get() == "chat"

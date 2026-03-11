@@ -59,9 +59,9 @@ def _generate_tool_parameters() -> str:
         required = set(params.get("required", []))
 
         lines.append(f"#### `{name}`")
-        lines.append(f"")
+        lines.append("")
         lines.append(f"{desc}")
-        lines.append(f"")
+        lines.append("")
         lines.append("| パラメータ | 型 | 必須 | 説明 |")
         lines.append("|-----------|-----|------|------|")
 

@@ -539,6 +539,25 @@ class ToolHandler(
             )
 
         schema_name = f"{tool_name}_{action}"
+
+        # Check gated action permission
+        permitted: set[str] = set()
+        try:
+            permissions_text = self._memory.read_permissions()
+            from core.tooling.permissions import parse_permitted_tools
+
+            permitted = parse_permitted_tools(permissions_text)
+        except Exception:
+            logger.debug("Failed to parse permissions for gated action check; defaulting to empty set")
+
+        from core.tooling.permissions import is_action_gated
+
+        if is_action_gated(tool_name, action, permitted):
+            return _error_result(
+                "PermissionDenied",
+                t("tooling.gated_action_denied", tool=tool_name, action=action),
+            )
+
         dispatch_args = {**tool_args, "anima_dir": str(self._anima_dir)}
 
         try:

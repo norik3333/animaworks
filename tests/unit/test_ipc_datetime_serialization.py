@@ -16,7 +16,6 @@ from datetime import datetime
 from core.time_utils import now_jst
 from pathlib import Path
 
-import pytest
 
 from core.schemas import CycleResult
 from core.supervisor.ipc import IPCRequest, IPCResponse, IPCEvent

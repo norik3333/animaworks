@@ -9,7 +9,6 @@ import json
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from httpx import ASGITransport, AsyncClient
 
 from core.time_utils import now_jst

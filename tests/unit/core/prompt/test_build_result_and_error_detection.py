@@ -10,14 +10,12 @@ from __future__ import annotations
 and bugfix: pending procedures persistence + streaming retry BuildResult extraction.
 """
 
-import json
 from pathlib import Path
 
 import pytest
 
 from core.memory.conversation import (
     ConversationMemory,
-    ConversationTurn,
     _ERROR_PATTERN,
     _RESOLVED_PATTERN,
 )
@@ -43,7 +41,7 @@ class TestBuildResult:
         result = BuildResult(system_prompt="日本語テスト")
         encoded = result.encode("utf-8")
         assert isinstance(encoded, bytes)
-        assert "日本語テスト".encode("utf-8") == encoded
+        assert "日本語テスト".encode() == encoded
 
     def test_injected_procedures_default_empty(self) -> None:
         result = BuildResult(system_prompt="test")

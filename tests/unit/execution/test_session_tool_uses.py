@@ -12,7 +12,6 @@ Covers:
 """
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -23,7 +22,6 @@ from core.execution._session import handle_session_chaining
 from core.memory.shortterm import (
     SessionState,
     ShortTermMemory,
-    _MAX_RESPONSE_CHARS,
 )
 from core.prompt.builder import BuildResult
 
@@ -116,19 +114,13 @@ class TestHandleSessionChainingToolUsesNone:
                 original_prompt="Do something",
             )
 
-        assert result is not None
-        assert chain_count == 1
+        assert result is None
+        assert chain_count == 0
 
         # Verify the saved state has empty tool_uses
         loaded = shortterm.load()
-        # load() returns None because clear() was called, so check archive
-        # Actually, clear() is called after inject, so let's check the
-        # JSON was saved with empty tool_uses by inspecting the archive
-        archive_dir = shortterm._archive_dir
-        json_files = list(archive_dir.glob("*.json"))
-        assert len(json_files) == 1
-        data = json.loads(json_files[0].read_text(encoding="utf-8"))
-        assert data["tool_uses"] == []
+        assert loaded is not None
+        assert loaded.tool_uses == []
 
     @pytest.mark.asyncio
     async def test_backward_compatible_signature(
@@ -151,8 +143,8 @@ class TestHandleSessionChainingToolUsesNone:
                 chain_count=0,
             )
 
-        assert result is not None
-        assert chain_count == 1
+        assert result is None
+        assert chain_count == 0
 
     @pytest.mark.asyncio
     async def test_no_chaining_when_shortterm_is_none(
@@ -231,18 +223,16 @@ class TestHandleSessionChainingWithToolUses:
                 tool_uses=sample_tool_uses,
             )
 
-        assert result is not None
-        assert chain_count == 1
+        assert result is None
+        assert chain_count == 0
 
-        # Check archived JSON has the tool_uses
-        archive_dir = shortterm._archive_dir
-        json_files = list(archive_dir.glob("*.json"))
-        assert len(json_files) == 1
-        data = json.loads(json_files[0].read_text(encoding="utf-8"))
-        assert len(data["tool_uses"]) == 3
-        assert data["tool_uses"][0]["name"] == "web_search"
-        assert data["tool_uses"][1]["name"] == "read_file"
-        assert data["tool_uses"][2]["name"] == "bash"
+        # Check saved state has the tool_uses
+        loaded = shortterm.load()
+        assert loaded is not None
+        assert len(loaded.tool_uses) == 3
+        assert loaded.tool_uses[0]["name"] == "web_search"
+        assert loaded.tool_uses[1]["name"] == "read_file"
+        assert loaded.tool_uses[2]["name"] == "bash"
 
     @pytest.mark.asyncio
     async def test_tool_uses_appear_in_new_system_prompt(
@@ -269,12 +259,14 @@ class TestHandleSessionChainingWithToolUses:
                 tool_uses=sample_tool_uses,
             )
 
-        assert result is not None
-        # The system prompt should contain tool names from the session state
-        # (inject_shortterm loads the markdown which includes tool entries)
-        assert "web_search" in result
-        assert "read_file" in result
-        assert "bash" in result
+        assert result is None
+        # tool_uses are saved in shortterm state (injected into prompt on next message)
+        loaded = shortterm.load()
+        assert loaded is not None
+        rendered = shortterm._render_markdown(loaded)
+        assert "web_search" in rendered
+        assert "read_file" in rendered
+        assert "bash" in rendered
 
     @pytest.mark.asyncio
     async def test_empty_list_treated_as_no_tools(
@@ -297,9 +289,12 @@ class TestHandleSessionChainingWithToolUses:
                 tool_uses=[],
             )
 
-        assert result is not None
+        assert result is None
         # The rendered markdown should show "(なし)" for tools
-        assert "(なし)" in result
+        loaded = shortterm.load()
+        assert loaded is not None
+        rendered = shortterm._render_markdown(loaded)
+        assert "(なし)" in rendered
 
     @pytest.mark.asyncio
     async def test_accumulated_response_includes_current_text(
@@ -323,11 +318,10 @@ class TestHandleSessionChainingWithToolUses:
                 tool_uses=[{"name": "tool1", "input": "i1"}],
             )
 
-        archive_dir = shortterm._archive_dir
-        json_files = list(archive_dir.glob("*.json"))
-        data = json.loads(json_files[0].read_text(encoding="utf-8"))
-        assert "previous text" in data["accumulated_response"]
-        assert "new fragment" in data["accumulated_response"]
+        loaded = shortterm.load()
+        assert loaded is not None
+        assert "previous text" in loaded.accumulated_response
+        assert "new fragment" in loaded.accumulated_response
 
     @pytest.mark.asyncio
     async def test_max_chains_prevents_chaining(

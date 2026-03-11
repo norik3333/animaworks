@@ -8,13 +8,11 @@ Unit tests for ProcessSupervisor.
 
 from __future__ import annotations
 
-import asyncio
 import pytest
-from datetime import datetime
 from core.time_utils import now_jst
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 from core.supervisor.manager import (
     ProcessSupervisor,

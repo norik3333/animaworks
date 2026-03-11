@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 # AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: Apache-2.0
@@ -30,7 +31,6 @@ from core.tooling.skill_tool import (
     build_skill_tool_description,
     load_and_render_skill,
 )
-
 
 # ── Helpers ──────────────────────────────────────────────
 
@@ -99,17 +99,14 @@ class TestApplyBuiltins:
         assert result == "No placeholders here."
 
     def test_multiple_placeholders_replaced(self):
-        content = "Name: {{anima_name}}, Dir: {{anima_dir}}, Time: {{now_jst}}"
+        content = "Name: {{anima_name}}, Dir: {{anima_dir}}, Time: {{now_local}}"
         builtins = {
             "anima_name": "bob",
             "anima_dir": "/data/animas/bob",
-            "now_jst": "2026-02-22T10:00:00+09:00",
+            "now_local": "2026-02-22T10:00:00+09:00",
         }
         result = apply_builtins(content, builtins)
-        assert result == (
-            "Name: bob, Dir: /data/animas/bob, "
-            "Time: 2026-02-22T10:00:00+09:00"
-        )
+        assert result == ("Name: bob, Dir: /data/animas/bob, Time: 2026-02-22T10:00:00+09:00")
 
     def test_repeated_placeholder_replaced_all_occurrences(self):
         content = "{{anima_name}} says hello, {{anima_name}}."
@@ -163,14 +160,8 @@ class TestBuildSkillToolDescription:
 
     def test_budget_exceeded_in_common_skills(self):
         """Budget overflow in common skills section also triggers truncation."""
-        personal = [
-            _make_skill_meta(f"p{i}", f"description {'x' * 80}")
-            for i in range(100)
-        ]
-        common = [
-            _make_skill_meta(f"c{i}", f"common description {'y' * 80}", is_common=True)
-            for i in range(100)
-        ]
+        personal = [_make_skill_meta(f"p{i}", f"description {'x' * 80}") for i in range(100)]
+        common = [_make_skill_meta(f"c{i}", f"common description {'y' * 80}", is_common=True) for i in range(100)]
         result = build_skill_tool_description(personal, common, [])
         assert "(以降省略)" in result
 
@@ -244,9 +235,7 @@ class TestResolveSkillPath:
         _make_skill_dir_file(common, "shared_skill", content="Common version")
         procedures.mkdir(parents=True)
 
-        path, skill_type = _resolve_skill_path(
-            "shared_skill", skills, common, procedures
-        )
+        path, skill_type = _resolve_skill_path("shared_skill", skills, common, procedures)
         assert path == skills / "shared_skill" / "SKILL.md"
         assert skill_type == "個人"
         assert "Personal version" in path.read_text(encoding="utf-8")
@@ -284,9 +273,7 @@ class TestResolveSkillPath:
         common.mkdir(parents=True)
         procedures.mkdir(parents=True)
 
-        path, skill_type = _resolve_skill_path(
-            malicious_name, skills, common, procedures
-        )
+        path, skill_type = _resolve_skill_path(malicious_name, skills, common, procedures)
         assert path is None
         assert skill_type == ""
 
@@ -299,9 +286,7 @@ class TestResolveSkillPath:
         common.mkdir(parents=True)
         procedures.mkdir(parents=True)
 
-        path, skill_type = _resolve_skill_path(
-            "my-skill_v2", skills, common, procedures
-        )
+        path, skill_type = _resolve_skill_path("my-skill_v2", skills, common, procedures)
         assert path == skills / "my-skill_v2" / "SKILL.md"
         assert skill_type == "個人"
 
@@ -372,13 +357,13 @@ class TestStripFrontmatter:
 class TestResolveBuiltins:
     """Test _resolve_builtins() builtin variable resolution."""
 
-    def test_contains_now_jst(self, tmp_path: Path):
+    def test_contains_now_local(self, tmp_path: Path):
         anima_dir = tmp_path / "animas" / "alice"
         anima_dir.mkdir(parents=True)
         builtins = _resolve_builtins(anima_dir)
-        assert "now_jst" in builtins
+        assert "now_local" in builtins
         # Should be a valid ISO8601 string with timezone info
-        assert "+" in builtins["now_jst"] or "T" in builtins["now_jst"]
+        assert "+" in builtins["now_local"] or "T" in builtins["now_local"]
 
     def test_contains_anima_name(self, tmp_path: Path):
         anima_dir = tmp_path / "animas" / "alice"
@@ -396,7 +381,7 @@ class TestResolveBuiltins:
         anima_dir = tmp_path / "animas" / "test"
         anima_dir.mkdir(parents=True)
         builtins = _resolve_builtins(anima_dir)
-        assert set(builtins.keys()) == {"now_jst", "anima_name", "anima_dir"}
+        assert set(builtins.keys()) == {"now_local", "anima_name", "anima_dir"}
 
 
 # ── load_and_render_skill ────────────────────────────────
@@ -423,9 +408,7 @@ class TestLoadAndRenderSkill:
             frontmatter="description: Deploy to production\n",
             content="# Deploy\n\nStep 1: Build.\nStep 2: Push.",
         )
-        result = load_and_render_skill(
-            "deploy", anima_dir, skills_dir, common, procs
-        )
+        result = load_and_render_skill("deploy", anima_dir, skills_dir, common, procs)
         assert "# Deploy" in result
         assert "Step 1: Build." in result
         assert "Step 2: Push." in result
@@ -439,9 +422,7 @@ class TestLoadAndRenderSkill:
             "greet",
             content="Hello from {{anima_name}} at {{anima_dir}}.",
         )
-        result = load_and_render_skill(
-            "greet", anima_dir, skills_dir, common, procs
-        )
+        result = load_and_render_skill("greet", anima_dir, skills_dir, common, procs)
         assert "test-anima" in result
         assert str(anima_dir) in result
         # Placeholders should be gone
@@ -453,17 +434,10 @@ class TestLoadAndRenderSkill:
         _make_skill_dir_file(
             skills_dir,
             "search",
-            frontmatter=(
-                "description: Web search skill\n"
-                "allowed_tools:\n"
-                "  - web_search\n"
-                "  - read_memory_file\n"
-            ),
+            frontmatter=("description: Web search skill\nallowed_tools:\n  - web_search\n  - read_memory_file\n"),
             content="# Search\nSearch the web.",
         )
-        result = load_and_render_skill(
-            "search", anima_dir, skills_dir, common, procs
-        )
+        result = load_and_render_skill("search", anima_dir, skills_dir, common, procs)
         assert "ツール制約" in result
         assert "web_search" in result
         assert "read_memory_file" in result
@@ -476,9 +450,7 @@ class TestLoadAndRenderSkill:
             frontmatter="description: Simple skill\n",
             content="# Simple\nJust do it.",
         )
-        result = load_and_render_skill(
-            "simple", anima_dir, skills_dir, common, procs
-        )
+        result = load_and_render_skill("simple", anima_dir, skills_dir, common, procs)
         assert "ツール制約" not in result
 
     def test_nonexistent_skill_error_with_available_list(self, tmp_path: Path):
@@ -488,9 +460,7 @@ class TestLoadAndRenderSkill:
         _make_skill_dir_file(common, "review")
         _make_skill_file(procs, "onboarding")
 
-        result = load_and_render_skill(
-            "nonexistent", anima_dir, skills_dir, common, procs
-        )
+        result = load_and_render_skill("nonexistent", anima_dir, skills_dir, common, procs)
         assert "見つかりません" in result
         assert "nonexistent" in result
         assert "deploy" in result
@@ -500,9 +470,7 @@ class TestLoadAndRenderSkill:
     def test_nonexistent_skill_empty_dirs(self, tmp_path: Path):
         """Error for nonexistent skill when no skills exist at all."""
         anima_dir, skills_dir, common, procs = self._setup_dirs(tmp_path)
-        result = load_and_render_skill(
-            "missing", anima_dir, skills_dir, common, procs
-        )
+        result = load_and_render_skill("missing", anima_dir, skills_dir, common, procs)
         assert "見つかりません" in result
         assert "missing" in result
 
@@ -523,30 +491,22 @@ class TestLoadAndRenderSkill:
     def test_empty_context_omits_section(self, tmp_path: Path):
         anima_dir, skills_dir, common, procs = self._setup_dirs(tmp_path)
         _make_skill_dir_file(skills_dir, "deploy", content="# Deploy\nDeploy steps.")
-        result = load_and_render_skill(
-            "deploy", anima_dir, skills_dir, common, procs, context=""
-        )
+        result = load_and_render_skill("deploy", anima_dir, skills_dir, common, procs, context="")
         assert "コンテキスト" not in result
 
     def test_context_default_omits_section(self, tmp_path: Path):
         """When context is not provided at all, section is omitted."""
         anima_dir, skills_dir, common, procs = self._setup_dirs(tmp_path)
         _make_skill_dir_file(skills_dir, "deploy", content="# Deploy\nDeploy steps.")
-        result = load_and_render_skill(
-            "deploy", anima_dir, skills_dir, common, procs
-        )
+        result = load_and_render_skill("deploy", anima_dir, skills_dir, common, procs)
         assert "コンテキスト" not in result
 
-    def test_now_jst_placeholder_replaced(self, tmp_path: Path):
-        """The {{now_jst}} builtin is replaced with a timestamp."""
+    def test_now_local_placeholder_replaced(self, tmp_path: Path):
+        """The {{now_local}} builtin is replaced with a timestamp."""
         anima_dir, skills_dir, common, procs = self._setup_dirs(tmp_path)
-        _make_skill_dir_file(
-            skills_dir, "timed", content="Current time: {{now_jst}}"
-        )
-        result = load_and_render_skill(
-            "timed", anima_dir, skills_dir, common, procs
-        )
-        assert "{{now_jst}}" not in result
+        _make_skill_dir_file(skills_dir, "timed", content="Current time: {{now_local}}")
+        result = load_and_render_skill("timed", anima_dir, skills_dir, common, procs)
+        assert "{{now_local}}" not in result
         # Should contain an ISO8601-like timestamp with T separator
         assert "T" in result
 
@@ -554,9 +514,7 @@ class TestLoadAndRenderSkill:
         """Skills from common_skills_dir are loaded correctly."""
         anima_dir, skills_dir, common, procs = self._setup_dirs(tmp_path)
         _make_skill_dir_file(common, "shared_review", content="# Review\nReview steps.")
-        result = load_and_render_skill(
-            "shared_review", anima_dir, skills_dir, common, procs
-        )
+        result = load_and_render_skill("shared_review", anima_dir, skills_dir, common, procs)
         assert "# Review" in result
         assert "Review steps." in result
 
@@ -564,9 +522,7 @@ class TestLoadAndRenderSkill:
         """Skills from procedures_dir are loaded correctly."""
         anima_dir, skills_dir, common, procs = self._setup_dirs(tmp_path)
         _make_skill_file(procs, "hiring", content="# Hiring\nHiring process.")
-        result = load_and_render_skill(
-            "hiring", anima_dir, skills_dir, common, procs
-        )
+        result = load_and_render_skill("hiring", anima_dir, skills_dir, common, procs)
         assert "# Hiring" in result
         assert "Hiring process." in result
 
@@ -578,10 +534,51 @@ class TestLoadAndRenderSkill:
         secret.write_text("TOP SECRET", encoding="utf-8")
         _make_skill_dir_file(skills_dir, "legit", content="# Legit skill")
 
-        result = load_and_render_skill(
-            "../../secret", anima_dir, skills_dir, common, procs
-        )
+        result = load_and_render_skill("../../secret", anima_dir, skills_dir, common, procs)
         assert "見つかりません" in result
         assert "TOP SECRET" not in result
         # Available list should show legit skills
         assert "legit" in result
+
+    def test_gated_action_filtered_in_tool_skill(self, tmp_path: Path):
+        """Gated action CLI lines are filtered when not permitted in permissions.md."""
+        anima_dir, skills_dir, common, procs = self._setup_dirs(tmp_path)
+        content = """# Gmail Tool
+
+```bash
+animaworks-tool gmail unread -n 10
+animaworks-tool gmail send --to "x" --subject "s" --body "b"
+animaworks-tool gmail draft --to "x" --subject "s" --body "b"
+```
+"""
+        _make_skill_dir_file(common, "gmail-tool", content=content)
+        # permissions.md with gmail but NOT gmail_send (gated action)
+        (anima_dir / "permissions.md").write_text(
+            "## 外部ツール\n- gmail: yes\n",
+            encoding="utf-8",
+        )
+
+        result = load_and_render_skill("gmail-tool", anima_dir, skills_dir, common, procs)
+        assert "animaworks-tool gmail send" not in result
+        assert "animaworks-tool gmail unread" in result
+        assert "animaworks-tool gmail draft" in result
+
+    def test_gated_action_kept_when_permitted(self, tmp_path: Path):
+        """Gated action CLI lines are kept when explicitly permitted."""
+        anima_dir, skills_dir, common, procs = self._setup_dirs(tmp_path)
+        content = """# Gmail Tool
+
+```bash
+animaworks-tool gmail unread -n 10
+animaworks-tool gmail send --to "x" --subject "s" --body "b"
+```
+"""
+        _make_skill_dir_file(common, "gmail-tool", content=content)
+        (anima_dir / "permissions.md").write_text(
+            "## 外部ツール\n- gmail: yes\n- gmail_send: yes\n",
+            encoding="utf-8",
+        )
+
+        result = load_and_render_skill("gmail-tool", anima_dir, skills_dir, common, procs)
+        assert "animaworks-tool gmail send" in result
+        assert "animaworks-tool gmail unread" in result

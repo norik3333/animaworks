@@ -328,7 +328,7 @@ async def collect_org_audit(
 
     anima_dirs = sorted([d for d in animas_dir.iterdir() if d.is_dir() and (d / "status.json").exists()])
 
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     tasks = [loop.run_in_executor(None, _collect_single_anima, d, date) for d in anima_dirs]
     results = await asyncio.gather(*tasks, return_exceptions=True)
 

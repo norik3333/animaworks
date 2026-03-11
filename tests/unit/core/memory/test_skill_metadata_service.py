@@ -7,10 +7,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
 
 from core.memory.skill_metadata import SkillMetadataService
-from core.schemas import SkillMeta
 
 
 # ── extract_skill_meta ─────────────────────────────────────

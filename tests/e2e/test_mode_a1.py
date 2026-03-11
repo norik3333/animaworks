@@ -12,7 +12,6 @@ from __future__ import annotations
 import pytest
 
 from tests.helpers.mocks import (
-    MockResultMessage,
     patch_agent_sdk,
     patch_agent_sdk_streaming,
 )

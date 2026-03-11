@@ -8,7 +8,6 @@ the extracted sub-services while maintaining backward compatibility.
 """
 from __future__ import annotations
 
-import inspect
 from pathlib import Path
 
 import pytest
@@ -30,7 +29,6 @@ from core.memory.config_reader import ConfigReader
 from core.memory.skill_metadata import SkillMetadataService
 from core.memory.rag_search import RAGMemorySearch
 from core.memory.frontmatter import FrontmatterService
-from core.schemas import SkillMeta
 
 
 # ── Import compatibility ─────────────────────────────────

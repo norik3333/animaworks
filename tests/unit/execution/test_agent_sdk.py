@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -15,15 +15,6 @@ pytestmark = pytest.mark.asyncio
 
 from core.schemas import ModelConfig
 from tests.helpers.mocks import (
-    MockAssistantMessage,
-    MockClaudeSDKClient,
-    MockResultMessage,
-    MockStreamEvent,
-    MockSystemMessage,
-    MockTextBlock,
-    MockToolResultBlock,
-    MockToolUseBlock,
-    MockUserMessage,
     patch_agent_sdk,
     patch_agent_sdk_streaming,
 )

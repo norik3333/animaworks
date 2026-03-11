@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-from core.time_utils import ensure_aware, now_iso, now_jst
+from core.time_utils import ensure_aware, now_iso, now_local
 
 logger = logging.getLogger("animaworks.rag.retriever")
 
@@ -268,7 +268,7 @@ class MemoryRetriever:
         - Temporal decay: exponential decay based on document age
         - Frequency boost: log-scaled boost based on access count (Hebbian LTP)
         """
-        now = now_jst()
+        now = now_local()
 
         for result in results:
             # --- Temporal decay (existing) ---
@@ -299,35 +299,47 @@ class MemoryRetriever:
         """Record access for retrieved results (LTP analog).
 
         Increments access_count and updates last_accessed_at for each result.
-        Called when results are injected into the agent's context.
+        Reads current access_count from the DB to avoid stale metadata in
+        search results causing missed increments.
         """
         if not results:
             return
 
         now_iso_str = now_iso()
-        updates_by_collection: dict[str, tuple[list[str], list[dict]]] = {}
+        ids_by_collection: dict[str, list[str]] = {}
 
         for r in results:
             memory_type = r.metadata.get("memory_type", "knowledge")
             source = r.metadata.get("anima", anima_name)
             collection = f"{source}_{memory_type}"
-            if collection not in updates_by_collection:
-                updates_by_collection[collection] = ([], [])
-            ids, metas = updates_by_collection[collection]
-            ids.append(r.doc_id)
-            metas.append(
-                {
-                    "access_count": int(str(r.metadata.get("access_count", 0))) + 1,
-                    "last_accessed_at": now_iso_str,
-                }
-            )
+            ids_by_collection.setdefault(collection, []).append(r.doc_id)
 
-        for collection, (ids, metas) in updates_by_collection.items():
+        for collection, ids in ids_by_collection.items():
             try:
+                current = self._read_current_access_counts(collection, ids)
+                metas = [
+                    {
+                        "access_count": current.get(doc_id, 0) + 1,
+                        "last_accessed_at": now_iso_str,
+                    }
+                    for doc_id in ids
+                ]
                 self.vector_store.update_metadata(collection, ids, metas)
                 logger.debug("Recorded access for %d chunks in %s", len(ids), collection)
             except Exception as e:
                 logger.warning("Failed to record access for %s: %s", collection, e)
+
+    def _read_current_access_counts(self, collection: str, ids: list[str]) -> dict[str, int]:
+        """Read current access_count values from the vector store."""
+        try:
+            coll = self.vector_store.client.get_collection(name=collection)
+            data = coll.get(ids=ids, include=["metadatas"])
+            return {
+                doc_id: int(str(meta.get("access_count", 0)))
+                for doc_id, meta in zip(data["ids"], data["metadatas"], strict=False)
+            }
+        except Exception:
+            return {}
 
     # ── Config helpers ──────────────────────────────────────────────
 

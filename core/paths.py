@@ -67,6 +67,10 @@ def get_common_knowledge_dir() -> Path:
     return get_data_dir() / "common_knowledge"
 
 
+def get_reference_dir() -> Path:
+    return get_data_dir() / "reference"
+
+
 def get_tmp_dir() -> Path:
     return get_data_dir() / "tmp"
 

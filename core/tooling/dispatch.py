@@ -18,9 +18,11 @@ removed in favour of module-level ``dispatch()`` functions.
 
 import json
 import logging
+from pathlib import Path
 from typing import Any
 
 from core.exceptions import ToolExecutionError  # noqa: F401
+from core.i18n import t
 
 logger = logging.getLogger("animaworks.external_tools")
 
@@ -52,12 +54,76 @@ class ExternalToolDispatcher:
         """Hot-reload: replace the personal/common tools mapping."""
         self._personal_tools = personal_tools
 
+    def _check_gated(self, name: str, args: dict[str, Any]) -> str | None:
+        """Check if a schema name is gated and not permitted.
+
+        Parses tool_name and action from schema name (e.g. gmail_send),
+        reads permissions.md from anima_dir, and returns an error string
+        if the action is gated and not explicitly permitted.
+
+        Returns:
+            Error string if blocked, None if allowed or anima_dir missing.
+        """
+        anima_dir = args.get("anima_dir")
+        if not anima_dir:
+            return None
+
+        tool_name, action = self._split_schema_name(name)
+        if tool_name is None or action is None:
+            return None
+
+        try:
+            perm_path = Path(anima_dir) / "permissions.md"
+            if not perm_path.is_file():
+                return None
+            text = perm_path.read_text(encoding="utf-8")
+            from core.tooling.permissions import is_action_gated, parse_permitted_tools
+
+            permitted = parse_permitted_tools(text)
+            if is_action_gated(tool_name, action, permitted):
+                return json.dumps(
+                    {
+                        "status": "error",
+                        "error_type": "PermissionDenied",
+                        "message": t("tooling.gated_action_denied", tool=tool_name, action=action),
+                    },
+                    ensure_ascii=False,
+                )
+        except Exception as e:
+            logger.debug("Gated check failed for %s: %s", name, e)
+        return None
+
+    def _split_schema_name(self, name: str) -> tuple[str | None, str | None]:
+        """Split schema name into tool_name and action.
+
+        Convention: name is {tool}_{action}. Matches against registry
+        and personal tools, preferring longest match (e.g. image_gen over image).
+        """
+        from core.tools import TOOL_MODULES
+
+        all_tools = set(self._registry) | set(self._personal_tools.keys()) | set(TOOL_MODULES.keys())
+        best_tool: str | None = None
+        best_len = 0
+        for tool in all_tools:
+            prefix = f"{tool}_"
+            if name.startswith(prefix) and len(tool) > best_len:
+                best_tool = tool
+                best_len = len(tool)
+        if best_tool is None:
+            return None, None
+        action = name[len(best_tool) + 1 :]
+        return best_tool, action if action else None
+
     def dispatch(self, name: str, args: dict[str, Any]) -> str | None:
         """Execute a tool by schema name.
 
         Tries core tools first (from TOOL_MODULES), then file-based tools
         (common + personal).  Returns None if no matching tool found.
         """
+        err = self._check_gated(name, args)
+        if err is not None:
+            return err
+
         result = self._dispatch_from_registry(name, args)
         if result is not None:
             return result

@@ -20,7 +20,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from core.memory.conversation import ConversationMemory, ConversationTurn, _MAX_DISPLAY_TURNS
+from core.memory.conversation import ConversationMemory, _MAX_DISPLAY_TURNS
 from core.schemas import ModelConfig
 
 

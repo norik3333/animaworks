@@ -5,8 +5,10 @@
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import timedelta
 from pathlib import Path
+
+from core.time_utils import today_local
 from unittest.mock import patch
 
 import pytest
@@ -245,16 +247,16 @@ class TestListSharedUsers:
 class TestAppendEpisode:
     def test_creates_file(self, mm):
         mm.append_episode("Did something")
-        path = mm.episodes_dir / f"{date.today().isoformat()}.md"
+        path = mm.episodes_dir / f"{today_local().isoformat()}.md"
         assert path.exists()
         content = path.read_text(encoding="utf-8")
         assert "Did something" in content
-        assert date.today().isoformat() in content
+        assert today_local().isoformat() in content
 
     def test_appends_to_existing(self, mm):
         mm.append_episode("First")
         mm.append_episode("Second")
-        path = mm.episodes_dir / f"{date.today().isoformat()}.md"
+        path = mm.episodes_dir / f"{today_local().isoformat()}.md"
         content = path.read_text(encoding="utf-8")
         assert "First" in content
         assert "Second" in content
@@ -292,7 +294,7 @@ class TestWriteKnowledge:
 
 class TestReadRecentEpisodes:
     def test_reads_recent(self, mm):
-        today = date.today()
+        today = today_local()
         for i in range(3):
             d = today - timedelta(days=i)
             (mm.episodes_dir / f"{d.isoformat()}.md").write_text(
@@ -496,7 +498,7 @@ class TestReadModelConfigFromMd:
 
 class TestReadTodayEpisodes:
     def test_reads_today(self, mm):
-        today = date.today().isoformat()
+        today = today_local().isoformat()
         (mm.episodes_dir / f"{today}.md").write_text(
             "Today's log", encoding="utf-8"
         )

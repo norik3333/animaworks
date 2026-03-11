@@ -154,7 +154,10 @@ class MockToolResultBlock:
     """Mock for ``claude_agent_sdk.ToolResultBlock``."""
 
     def __init__(
-        self, tool_use_id: str, content: Any = "", is_error: bool | None = None,
+        self,
+        tool_use_id: str,
+        content: Any = "",
+        is_error: bool | None = None,
     ) -> None:
         self.tool_use_id = tool_use_id
         self.content = content
@@ -173,7 +176,9 @@ class MockSystemMessage:
     """Mock for ``claude_agent_sdk.SystemMessage``."""
 
     def __init__(
-        self, subtype: str = "", data: dict[str, Any] | None = None,
+        self,
+        subtype: str = "",
+        data: dict[str, Any] | None = None,
     ) -> None:
         self.subtype = subtype
         self.data = data or {}
@@ -189,7 +194,7 @@ class MockClaudeSDKClient:
     def __init__(self, messages: list[Any], **kwargs: Any) -> None:
         self._messages = messages
 
-    async def __aenter__(self) -> "MockClaudeSDKClient":
+    async def __aenter__(self) -> MockClaudeSDKClient:
         return self
 
     async def __aexit__(self, *args: Any) -> None:
@@ -227,7 +232,8 @@ def patch_agent_sdk(
 
     assistant_msg = MockAssistantMessage(content_blocks)
     result_msg = MockResultMessage(
-        usage=usage, num_turns=num_turns,
+        usage=usage,
+        num_turns=num_turns,
     )
 
     messages = [assistant_msg, result_msg]
@@ -298,11 +304,15 @@ def patch_agent_sdk_streaming(
     # Build the message sequence for streaming
     messages: list[Any] = []
     for delta in text_deltas:
-        messages.append(MockStreamEvent({
-            "type": "content_block_delta",
-            "delta": {"type": "text_delta", "text": delta},
-            "index": 0,
-        }))
+        messages.append(
+            MockStreamEvent(
+                {
+                    "type": "content_block_delta",
+                    "delta": {"type": "text_delta", "text": delta},
+                    "index": 0,
+                }
+            )
+        )
     messages.append(MockAssistantMessage([MockTextBlock(full_text)]))
     messages.append(result_msg)
 

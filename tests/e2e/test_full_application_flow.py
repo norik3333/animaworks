@@ -12,14 +12,12 @@ Tests cover:
 """
 
 import json
-from datetime import datetime
 from core.time_utils import now_jst
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from core.agent import AgentCore
 from core.lifecycle import LifecycleManager
 from core.memory.consolidation import ConsolidationEngine
 from core.memory.conversation import ConversationMemory

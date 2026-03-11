@@ -10,7 +10,6 @@ supervisor / subordinate / peer annotations in the built system prompt.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
 
 import pytest
 
@@ -70,10 +69,10 @@ class TestOrgContextE2E:
         prompt = self._build_prompt_for(org_team, "rin")
 
         assert "コミュニケーションルール" in prompt
-        assert "上司への報告" in prompt
-        assert "部下への指示" in prompt
-        assert "同僚との連携" in prompt
-        assert "他部署のメンバー" in prompt
+        assert "上司" in prompt
+        assert "部下" in prompt
+        assert "同僚" in prompt
+        assert "他部署" in prompt
 
     def test_solo_anima_no_communication_rules(self, data_dir: Path, make_anima):
         """A solo anima should not see communication rules."""

@@ -10,12 +10,12 @@ Tests the API integration points that drive the frontend bootstrap UI:
 4. Bootstrapping anima transitions to idle after completion
 5. Multiple animas can have independent states simultaneously
 """
+
 from __future__ import annotations
 
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from httpx import ASGITransport, AsyncClient
 
 
@@ -26,7 +26,7 @@ def _create_app(
     tmp_path: Path,
     anima_names: list[str] | None = None,
     supervisor: MagicMock | None = None,
-) -> "FastAPI":  # noqa: F821
+) -> FastAPI:  # noqa: F821
     """Build a real FastAPI app via create_app with mocked externals.
 
     Args:
@@ -74,6 +74,7 @@ def _create_app(
 
     # Persist auth mock beyond the with-block for request-time middleware
     import server.app as _sa
+
     _auth = MagicMock()
     _auth.auth_mode = "local_trust"
     _sa.load_auth = lambda: _auth
@@ -91,7 +92,8 @@ def _create_anima_on_disk(animas_dir: Path, name: str) -> Path:
     for subdir in ("episodes", "knowledge", "procedures", "state", "shortterm"):
         (anima_dir / subdir).mkdir(exist_ok=True)
     (anima_dir / "identity.md").write_text(
-        f"# {name}\nTest anima.", encoding="utf-8",
+        f"# {name}\nTest anima.",
+        encoding="utf-8",
     )
     (anima_dir / "injection.md").write_text("", encoding="utf-8")
     (anima_dir / "permissions.md").write_text("", encoding="utf-8")
@@ -127,7 +129,8 @@ class TestAnimaListBootstrapIntegration:
     """Test GET /api/animas returns correct bootstrap status."""
 
     async def test_anima_list_shows_bootstrapping_status(
-        self, tmp_path: Path,
+        self,
+        tmp_path: Path,
     ) -> None:
         """When supervisor reports an anima as bootstrapping, the
         GET /api/animas response includes ``bootstrapping: True``."""
@@ -159,7 +162,8 @@ class TestAnimaListBootstrapIntegration:
         assert alice["status"] == "bootstrapping"
 
     async def test_anima_start_triggers_bootstrap(
-        self, tmp_path: Path,
+        self,
+        tmp_path: Path,
     ) -> None:
         """POST /api/animas/{name}/start calls supervisor.start_anima
         and returns ``{status: started}``."""
@@ -191,7 +195,8 @@ class TestAnimaListBootstrapIntegration:
         supervisor.start_anima.assert_awaited_once_with("alice")
 
     async def test_start_endpoint_rejects_running_anima(
-        self, tmp_path: Path,
+        self,
+        tmp_path: Path,
     ) -> None:
         """When an anima is already running, POST /start returns
         ``{status: already_running}`` without calling start_anima."""
@@ -223,7 +228,8 @@ class TestAnimaListBootstrapIntegration:
         supervisor.start_anima.assert_not_awaited()
 
     async def test_bootstrapping_anima_transitions_to_idle(
-        self, tmp_path: Path,
+        self,
+        tmp_path: Path,
     ) -> None:
         """After bootstrap completes, the anima status should reflect
         'running' (idle) rather than 'bootstrapping'.
@@ -276,7 +282,8 @@ class TestAnimaListBootstrapIntegration:
         assert data2[0]["status"] == "running"
 
     async def test_multiple_animas_independent_states(
-        self, tmp_path: Path,
+        self,
+        tmp_path: Path,
     ) -> None:
         """Two animas can have different states simultaneously — one
         sleeping (stopped), one bootstrapping."""
@@ -302,7 +309,9 @@ class TestAnimaListBootstrapIntegration:
         )
 
         app = _create_app(
-            tmp_path, anima_names=["alice", "bob"], supervisor=supervisor,
+            tmp_path,
+            anima_names=["alice", "bob"],
+            supervisor=supervisor,
         )
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -323,7 +332,8 @@ class TestAnimaListBootstrapIntegration:
         assert animas["bob"]["bootstrapping"] is True
 
     async def test_start_unknown_anima_returns_404(
-        self, tmp_path: Path,
+        self,
+        tmp_path: Path,
     ) -> None:
         """POST /api/animas/{name}/start for a name not in anima_names
         returns 404."""
@@ -337,7 +347,8 @@ class TestAnimaListBootstrapIntegration:
         assert resp.status_code == 404
 
     async def test_start_stopped_anima_is_accepted(
-        self, tmp_path: Path,
+        self,
+        tmp_path: Path,
     ) -> None:
         """POST /start with status 'not_found' (never started) is accepted."""
         animas_dir = tmp_path / "animas"
@@ -363,7 +374,8 @@ class TestAnimaListBootstrapIntegration:
         supervisor.start_anima.assert_awaited_once_with("alice")
 
     async def test_anima_list_non_bootstrapping_anima(
-        self, tmp_path: Path,
+        self,
+        tmp_path: Path,
     ) -> None:
         """A running anima that is NOT bootstrapping has
         ``bootstrapping: False``."""

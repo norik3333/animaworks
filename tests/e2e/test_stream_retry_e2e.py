@@ -15,18 +15,13 @@ from collections.abc import AsyncGenerator
 from typing import Any
 from unittest.mock import AsyncMock
 
-import pytest
 
-from core.agent import AgentCore
 from core.execution.agent_sdk import StreamDisconnectedError
-from core.memory.shortterm import ShortTermMemory, StreamCheckpoint
+from core.memory.shortterm import ShortTermMemory
 from core.prompt.builder import BuildResult
 
 from tests.helpers.mocks import (
-    MockAssistantMessage,
     MockResultMessage,
-    MockStreamEvent,
-    MockTextBlock,
     patch_agent_sdk_streaming,
 )
 

@@ -8,7 +8,6 @@ from __future__ import annotations
 import sys
 import threading
 import types
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -350,7 +349,6 @@ class TestResetForTesting:
         from core.memory.rag.singleton import (
             _reset_for_testing,
             get_embedding_model,
-            _embedding_model_name,
         )
         import core.memory.rag.singleton as singleton_mod
 

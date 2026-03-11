@@ -356,7 +356,7 @@ class TestCollectResolvedEventsMeta:
 
     def test_resolved_events_empty_meta(self, temp_anima_dir: Path) -> None:
         """_collect_resolved_events should handle entries with None meta."""
-        from dataclasses import dataclass, field
+        from dataclasses import dataclass
         from typing import Any
 
         from core.memory.consolidation import ConsolidationEngine

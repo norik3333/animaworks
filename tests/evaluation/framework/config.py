@@ -11,13 +11,13 @@ as specified in the evaluation protocol.
 """
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Literal
 
 # ── Enumerations ────────────────────────────────────────────────────────────
 
 
-class MemorySize(str, Enum):
+class MemorySize(StrEnum):
     """Memory base size categories."""
 
     SMALL = "small"  # 50 files, ~50K tokens
@@ -25,7 +25,7 @@ class MemorySize(str, Enum):
     LARGE = "large"  # 5000 files, ~5M tokens
 
 
-class SearchMethod(str, Enum):
+class SearchMethod(StrEnum):
     """Search method types."""
 
     BM25 = "bm25"  # BM25 only (baseline)
@@ -34,7 +34,7 @@ class SearchMethod(str, Enum):
     HYBRID_PRIMING = "hybrid_priming"  # Hybrid + Priming layer
 
 
-class ConversationLength(str, Enum):
+class ConversationLength(StrEnum):
     """Conversation length categories."""
 
     SHORT = "short"  # 5 turns
@@ -42,7 +42,7 @@ class ConversationLength(str, Enum):
     LONG = "long"  # 50 turns
 
 
-class ScenarioType(str, Enum):
+class ScenarioType(StrEnum):
     """Conversation scenario types."""
 
     FACTUAL_RECALL = "factual_recall"
@@ -51,7 +51,7 @@ class ScenarioType(str, Enum):
     LONG_CONVERSATION = "long_conversation"
 
 
-class Domain(str, Enum):
+class Domain(StrEnum):
     """Memory domain types."""
 
     BUSINESS = "business"
@@ -79,9 +79,7 @@ class SearchConfig:
     top_k: int = 3
     priming_enabled: bool = False
     priming_budget: int = 2000
-    weights: dict[str, float] = field(
-        default_factory=lambda: {"vector": 0.5, "bm25": 0.3, "recency": 0.2}
-    )
+    weights: dict[str, float] = field(default_factory=lambda: {"vector": 0.5, "bm25": 0.3, "recency": 0.2})
     vector_model: str = "multilingual-e5-small"
 
     def __post_init__(self):

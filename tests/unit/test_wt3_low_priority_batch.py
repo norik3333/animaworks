@@ -18,7 +18,6 @@ from __future__ import annotations
 import asyncio
 import json
 import re
-from datetime import datetime, timedelta
 from core.time_utils import now_jst
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -30,7 +29,7 @@ import pytest
 # ══════════════════════════════════════════════════════════════════════
 
 
-def _make_handler(tmp_path: Path, anima_name: str = "alice") -> "ToolHandler":
+def _make_handler(tmp_path: Path, anima_name: str = "alice") -> ToolHandler:
     """Create a ToolHandler with minimal mocked dependencies."""
     from core.tooling.handler import ToolHandler
 
@@ -86,9 +85,7 @@ class TestFanoutAllExcludesStoppedAnimas:
         messenger = handler._messenger
         # Should have called send() for bob and carol (sorted order)
         assert messenger.send.call_count == 2
-        targets = sorted(
-            c[1]["to"] for c in messenger.send.call_args_list
-        )
+        targets = sorted(c[1]["to"] for c in messenger.send.call_args_list)
         assert targets == ["bob", "carol"]
         assert "dave" not in targets
 
@@ -166,9 +163,7 @@ class TestStreamingCommentUpdated:
         """agent.py should reference 'S / A / all modes', not just 'A1 Agent SDK'."""
         agent_path = Path(__file__).resolve().parents[2] / "core" / "agent.py"
         content = agent_path.read_text(encoding="utf-8")
-        assert "S / A / all modes" in content, (
-            "agent.py streaming section comment should say 'S / A / all modes'"
-        )
+        assert "S / A / all modes" in content, "agent.py streaming section comment should say 'S / A / all modes'"
 
 
 class TestLitellmCommentUpdated:
@@ -176,18 +171,13 @@ class TestLitellmCommentUpdated:
 
     def test_litellm_comment_updated(self):
         """litellm_loop.py should say 'handled by AgentCore', not 'NOT handled'."""
-        litellm_path = (
-            Path(__file__).resolve().parents[2]
-            / "core" / "execution" / "litellm_loop.py"
-        )
+        litellm_path = Path(__file__).resolve().parents[2] / "core" / "execution" / "litellm_loop.py"
         content = litellm_path.read_text(encoding="utf-8")
         assert "handled by AgentCore" in content, (
             "litellm_loop.py should say session chaining is 'handled by AgentCore'"
         )
         # Verify old incorrect comment is gone
-        assert "NOT handled" not in content, (
-            "litellm_loop.py should NOT contain 'NOT handled' anymore"
-        )
+        assert "NOT handled" not in content, "litellm_loop.py should NOT contain 'NOT handled' anymore"
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -292,10 +282,7 @@ class TestForgettingThresholds:
         days_low = 100
         access_count = 1
 
-        eligible = (
-            days_low > FORGETTING_LOW_ACTIVATION_DAYS
-            and access_count <= FORGETTING_MAX_ACCESS_COUNT
-        )
+        eligible = days_low > FORGETTING_LOW_ACTIVATION_DAYS and access_count <= FORGETTING_MAX_ACCESS_COUNT
         assert eligible is True, (
             f"Chunk with access_count={access_count} and days_low={days_low} "
             f"should be eligible for deletion (threshold: days>{FORGETTING_LOW_ACTIVATION_DAYS}, "
@@ -312,10 +299,7 @@ class TestForgettingThresholds:
         days_low = 100
         access_count = 3
 
-        eligible = (
-            days_low > FORGETTING_LOW_ACTIVATION_DAYS
-            and access_count <= FORGETTING_MAX_ACCESS_COUNT
-        )
+        eligible = days_low > FORGETTING_LOW_ACTIVATION_DAYS and access_count <= FORGETTING_MAX_ACCESS_COUNT
         assert eligible is False, (
             f"Chunk with access_count={access_count} should NOT be eligible "
             f"(threshold: access<={FORGETTING_MAX_ACCESS_COUNT})"
@@ -328,35 +312,30 @@ class TestForgettingThresholds:
 
 
 class TestPrimingRegexCompiledConstants:
-    """Fix N6: _RE_KATAKANA and _RE_WORDS are pre-compiled regex patterns."""
+    """Fix N6: _RE_UNICODE_WORDS is a pre-compiled regex pattern."""
 
     def test_priming_regex_compiled_constants(self):
-        """Module-level regex constants should be compiled re.Pattern objects."""
-        from core.memory.priming import _RE_KATAKANA, _RE_WORDS
+        """Module-level regex constant should be a compiled re.Pattern object."""
+        from core.memory.priming import _RE_UNICODE_WORDS
 
-        assert isinstance(_RE_KATAKANA, re.Pattern), (
-            "_RE_KATAKANA should be a compiled regex Pattern"
-        )
-        assert isinstance(_RE_WORDS, re.Pattern), (
-            "_RE_WORDS should be a compiled regex Pattern"
-        )
+        assert isinstance(_RE_UNICODE_WORDS, re.Pattern), "_RE_UNICODE_WORDS should be a compiled regex Pattern"
 
-    def test_re_katakana_matches_katakana(self):
-        """_RE_KATAKANA should match katakana sequences of 2+ characters."""
-        from core.memory.priming import _RE_KATAKANA
+    def test_re_unicode_words_matches_mixed_text(self):
+        """_RE_UNICODE_WORDS should match alphanumeric and CJK word tokens."""
+        from core.memory.priming import _RE_UNICODE_WORDS
 
-        assert _RE_KATAKANA.findall("テスト") == ["テスト"]
-        assert _RE_KATAKANA.findall("ア") == []  # Single char: no match
-        assert _RE_KATAKANA.findall("アイウ") == ["アイウ"]
-
-    def test_re_words_matches_mixed_text(self):
-        """_RE_WORDS should match alphanumeric and CJK word tokens."""
-        from core.memory.priming import _RE_WORDS
-
-        tokens = _RE_WORDS.findall("Hello 世界 test123")
+        tokens = _RE_UNICODE_WORDS.findall("Hello 世界 test123")
         assert "Hello" in tokens
         assert "世界" in tokens
         assert "test123" in tokens
+
+    def test_re_unicode_words_matches_katakana(self):
+        """_RE_UNICODE_WORDS should match katakana sequences."""
+        from core.memory.priming import _RE_UNICODE_WORDS
+
+        tokens = _RE_UNICODE_WORDS.findall("テスト マレーシア")
+        assert "テスト" in tokens
+        assert "マレーシア" in tokens
 
 
 class TestExtractKeywordsTruncatesLongInput:
@@ -432,13 +411,15 @@ class TestJournalOpenRecoversOrphan:
 
         # Create an orphaned journal (simulate previous crash)
         journal_path = journal_anima_dir / "shortterm" / "streaming_journal_chat.jsonl"
-        orphan_data = json.dumps({
-            "ev": "start",
-            "trigger": "heartbeat",
-            "from": "old-session",
-            "session_id": "orphan-sess",
-            "ts": now_jst().isoformat(),
-        })
+        orphan_data = json.dumps(
+            {
+                "ev": "start",
+                "trigger": "heartbeat",
+                "from": "old-session",
+                "session_id": "orphan-sess",
+                "ts": now_jst().isoformat(),
+            }
+        )
         journal_path.write_text(orphan_data + "\n", encoding="utf-8")
 
         assert StreamingJournal.has_orphan(journal_anima_dir) is True
@@ -446,9 +427,7 @@ class TestJournalOpenRecoversOrphan:
         # Now open a new journal — should trigger recovery first
         journal = StreamingJournal(journal_anima_dir)
 
-        with patch.object(
-            StreamingJournal, "recover", wraps=StreamingJournal.recover
-        ) as mock_recover:
+        with patch.object(StreamingJournal, "recover", wraps=StreamingJournal.recover) as mock_recover:
             journal.open(trigger="chat", from_person="user", session_id="new-sess")
 
         # The orphan was present before open() — recovery path was taken.
@@ -466,11 +445,16 @@ class TestJournalOpenRecoversOrphan:
         # Write an orphan with some text
         journal_path = journal_anima_dir / "shortterm" / "streaming_journal_chat.jsonl"
         lines = [
-            json.dumps({"ev": "start", "trigger": "chat", "from": "tester",
-                         "session_id": "orphan-1",
-                         "ts": now_jst().isoformat()}),
-            json.dumps({"ev": "text", "t": "orphan content",
-                         "ts": now_jst().isoformat()}),
+            json.dumps(
+                {
+                    "ev": "start",
+                    "trigger": "chat",
+                    "from": "tester",
+                    "session_id": "orphan-1",
+                    "ts": now_jst().isoformat(),
+                }
+            ),
+            json.dumps({"ev": "text", "t": "orphan content", "ts": now_jst().isoformat()}),
         ]
         journal_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 

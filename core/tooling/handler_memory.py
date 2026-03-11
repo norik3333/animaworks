@@ -80,6 +80,17 @@ class MemoryToolsMixin:
                     "PermissionDenied",
                     "Path traversal detected — access denied.",
                 )
+        elif rel.startswith("reference/"):
+            from core.paths import get_reference_dir
+
+            suffix = rel[len("reference/") :]
+            ref_dir = get_reference_dir()
+            path = (ref_dir / suffix).resolve()
+            if not path.is_relative_to(ref_dir.resolve()):
+                return _error_result(
+                    "PermissionDenied",
+                    "Path traversal detected — access denied.",
+                )
         else:
             path = self._anima_dir / rel
             resolved = path.resolve()
@@ -129,6 +140,12 @@ class MemoryToolsMixin:
 
     def _handle_write_memory_file(self, args: dict[str, Any]) -> str:
         rel = args["path"]
+
+        if rel.startswith("reference/"):
+            return _error_result(
+                "PermissionDenied",
+                "reference/ is read-only. Use common_knowledge/ for shared writable documents.",
+            )
 
         # Support common_knowledge/ prefix — resolve to shared dir
         if rel.startswith("common_knowledge/"):
@@ -218,7 +235,7 @@ class MemoryToolsMixin:
                 from core.memory.frontmatter import (
                     validate_and_complete_frontmatter as _validate_fm_hw,
                 )
-                from core.schemas import now_jst as _now_jst_hw
+                from core.time_utils import now_local as _now_local_hw
 
                 _meta_hw, _body_hw = _parse_fm_hw(content.lstrip())
                 if _meta_hw:
@@ -232,7 +249,7 @@ class MemoryToolsMixin:
                         except OSError:
                             pass
                     _validate_fm_hw(_meta_hw, path)
-                    _meta_hw["updated_at"] = _now_jst_hw().isoformat()
+                    _meta_hw["updated_at"] = _now_local_hw().isoformat()
                     _fm_hw = _yaml_km_fm.dump(_meta_hw, default_flow_style=False, allow_unicode=True)
                     path.write_text(f"---\n{_fm_hw}---\n\n{_body_hw.lstrip()}", encoding="utf-8")
                     auto_frontmatter_applied = True
@@ -241,7 +258,7 @@ class MemoryToolsMixin:
                     from core.memory.frontmatter import strip_content_frontmatter as _strip_fm_hw
 
                     _clean_body_hw = _strip_fm_hw(content.lstrip())
-                    _ts_fb = _now_jst_hw().isoformat()
+                    _ts_fb = _now_local_hw().isoformat()
                     _fallback_meta: dict[str, Any] = {
                         "confidence": 0.5,
                         "created_at": _ts_fb,
@@ -281,7 +298,7 @@ class MemoryToolsMixin:
                 import yaml as _yaml_km
 
                 from core.memory.frontmatter import strip_content_frontmatter
-                from core.schemas import now_jst
+                from core.time_utils import now_local
 
                 # Preserve original created_at on overwrite
                 _original_created_at = None
@@ -294,7 +311,7 @@ class MemoryToolsMixin:
                         _original_created_at = _existing_meta_ow.get("created_at")
                     except OSError:
                         pass
-                ts = now_jst().isoformat()
+                ts = now_local().isoformat()
                 metadata: dict[str, Any] = {
                     "confidence": 0.5,
                     "created_at": _original_created_at or ts,

@@ -13,7 +13,6 @@ import pytest
 
 from core.memory.conversation import (
     ConversationMemory,
-    ConversationState,
     ConversationTurn,
     ToolRecord,
     _MAX_TOOL_RECORDS_PER_TURN,

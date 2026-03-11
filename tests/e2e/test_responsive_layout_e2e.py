@@ -15,10 +15,8 @@ Run with: python -m pytest tests/e2e/test_responsive_layout_e2e.py -v
 from __future__ import annotations
 
 import os
-import subprocess
 import time
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 import pytest
 

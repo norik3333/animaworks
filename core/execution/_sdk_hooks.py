@@ -588,9 +588,9 @@ def _build_pre_tool_hook(
             class _PlanTasksProxy(SkillsToolsMixin):
                 _anima_dir = anima_dir
                 _anima_name = anima_dir.name
-                _pending_executor_wake = on_task_intercepted
 
             proxy = _PlanTasksProxy()
+            proxy._pending_executor_wake = on_task_intercepted
             try:
                 result_str = proxy._handle_plan_tasks(tool_input)
             except Exception as exc:

@@ -111,6 +111,8 @@ TOOL_TRUST_LEVELS: dict[str, str] = {
     "slack_search": "untrusted",
     "slack_unreplied": "untrusted",
     "slack_channels": "untrusted",
+    "slack_channel_post": "untrusted",
+    "slack_channel_update": "untrusted",
     "chatwork_messages": "untrusted",
     "chatwork_search": "untrusted",
     "chatwork_unreplied": "untrusted",

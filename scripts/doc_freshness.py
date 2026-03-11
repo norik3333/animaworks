@@ -11,6 +11,7 @@ Usage:
     python scripts/doc_freshness.py --fix              # Auto-update via cursor-agent
     python scripts/doc_freshness.py --fix --dry-run    # Preview fix commands
 """
+
 from __future__ import annotations
 
 import argparse
@@ -19,7 +20,7 @@ import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from pathlib import Path
 
 # ── Constants ────────────────────────────────────────────────────────
@@ -53,9 +54,7 @@ _SKILL_JA_TO_EN: dict[str, str] = {
     "common_skills/image-posting/SKILL.md": "common_skills/image-posting.md",
     "common_skills/skill-creator/SKILL.md": "common_skills/skill-creator.md",
     "common_skills/subagent-cli/SKILL.md": "common_skills/subagent-cli.md",
-    "common_skills/subordinate-management/SKILL.md": (
-        "common_skills/subordinate_management.md"
-    ),
+    "common_skills/subordinate-management/SKILL.md": ("common_skills/subordinate_management.md"),
     "common_skills/tool-creator/SKILL.md": "common_skills/tool-creator.md",
 }
 
@@ -122,6 +121,25 @@ DOC_SOURCE_MAP: dict[str, list[str]] = {
     "common_knowledge/operations/voice-chat-guide.md": [
         "core/voice/",
         "server/routes/voice.py",
+    ],
+    # ── common_knowledge — anatomy ──
+    "common_knowledge/anatomy/what-is-anima.md": [
+        "core/anima.py",
+        "core/background.py",
+        "core/lifecycle.py",
+    ],
+    "common_knowledge/anatomy/anima-anatomy.md": [
+        "core/anima_factory.py",
+        "core/init.py",
+        "core/prompt/builder.py",
+        "core/schedule_parser.py",
+    ],
+    "common_knowledge/anatomy/memory-system.md": [
+        "core/memory/",
+        "core/memory/priming.py",
+        "core/memory/consolidation.py",
+        "core/memory/forgetting.py",
+        "core/memory/rag/",
     ],
     # ── common_knowledge — organization ──
     "common_knowledge/organization/hierarchy-rules.md": [
@@ -262,7 +280,7 @@ def _git_timestamp(rel_path: str) -> int | None:
 
 
 def _ts_to_date(ts: int) -> str:
-    return datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d")
+    return datetime.fromtimestamp(ts, tz=UTC).strftime("%Y-%m-%d")
 
 
 # ── Path resolution ──────────────────────────────────────────────────
@@ -276,7 +294,7 @@ def _en_rel(doc_key: str) -> str | None:
         _, en = _ROOT_FILE_MAP[doc_key]
         return en if (WORKSPACE / en).exists() else None
     if doc_key.startswith("docs/"):
-        stem = doc_key[len("docs/"):]
+        stem = doc_key[len("docs/") :]
         rel = f"docs/{stem}.md"
         return rel if (WORKSPACE / rel).exists() else None
     en_key = _SKILL_JA_TO_EN.get(doc_key, doc_key)
@@ -289,7 +307,7 @@ def _ja_rel(doc_key: str) -> str:
         ja, _ = _ROOT_FILE_MAP[doc_key]
         return ja
     if doc_key.startswith("docs/"):
-        stem = doc_key[len("docs/"):]
+        stem = doc_key[len("docs/") :]
         return f"docs/{stem}.ja.md"
     return f"templates/ja/{doc_key}"
 
@@ -358,13 +376,24 @@ def _check_one(
 # ── Discovery (--all) ────────────────────────────────────────────────
 
 
-_PUBLISH_EXCLUDED_DIRS = frozenset({
-    "implemented", "issues", "research", "records",
-    "reports", "drafts", "legacy", "testing",
-})
-_PUBLISH_EXCLUDED_FILES = frozenset({
-    "index.md", "oss-publication-strategy.md",
-})
+_PUBLISH_EXCLUDED_DIRS = frozenset(
+    {
+        "implemented",
+        "issues",
+        "research",
+        "records",
+        "reports",
+        "drafts",
+        "legacy",
+        "testing",
+    }
+)
+_PUBLISH_EXCLUDED_FILES = frozenset(
+    {
+        "index.md",
+        "oss-publication-strategy.md",
+    }
+)
 
 
 def _discover_unmapped() -> dict[str, list[str]]:
@@ -402,11 +431,7 @@ def collect(
     """Return (stale_entries, total_doc_paths_checked)."""
     since_ts: int | None = None
     if since:
-        since_ts = int(
-            datetime.strptime(since, "%Y-%m-%d")
-            .replace(tzinfo=timezone.utc)
-            .timestamp()
-        )
+        since_ts = int(datetime.strptime(since, "%Y-%m-%d").replace(tzinfo=UTC).timestamp())
 
     doc_map: dict[str, list[str]] = dict(DOC_SOURCE_MAP)
     if all_docs:
@@ -422,9 +447,7 @@ def collect(
         doc_map = {k: v for k, v in doc_map.items() if k == norm}
 
     if category:
-        doc_map = {
-            k: v for k, v in doc_map.items() if k.startswith(f"{category}/") or k.startswith(category)
-        }
+        doc_map = {k: v for k, v in doc_map.items() if k.startswith(f"{category}/") or k.startswith(category)}
 
     total = 0
     entries: list[StaleEntry] = []
@@ -451,10 +474,7 @@ def print_report(entries: list[StaleEntry], total: int) -> None:
         return
     for e in entries:
         print(f"[{_SEV_LABEL[e.severity]}] {e.doc_path}")
-        print(
-            f"       Reason: {e.changed_code} changed {e.code_date} "
-            f"(doc: {e.doc_date}, {e.days_stale}d stale)"
-        )
+        print(f"       Reason: {e.changed_code} changed {e.code_date} (doc: {e.doc_date}, {e.days_stale}d stale)")
 
 
 def print_json_report(entries: list[StaleEntry]) -> None:
@@ -503,8 +523,7 @@ def run_fix(
         agent = shutil.which("cursor-agent")
         if not agent:
             print(
-                "Error: cursor-agent not found in PATH. "
-                "Install it or use --dry-run to preview commands.",
+                "Error: cursor-agent not found in PATH. Install it or use --dry-run to preview commands.",
                 file=sys.stderr,
             )
             sys.exit(1)
@@ -534,9 +553,7 @@ def run_fix(
                 print(f"  WARN: timed out after {timeout}s, skipping")
                 continue
             if result.returncode != 0:
-                print(
-                    f"  WARN: cursor-agent exited {result.returncode}, skipping"
-                )
+                print(f"  WARN: cursor-agent exited {result.returncode}, skipping")
                 continue
         fixed_keys.add(e.doc_key)
 
@@ -565,9 +582,7 @@ def run_fix(
                 print(f"  WARN: timed out after {timeout}s, skipping")
                 continue
             if result.returncode != 0:
-                print(
-                    f"  WARN: cursor-agent exited {result.returncode}, skipping"
-                )
+                print(f"  WARN: cursor-agent exited {result.returncode}, skipping")
 
 
 def _shell_join(cmd: list[str]) -> str:

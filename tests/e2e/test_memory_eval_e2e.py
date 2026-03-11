@@ -6,11 +6,8 @@ Runs the full pipeline: dataset generation -> ablation experiments -> report
 in mock mode with a temporary directory for isolation.
 """
 
-import asyncio
 import json
 import logging
-from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 import pytest
 

@@ -75,7 +75,7 @@ class TestDoneHandlerClearsActiveTool:
         done_idx = content.find("onDone")
         assert done_idx != -1, f"onDone handler not found in {js_path.name}"
 
-        after_done = content[done_idx:done_idx + 500]
+        after_done = content[done_idx:done_idx + 1000]
         assert "activeTool = null" in after_done, (
             f"onDone handler should clear activeTool in {js_path.name}"
         )

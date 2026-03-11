@@ -6,11 +6,10 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, UTC
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
 from httpx import ASGITransport, AsyncClient
 
 
@@ -46,9 +45,11 @@ def _create_app(tmp_path: Path, anima_names: list[str] | None = None):
         ws_manager.active_connections = []
         mock_ws_cls.return_value = ws_manager
         from server.app import create_app
+
         app = create_app(animas_dir, shared_dir)
     # Persist auth mock beyond the with-block for request-time middleware
     import server.app as _sa
+
     _auth = MagicMock()
     _auth.auth_mode = "local_trust"
     _sa.load_auth = lambda: _auth
@@ -105,9 +106,14 @@ class TestActivityPagination:
     async def test_limit_parameter(self, tmp_path: Path) -> None:
         animas_dir = tmp_path / "animas"
         _setup_anima(animas_dir, "alice")
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         entries = [
-            {"ts": (now - timedelta(seconds=10 - i)).isoformat(), "type": "heartbeat_start", "summary": f"HB {i}", "content": ""}
+            {
+                "ts": (now - timedelta(seconds=10 - i)).isoformat(),
+                "type": "heartbeat_start",
+                "summary": f"HB {i}",
+                "content": "",
+            }
             for i in range(10)
         ]
         _write_activity(animas_dir, "alice", entries)
@@ -125,9 +131,14 @@ class TestActivityPagination:
     async def test_offset_parameter(self, tmp_path: Path) -> None:
         animas_dir = tmp_path / "animas"
         _setup_anima(animas_dir, "alice")
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         entries = [
-            {"ts": (now - timedelta(seconds=5 - i)).isoformat(), "type": "heartbeat_start", "summary": f"HB {i}", "content": ""}
+            {
+                "ts": (now - timedelta(seconds=5 - i)).isoformat(),
+                "type": "heartbeat_start",
+                "summary": f"HB {i}",
+                "content": "",
+            }
             for i in range(5)
         ]
         _write_activity(animas_dir, "alice", entries)
@@ -159,10 +170,25 @@ class TestActivityMessageLog:
     async def test_dm_events_returned(self, tmp_path: Path) -> None:
         animas_dir = tmp_path / "animas"
         _setup_anima(animas_dir, "alice")
-        now = datetime.now(timezone.utc)
-        _write_activity(animas_dir, "alice", [
-            {"ts": now.isoformat(), "type": "dm_sent", "summary": "Hello Bob!", "content": "Hello Bob!", "from": "alice", "to": "bob", "channel": "", "tool": "", "via": "", "meta": {}},
-        ])
+        now = datetime.now(UTC)
+        _write_activity(
+            animas_dir,
+            "alice",
+            [
+                {
+                    "ts": now.isoformat(),
+                    "type": "dm_sent",
+                    "summary": "Hello Bob!",
+                    "content": "Hello Bob!",
+                    "from": "alice",
+                    "to": "bob",
+                    "channel": "",
+                    "tool": "",
+                    "via": "",
+                    "meta": {},
+                },
+            ],
+        )
         app = _create_app(tmp_path, anima_names=["alice"])
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -180,13 +206,35 @@ class TestActivityMessageLog:
         animas_dir = tmp_path / "animas"
         _setup_anima(animas_dir, "alice")
         _setup_anima(animas_dir, "charlie")
-        now = datetime.now(timezone.utc)
-        _write_activity(animas_dir, "alice", [
-            {"ts": now.isoformat(), "type": "dm_sent", "summary": "A to B", "content": "", "from": "alice", "to": "bob"},
-        ])
-        _write_activity(animas_dir, "charlie", [
-            {"ts": now.isoformat(), "type": "dm_sent", "summary": "C to D", "content": "", "from": "charlie", "to": "dave"},
-        ])
+        now = datetime.now(UTC)
+        _write_activity(
+            animas_dir,
+            "alice",
+            [
+                {
+                    "ts": now.isoformat(),
+                    "type": "dm_sent",
+                    "summary": "A to B",
+                    "content": "",
+                    "from": "alice",
+                    "to": "bob",
+                },
+            ],
+        )
+        _write_activity(
+            animas_dir,
+            "charlie",
+            [
+                {
+                    "ts": now.isoformat(),
+                    "type": "dm_sent",
+                    "summary": "C to D",
+                    "content": "",
+                    "from": "charlie",
+                    "to": "dave",
+                },
+            ],
+        )
         app = _create_app(tmp_path, anima_names=["alice", "charlie"])
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -216,12 +264,23 @@ class TestActivityTypeFilter:
     async def test_filter_by_single_type(self, tmp_path: Path) -> None:
         animas_dir = tmp_path / "animas"
         _setup_anima(animas_dir, "alice")
-        now = datetime.now(timezone.utc)
-        _write_activity(animas_dir, "alice", [
-            {"ts": now.isoformat(), "type": "heartbeat_start", "summary": "HB 1", "content": ""},
-            {"ts": now.isoformat(), "type": "cron_executed", "summary": "Cron 1", "content": ""},
-            {"ts": now.isoformat(), "type": "dm_sent", "summary": "msg", "content": "", "from": "alice", "to": "bob"},
-        ])
+        now = datetime.now(UTC)
+        _write_activity(
+            animas_dir,
+            "alice",
+            [
+                {"ts": now.isoformat(), "type": "heartbeat_start", "summary": "HB 1", "content": ""},
+                {"ts": now.isoformat(), "type": "cron_executed", "summary": "Cron 1", "content": ""},
+                {
+                    "ts": now.isoformat(),
+                    "type": "dm_sent",
+                    "summary": "msg",
+                    "content": "",
+                    "from": "alice",
+                    "to": "bob",
+                },
+            ],
+        )
         app = _create_app(tmp_path, anima_names=["alice"])
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -233,12 +292,23 @@ class TestActivityTypeFilter:
     async def test_filter_by_multiple_types(self, tmp_path: Path) -> None:
         animas_dir = tmp_path / "animas"
         _setup_anima(animas_dir, "alice")
-        now = datetime.now(timezone.utc)
-        _write_activity(animas_dir, "alice", [
-            {"ts": now.isoformat(), "type": "heartbeat_start", "summary": "HB", "content": ""},
-            {"ts": now.isoformat(), "type": "cron_executed", "summary": "Cron", "content": ""},
-            {"ts": now.isoformat(), "type": "dm_sent", "summary": "msg", "content": "", "from": "alice", "to": "bob"},
-        ])
+        now = datetime.now(UTC)
+        _write_activity(
+            animas_dir,
+            "alice",
+            [
+                {"ts": now.isoformat(), "type": "heartbeat_start", "summary": "HB", "content": ""},
+                {"ts": now.isoformat(), "type": "cron_executed", "summary": "Cron", "content": ""},
+                {
+                    "ts": now.isoformat(),
+                    "type": "dm_sent",
+                    "summary": "msg",
+                    "content": "",
+                    "from": "alice",
+                    "to": "bob",
+                },
+            ],
+        )
         app = _create_app(tmp_path, anima_names=["alice"])
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -258,13 +328,40 @@ class TestActivityMixedEvents:
     async def test_all_event_types_aggregated(self, tmp_path: Path) -> None:
         animas_dir = tmp_path / "animas"
         _setup_anima(animas_dir, "alice")
-        now = datetime.now(timezone.utc)
-        _write_activity(animas_dir, "alice", [
-            {"ts": (now - timedelta(seconds=3)).isoformat(), "type": "heartbeat_start", "summary": "HB", "content": ""},
-            {"ts": (now - timedelta(seconds=2)).isoformat(), "type": "cron_executed", "summary": "Cron", "content": ""},
-            {"ts": (now - timedelta(seconds=1)).isoformat(), "type": "dm_sent", "summary": "msg", "content": "", "from": "alice", "to": "bob"},
-            {"ts": now.isoformat(), "type": "tool_use", "summary": "web_search", "content": "", "tool": "web_search"},
-        ])
+        now = datetime.now(UTC)
+        _write_activity(
+            animas_dir,
+            "alice",
+            [
+                {
+                    "ts": (now - timedelta(seconds=3)).isoformat(),
+                    "type": "heartbeat_start",
+                    "summary": "HB",
+                    "content": "",
+                },
+                {
+                    "ts": (now - timedelta(seconds=2)).isoformat(),
+                    "type": "cron_executed",
+                    "summary": "Cron",
+                    "content": "",
+                },
+                {
+                    "ts": (now - timedelta(seconds=1)).isoformat(),
+                    "type": "dm_sent",
+                    "summary": "msg",
+                    "content": "",
+                    "from": "alice",
+                    "to": "bob",
+                },
+                {
+                    "ts": now.isoformat(),
+                    "type": "tool_use",
+                    "summary": "web_search",
+                    "content": "",
+                    "tool": "web_search",
+                },
+            ],
+        )
         app = _create_app(tmp_path, anima_names=["alice"])
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:

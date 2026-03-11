@@ -11,12 +11,12 @@ Validates the default-all permission model:
   - Empty permissions -> returns all tools
   - ``- all: yes`` + multiple denies -> correct exclusion
 """
+
 from __future__ import annotations
 
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 from core.schemas import ModelConfig
 
@@ -41,7 +41,7 @@ _FAKE_TOOL_MODULES: dict[str, str] = {
 _ALL_TOOLS_SORTED = sorted(_FAKE_TOOL_MODULES.keys())
 
 
-def _build_agent(tmp_path: Path, permissions_text: str) -> "AgentCore":
+def _build_agent(tmp_path: Path, permissions_text: str) -> AgentCore:
     """Construct AgentCore with a mocked MemoryManager returning *permissions_text*."""
     mc = ModelConfig(model="claude-sonnet-4-6", api_key="test-key")
     memory = MagicMock()
@@ -57,6 +57,7 @@ def _build_agent(tmp_path: Path, permissions_text: str) -> "AgentCore":
         patch("core.tools.discover_core_tools", return_value=_FAKE_TOOL_MODULES),
     ):
         from core.agent import AgentCore
+
         agent = AgentCore(tmp_path, memory, mc)
     return agent
 
@@ -99,18 +100,9 @@ class TestToolPermissionsDefaultAll:
 
     def test_all_yes_with_multiple_denies(self, tmp_path: Path) -> None:
         """``- all: yes`` + multiple deny entries -> correct exclusion."""
-        permissions = (
-            "## 外部ツール\n"
-            "- all: yes\n"
-            "- chatwork: no\n"
-            "- slack: disabled\n"
-            "- gmail: false\n"
-        )
+        permissions = "## 外部ツール\n- all: yes\n- chatwork: no\n- slack: disabled\n- gmail: false\n"
         agent = _build_agent(tmp_path, permissions)
-        expected = [
-            t for t in _ALL_TOOLS_SORTED
-            if t not in {"chatwork", "slack", "gmail"}
-        ]
+        expected = [t for t in _ALL_TOOLS_SORTED if t not in {"chatwork", "slack", "gmail"}]
         assert agent._tool_registry == expected
 
     def test_section_present_but_no_entries_returns_all(self, tmp_path: Path) -> None:
@@ -121,39 +113,20 @@ class TestToolPermissionsDefaultAll:
 
     def test_deny_values_case_insensitive(self, tmp_path: Path) -> None:
         """Deny values are case-insensitive (No, NO, DENY, Disabled, False)."""
-        permissions = (
-            "## 外部ツール\n"
-            "- all: yes\n"
-            "- chatwork: No\n"
-            "- slack: DENY\n"
-            "- gmail: Disabled\n"
-            "- github: False\n"
-        )
+        permissions = "## 外部ツール\n- all: yes\n- chatwork: No\n- slack: DENY\n- gmail: Disabled\n- github: False\n"
         agent = _build_agent(tmp_path, permissions)
-        expected = [
-            t for t in _ALL_TOOLS_SORTED
-            if t not in {"chatwork", "slack", "gmail", "github"}
-        ]
+        expected = [t for t in _ALL_TOOLS_SORTED if t not in {"chatwork", "slack", "gmail", "github"}]
         assert agent._tool_registry == expected
 
     def test_allow_values_case_insensitive(self, tmp_path: Path) -> None:
         """Allow values accept OK, yes, enabled, true (case-insensitive)."""
-        permissions = (
-            "## 外部ツール\n"
-            "- web_search: OK\n"
-            "- chatwork: Enabled\n"
-            "- gmail: TRUE\n"
-        )
+        permissions = "## 外部ツール\n- web_search: OK\n- chatwork: Enabled\n- gmail: TRUE\n"
         agent = _build_agent(tmp_path, permissions)
         assert sorted(agent._tool_registry) == ["chatwork", "gmail", "web_search"]
 
     def test_deny_unknown_tool_ignored(self, tmp_path: Path) -> None:
         """Deny entries for tools not in TOOL_MODULES are silently ignored."""
-        permissions = (
-            "## 外部ツール\n"
-            "- all: yes\n"
-            "- nonexistent_tool: no\n"
-        )
+        permissions = "## 外部ツール\n- all: yes\n- nonexistent_tool: no\n"
         agent = _build_agent(tmp_path, permissions)
         assert agent._tool_registry == _ALL_TOOLS_SORTED
 
@@ -170,5 +143,6 @@ class TestToolPermissionsDefaultAll:
             patch("core.tools.discover_core_tools", return_value=_FAKE_TOOL_MODULES),
         ):
             from core.agent import AgentCore
+
             agent = AgentCore(tmp_path, None, mc)  # type: ignore[arg-type]
         assert agent._tool_registry == _ALL_TOOLS_SORTED

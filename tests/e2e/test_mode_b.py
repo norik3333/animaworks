@@ -9,8 +9,7 @@ Post-call: episode recording and knowledge extraction.
 
 from __future__ import annotations
 
-from datetime import date
-from core.time_utils import now_jst
+from core.time_utils import now_jst, today_local
 
 import pytest
 
@@ -62,7 +61,7 @@ class TestModeBMock:
         agent.memory.append_episode(episode)
 
         # Check episode file was written
-        today = date.today().isoformat()
+        today = today_local().isoformat()
         episode_path = agent.anima_dir / "episodes" / f"{today}.md"
         assert episode_path.exists()
         content = episode_path.read_text(encoding="utf-8")
@@ -93,7 +92,6 @@ class TestModeBMock:
 
         # Simulate post-call knowledge extraction (formerly done by old AssistedExecutor)
         knowledge_text = "France's capital is Paris — useful geographic fact."
-        from datetime import datetime
         topic = now_jst().strftime("learned_%Y%m%d_%H%M%S")
         agent.memory.write_knowledge(topic, knowledge_text)
 
@@ -147,7 +145,7 @@ class TestModeBLive:
         assert result.summary
         assert result.action == "responded"
         # Episode should be recorded
-        today = date.today().isoformat()
+        today = today_local().isoformat()
         episode_path = agent.anima_dir / "episodes" / f"{today}.md"
         assert episode_path.exists()
 
@@ -192,7 +190,7 @@ class TestModeBSkillInjection:
         # Create a personal skill (directory structure)
         (agent.anima_dir / "skills" / "test_skill").mkdir(parents=True, exist_ok=True)
         (agent.anima_dir / "skills" / "test_skill" / "SKILL.md").write_text(
-            "# Test Skill\n## 概要\nA test skill for validation\n## 手順\n1. Do something",
+            "# Test Skill\n## 概要\n[test, validation, check]\nA test skill for validation\n## 手順\n1. Do something",
             encoding="utf-8",
         )
 
@@ -211,7 +209,7 @@ class TestModeBSkillInjection:
         agent._executor._call_llm = capture_call
 
         with patch_litellm(main_resp):
-            await agent.run_cycle("Hello")
+            await agent.run_cycle("I need to run a test validation check")
 
         assert len(captured_system) >= 1
         sys_prompt = captured_system[0]

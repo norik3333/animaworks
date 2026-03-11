@@ -395,9 +395,7 @@ class ExperimentVisualizer:
 
         colors = [self.condition_colors.get(cond, "gray") for cond in conditions]
         labels = [
-            {"bm25": "BM25", "vector": "Vector", "hybrid": "Hybrid", "hybrid_priming": "Hybrid+Priming"}.get(
-                cond, cond
-            )
+            {"bm25": "BM25", "vector": "Vector", "hybrid": "Hybrid", "hybrid_priming": "Hybrid+Priming"}.get(cond, cond)
             for cond in conditions
         ]
 
@@ -410,7 +408,7 @@ class ExperimentVisualizer:
         ax.grid(True, axis="y", alpha=0.3)
 
         # Add value labels on bars
-        for i, (bar, value) in enumerate(zip(bars, tokens, strict=False)):
+        for _i, (bar, value) in enumerate(zip(bars, tokens, strict=False)):
             height = bar.get_height()
             ax.text(
                 bar.get_x() + bar.get_width() / 2.0,
@@ -516,7 +514,7 @@ class ExperimentVisualizer:
         ax4.grid(True, axis="x", alpha=0.3)
 
         # Add interpretation labels
-        for i, (bar, interp) in enumerate(
+        for _i, (bar, interp) in enumerate(
             zip(
                 bars,
                 [
@@ -542,9 +540,7 @@ class ExperimentVisualizer:
 
     # ── Generate All Figures ────────────────────────────────────────────
 
-    def generate_all_figures(
-        self, results_dir: Path, output_dir: Path
-    ) -> list[Path]:
+    def generate_all_figures(self, results_dir: Path, output_dir: Path) -> list[Path]:
         """Generate all publication figures from results directory.
 
         Args:

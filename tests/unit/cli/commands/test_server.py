@@ -127,7 +127,7 @@ class TestFindServerPidByProcess:
                 mock_stat_result = MagicMock()
                 mock_stat_result.st_uid = 1000
                 mock_stat.return_value = mock_stat_result
-                result = _find_server_pid_by_process()
+                _find_server_pid_by_process()
 
         # Can't easily assert the exact PID because we're mocking Path
         # but the function should not raise
@@ -235,9 +235,7 @@ class TestStopServer:
 
         def alive_side_effect(pid):
             call_count[0] += 1
-            if call_count[0] <= 10:
-                return True
-            return False
+            return call_count[0] <= 10
 
         mock_alive.side_effect = alive_side_effect
 
@@ -500,7 +498,6 @@ class TestDeprecatedCommands:
 class TestClearPycache:
     def test_clear_pycache(self, tmp_path):
         """Verify _clear_pycache removes __pycache__ directories."""
-        import shutil
 
         from cli.commands.server import _clear_pycache
 

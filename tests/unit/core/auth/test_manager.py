@@ -6,7 +6,6 @@
 from __future__ import annotations
 
 import json
-import os
 import stat
 from pathlib import Path
 
@@ -25,7 +24,7 @@ from core.auth.manager import (
     validate_session,
     verify_password,
 )
-from core.auth.models import AuthConfig, AuthUser, Session
+from core.auth.models import AuthConfig, AuthUser
 
 
 # ── get_auth_path ────────────────────────────────────────

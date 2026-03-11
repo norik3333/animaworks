@@ -9,12 +9,12 @@ from __future__ import annotations
 import json as _json
 import logging
 import re
-from datetime import UTC, datetime
+from datetime import UTC
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from core.i18n import t
-from core.time_utils import now_iso
+from core.time_utils import now_iso, now_local
 from core.tooling.handler_base import _error_result
 
 if TYPE_CHECKING:
@@ -184,7 +184,7 @@ class SkillsToolsMixin:
         else:
             meta["failure_count"] = meta.get("failure_count", 0) + 1
 
-        meta["last_used"] = datetime.now().isoformat()
+        meta["last_used"] = now_local().isoformat()
 
         s = meta.get("success_count", 0)
         f = meta.get("failure_count", 0)
@@ -430,12 +430,13 @@ class SkillsToolsMixin:
                 "description": t["description"],
                 "parallel": t.get("parallel", False),
                 "depends_on": t.get("depends_on", []),
+                "context": t.get("context", ""),
                 "acceptance_criteria": t.get("acceptance_criteria", []),
                 "constraints": t.get("constraints", []),
                 "file_paths": t.get("file_paths", []),
                 "submitted_by": self._anima_name,
                 "submitted_at": now_iso,
-                "reply_to": self._anima_name,
+                "reply_to": t.get("reply_to", self._anima_name),
             }
             path = pending_dir / f"{t['task_id']}.json"
             path.write_text(

@@ -7,8 +7,9 @@ from __future__ import annotations
 
 import asyncio
 import tempfile
-from datetime import date
 from pathlib import Path
+
+from core.time_utils import today_local
 
 import pytest
 
@@ -28,9 +29,9 @@ def temp_anima_dir():
         (anima_dir / "skills").mkdir()
 
         # Create sample episode file (today)
-        today_episode = anima_dir / "episodes" / f"{date.today().isoformat()}.md"
+        today_episode = anima_dir / "episodes" / f"{today_local().isoformat()}.md"
         today_episode.write_text(
-            f"# {date.today().isoformat()} 行動ログ\n\n"
+            f"# {today_local().isoformat()} 行動ログ\n\n"
             "## 09:00 — 朝のタスク確認\n\n"
             "**相手**: システム\n"
             "**トピック**: タスク管理\n"
@@ -129,7 +130,7 @@ async def test_priming_all_channels(temp_anima_dir, temp_shared_dir):
     assert result.estimated_tokens() > 0
     assert result.estimated_tokens() < 2500  # Should be under budget
 
-    print(f"\nPriming result:")
+    print("\nPriming result:")
     print(f"  Sender profile: {len(result.sender_profile)} chars")
     print(f"  Episodes: {len(result.recent_activity)} chars")
     print(f"  Knowledge: {len(result.related_knowledge)} chars")
@@ -168,7 +169,7 @@ async def test_priming_empty_result(temp_anima_dir, temp_shared_dir):
     assert not result.sender_profile
     assert result.recent_activity  # Today's episodes should still be loaded
 
-    print(f"\nEmpty sender priming result:")
+    print("\nEmpty sender priming result:")
     print(f"  Sender profile: {len(result.sender_profile)} chars")
     print(f"  Episodes: {len(result.recent_activity)} chars")
 
@@ -291,7 +292,7 @@ async def test_channel_c_top_k(temp_anima_dir):
 
 @pytest.mark.asyncio
 async def test_channel_c_query_includes_message(temp_anima_dir):
-    """Channel C query must prepend message[:200] when message is provided."""
+    """Channel C uses dual queries: message-context + keyword-only."""
     engine = PrimingEngine(temp_anima_dir)
 
     from unittest.mock import MagicMock, patch
@@ -304,11 +305,12 @@ async def test_channel_c_query_includes_message(temp_anima_dir):
     with patch.object(engine, "_get_or_create_retriever", return_value=mock_retriever):
         await engine._channel_c_related_knowledge(["Issue", "裏", "実装"], message=msg)
 
-    call_kwargs = mock_retriever.search.call_args
-    actual_query = call_kwargs.kwargs.get("query") or call_kwargs[1].get("query")
-    assert actual_query is not None
-    assert actual_query.startswith(msg[:200])
-    assert "Issue" in actual_query
+    calls = mock_retriever.search.call_args_list
+    assert len(calls) == 2, f"Expected 2 dual queries, got {len(calls)}"
+    q1 = calls[0].kwargs.get("query") or calls[0][1].get("query")
+    q2 = calls[1].kwargs.get("query") or calls[1][1].get("query")
+    assert q1.startswith(msg[:200])
+    assert "Issue" in q2
 
 
 @pytest.mark.asyncio
@@ -331,7 +333,6 @@ async def test_channel_c_query_keyword_only_when_no_message(temp_anima_dir):
 
 if __name__ == "__main__":
     # Run tests manually
-    import sys
 
     async def run_tests():
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -346,9 +347,9 @@ if __name__ == "__main__":
             users_dir.mkdir(parents=True)
 
             # Create sample data
-            today_episode = anima_dir / "episodes" / f"{date.today().isoformat()}.md"
+            today_episode = anima_dir / "episodes" / f"{today_local().isoformat()}.md"
             today_episode.write_text(
-                f"# {date.today().isoformat()} 行動ログ\n\n"
+                f"# {today_local().isoformat()} 行動ログ\n\n"
                 "## 09:00 — テスト\n\nテストエピソード\n",
                 encoding="utf-8",
             )
@@ -360,7 +361,7 @@ if __name__ == "__main__":
             engine = PrimingEngine(anima_dir)
             result = await engine.prime_memories("テストメッセージ", "human")
 
-            print(f"Priming test result:")
+            print("Priming test result:")
             print(f"  Episodes: {len(result.recent_activity)} chars")
             print(f"  Knowledge: {len(result.related_knowledge)} chars")
             print(f"  Tokens: {result.estimated_tokens()}")

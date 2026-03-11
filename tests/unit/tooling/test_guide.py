@@ -9,9 +9,9 @@ from unittest.mock import patch
 
 from core.tooling.guide import (
     build_tools_guide,
+    filter_gated_from_guide,
     load_tool_schemas,
 )
-
 
 # ── build_tools_guide ─────────────────────────────────────────
 
@@ -48,9 +48,7 @@ class TestLoadToolSchemas:
 
     @patch("core.tooling.schemas.load_external_schemas")
     def test_delegates_to_load_external_schemas(self, mock_ext):
-        mock_ext.return_value = [
-            {"name": "web_search", "description": "d", "parameters": {}}
-        ]
+        mock_ext.return_value = [{"name": "web_search", "description": "d", "parameters": {}}]
         result = load_tool_schemas(["web_search"])
         mock_ext.assert_called_once_with(["web_search"])
         assert len(result) == 1
@@ -104,3 +102,65 @@ class TestLoadToolSchemas:
 
         result = load_tool_schemas([], {"my_tool": "/path/to/tool.py"})
         assert result[0]["parameters"] == {"type": "object"}
+
+
+# ── filter_gated_from_guide ─────────────────────────────────────
+
+
+class TestFilterGatedFromGuide:
+    """Tests for gated action filtering in tool guides."""
+
+    def test_gated_action_lines_removed_when_not_permitted(self):
+        """Gated action CLI lines are removed when action is not in permitted set."""
+        guide = """### Gmail
+```bash
+animaworks-tool gmail unread -n 10
+animaworks-tool gmail send --to "x" --subject "s" --body "b"
+animaworks-tool gmail draft --to "x" --subject "s" --body "b"
+```"""
+        permitted = {"gmail"}
+        result = filter_gated_from_guide(guide, "gmail", permitted)
+        assert "animaworks-tool gmail send" not in result
+        assert "animaworks-tool gmail unread" in result
+        assert "animaworks-tool gmail draft" in result
+
+    def test_gated_action_lines_kept_when_permitted(self):
+        """Gated action CLI lines are kept when action is explicitly permitted."""
+        guide = """### Gmail
+```bash
+animaworks-tool gmail unread -n 10
+animaworks-tool gmail send --to "x" --subject "s" --body "b"
+```"""
+        permitted = {"gmail", "gmail_send"}
+        result = filter_gated_from_guide(guide, "gmail", permitted)
+        assert "animaworks-tool gmail send" in result
+        assert "animaworks-tool gmail unread" in result
+
+    def test_non_gated_action_lines_always_kept(self):
+        """Non-gated action lines are always kept regardless of permitted set."""
+        guide = """### Gmail
+```bash
+animaworks-tool gmail unread -n 10
+animaworks-tool gmail draft --to "x" --subject "s" --body "b"
+```"""
+        permitted = {"gmail"}
+        result = filter_gated_from_guide(guide, "gmail", permitted)
+        assert "animaworks-tool gmail unread" in result
+        assert "animaworks-tool gmail draft" in result
+
+    def test_tool_without_gated_actions_unchanged(self):
+        """Tools with no gated actions return guide unchanged."""
+        guide = """### web_search
+```bash
+animaworks-tool web_search search "query"
+```"""
+        permitted = {"web_search"}
+        result = filter_gated_from_guide(guide, "web_search", permitted)
+        assert result == guide
+
+    def test_unknown_tool_unchanged(self):
+        """Unknown tool names return guide unchanged."""
+        guide = "animaworks-tool fake_tool do_something"
+        permitted = set()
+        result = filter_gated_from_guide(guide, "nonexistent_tool", permitted)
+        assert result == guide

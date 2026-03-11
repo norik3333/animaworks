@@ -16,7 +16,6 @@ duplicate ``message_received`` log entries.
 
 from pathlib import Path
 
-import pytest
 
 
 class FakeMsg:

@@ -1,14 +1,14 @@
 ---
 name: slack-tool
 description: >-
-  Slack連携ツール。メッセージ送信・取得・検索・未返信確認・チャンネル一覧。
-  「Slack」「スラック」「チャンネル」「スレッド」
+  Slack連携ツール。メッセージ送信・取得・検索・未返信確認・チャンネル一覧・絵文字リアクション。
+  「Slack」「スラック」「チャンネル」「スレッド」「リアクション」
 tags: [communication, slack, external]
 ---
 
 # Slack ツール
 
-Slackのメッセージ送受信・検索を行う外部ツール。
+Slackのメッセージ送受信・検索・リアクションを行う外部ツール。
 
 ## use_tool での呼び出し
 
@@ -43,6 +43,13 @@ Slackのメッセージ送受信・検索を行う外部ツール。
 {"tool_name": "slack", "action": "channels", "args": {}}
 ```
 
+### react — 絵文字リアクション
+```json
+{"tool_name": "slack", "action": "react", "args": {"channel": "#チャンネル名", "emoji": "thumbsup", "message_ts": "メッセージのタイムスタンプ"}}
+```
+- `emoji`: Slack の絵文字名（コロンなし。例: `thumbsup`, `eyes`, `white_check_mark`）
+- `message_ts`: リアクション対象メッセージのタイムスタンプ（`messages` アクションの結果から取得可能）
+
 ## CLI使用法（Sモード）
 
 ```bash
@@ -53,7 +60,10 @@ animaworks-tool slack unreplied [--json]
 animaworks-tool slack channels
 ```
 
+> `react` アクションは CLI 未対応。`use_tool` または MCP 経由で使用する。
+
 ## 注意事項
 
 - Slack Bot Token は credentials に事前設定が必要
 - チャンネルは #付きの名前またはチャンネルIDで指定
+- リアクションには `reactions:write` スコープが必要

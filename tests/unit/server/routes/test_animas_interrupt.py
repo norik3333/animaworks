@@ -5,11 +5,9 @@
 
 from __future__ import annotations
 
-import asyncio
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 from httpx import ASGITransport, AsyncClient
 
 
@@ -75,7 +73,7 @@ class TestInterruptEndpoint:
         """Interrupt that times out should return timeout status."""
         sup = MagicMock()
         sup.processes = {"carol": MagicMock()}
-        sup.send_request = AsyncMock(side_effect=asyncio.TimeoutError())
+        sup.send_request = AsyncMock(side_effect=TimeoutError())
         app = _make_test_app(anima_names=["carol"], supervisor=sup)
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:

@@ -20,9 +20,8 @@ Benchmark results: tests/performance/BENCHMARK_RESULTS.md
 import asyncio
 import statistics
 import time
-from datetime import datetime, timedelta
+from datetime import timedelta
 from core.time_utils import now_jst
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -31,14 +30,16 @@ from core.memory.priming import PrimingEngine
 
 # Try to import optional dependencies
 try:
-    import psutil
+    import psutil  # noqa: F401
+
     PSUTIL_AVAILABLE = True
 except ImportError:
     PSUTIL_AVAILABLE = False
 
 try:
-    from core.memory.rag import MemoryIndexer, MemoryRetriever
+    from core.memory.rag import MemoryIndexer, MemoryRetriever  # noqa: F401
     import chromadb as _chromadb  # noqa: F401 — verify native dep is available
+
     RAG_AVAILABLE = True
 except ImportError:
     RAG_AVAILABLE = False
@@ -61,7 +62,7 @@ def large_knowledge_base(tmp_path):
 This is knowledge document number {i} for performance testing.
 
 ## Details
-{'Content paragraph. ' * 50}
+{"Content paragraph. " * 50}
 
 ## Technical Information
 - Item 1: Performance testing
@@ -76,7 +77,7 @@ This is knowledge document number {i} for performance testing.
 - Topic C{i}: Benchmark results
 
 ## Notes
-{'Additional notes. ' * 20}
+{"Additional notes. " * 20}
 """
         (knowledge_dir / f"file_{i:03d}.md").write_text(content, encoding="utf-8")
 
@@ -97,9 +98,7 @@ def anima_dir_with_data(tmp_path):
     # Create 50 knowledge files
     for i in range(50):
         content = f"# Knowledge {i}\n\n" + "Content " * 100
-        (anima_dir / "knowledge" / f"knowledge_{i:03d}.md").write_text(
-            content, encoding="utf-8"
-        )
+        (anima_dir / "knowledge" / f"knowledge_{i:03d}.md").write_text(content, encoding="utf-8")
 
     # Create 50 episode files
     for i in range(50):
@@ -115,9 +114,7 @@ def anima_dir_with_data(tmp_path):
 - 進捗確認
 - 報告作成
 """
-        (anima_dir / "episodes" / f"{episode_date}.md").write_text(
-            content, encoding="utf-8"
-        )
+        (anima_dir / "episodes" / f"{episode_date}.md").write_text(content, encoding="utf-8")
 
     # Create shared users directory
     shared_users_dir = tmp_path / "shared" / "users"
@@ -133,6 +130,7 @@ def memory_tracker():
         pytest.skip("psutil not installed")
 
     import psutil
+
     process = psutil.Process()
 
     class MemoryTracker:
@@ -164,13 +162,13 @@ def print_benchmark(name, times):
     p99 = sorted(times)[int(len(times) * 0.99)] if len(times) >= 100 else max(times)
 
     print(f"\n{name} Benchmark:")
-    print(f"  Mean:   {mean*1000:.2f} ms")
-    print(f"  Median: {median*1000:.2f} ms")
-    print(f"  StdDev: {stdev*1000:.2f} ms")
-    print(f"  P95:    {p95*1000:.2f} ms")
-    print(f"  P99:    {p99*1000:.2f} ms")
-    print(f"  Min:    {min(times)*1000:.2f} ms")
-    print(f"  Max:    {max(times)*1000:.2f} ms")
+    print(f"  Mean:   {mean * 1000:.2f} ms")
+    print(f"  Median: {median * 1000:.2f} ms")
+    print(f"  StdDev: {stdev * 1000:.2f} ms")
+    print(f"  P95:    {p95 * 1000:.2f} ms")
+    print(f"  P99:    {p99 * 1000:.2f} ms")
+    print(f"  Min:    {min(times) * 1000:.2f} ms")
+    print(f"  Max:    {max(times) * 1000:.2f} ms")
 
 
 # ── Test Cases ────────────────────────────────────────────────
@@ -231,7 +229,7 @@ def test_indexing_throughput(large_knowledge_base):
 
     # Verify (environment-dependent; relaxed for CI/slower machines)
     p95 = sorted(per_file_times)[95]
-    assert p95 < 0.250, f"P95 indexing time {p95*1000:.2f}ms exceeds 250ms target"
+    assert p95 < 0.250, f"P95 indexing time {p95 * 1000:.2f}ms exceeds 250ms target"
 
 
 @pytest.mark.performance
@@ -341,7 +339,7 @@ async def test_memory_usage_baseline(anima_dir_with_data, memory_tracker):
         final_mem = memory_tracker.current_usage_mb()
         mem_increase = final_mem - initial_mem
 
-        print(f"\n=== Memory Usage ===")
+        print("\n=== Memory Usage ===")
         print(f"Initial:  {initial_mem:.2f} MB")
         print(f"Final:    {final_mem:.2f} MB")
         print(f"Increase: {mem_increase:.2f} MB")
@@ -396,20 +394,18 @@ async def test_concurrent_priming(tmp_path):
         )
 
     start = time.perf_counter()
-    results = await asyncio.gather(*[
-        prime_one(engine, i) for i, engine in enumerate(engines)
-    ])
+    results = await asyncio.gather(*[prime_one(engine, i) for i, engine in enumerate(engines)])
     end = time.perf_counter()
 
     total_time = end - start
 
-    print(f"\n=== Concurrent Priming ===")
-    print(f"Total time: {total_time*1000:.2f} ms")
-    print(f"Average per anima: {total_time/len(engines)*1000:.2f} ms")
+    print("\n=== Concurrent Priming ===")
+    print(f"Total time: {total_time * 1000:.2f} ms")
+    print(f"Average per anima: {total_time / len(engines) * 1000:.2f} ms")
 
     # Verify all completed successfully
     assert len(results) == 10
-    for i, result in enumerate(results):
+    for _i, result in enumerate(results):
         # Each result should be valid (not necessarily non-empty)
         assert isinstance(result.sender_profile, str)
         assert isinstance(result.recent_activity, str)
@@ -500,7 +496,7 @@ def test_large_dataset_scalability(tmp_path):
 
     # Verify search latency
     mean_search = statistics.mean(search_times)
-    assert mean_search < 2.0, f"Mean search time {mean_search*1000:.2f}ms exceeds 2000ms target"
+    assert mean_search < 2.0, f"Mean search time {mean_search * 1000:.2f}ms exceeds 2000ms target"
 
 
 # ── Additional Performance Tests ──────────────────────────────
@@ -556,16 +552,16 @@ async def test_priming_latency_percentiles(anima_dir_with_data):
         }
 
         print("\n=== Priming Latency Percentiles ===")
-        print(f"Mean:   {statistics.mean(latencies)*1000:.2f} ms")
-        print(f"Median: {statistics.median(latencies)*1000:.2f} ms")
+        print(f"Mean:   {statistics.mean(latencies) * 1000:.2f} ms")
+        print(f"Median: {statistics.median(latencies) * 1000:.2f} ms")
         for name, value in percentiles.items():
-            print(f"{name}:    {value*1000:.2f} ms")
+            print(f"{name}:    {value * 1000:.2f} ms")
 
         # Verify P95 is under threshold
         # Environment-dependent; relaxed for CI/slower machines (was 300ms)
         threshold = 1000  # ms
         assert percentiles["P95"] < threshold / 1000, (
-            f"P95 latency {percentiles['P95']*1000:.2f}ms exceeds {threshold}ms"
+            f"P95 latency {percentiles['P95'] * 1000:.2f}ms exceeds {threshold}ms"
         )
 
 
@@ -606,10 +602,10 @@ async def test_empty_cache_vs_warm_cache(anima_dir_with_data):
 
         mean_warm = statistics.mean(warm_times)
 
-        print(f"\n=== Cache Performance ===")
-        print(f"Cold cache: {cold_time*1000:.2f} ms")
-        print(f"Warm cache (mean): {mean_warm*1000:.2f} ms")
-        print(f"Speedup: {cold_time/mean_warm:.2f}x")
+        print("\n=== Cache Performance ===")
+        print(f"Cold cache: {cold_time * 1000:.2f} ms")
+        print(f"Warm cache (mean): {mean_warm * 1000:.2f} ms")
+        print(f"Speedup: {cold_time / mean_warm:.2f}x")
 
         # Warm cache should be faster or equal
         # (Note: Might be equal if caching is not implemented)
@@ -658,11 +654,11 @@ async def test_budget_allocation_performance(anima_dir_with_data):
         mean_small = statistics.mean(small_budget_times)
         mean_large = statistics.mean(large_budget_times)
 
-        print(f"\n=== Budget Allocation Performance ===")
-        print(f"Small budget (500 tokens):  {mean_small*1000:.2f} ms")
-        print(f"Large budget (3000 tokens): {mean_large*1000:.2f} ms")
-        print(f"Ratio: {mean_large/mean_small:.2f}x")
+        print("\n=== Budget Allocation Performance ===")
+        print(f"Small budget (500 tokens):  {mean_small * 1000:.2f} ms")
+        print(f"Large budget (3000 tokens): {mean_large * 1000:.2f} ms")
+        print(f"Ratio: {mean_large / mean_small:.2f}x")
 
         # Both should complete in reasonable time
-        assert mean_small < 0.300, f"Small budget too slow: {mean_small*1000:.2f}ms"
-        assert mean_large < 0.500, f"Large budget too slow: {mean_large*1000:.2f}ms"
+        assert mean_small < 0.300, f"Small budget too slow: {mean_small * 1000:.2f}ms"
+        assert mean_large < 0.500, f"Large budget too slow: {mean_large * 1000:.2f}ms"

@@ -17,11 +17,11 @@ behaves identically to the original monolithic run_heartbeat():
 from __future__ import annotations
 
 import inspect
-import textwrap
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
+from core.time_utils import today_local
 
 from core.schemas import CycleResult
 from core.tooling.handler import active_session_type
@@ -75,7 +75,7 @@ def _attach_failing_stream(dp, error: Exception | None = None):
 
     async def mock_stream(prompt, trigger="manual", **kwargs):
         raise exc
-        yield  # noqa: unreachable — makes this an async generator
+        yield  # noqa
 
     dp.agent.run_cycle_streaming = mock_stream
 
@@ -228,8 +228,7 @@ class TestInboxProcessing:
 
             await dp.process_inbox_message()
 
-        from datetime import date
-        episode_file = alice_dir / "episodes" / f"{date.today().isoformat()}.md"
+        episode_file = alice_dir / "episodes" / f"{today_local().isoformat()}.md"
         assert episode_file.exists()
         content = episode_file.read_text(encoding="utf-8")
         assert "episode_senderからのメッセージ受信" in content

@@ -14,22 +14,25 @@
 .right-tabs {
   display: flex;
   padding: 10px 12px 0;
-  gap: 4px;
+  gap: 3px;
   flex-shrink: 0;
+  flex-wrap: wrap;
 }
 
 .right-tab {
-  flex: 1;
-  padding: 8px 6px;
+  flex: 1 1 auto;
+  padding: 7px 4px;
   border: none;
   background: var(--aw-color-bg-secondary);
   color: var(--aw-color-text-secondary);
-  font-size: 0.82rem;
+  font-size: 0.78rem;
   font-weight: 600;
   cursor: pointer;
   border-radius: 6px 6px 0 0;
   transition: background 0.15s, color 0.15s;
   font-family: inherit;
+  white-space: nowrap;
+  min-width: 0;
 }
 
 .right-tab:hover,
@@ -78,4 +81,101 @@
   word-wrap: break-word;
   flex: 1;
   min-height: 0;
+}
+
+/* --- Markdown Config Content (Heartbeat / Cron) --- */
+.md-config-content {
+  font-size: 0.82rem;
+  line-height: 1.6;
+  color: var(--aw-color-text-primary);
+  overflow-y: auto;
+  word-break: break-word;
+}
+
+.md-config-content h1,
+.md-config-content h2,
+.md-config-content h3,
+.md-config-content h4 {
+  margin: 0.6em 0 0.3em;
+  line-height: 1.3;
+}
+.md-config-content h1 { font-size: 1.1em; }
+.md-config-content h2 { font-size: 1.05em; border-bottom: 1px solid var(--aw-color-border-light); padding-bottom: 0.2em; }
+.md-config-content h3 { font-size: 1em; }
+
+.md-config-content p {
+  margin: 0 0 0.5em;
+}
+.md-config-content p:last-child {
+  margin-bottom: 0;
+}
+
+.md-config-content ul,
+.md-config-content ol {
+  margin: 0.3em 0;
+  padding-left: 1.4em;
+}
+.md-config-content li {
+  margin: 0.15em 0;
+}
+
+.md-config-content code {
+  background: var(--aw-color-code-inline-bg, rgba(0,0,0,0.06));
+  padding: 0.1em 0.35em;
+  border-radius: 3px;
+  font-size: 0.85em;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+}
+
+.md-config-content pre {
+  background: var(--aw-color-code-bg, #1e1e1e);
+  color: var(--aw-color-code-text, #d4d4d4);
+  padding: 8px 10px;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 0.4em 0;
+  font-size: 0.82em;
+  line-height: 1.5;
+}
+.md-config-content pre code {
+  background: none;
+  padding: 0;
+  color: inherit;
+  font-size: inherit;
+}
+
+.md-config-content blockquote {
+  border-left: 3px solid var(--aw-color-border-dark, #ccc);
+  margin: 0.4em 0;
+  padding: 0.2em 0.8em;
+  color: var(--aw-color-text-secondary);
+}
+
+.md-config-content table {
+  border-collapse: collapse;
+  margin: 0.4em 0;
+  font-size: 0.85em;
+  width: 100%;
+}
+.md-config-content th,
+.md-config-content td {
+  border: 1px solid var(--aw-color-border-dark, #ccc);
+  padding: 4px 8px;
+}
+.md-config-content th {
+  background: var(--aw-color-bg-tertiary);
+  font-weight: 600;
+}
+
+.md-config-content hr {
+  border: none;
+  border-top: 1px solid var(--aw-color-border-light, #eee);
+  margin: 0.5em 0;
+}
+
+.config-empty {
+  padding: 2rem 1rem;
+  text-align: center;
+  color: var(--aw-color-text-tertiary, #999);
+  font-size: 0.85rem;
 }

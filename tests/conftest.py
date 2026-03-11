@@ -9,7 +9,6 @@ mock/live switching for all test modules.
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 import signal
@@ -35,7 +34,7 @@ load_dotenv()
 
 # Check if ChromaDB is available
 try:
-    import chromadb
+    import chromadb  # noqa: F401
     CHROMADB_AVAILABLE = True
 except ImportError:
     CHROMADB_AVAILABLE = False
@@ -60,6 +59,22 @@ def pytest_addoption(parser: pytest.Parser) -> None:
 
 
 # ── Fixtures ──────────────────────────────────────────────
+
+
+@pytest.fixture(autouse=True)
+def _reset_app_timezone():
+    """Reset the application timezone to the fallback after each test.
+
+    Prevents state leakage when tests call ``configure_timezone()``.
+    Force-resets ``_app_tz`` to ``None`` so ``get_app_timezone()`` always
+    falls back to the hardcoded ``Asia/Tokyo`` default, regardless of
+    what a previous test or import side-effect may have configured.
+    """
+    import core.time_utils as _tu
+
+    _tu._app_tz = None  # ensure clean state at test start
+    yield
+    _tu._app_tz = None  # force-reset to prevent leakage
 
 
 @pytest.fixture(autouse=True)
@@ -125,6 +140,7 @@ def data_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """
     from core.config import invalidate_cache
     from core.paths import _prompt_cache
+    from core.tooling.prompt_db import reset_prompt_store
 
     # Create the data directory structure
     d = create_test_data_dir(tmp_path)
@@ -135,6 +151,7 @@ def data_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     # Invalidate caches to pick up the new data dir
     invalidate_cache()
     _prompt_cache.clear()
+    reset_prompt_store()
 
     yield d
 
@@ -146,6 +163,7 @@ def data_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     # Cleanup: invalidate caches again to avoid leaking between tests
     invalidate_cache()
     _prompt_cache.clear()
+    reset_prompt_store()
 
 
 def _kill_orphan_runners(data_dir_str: str) -> None:

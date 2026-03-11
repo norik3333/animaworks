@@ -5,11 +5,9 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
 from fastapi.testclient import TestClient
 
 from core.auth.manager import hash_password, save_auth
@@ -19,7 +17,6 @@ from core.auth.models import AuthConfig, AuthUser
 def _create_test_app(data_dir: Path):
     """Create a minimal test app with auth routes."""
     import json
-    from unittest.mock import MagicMock
     from server.app import create_app
 
     animas_dir = data_dir / "animas"

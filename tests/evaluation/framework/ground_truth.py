@@ -6,16 +6,16 @@ Ground Truth management for memory evaluation.
 
 Provides annotation creation, storage, and inter-annotator agreement calculation.
 """
+
 from __future__ import annotations
 
 import json
-from datetime import datetime
-from core.time_utils import now_jst
 from pathlib import Path
 from typing import Any
 
-from .schemas import AnnotationSet, GroundTruth, MemoryBase, RelevantMemory, Scenario
+from core.time_utils import now_jst
 
+from .schemas import AnnotationSet, GroundTruth, MemoryBase, RelevantMemory, Scenario
 
 # ── Ground Truth Manager ────────────────────────────────────────────────────
 
@@ -43,10 +43,7 @@ class GroundTruthManager:
     # ── Annotation Creation ──────────────────────────────────────────────────
 
     def create_annotations(
-        self,
-        scenarios: list[Scenario],
-        memory_base: MemoryBase,
-        annotator_id: str = "auto"
+        self, scenarios: list[Scenario], memory_base: MemoryBase, annotator_id: str = "auto"
     ) -> AnnotationSet:
         """
         Create ground truth annotations for scenarios.
@@ -69,20 +66,17 @@ class GroundTruthManager:
                 "created_at": now_jst().isoformat(),
                 "num_scenarios": len(scenarios),
                 "domain": memory_base.domain,
-                "size": memory_base.size
-            }
+                "size": memory_base.size,
+            },
         )
 
         for scenario in scenarios:
-            for turn_idx, turn in enumerate(scenario.turns):
+            for turn_idx, _turn in enumerate(scenario.turns):
                 query_id = f"{scenario.scenario_id}_turn_{turn_idx}"
 
                 # Create ground truth from pre-specified relevant memories
                 gt = self._create_ground_truth_from_turn(
-                    scenario=scenario,
-                    turn_idx=turn_idx,
-                    memory_base=memory_base,
-                    annotator_id=annotator_id
+                    scenario=scenario, turn_idx=turn_idx, memory_base=memory_base, annotator_id=annotator_id
                 )
 
                 annotation_set.add_annotation(query_id, gt)
@@ -90,11 +84,7 @@ class GroundTruthManager:
         return annotation_set
 
     def _create_ground_truth_from_turn(
-        self,
-        scenario: Scenario,
-        turn_idx: int,
-        memory_base: MemoryBase,
-        annotator_id: str
+        self, scenario: Scenario, turn_idx: int, memory_base: MemoryBase, annotator_id: str
     ) -> GroundTruth:
         """
         Create ground truth for a single turn.
@@ -107,12 +97,7 @@ class GroundTruthManager:
         # Convert paths to RelevantMemory objects
         # For now, mark all as "high" relevance (can be refined later)
         relevant_memories = [
-            RelevantMemory(
-                file_path=path,
-                relevance="high",
-                section=None,
-                notes="Auto-generated from scenario"
-            )
+            RelevantMemory(file_path=path, relevance="high", section=None, notes="Auto-generated from scenario")
             for path in turn.relevant_memories
         ]
 
@@ -128,16 +113,12 @@ class GroundTruthManager:
             relevant_memories=relevant_memories,
             irrelevant_memories=irrelevant_paths,
             annotator_id=annotator_id,
-            timestamp=now_jst().isoformat()
+            timestamp=now_jst().isoformat(),
         )
 
     # ── Storage ──────────────────────────────────────────────────────────────
 
-    def save_annotations(
-        self,
-        annotation_set: AnnotationSet,
-        filename: str | None = None
-    ) -> Path:
+    def save_annotations(self, annotation_set: AnnotationSet, filename: str | None = None) -> Path:
         """
         Save annotation set to JSON file.
 
@@ -158,9 +139,8 @@ class GroundTruthManager:
             "annotator_id": annotation_set.annotator_id,
             "metadata": annotation_set.metadata,
             "annotations": {
-                query_id: self._ground_truth_to_dict(gt)
-                for query_id, gt in annotation_set.annotations.items()
-            }
+                query_id: self._ground_truth_to_dict(gt) for query_id, gt in annotation_set.annotations.items()
+            },
         }
 
         with open(output_path, "w", encoding="utf-8") as f:
@@ -180,13 +160,10 @@ class GroundTruthManager:
         """
         file_path = self.output_dir / filename
 
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(file_path, encoding="utf-8") as f:
             data = json.load(f)
 
-        annotation_set = AnnotationSet(
-            annotator_id=data["annotator_id"],
-            metadata=data["metadata"]
-        )
+        annotation_set = AnnotationSet(annotator_id=data["annotator_id"], metadata=data["metadata"])
 
         for query_id, gt_dict in data["annotations"].items():
             gt = self._dict_to_ground_truth(gt_dict)
@@ -201,17 +178,12 @@ class GroundTruthManager:
             "scenario_id": gt.scenario_id,
             "turn_index": gt.turn_index,
             "relevant_memories": [
-                {
-                    "file_path": str(rm.file_path),
-                    "relevance": rm.relevance,
-                    "section": rm.section,
-                    "notes": rm.notes
-                }
+                {"file_path": str(rm.file_path), "relevance": rm.relevance, "section": rm.section, "notes": rm.notes}
                 for rm in gt.relevant_memories
             ],
             "irrelevant_memories": [str(p) for p in gt.irrelevant_memories],
             "annotator_id": gt.annotator_id,
-            "timestamp": gt.timestamp
+            "timestamp": gt.timestamp,
         }
 
     def _dict_to_ground_truth(self, data: dict[str, Any]) -> GroundTruth:
@@ -225,22 +197,18 @@ class GroundTruthManager:
                     file_path=Path(rm["file_path"]),
                     relevance=rm["relevance"],
                     section=rm.get("section"),
-                    notes=rm.get("notes", "")
+                    notes=rm.get("notes", ""),
                 )
                 for rm in data["relevant_memories"]
             ],
             irrelevant_memories=[Path(p) for p in data["irrelevant_memories"]],
             annotator_id=data["annotator_id"],
-            timestamp=data["timestamp"]
+            timestamp=data["timestamp"],
         )
 
     # ── Inter-Annotator Agreement ────────────────────────────────────────────
 
-    def calculate_agreement(
-        self,
-        annotator1: AnnotationSet,
-        annotator2: AnnotationSet
-    ) -> dict[str, float]:
+    def calculate_agreement(self, annotator1: AnnotationSet, annotator2: AnnotationSet) -> dict[str, float]:
         """
         Calculate inter-annotator agreement using Cohen's κ.
 
@@ -262,11 +230,7 @@ class GroundTruthManager:
         common_queries = set(annotator1.annotations.keys()) & set(annotator2.annotations.keys())
 
         if not common_queries:
-            return {
-                "cohens_kappa": 0.0,
-                "agreement_rate": 0.0,
-                "num_queries": 0
-            }
+            return {"cohens_kappa": 0.0, "agreement_rate": 0.0, "num_queries": 0}
 
         # Collect binary relevance judgments
         agreements = []
@@ -294,11 +258,7 @@ class GroundTruthManager:
 
         # Calculate metrics
         if not agreements:
-            return {
-                "cohens_kappa": 0.0,
-                "agreement_rate": 0.0,
-                "num_queries": len(common_queries)
-            }
+            return {"cohens_kappa": 0.0, "agreement_rate": 0.0, "num_queries": len(common_queries)}
 
         agreement_rate = sum(agreements) / len(agreements)
         cohens_kappa = self._calculate_cohens_kappa(agreements)
@@ -307,7 +267,7 @@ class GroundTruthManager:
             "cohens_kappa": cohens_kappa,
             "agreement_rate": agreement_rate,
             "num_queries": len(common_queries),
-            "num_items_compared": total_items
+            "num_items_compared": total_items,
         }
 
     def _calculate_cohens_kappa(self, agreements: list[int]) -> float:
@@ -336,10 +296,7 @@ class GroundTruthManager:
     # ── Utility Methods ──────────────────────────────────────────────────────
 
     def save_agreement_report(
-        self,
-        annotator1: AnnotationSet,
-        annotator2: AnnotationSet,
-        filename: str = "agreement_report.json"
+        self, annotator1: AnnotationSet, annotator2: AnnotationSet, filename: str = "agreement_report.json"
     ) -> Path:
         """
         Calculate and save agreement report to file.
@@ -359,7 +316,7 @@ class GroundTruthManager:
             "annotator_2": annotator2.annotator_id,
             "timestamp": now_jst().isoformat(),
             "agreement_metrics": agreement,
-            "interpretation": self._interpret_kappa(agreement["cohens_kappa"])
+            "interpretation": self._interpret_kappa(agreement["cohens_kappa"]),
         }
 
         output_path = self.output_dir / filename

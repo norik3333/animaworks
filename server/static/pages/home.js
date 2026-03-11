@@ -49,6 +49,22 @@ export function render(container) {
       </div>
     </div>
 
+    <div class="card" id="homeExternalTasksCard" style="margin-bottom: 1.5rem;">
+      <div class="card-header" id="extTasksHeader" style="cursor:pointer;display:flex;align-items:center;gap:0.5rem;">
+        <span id="extTasksToggle" style="font-size:0.7rem;">&#x25BC;</span>
+        ${t("home.external_tasks")}
+        <span id="extTasksBadge" style="display:none;font-size:0.7rem;background:var(--accent-color,#2563eb);color:#fff;border-radius:10px;padding:0.1rem 0.5rem;margin-left:0.25rem;"></span>
+        <span style="flex:1;"></span>
+        <span id="extTasksLastUpdated" style="font-size:0.75rem;color:var(--text-secondary,#666);margin-right:0.5rem;"></span>
+        <button id="extTasksRefresh" class="btn-icon" title="${t("home.ext_refresh")}" style="font-size:0.85rem;">&#x21BB;</button>
+      </div>
+      <div class="card-body" id="extTasksBody">
+        <div id="extTasksList">
+          <div class="loading-placeholder">${t("common.loading")}</div>
+        </div>
+      </div>
+    </div>
+
     <div class="card">
       <div class="card-header">${t("home.quick_links")}</div>
       <div class="card-body" style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
@@ -61,6 +77,7 @@ export function render(container) {
   `;
 
   _loadAll();
+  _initExternalTasksWidget();
   _refreshInterval = setInterval(_loadAll, 30000);
 }
 
@@ -77,6 +94,7 @@ async function _loadAll() {
   _loadSystemStatus();
   _loadOrgChart();
   _loadActivity();
+  _loadExternalTasks();
 }
 
 async function _loadSystemStatus() {
@@ -249,5 +267,166 @@ async function _loadActivity() {
     `;
   } catch (err) {
     timeline.innerHTML = `<div class="loading-placeholder">${t("activity.load_failed")}: ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+// ── External Tasks Widget ──────────────────
+
+const _SOURCE_ICONS = {
+  github: "\u{1F4BB}",
+  slack: "\u{1F4AC}",
+  gmail: "\u{2709}\uFE0F",
+  jira: "\u{1F4CB}",
+  notion: "\u{1F4D3}",
+  other: "\u{1F517}",
+};
+
+const _STATUS_COLORS = {
+  open: "#2563eb",
+  in_progress: "#d97706",
+  done: "#16a34a",
+  cancelled: "#6b7280",
+};
+
+let _extTasksExpanded = true;
+let _extTasksLimit = 2;
+let _extTasksRetryCount = 0;
+
+function _initExternalTasksWidget() {
+  const header = document.getElementById("extTasksHeader");
+  const refreshBtn = document.getElementById("extTasksRefresh");
+  if (header) {
+    header.addEventListener("click", (e) => {
+      if (e.target === refreshBtn || refreshBtn?.contains(e.target)) return;
+      _extTasksExpanded = !_extTasksExpanded;
+      _updateExtTasksToggle();
+      if (_extTasksExpanded) _loadExternalTasks();
+    });
+  }
+  if (refreshBtn) {
+    refreshBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      _extTasksRetryCount = 0;
+      _loadExternalTasks(true);
+    });
+  }
+}
+
+function _updateExtTasksToggle() {
+  const toggle = document.getElementById("extTasksToggle");
+  const body = document.getElementById("extTasksBody");
+  if (toggle) toggle.innerHTML = _extTasksExpanded ? "&#x25BC;" : "&#x25B6;";
+  if (body) body.style.display = _extTasksExpanded ? "" : "none";
+}
+
+function _relativeTime(isoStr) {
+  if (!isoStr) return "";
+  const diff = Date.now() - new Date(isoStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return t("home.ext_just_now");
+  if (mins < 60) return `${mins}${t("home.ext_min_ago")}`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}${t("home.ext_hour_ago")}`;
+  const days = Math.floor(hrs / 24);
+  return `${days}${t("home.ext_day_ago")}`;
+}
+
+function _renderTaskItem(task) {
+  const icon = _SOURCE_ICONS[task.source_type] || _SOURCE_ICONS.other;
+  const title = escapeHtml((task.title || "").slice(0, 40));
+  const statusColor = _STATUS_COLORS[task.status] || _STATUS_COLORS.open;
+  const statusLabel = task.status === "in_progress" ? "in progress" : task.status;
+  const relTime = _relativeTime(task.last_updated_at);
+  const clickAttr = task.source_url
+    ? `onclick="window.open('${escapeHtml(task.source_url)}','_blank')"`
+    : "";
+  const cursorStyle = task.source_url ? "cursor:pointer;" : "";
+
+  return `
+    <div style="display:flex;align-items:center;gap:0.5rem;padding:0.5rem 0;border-bottom:1px solid var(--border-color,#eee);${cursorStyle}" ${clickAttr} role="link" tabindex="0" aria-label="${escapeHtml(task.title)}">
+      <span style="flex-shrink:0;font-size:1.1rem;" aria-label="${escapeHtml(task.source_type)}">${icon}</span>
+      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${title}</span>
+      <span style="flex-shrink:0;font-size:0.7rem;padding:0.15rem 0.4rem;border-radius:4px;background:${statusColor};color:#fff;">${escapeHtml(statusLabel)}</span>
+      <span style="flex-shrink:0;font-size:0.75rem;color:var(--text-secondary,#666);min-width:3.5rem;text-align:right;">${escapeHtml(relTime)}</span>
+    </div>
+  `;
+}
+
+async function _loadExternalTasks(forceRefresh = false) {
+  const listEl = document.getElementById("extTasksList");
+  const badgeEl = document.getElementById("extTasksBadge");
+  const lastUpdEl = document.getElementById("extTasksLastUpdated");
+  if (!listEl) return;
+
+  const limit = _extTasksExpanded ? _extTasksLimit : 2;
+  let url = `/api/external-tasks?limit=${limit}&status=open,in_progress&sort=priority&order=desc`;
+  if (forceRefresh) url += "&_t=" + Date.now();
+
+  try {
+    const data = await api(url);
+    const tasks = data.data || [];
+    const totalCount = data.meta?.total_count ?? 0;
+
+    if (badgeEl) {
+      if (totalCount > 0) {
+        badgeEl.textContent = totalCount;
+        badgeEl.style.display = "inline";
+      } else {
+        badgeEl.style.display = "none";
+      }
+    }
+
+    if (lastUpdEl) {
+      lastUpdEl.textContent = `${t("home.ext_last_updated")}: ${timeStr(new Date().toISOString())}`;
+    }
+
+    if (tasks.length === 0) {
+      listEl.innerHTML = `
+        <div style="text-align:center;padding:1.5rem 0;color:var(--text-secondary,#666);">
+          <div style="font-size:1.5rem;margin-bottom:0.5rem;">&#x2714;</div>
+          <div>${t("home.ext_empty")}</div>
+          <div style="font-size:0.8rem;margin-top:0.25rem;">${t("home.ext_empty_hint")}</div>
+        </div>
+      `;
+      _extTasksRetryCount = 0;
+      return;
+    }
+
+    let html = tasks.map(_renderTaskItem).join("");
+    if (data.meta?.has_more) {
+      html += `<div style="text-align:right;margin-top:0.5rem;">
+        <a href="#" id="extTasksShowAll" style="color:var(--accent-color,#2563eb);text-decoration:none;font-size:0.85rem;">
+          ${t("home.ext_show_all")}(${totalCount}${t("home.ext_count_suffix")})
+        </a>
+      </div>`;
+    }
+
+    listEl.innerHTML = html;
+
+    const showAllLink = document.getElementById("extTasksShowAll");
+    if (showAllLink) {
+      showAllLink.addEventListener("click", (e) => {
+        e.preventDefault();
+        _extTasksLimit = 10;
+        _loadExternalTasks();
+      });
+    }
+    _extTasksRetryCount = 0;
+  } catch (err) {
+    _extTasksRetryCount++;
+    const errMsg = _extTasksRetryCount >= 3
+      ? t("home.ext_error_persistent")
+      : t("home.ext_error");
+    listEl.innerHTML = `
+      <div style="text-align:center;padding:1.5rem 0;color:var(--text-secondary,#666);">
+        <div style="font-size:1.5rem;margin-bottom:0.5rem;">&#x26A0;</div>
+        <div>${errMsg}</div>
+        <button id="extTasksRetryBtn" class="btn-secondary" style="margin-top:0.5rem;font-size:0.85rem;">${t("home.ext_retry")}</button>
+      </div>
+    `;
+    const retryBtn = document.getElementById("extTasksRetryBtn");
+    if (retryBtn) {
+      retryBtn.addEventListener("click", () => _loadExternalTasks(true));
+    }
   }
 }

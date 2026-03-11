@@ -616,7 +616,6 @@ class TestConsecutiveTTSFailures:
     @pytest.mark.asyncio
     async def test_success_resets_counter(self) -> None:
         from core.voice.session import VoiceSession
-        from core.voice.tts_base import TTSSynthesisError
 
         ws = AsyncMock()
         stt = MagicMock()
@@ -649,7 +648,7 @@ class TestConsecutiveTTSFailures:
 
         async def mock_synthesize_fail(text, config):
             raise TTSSynthesisError("test error")
-            yield  # noqa: unreachable — makes this an async generator
+            yield  # noqa
 
         tts.synthesize = mock_synthesize_fail
 
@@ -674,7 +673,7 @@ class TestConsecutiveTTSFailures:
 
         async def mock_synthesize_fail(text, config):
             raise TTSSynthesisError("provider down")
-            yield  # noqa: unreachable
+            yield  # noqa
 
         tts.synthesize = mock_synthesize_fail
 
@@ -702,7 +701,7 @@ class TestConsecutiveTTSFailures:
 
         async def mock_synthesize_fail(text, config):
             raise TTSSynthesisError("VOICEVOX synthesis failed: http://localhost:50021/synthesis 500")
-            yield  # noqa: unreachable
+            yield  # noqa
 
         tts.synthesize = mock_synthesize_fail
 
@@ -765,7 +764,7 @@ class TestResponseDoneGuarantee:
 
         async def mock_stream_error(*args, **kwargs):
             raise RuntimeError("IPC connection lost")
-            yield  # noqa: unreachable
+            yield  # noqa
 
         supervisor.send_request_stream = mock_stream_error
 

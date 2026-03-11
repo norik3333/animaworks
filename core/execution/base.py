@@ -72,6 +72,41 @@ def is_anthropic_claude(model: str) -> bool:
     return _bare_model_name(model).startswith("claude-")
 
 
+def is_bedrock_qwen(model: str) -> bool:
+    """Return True if *model* is a Qwen model on AWS Bedrock."""
+    return model.startswith("bedrock/") and "qwen" in model.lower()
+
+
+def is_bedrock_glm(model: str) -> bool:
+    """Return True if *model* is a ZhipuAI GLM model on AWS Bedrock."""
+    return model.startswith("bedrock/") and "glm" in model.lower()
+
+
+def is_bedrock_kimi(model: str) -> bool:
+    """Return True if *model* is a Moonshot Kimi model on AWS Bedrock."""
+    return model.startswith("bedrock/") and ("kimi" in model.lower() or "moonshot" in model.lower())
+
+
+def supports_streaming_tool_use(model: str) -> bool:
+    """Return True if *model* supports tool use in streaming mode.
+
+    Some Bedrock models (Llama 4, etc.) support tool use only via non-streaming
+    Converse API.  When streaming is requested with tools, Bedrock returns:
+    ``"This model doesn't support tool use in streaming mode."``
+
+    For these models, callers should fall back to ``stream=False`` when tools
+    are present in the request.
+    """
+    if not model.startswith("bedrock/"):
+        return True
+    bare = _bare_model_name(model).lower()
+    # Models known NOT to support streaming tool use on Bedrock:
+    _no_streaming_tool_use = (
+        "llama4",  # Meta Llama 4 Scout / Maverick
+    )
+    return not any(tag in bare for tag in _no_streaming_tool_use)
+
+
 def resolve_thinking_effort(model: str, effort: str | None) -> str:
     """Resolve thinking effort, clamping ``"max"`` to ``"high"`` for non-Opus-4.6."""
     resolved = effort or "high"
@@ -94,11 +129,18 @@ def strip_thinking_tags(text: str) -> tuple[str, str]:
     in ``<think>`` tags rather than using a dedicated ``reasoning_content``
     field.  This helper splits the text into ``(thinking, response)``.
 
+    Also handles the case where ``<think>`` is absent but ``</think>``
+    is present (e.g. vLLM reasoning parser strips the opening tag).
+
     Returns ``("", text)`` when no ``</think>`` closing tag is found.
     """
     m = _THINK_TAG_RE.match(text)
     if m:
-        return m.group(1), text[m.end() :]
+        raw = m.group(1)
+        stripped = raw.lstrip()
+        if stripped.startswith("<think>"):
+            raw = stripped[len("<think>") :]
+        return raw, text[m.end() :]
     return "", text
 
 
@@ -110,8 +152,16 @@ class StreamingThinkFilter:
     when the stream begins with ``<think>``; otherwise chunks pass
     through immediately as *text*.
 
+    The ``</think>`` check runs **before** the early-exit so that a
+    single chunk like ``"thinking</think>response"`` (vLLM reasoning
+    parser may strip the opening tag) is still split correctly.
+
     A safety valve flushes the buffer as plain text if it exceeds
     ``_MAX_THINK_BUFFER`` characters without encountering ``</think>``.
+
+    For models that emit thinking without proper ``<think>`` tags, the
+    post-stream ``strip_thinking_tags`` safety net in the streaming
+    executor catches any residual leaks in the final ``full_text``.
     """
 
     _THINK_OPEN = "<think>"
@@ -127,6 +177,20 @@ class StreamingThinkFilter:
         if self._done:
             return ("", delta)
         self._buffer += delta
+
+        # Check for </think> FIRST — handles both normal <think>...</think>
+        # and the edge case where <think> is absent (vLLM reasoning parser).
+        if "</think>" in self._buffer:
+            self._done = True
+            parts = self._buffer.split("</think>", 1)
+            response = parts[1].lstrip("\n")
+            self._buffer = ""
+            thinking_raw = parts[0]
+            stripped_t = thinking_raw.lstrip()
+            if stripped_t.startswith("<think>"):
+                thinking_raw = stripped_t[len("<think>") :]
+            return (thinking_raw, response)
+
         # Early exit: if accumulated text clearly doesn't start with <think>,
         # pass through immediately so non-think streams aren't buffered.
         stripped = self._buffer.lstrip()
@@ -135,12 +199,7 @@ class StreamingThinkFilter:
             text = self._buffer
             self._buffer = ""
             return ("", text)
-        if "</think>" in self._buffer:
-            self._done = True
-            parts = self._buffer.split("</think>", 1)
-            response = parts[1].lstrip("\n")
-            self._buffer = ""
-            return (parts[0], response)
+
         if len(self._buffer) > _MAX_THINK_BUFFER:
             text = self._buffer
             self._buffer = ""
@@ -155,6 +214,68 @@ class StreamingThinkFilter:
             self._buffer = ""
             return text
         return ""
+
+
+# ── Repetition detection ────────────────────────────────────
+
+
+class RepetitionDetector:
+    """Detect degenerate repetition in streaming token output.
+
+    Uses n-gram frequency counting on word-level tokens. When any single
+    n-gram appears *threshold* times after *min_tokens* words have been
+    accumulated, the detector fires.
+    """
+
+    def __init__(
+        self,
+        n: int = 10,
+        threshold: int = 10,
+        min_tokens: int = 100,
+    ) -> None:
+        self._n = n
+        self._threshold = threshold
+        self._min_tokens = min_tokens
+        self._tokens: list[str] = []
+        self._ngram_counts: dict[tuple[str, ...], int] = {}
+
+    def feed(self, text: str) -> bool:
+        """Feed a text chunk and check for repetition.
+
+        Returns ``True`` if degenerate repetition is detected.
+        """
+        words = text.split()
+        if not words:
+            return False
+        self._tokens.extend(words)
+        if len(self._tokens) < self._min_tokens:
+            return False
+        for i in range(len(self._tokens) - len(words), len(self._tokens)):
+            start = i - self._n + 1
+            if start < 0:
+                continue
+            ngram = tuple(self._tokens[start : i + 1])
+            self._ngram_counts[ngram] = self._ngram_counts.get(ngram, 0) + 1
+            if self._ngram_counts[ngram] >= self._threshold:
+                return True
+        return False
+
+    def check_full_text(self, text: str) -> bool:
+        """Check complete response text for repetition (post-hoc).
+
+        Useful for iteration-level streaming where tokens aren't
+        available incrementally.
+        """
+        words = text.split()
+        if len(words) < self._min_tokens:
+            return False
+        counts: dict[tuple[str, ...], int] = {}
+        for i in range(len(words) - self._n + 1):
+            ngram = tuple(words[i : i + self._n])
+            counts[ngram] = counts.get(ngram, 0) + 1
+            if counts[ngram] >= self._threshold:
+                return True
+        return False
 
 
 # ── Dynamic tool-record budget ───────────────────────────────

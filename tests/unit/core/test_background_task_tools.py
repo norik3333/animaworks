@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from core.background import BackgroundTaskManager, TaskStatus
+from core.background import BackgroundTaskManager
 from core.tooling.handler import ToolHandler
 
 

@@ -15,11 +15,9 @@ Covers:
 """
 from __future__ import annotations
 
-from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 from core.messenger import InboxItem
 from core.schemas import Message
@@ -395,6 +393,7 @@ class TestHeartbeatMessageEpisodeRecording:
             dp.agent._tool_handler.set_active_session_type = lambda st: active_session_type.set(st)
 
             async def mock_stream(prompt, trigger="manual", **kwargs):
+                yield {"type": "text_delta", "text": "Processing message"}
                 yield {
                     "type": "cycle_done",
                     "cycle_result": {

@@ -216,7 +216,7 @@ class TestStatisticalAnalyzer:
         result = analyzer.hypothesis_h3_consolidation(df)
 
         # Should have memory type dummies in results
-        assert any("type_" in k for k in result["coefficients"].keys())
+        assert any("type_" in k for k in result["coefficients"])
 
     # ── Power Analysis Tests ────────────────────────────────────────────
 

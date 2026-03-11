@@ -10,7 +10,6 @@ Requires ChromaDB and sentence-transformers.
 
 from datetime import datetime, timedelta
 from core.time_utils import now_jst
-from pathlib import Path
 
 import pytest
 

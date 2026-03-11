@@ -42,6 +42,7 @@ async def test_handle_process_message_normalizes_none_intent(tmp_path: Path):
         attachment_paths=None,
         thread_id="default",
         include_cycle_result=True,
+        source="",
     )
 
 

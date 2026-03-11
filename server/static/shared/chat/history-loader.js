@@ -50,6 +50,23 @@ export function applyHistoryData(hs, data, options) {
  * @param {object} pollData - Poll API response { sessions, has_more, next_before }
  * @returns {{ changed: boolean, merged: object }} Whether data changed and the merged state
  */
+function _sessionsEqual(a, b) {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i].session_start !== b[i].session_start) return false;
+    if (a[i].session_end !== b[i].session_end) return false;
+    const aMsgs = a[i].messages || [];
+    const bMsgs = b[i].messages || [];
+    if (aMsgs.length !== bMsgs.length) return false;
+    if (aMsgs.length > 0 && bMsgs.length > 0) {
+      const aLast = aMsgs[aMsgs.length - 1];
+      const bLast = bMsgs[bMsgs.length - 1];
+      if (aLast.ts !== bLast.ts) return false;
+    }
+  }
+  return true;
+}
+
 export function mergePolledHistory(prev, pollData) {
   if (!pollData || !Array.isArray(pollData.sessions)) {
     return { changed: false, merged: prev };
@@ -77,7 +94,7 @@ export function mergePolledHistory(prev, pollData) {
     ? prev.sessions.filter(s => !s.session_start || s.session_start >= pollOldestStart)
     : prev.sessions;
 
-  const changed = JSON.stringify(currentPolledPart) !== JSON.stringify(pollData.sessions);
+  const changed = !_sessionsEqual(currentPolledPart, pollData.sessions);
   if (!changed) return { changed: false, merged: prev };
 
   const merged = {

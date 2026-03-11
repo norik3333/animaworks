@@ -17,11 +17,16 @@ build/
 site/
 site-docs/
 .env
+demo/.env
 tmp/
 
 # Coverage
 .coverage
 htmlcov/
+
+# Tool caches
+.pytest_cache/
+.ruff_cache/
 
 # Evaluation framework - generated data (excluded from repo)
 tests/evaluation/datasets/
@@ -101,6 +106,9 @@ scripts/test_desktop_chat_layout.py
 scripts/test_mobile_chat_screenshots.py
 scripts/test_mobile_chat_ui.py
 scripts/verify_template_placeholders.py
+
+# Skill archives
+*.skill
 
 # Private-only static assets
 server/static/files/

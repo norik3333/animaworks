@@ -164,6 +164,36 @@ def create_animas_router() -> APIRouter:
                 status_code=500,
             )
 
+    # ── Heartbeat / Cron Config ────────────────────────────
+
+    @router.get("/animas/{name}/heartbeat")
+    async def get_anima_heartbeat(name: str, request: Request):
+        """Return the raw heartbeat.md content for an anima."""
+        animas_dir = request.app.state.animas_dir
+        anima_dir = animas_dir / name
+        if not anima_dir.exists():
+            raise HTTPException(status_code=404, detail=f"Anima not found: {name}")
+
+        hb_path = anima_dir / "heartbeat.md"
+        content = ""
+        if hb_path.exists():
+            content = await asyncio.to_thread(hb_path.read_text, "utf-8")
+        return {"content": content}
+
+    @router.get("/animas/{name}/cron")
+    async def get_anima_cron(name: str, request: Request):
+        """Return the raw cron.md content for an anima."""
+        animas_dir = request.app.state.animas_dir
+        anima_dir = animas_dir / name
+        if not anima_dir.exists():
+            raise HTTPException(status_code=404, detail=f"Anima not found: {name}")
+
+        cron_path = anima_dir / "cron.md"
+        content = ""
+        if cron_path.exists():
+            content = await asyncio.to_thread(cron_path.read_text, "utf-8")
+        return {"content": content}
+
     # ── Anima Config ─────────────────────────────────────
 
     @router.get("/animas/{name}/config")

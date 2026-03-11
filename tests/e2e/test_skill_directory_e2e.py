@@ -6,7 +6,6 @@ from __future__ import annotations
 """End-to-end tests for skill directory structure and resolution flow."""
 
 import pytest
-from pathlib import Path
 
 from core.tooling.skill_creator import create_skill_directory
 from core.tooling.skill_tool import load_and_render_skill, _list_available_names

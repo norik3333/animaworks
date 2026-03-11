@@ -17,9 +17,6 @@ Covers:
 """
 
 import json
-from pathlib import Path
-
-import pytest
 
 
 class TestInboxReadCounts:
@@ -42,7 +39,8 @@ class TestInboxReadCounts:
             _read_counts[key] = _read_counts.get(key, 0) + 1
 
         counts_path.write_text(
-            json.dumps(_read_counts, ensure_ascii=False), encoding="utf-8",
+            json.dumps(_read_counts, ensure_ascii=False),
+            encoding="utf-8",
         )
 
         assert counts_path.exists()
@@ -88,10 +86,7 @@ class TestInboxReadCounts:
 
         _read_counts = {"exists.json": 3, "gone.json": 5}
         # Prune using inbox_dir (matching production logic)
-        _read_counts = {
-            k: v for k, v in _read_counts.items()
-            if (inbox_dir / k).exists()
-        }
+        _read_counts = {k: v for k, v in _read_counts.items() if (inbox_dir / k).exists()}
         counts_path.write_text(json.dumps(_read_counts), encoding="utf-8")
 
         data = json.loads(counts_path.read_text(encoding="utf-8"))
@@ -108,9 +103,7 @@ class TestInboxReadCounts:
         _read_counts: dict[str, int] = {}
         try:
             if counts_path.exists():
-                _read_counts = json.loads(
-                    counts_path.read_text(encoding="utf-8")
-                )
+                _read_counts = json.loads(counts_path.read_text(encoding="utf-8"))
         except Exception:
             _read_counts = {}
 
@@ -131,7 +124,7 @@ class TestRetryAnnotation:
             prefix = f"- {from_person}: "
         line = f"{prefix}{content[:800]}"
         assert "未返信" not in line
-        assert "- bob: hello" == line
+        assert line == "- bob: hello"
 
     def test_second_read_has_annotation(self):
         """Second read: shows ⚠️ 未返信2回目."""

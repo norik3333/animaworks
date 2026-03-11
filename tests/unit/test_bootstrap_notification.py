@@ -10,12 +10,10 @@ Tests:
 """
 from __future__ import annotations
 
-import asyncio
 import json
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 
 from core.tooling.handler import active_session_type
 

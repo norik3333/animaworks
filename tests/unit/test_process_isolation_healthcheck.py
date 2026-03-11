@@ -14,9 +14,8 @@ from __future__ import annotations
 
 import asyncio
 import json
-import os
 import signal
-from datetime import datetime, timedelta
+from datetime import timedelta
 from core.time_utils import now_jst
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -27,7 +26,6 @@ from core.supervisor.manager import (
     HealthConfig,
     ProcessSupervisor,
     RestartPolicy,
-    ReconciliationConfig,
 )
 from core.supervisor.process_handle import ProcessHandle, ProcessState
 

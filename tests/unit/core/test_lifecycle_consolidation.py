@@ -9,7 +9,6 @@ from __future__ import annotations
 
 """Integration tests for lifecycle consolidation setup."""
 
-import asyncio
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 

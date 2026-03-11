@@ -11,9 +11,10 @@ from __future__ import annotations
 """Shared session-chaining helper for inline executors (Mode A / Fallback).
 
 Both ``LiteLLMExecutor`` and ``AnthropicFallbackExecutor`` monitor context
-usage mid-conversation and restart the session with short-term memory when
-the configured threshold is crossed.  This module extracts that shared
-logic so it lives in exactly one place.
+usage mid-conversation and save short-term memory when the configured
+threshold is crossed.  The next incoming message picks up the saved state
+via ``inject_shortterm`` — no in-flight chaining is performed, so the Anima
+does not produce an unnatural "session handoff" message mid-conversation.
 """
 
 import logging
@@ -27,7 +28,7 @@ from core.i18n import t
 from core.memory import MemoryManager
 from core.memory.shortterm import SessionState, ShortTermMemory
 from core.paths import load_prompt
-from core.prompt.builder import BuildResult, inject_shortterm
+from core.prompt.builder import BuildResult
 from core.prompt.context import ContextTracker
 from core.time_utils import now_iso
 
@@ -88,9 +89,10 @@ async def handle_session_chaining(
 
     Returns:
         A 2-tuple ``(new_system_prompt, new_chain_count)``:
-        - ``new_system_prompt`` is the rebuilt prompt if chaining was
-          performed, or ``None`` if no chaining occurred.
-        - ``new_chain_count`` is the updated chain counter.
+        - ``new_system_prompt`` is always ``None`` — chaining is deferred to
+          the next incoming message so the Anima does not produce an
+          unnatural "session handoff" message mid-response.
+        - ``new_chain_count`` is the (unchanged) chain counter.
     """
     if shortterm is None:
         return None, chain_count
@@ -101,11 +103,8 @@ async def handle_session_chaining(
     if chain_count >= max_chains:
         return None, chain_count
 
-    chain_count += 1
     logger.info(
-        "Session chaining %d/%d: context at %.1f%%",
-        chain_count,
-        max_chains,
+        "Session context at %.1f%% — saving shortterm, will resume on next message",
         tracker.usage_ratio * 100,
     )
 
@@ -127,16 +126,10 @@ async def handle_session_chaining(
         )
     )
 
-    tracker.reset()
-    built = system_prompt_builder()
-    base_prompt = built.system_prompt if isinstance(built, BuildResult) else built
-    new_system_prompt = inject_shortterm(
-        base_prompt,
-        shortterm,
-    )
-    shortterm.clear()
-
-    return new_system_prompt, chain_count
+    # Do NOT chain here. The shortterm file is now ready and will be
+    # injected into the system prompt when the next message arrives
+    # (_agent_cycle.py: inject_shortterm called if shortterm.has_pending()).
+    return None, chain_count
 
 
 def build_continuation_prompt() -> str:

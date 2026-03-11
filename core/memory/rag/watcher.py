@@ -17,8 +17,30 @@ import time
 from pathlib import Path
 from typing import Any
 
-from watchdog.events import FileSystemEvent, FileSystemEventHandler
-from watchdog.observers import Observer
+_WATCHDOG_AVAILABLE = True
+_WATCHDOG_IMPORT_ERROR: ImportError | None = None
+
+try:
+    from watchdog.events import FileSystemEvent, FileSystemEventHandler
+    from watchdog.observers import Observer
+except ImportError as exc:
+    _WATCHDOG_AVAILABLE = False
+    _WATCHDOG_IMPORT_ERROR = exc
+
+    class FileSystemEvent:  # type: ignore[no-redef]
+        """Fallback event object used when watchdog is unavailable."""
+
+        def __init__(self, src_path: str, is_directory: bool = False) -> None:
+            self.src_path = src_path
+            self.is_directory = is_directory
+
+    class FileSystemEventHandler:  # type: ignore[no-redef]
+        """Fallback base class."""
+
+    class _MissingWatchdogObserver:
+        """Sentinel observer used only to detect missing watchdog."""
+
+    Observer = _MissingWatchdogObserver  # type: ignore[assignment,misc]
 
 logger = logging.getLogger("animaworks.rag.watcher")
 
@@ -116,6 +138,12 @@ class FileWatcher:
         if self._running:
             logger.warning("FileWatcher already running")
             return
+
+        if not _WATCHDOG_AVAILABLE:
+            raise RuntimeError(
+                "watchdog is required for FileWatcher.start(); "
+                "install with 'pip install \"animaworks[rag]\"' or 'pip install watchdog'"
+            ) from _WATCHDOG_IMPORT_ERROR
 
         logger.info("Starting FileWatcher for %s", self.anima_dir)
 

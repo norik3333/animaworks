@@ -12,7 +12,6 @@ import asyncio
 import json
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 from httpx import ASGITransport, AsyncClient
 
 from server.stream_registry import StreamRegistry

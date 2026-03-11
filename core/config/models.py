@@ -56,6 +56,7 @@ class WorkerSystemConfig(BaseModel):
 class SystemConfig(BaseModel):
     mode: str = "server"
     log_level: str = "INFO"
+    timezone: str = ""  # IANA TZ name; empty = auto-detect from system
     gateway: GatewaySystemConfig = GatewaySystemConfig()
     worker: WorkerSystemConfig = WorkerSystemConfig()
 
@@ -169,6 +170,7 @@ class RAGConfig(BaseModel):
     implicit_link_threshold: float = 0.75
     spreading_memory_types: list[str] = ["knowledge", "episodes"]
     min_retrieval_score: float = 0.3
+    skill_match_min_score: float = 0.75
 
 
 class PrimingConfig(BaseModel):
@@ -328,7 +330,7 @@ class ActivityLogConfig(BaseModel):
     rotation_mode: Literal["size", "time", "both"] = "size"
     max_size_mb: int = Field(default=1024, ge=0)  # per-anima total, default 1GB
     max_age_days: int = Field(default=7, ge=0)  # mode="time"|"both" で使用
-    rotation_time: str = "05:00"  # 実行時刻 (JST)
+    rotation_time: str = "05:00"  # 実行時刻 (configured TZ)
 
 
 class HousekeepingConfig(BaseModel):
@@ -591,9 +593,11 @@ def save_config(config: AnimaWorksConfig, path: Path | None = None) -> None:
     payload = config.model_dump(mode="json")
     text = json.dumps(payload, indent=2, ensure_ascii=False) + "\n"
 
-    # Atomic write: write to a sibling temp file then rename so that
-    # concurrent readers never see a partially-written (empty) file.
-    tmp_path = path.with_suffix(".tmp")
+    # Atomic write: write to a PID-unique sibling temp file then rename so
+    # that concurrent writers (multiple anima workers) never clobber each
+    # other's temp file.  Each process writes to .config.json.<PID>.tmp,
+    # then renames it to config.json atomically.
+    tmp_path = path.with_name(f".{path.name}.{os.getpid()}.tmp")
     tmp_path.write_text(text, encoding="utf-8")
     os.chmod(tmp_path, 0o600)
     tmp_path.rename(path)
@@ -1158,6 +1162,26 @@ def resolve_context_window(
                 return size
 
     return None
+
+
+def resolve_penalties(model_name: str) -> dict[str, float]:
+    """Resolve frequency_penalty and presence_penalty from models.json.
+
+    Returns a dict with only the keys that have non-None values.
+    An empty dict means no penalties configured (backward-compatible).
+    Values are clamped to [-2.0, 2.0] per the OpenAI API specification.
+    """
+    entry = _match_models_json(model_name)
+    result: dict[str, float] = {}
+    if entry is not None:
+        for key in ("frequency_penalty", "presence_penalty"):
+            val = entry.get(key)
+            if val is not None:
+                try:
+                    result[key] = max(-2.0, min(2.0, float(val)))
+                except (ValueError, TypeError):
+                    pass
+    return result
 
 
 # ---------------------------------------------------------------------------

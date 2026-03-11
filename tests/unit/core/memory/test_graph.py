@@ -92,15 +92,9 @@ def temp_knowledge_dir():
         knowledge_dir.mkdir()
 
         # Create sample knowledge files
-        (knowledge_dir / "file1.md").write_text(
-            "# File 1\n\nThis links to [[file2]].\n\nSome content."
-        )
-        (knowledge_dir / "file2.md").write_text(
-            "# File 2\n\nThis links to [[file3]] and [[file1]].\n"
-        )
-        (knowledge_dir / "file3.md").write_text(
-            "# File 3\n\nNo explicit links here.\n"
-        )
+        (knowledge_dir / "file1.md").write_text("# File 1\n\nThis links to [[file2]].\n\nSome content.")
+        (knowledge_dir / "file2.md").write_text("# File 2\n\nThis links to [[file3]] and [[file1]].\n")
+        (knowledge_dir / "file3.md").write_text("# File 3\n\nNo explicit links here.\n")
 
         yield knowledge_dir
 
@@ -115,19 +109,11 @@ def temp_anima_dir():
         episodes_dir = base / "episodes"
         episodes_dir.mkdir()
 
-        (knowledge_dir / "file1.md").write_text(
-            "# File 1\n\nThis links to [[file2]] and [[2026-03-01]].\n"
-        )
-        (knowledge_dir / "file2.md").write_text(
-            "# File 2\n\nRelated knowledge.\n"
-        )
+        (knowledge_dir / "file1.md").write_text("# File 1\n\nThis links to [[file2]] and [[2026-03-01]].\n")
+        (knowledge_dir / "file2.md").write_text("# File 2\n\nRelated knowledge.\n")
 
-        (episodes_dir / "2026-03-01.md").write_text(
-            "# 2026-03-01\n\n## 09:30 Meeting\n\nDiscussed file1 topic.\n"
-        )
-        (episodes_dir / "2026-03-02.md").write_text(
-            "# 2026-03-02\n\n## 14:00 Review\n\nReviewed file2.\n"
-        )
+        (episodes_dir / "2026-03-01.md").write_text("# 2026-03-01\n\n## 09:30 Meeting\n\nDiscussed file1 topic.\n")
+        (episodes_dir / "2026-03-02.md").write_text("# 2026-03-02\n\n## 14:00 Review\n\nReviewed file2.\n")
 
         yield base
 
@@ -378,7 +364,7 @@ def test_pagerank_with_edge_weights(temp_knowledge_dir):
     graph_builder.build_graph("test_anima", temp_knowledge_dir)
 
     # Verify explicit edges have similarity=1.0
-    for u, v, data in graph_builder.graph.edges(data=True):
+    for _u, _v, data in graph_builder.graph.edges(data=True):
         if data["link_type"] == "explicit":
             assert data["similarity"] == 1.0
         elif data["link_type"] == "implicit":
@@ -435,7 +421,8 @@ def test_build_graph_with_episodes(temp_anima_dir):
 
     graph_builder = KnowledgeGraph(vector_store, indexer)
     graph = graph_builder.build_graph(
-        "test_anima", knowledge_dir,
+        "test_anima",
+        knowledge_dir,
         memory_dirs={"episodes": episodes_dir},
     )
 
@@ -461,7 +448,8 @@ def test_cross_type_explicit_links(temp_anima_dir):
 
     graph_builder = KnowledgeGraph(vector_store, indexer)
     graph_builder.build_graph(
-        "test_anima", knowledge_dir,
+        "test_anima",
+        knowledge_dir,
         memory_dirs={"episodes": episodes_dir},
     )
 
@@ -480,7 +468,8 @@ def test_node_memory_type_attribute(temp_anima_dir):
 
     graph_builder = KnowledgeGraph(vector_store, indexer)
     graph_builder.build_graph(
-        "test_anima", knowledge_dir,
+        "test_anima",
+        knowledge_dir,
         memory_dirs={"episodes": episodes_dir},
     )
 
@@ -502,7 +491,8 @@ def test_spreading_activation_with_episodes(temp_anima_dir):
 
     graph_builder = KnowledgeGraph(vector_store, indexer)
     graph_builder.build_graph(
-        "test_anima", knowledge_dir,
+        "test_anima",
+        knowledge_dir,
         memory_dirs={"episodes": episodes_dir},
     )
 
@@ -542,7 +532,8 @@ def test_episode_doc_id_in_expansion(temp_anima_dir):
 
     graph_builder = KnowledgeGraph(vector_store, indexer)
     graph_builder.build_graph(
-        "test_anima", knowledge_dir,
+        "test_anima",
+        knowledge_dir,
         memory_dirs={"episodes": episodes_dir},
     )
 
@@ -576,7 +567,8 @@ def test_pagerank_across_types(temp_anima_dir):
 
     graph_builder = KnowledgeGraph(vector_store, indexer)
     graph_builder.build_graph(
-        "test_anima", knowledge_dir,
+        "test_anima",
+        knowledge_dir,
         memory_dirs={"episodes": episodes_dir},
     )
 
@@ -602,7 +594,8 @@ def test_incremental_update_episodes(temp_anima_dir):
 
     graph_builder = KnowledgeGraph(vector_store, indexer)
     graph_builder.build_graph(
-        "test_anima", knowledge_dir,
+        "test_anima",
+        knowledge_dir,
         memory_dirs={"episodes": episodes_dir},
     )
 
@@ -621,7 +614,9 @@ def test_incremental_update_episodes(temp_anima_dir):
     )
 
     graph_builder.update_graph_incremental(
-        [new_episode], "test_anima", memory_type="episodes",
+        [new_episode],
+        "test_anima",
+        memory_type="episodes",
     )
 
     assert graph_builder.graph.number_of_nodes() == initial_nodes + 1
@@ -662,14 +657,8 @@ def test_implicit_links_created(temp_knowledge_dir):
     graph_builder = KnowledgeGraph(vector_store, indexer)
     graph_builder.build_graph("test_anima", temp_knowledge_dir)
 
-    implicit_edges = [
-        (u, v, d)
-        for u, v, d in graph_builder.graph.edges(data=True)
-        if d["link_type"] == "implicit"
-    ]
-    assert len(implicit_edges) > 0, (
-        "Expected at least one implicit link from vector similarity"
-    )
+    implicit_edges = [(u, v, d) for u, v, d in graph_builder.graph.edges(data=True) if d["link_type"] == "implicit"]
+    assert len(implicit_edges) > 0, "Expected at least one implicit link from vector similarity"
 
 
 def test_implicit_links_in_multi_type_graph(temp_anima_dir):
@@ -682,18 +671,13 @@ def test_implicit_links_in_multi_type_graph(temp_anima_dir):
 
     graph_builder = KnowledgeGraph(vector_store, indexer)
     graph_builder.build_graph(
-        "test_anima", knowledge_dir,
+        "test_anima",
+        knowledge_dir,
         memory_dirs={"episodes": episodes_dir},
     )
 
-    implicit_edges = [
-        (u, v, d)
-        for u, v, d in graph_builder.graph.edges(data=True)
-        if d["link_type"] == "implicit"
-    ]
-    assert len(implicit_edges) > 0, (
-        "Expected implicit links from vector similarity in multi-type graph"
-    )
+    implicit_edges = [(u, v, d) for u, v, d in graph_builder.graph.edges(data=True) if d["link_type"] == "implicit"]
+    assert len(implicit_edges) > 0, "Expected implicit links from vector similarity in multi-type graph"
 
 
 def test_build_graph_with_custom_threshold(temp_knowledge_dir):
@@ -704,22 +688,20 @@ def test_build_graph_with_custom_threshold(temp_knowledge_dir):
     # Very high threshold — should create fewer (or zero) implicit links
     graph_builder_strict = KnowledgeGraph(vector_store, indexer)
     graph_strict = graph_builder_strict.build_graph(
-        "test_anima", temp_knowledge_dir,
+        "test_anima",
+        temp_knowledge_dir,
         implicit_link_threshold=0.99,
     )
-    implicit_strict = sum(
-        1 for _, _, d in graph_strict.edges(data=True) if d["link_type"] == "implicit"
-    )
+    implicit_strict = sum(1 for _, _, d in graph_strict.edges(data=True) if d["link_type"] == "implicit")
 
     # Low threshold — should create more implicit links
     graph_builder_lax = KnowledgeGraph(vector_store, indexer)
     graph_lax = graph_builder_lax.build_graph(
-        "test_anima", temp_knowledge_dir,
+        "test_anima",
+        temp_knowledge_dir,
         implicit_link_threshold=0.50,
     )
-    implicit_lax = sum(
-        1 for _, _, d in graph_lax.edges(data=True) if d["link_type"] == "implicit"
-    )
+    implicit_lax = sum(1 for _, _, d in graph_lax.edges(data=True) if d["link_type"] == "implicit")
 
     assert implicit_lax >= implicit_strict
 
@@ -763,7 +745,10 @@ def test_retriever_none_reads_config_enabled(monkeypatch, temp_knowledge_dir):
     retriever = MemoryRetriever(MockVectorStore(), MockIndexer(), temp_knowledge_dir)
 
     results = retriever.search(
-        "test query", "test_anima", memory_type="knowledge", top_k=3,
+        "test query",
+        "test_anima",
+        memory_type="knowledge",
+        top_k=3,
         enable_spreading_activation=None,
     )
     assert isinstance(results, list)
@@ -781,7 +766,10 @@ def test_retriever_none_reads_config_disabled(monkeypatch, temp_knowledge_dir):
     retriever = MemoryRetriever(MockVectorStore(), MockIndexer(), temp_knowledge_dir)
 
     results = retriever.search(
-        "test query", "test_anima", memory_type="knowledge", top_k=3,
+        "test query",
+        "test_anima",
+        memory_type="knowledge",
+        top_k=3,
         enable_spreading_activation=None,
     )
     assert isinstance(results, list)
@@ -802,7 +790,10 @@ def test_retriever_explicit_true_overrides_config(monkeypatch, temp_knowledge_di
     retriever = MemoryRetriever(MockVectorStore(), MockIndexer(), temp_knowledge_dir)
 
     results = retriever.search(
-        "test query", "test_anima", memory_type="knowledge", top_k=3,
+        "test query",
+        "test_anima",
+        memory_type="knowledge",
+        top_k=3,
         enable_spreading_activation=True,
     )
     assert isinstance(results, list)
@@ -820,7 +811,10 @@ def test_retriever_explicit_false_overrides_config(monkeypatch, temp_knowledge_d
     retriever = MemoryRetriever(MockVectorStore(), MockIndexer(), temp_knowledge_dir)
 
     results = retriever.search(
-        "test query", "test_anima", memory_type="knowledge", top_k=3,
+        "test query",
+        "test_anima",
+        memory_type="knowledge",
+        top_k=3,
         enable_spreading_activation=False,
     )
     assert isinstance(results, list)
@@ -859,7 +853,7 @@ class MockVectorStoreWithSourceFilter:
         return [
             SearchResult(
                 document=Document(
-                    id=f"anima/knowledge/fallback.md#0",
+                    id="anima/knowledge/fallback.md#0",
                     content="Fallback content from vector search",
                     embedding=embedding,
                     metadata={"source_file": "knowledge/fallback.md"},
@@ -904,7 +898,9 @@ def test_fetch_node_content_missing_file_stem_fallback():
     missing_path = Path("/nonexistent/episodes/2026-03-05.md")
 
     content = graph_builder._fetch_node_content(
-        "episodes:2026-03-05", missing_path, "episodes",
+        "episodes:2026-03-05",
+        missing_path,
+        "episodes",
     )
     assert content == "Fallback content from vector search"
 
@@ -931,9 +927,7 @@ def test_fetch_node_content_no_node_id_in_embedding():
 
     for call_texts in calls:
         for text in call_texts:
-            assert "episodes:2026-03-05" not in text, (
-                f"node_id should not be used as embedding input, got: {text}"
-            )
+            assert "episodes:2026-03-05" not in text, f"node_id should not be used as embedding input, got: {text}"
 
 
 def test_fetch_node_content_prefixed_node_id_with_empty_path():
@@ -947,13 +941,16 @@ def test_fetch_node_content_prefixed_node_id_with_empty_path():
     empty_path = Path("")
 
     content = graph_builder._fetch_node_content(
-        "episodes:2026-03-05", empty_path, "episodes",
+        "episodes:2026-03-05",
+        empty_path,
+        "episodes",
     )
     assert content == "Episode content via prefix"
 
 
 def test_fetch_node_content_unavailable_when_all_fail():
     """_fetch_node_content returns [Content unavailable] when all methods fail."""
+
     class FailingVectorStore:
         def query(self, **kwargs):
             raise RuntimeError("store unavailable")
@@ -978,7 +975,8 @@ def test_expand_results_no_content_unavailable(temp_anima_dir):
 
     graph_builder = KnowledgeGraph(vector_store, indexer)
     graph_builder.build_graph(
-        "test_anima", knowledge_dir,
+        "test_anima",
+        knowledge_dir,
         memory_dirs={"episodes": episodes_dir},
     )
 
@@ -1042,7 +1040,8 @@ def test_incremental_update_auto_detect_from_anima_dir(temp_anima_dir):
 
     graph_builder = KnowledgeGraph(vector_store, indexer)
     graph_builder.build_graph(
-        "test_anima", knowledge_dir,
+        "test_anima",
+        knowledge_dir,
         memory_dirs={"episodes": episodes_dir},
     )
 
@@ -1051,8 +1050,10 @@ def test_incremental_update_auto_detect_from_anima_dir(temp_anima_dir):
     new_episode.write_text("# 2026-03-03\n\nNew episode content.\n")
 
     graph_builder.update_graph_incremental(
-        [new_episode], "test_anima",
-        memory_type=None, anima_dir=temp_anima_dir,
+        [new_episode],
+        "test_anima",
+        memory_type=None,
+        anima_dir=temp_anima_dir,
     )
 
     assert "episodes:2026-03-03" in graph_builder.graph
@@ -1070,7 +1071,8 @@ def test_incremental_update_auto_detect_from_graph_attrs(temp_anima_dir):
 
     graph_builder = KnowledgeGraph(vector_store, indexer)
     graph_builder.build_graph(
-        "test_anima", knowledge_dir,
+        "test_anima",
+        knowledge_dir,
         memory_dirs={"episodes": episodes_dir},
     )
 
@@ -1079,8 +1081,10 @@ def test_incremental_update_auto_detect_from_graph_attrs(temp_anima_dir):
     episode_file.write_text("# 2026-03-01 Updated\n\nUpdated content.\n")
 
     graph_builder.update_graph_incremental(
-        [episode_file], "test_anima",
-        memory_type=None, anima_dir=None,
+        [episode_file],
+        "test_anima",
+        memory_type=None,
+        anima_dir=None,
     )
 
     assert "episodes:2026-03-01" in graph_builder.graph
@@ -1100,7 +1104,9 @@ def test_incremental_update_backward_compat(temp_knowledge_dir):
     new_file.write_text("# File 4\n\nNew knowledge.\n")
 
     graph_builder.update_graph_incremental(
-        [new_file], "test_anima", memory_type="knowledge",
+        [new_file],
+        "test_anima",
+        memory_type="knowledge",
     )
 
     assert "file4" in graph_builder.graph
@@ -1117,7 +1123,8 @@ def test_incremental_update_mixed_types(temp_anima_dir):
 
     graph_builder = KnowledgeGraph(vector_store, indexer)
     graph_builder.build_graph(
-        "test_anima", knowledge_dir,
+        "test_anima",
+        knowledge_dir,
         memory_dirs={"episodes": episodes_dir},
     )
 
@@ -1128,8 +1135,10 @@ def test_incremental_update_mixed_types(temp_anima_dir):
     new_episode.write_text("# 2026-03-04\n\nNew episode.\n")
 
     graph_builder.update_graph_incremental(
-        [new_knowledge, new_episode], "test_anima",
-        memory_type=None, anima_dir=temp_anima_dir,
+        [new_knowledge, new_episode],
+        "test_anima",
+        memory_type=None,
+        anima_dir=temp_anima_dir,
     )
 
     assert "new_topic" in graph_builder.graph

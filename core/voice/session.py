@@ -198,7 +198,7 @@ class VoiceSession:
             try:
                 from core.tools.transcribe import refine_with_llm
 
-                loop = asyncio.get_event_loop()
+                loop = asyncio.get_running_loop()
                 refined = await loop.run_in_executor(
                     None,
                     lambda: refine_with_llm(

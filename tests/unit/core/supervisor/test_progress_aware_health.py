@@ -12,7 +12,7 @@ never kills processes that are making progress.
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta, timezone
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 

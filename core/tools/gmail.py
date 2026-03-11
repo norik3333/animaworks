@@ -54,6 +54,8 @@ EXECUTION_PROFILE: dict[str, dict[str, object]] = {
     "search": {"expected_seconds": 15, "background_eligible": False},
     "read": {"expected_seconds": 10, "background_eligible": False},
     "draft": {"expected_seconds": 10, "background_eligible": False},
+    "send": {"expected_seconds": 15, "background_eligible": False, "gated": True},
+    "download": {"expected_seconds": 30, "background_eligible": False},
 }
 
 # Gmail API scopes
@@ -104,6 +106,16 @@ class DraftResult:
 
     draft_id: str
     message_id: str
+    success: bool
+    error: str | None = None
+
+
+@dataclass
+class SendResult:
+    """Email send result."""
+
+    message_id: str
+    thread_id: str
     success: bool
     error: str | None = None
 
@@ -455,8 +467,121 @@ class GmailClient:
                 error=str(e),
             )
 
+    def send_message(
+        self,
+        to: str,
+        subject: str,
+        body: str,
+        thread_id: str | None = None,
+        in_reply_to: str | None = None,
+        attachments: list[Path] | None = None,
+    ) -> SendResult:
+        """Send an email immediately.
+
+        Args:
+            to: Recipient address.
+            subject: Email subject.
+            body: Email body text.
+            thread_id: Thread ID (for replies).
+            in_reply_to: Gmail message ID being replied to. The RFC
+                Message-ID header and threadId are resolved automatically.
+            attachments: List of file paths to attach.
+
+        Returns:
+            SendResult with send outcome.
+        """
+        try:
+            _, email_addr = parseaddr(to)
+            recipient = email_addr if email_addr else to
+
+            # Resolve reply threading from Gmail message ID
+            rfc_message_id = ""
+            if in_reply_to:
+                rfc_message_id, resolved_thread_id, orig_subject = self._resolve_reply_headers(in_reply_to)
+                if not thread_id:
+                    thread_id = resolved_thread_id
+                if not subject.lower().startswith("re:"):
+                    subject = f"Re: {orig_subject}" if orig_subject else subject
+
+            if attachments:
+                message = MIMEMultipart()
+                message.attach(MIMEText(body))
+                for file_path in attachments:
+                    file_path = Path(file_path)
+                    if not file_path.exists():
+                        raise FileNotFoundError(f"Attachment not found: {file_path}")
+                    content_type, _ = mimetypes.guess_type(str(file_path))
+                    if content_type is None:
+                        content_type = "application/octet-stream"
+                    main_type, sub_type = content_type.split("/", 1)
+                    with open(file_path, "rb") as f:
+                        part = MIMEBase(main_type, sub_type)
+                        part.set_payload(f.read())
+                    encoders.encode_base64(part)
+                    part.add_header(
+                        "Content-Disposition",
+                        "attachment",
+                        filename=file_path.name,
+                    )
+                    message.attach(part)
+            else:
+                message = MIMEText(body)
+
+            message["to"] = recipient
+            message["subject"] = subject
+
+            if rfc_message_id:
+                message["In-Reply-To"] = rfc_message_id
+                message["References"] = rfc_message_id
+
+            raw = base64.urlsafe_b64encode(message.as_bytes()).decode("utf-8")
+
+            send_body: dict = {"raw": raw}
+            if thread_id:
+                send_body["threadId"] = thread_id
+
+            sent = self.service.users().messages().send(userId="me", body=send_body).execute()
+
+            attached_names = [Path(p).name for p in attachments] if attachments else []
+            logger.info("Email sent: %s (attachments: %s)", sent["id"], attached_names)
+
+            return SendResult(
+                message_id=sent["id"],
+                thread_id=sent.get("threadId", ""),
+                success=True,
+            )
+
+        except Exception as e:
+            logger.error("Send error: %s", e)
+            return SendResult(
+                message_id="",
+                thread_id="",
+                success=False,
+                error=str(e),
+            )
+
+    def _collect_attachment_parts(self, parts: list[dict]) -> list[dict]:
+        """Recursively collect attachment parts from nested multipart structures.
+
+        Args:
+            parts: List of MIME parts from the email payload.
+
+        Returns:
+            Flat list of parts that have a filename and attachmentId.
+        """
+        result: list[dict] = []
+        for part in parts:
+            if part.get("filename") and part["body"].get("attachmentId"):
+                result.append(part)
+            if "parts" in part:
+                result.extend(self._collect_attachment_parts(part["parts"]))
+        return result
+
     def get_attachments(self, message_id: str, save_dir: Path) -> list[tuple[str, Path]]:
         """Download attachments from an email.
+
+        Handles nested multipart structures by recursively scanning
+        all MIME parts.
 
         Args:
             message_id: Email message ID.
@@ -469,30 +594,39 @@ class GmailClient:
             message = self.service.users().messages().get(userId="me", id=message_id, format="full").execute()
 
             save_dir.mkdir(parents=True, exist_ok=True)
-            attachments = []
+            attachments: list[tuple[str, Path]] = []
 
-            parts = message["payload"].get("parts", [])
-            for part in parts:
-                if part.get("filename") and part["body"].get("attachmentId"):
-                    filename = part["filename"]
-                    attachment_id = part["body"]["attachmentId"]
+            top_parts = message["payload"].get("parts", [])
+            attachment_parts = self._collect_attachment_parts(top_parts)
 
-                    attachment = (
-                        self.service.users()
-                        .messages()
-                        .attachments()
-                        .get(userId="me", messageId=message_id, id=attachment_id)
-                        .execute()
-                    )
+            for part in attachment_parts:
+                filename = part["filename"]
+                attachment_id = part["body"]["attachmentId"]
 
-                    data = base64.urlsafe_b64decode(attachment["data"])
-                    save_path = save_dir / filename
+                attachment = (
+                    self.service.users()
+                    .messages()
+                    .attachments()
+                    .get(userId="me", messageId=message_id, id=attachment_id)
+                    .execute()
+                )
 
-                    with open(save_path, "wb") as f:
-                        f.write(data)
+                data = base64.urlsafe_b64decode(attachment["data"])
+                save_path = save_dir / filename
 
-                    attachments.append((filename, save_path))
-                    logger.info("Attachment saved: %s", filename)
+                # Avoid overwriting files with duplicate names
+                counter = 1
+                while save_path.exists():
+                    stem = Path(filename).stem
+                    suffix = Path(filename).suffix
+                    save_path = save_dir / f"{stem}_{counter}{suffix}"
+                    counter += 1
+
+                with open(save_path, "wb") as f:
+                    f.write(data)
+
+                attachments.append((filename, save_path))
+                logger.info("Attachment saved: %s -> %s", filename, save_path)
 
             return attachments
 
@@ -528,7 +662,11 @@ animaworks-tool gmail search "from:alice subject:report" -n 10
 animaworks-tool gmail read <メッセージID>
 animaworks-tool gmail draft --to "宛先" --subject "件名" --body "本文"
 animaworks-tool gmail draft --to "宛先" --subject "件名" --body "本文" --attachment /path/to/file.pdf
-```"""
+animaworks-tool gmail send --to "宛先" --subject "件名" --body "本文"
+animaworks-tool gmail download <メッセージID> [--save-dir /path/to/dir]
+```
+⚠️ **send はメールを即時送信します。取り消しできません。**
+💾 **download** は添付ファイルを指定ディレクトリに保存します（デフォルト: /tmp/gmail_attachments/）"""
 
 
 def _print_emails(emails: list[Email], label: str) -> None:
@@ -605,6 +743,24 @@ def cli_main(argv: list[str] | None = None) -> None:
     p_draft.add_argument("--in-reply-to", default=None, help="Original message ID")
     p_draft.add_argument("--attachment", action="append", default=[], help="File path to attach (repeatable)")
 
+    # download
+    p_download = sub.add_parser("download", help="Download attachments from an email")
+    p_download.add_argument("message_id", help="Gmail message ID")
+    p_download.add_argument(
+        "--save-dir",
+        default="/tmp/gmail_attachments",
+        help="Directory to save attachments (default: /tmp/gmail_attachments)",
+    )
+
+    # send
+    p_send = sub.add_parser("send", help="Send email immediately (cannot be undone)")
+    p_send.add_argument("--to", required=True, help="Recipient address")
+    p_send.add_argument("--subject", required=True, help="Subject line")
+    p_send.add_argument("--body", required=True, help="Body text")
+    p_send.add_argument("--thread-id", default=None, help="Thread ID (for replies)")
+    p_send.add_argument("--in-reply-to", default=None, help="Original message ID")
+    p_send.add_argument("--attachment", action="append", default=[], help="File path to attach (repeatable)")
+
     args = parser.parse_args(argv)
 
     if not args.command:
@@ -636,6 +792,16 @@ def cli_main(argv: list[str] | None = None) -> None:
             print("(empty or could not retrieve body)", file=sys.stderr)
             sys.exit(1)
 
+    elif args.command == "download":
+        results = client.get_attachments(args.message_id, Path(args.save_dir))
+        if results:
+            print(f"Downloaded {len(results)} attachment(s):")
+            for filename, save_path in results:
+                print(f"  {filename} -> {save_path}")
+        else:
+            print("No attachments found in this message.", file=sys.stderr)
+            sys.exit(1)
+
     elif args.command == "draft":
         attach_paths = [Path(p) for p in args.attachment] if args.attachment else None
         result = client.create_draft(
@@ -650,6 +816,22 @@ def cli_main(argv: list[str] | None = None) -> None:
             print(f"Draft created: {result.draft_id}")
         else:
             print(f"Draft creation failed: {result.error}", file=sys.stderr)
+            sys.exit(1)
+
+    elif args.command == "send":
+        attach_paths = [Path(p) for p in args.attachment] if args.attachment else None
+        result = client.send_message(
+            to=args.to,
+            subject=args.subject,
+            body=args.body,
+            thread_id=args.thread_id,
+            in_reply_to=args.in_reply_to,
+            attachments=attach_paths,
+        )
+        if result.success:
+            print(f"Email sent: {result.message_id}")
+        else:
+            print(f"Send failed: {result.error}", file=sys.stderr)
             sys.exit(1)
 
 
@@ -677,6 +859,16 @@ def dispatch(name: str, args: dict[str, Any]) -> Any:
         return [e.to_dict() for e in emails]
     if name == "gmail_read_body":
         return client.get_email_body(args["message_id"])
+    if name == "gmail_download":
+        save_dir = Path(args.get("save_dir", "/tmp/gmail_attachments"))
+        results = client.get_attachments(args["message_id"], save_dir)
+        return {
+            "count": len(results),
+            "attachments": [
+                {"filename": filename, "path": str(save_path)}
+                for filename, save_path in results
+            ],
+        }
     if name == "gmail_draft":
         raw_attachments = args.get("attachments")
         if isinstance(raw_attachments, str):
@@ -691,6 +883,25 @@ def dispatch(name: str, args: dict[str, Any]) -> Any:
             attachments=attach_paths,
         )
         return {"success": result.success, "draft_id": result.draft_id, "error": result.error}
+    if name == "gmail_send":
+        raw_attachments = args.get("attachments")
+        if isinstance(raw_attachments, str):
+            raw_attachments = json.loads(raw_attachments)
+        attach_paths = [Path(p) for p in raw_attachments] if raw_attachments else None
+        result = client.send_message(
+            to=args["to"],
+            subject=args["subject"],
+            body=args["body"],
+            thread_id=args.get("thread_id"),
+            in_reply_to=args.get("in_reply_to"),
+            attachments=attach_paths,
+        )
+        return {
+            "success": result.success,
+            "message_id": result.message_id,
+            "thread_id": result.thread_id,
+            "error": result.error,
+        }
     raise ValueError(f"Unknown tool: {name}")
 
 

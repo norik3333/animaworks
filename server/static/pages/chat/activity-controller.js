@@ -67,5 +67,47 @@ export function createActivityController(ctx) {
     el.textContent = typeof d.state === "string" ? d.state : JSON.stringify(d.state, null, 2);
   }
 
-  return { addLocalActivity, loadActivity, renderAnimaState };
+  async function loadHeartbeatConfig() {
+    const el = $root("chatHeartbeatContent");
+    if (!el) return;
+    if (!state.selectedAnima) {
+      el.innerHTML = `<div class="loading-placeholder">${t("chat.anima_select_first")}</div>`;
+      return;
+    }
+    el.innerHTML = `<div class="loading-placeholder">${t("chat.loading_config")}</div>`;
+    try {
+      const data = await api(`/api/animas/${encodeURIComponent(state.selectedAnima)}/heartbeat`);
+      if (!data.content) {
+        el.innerHTML = `<div class="config-empty">${t("chat.heartbeat_not_configured")}</div>`;
+        return;
+      }
+      const { renderMarkdown } = deps;
+      el.innerHTML = renderMarkdown(data.content, state.selectedAnima);
+    } catch {
+      el.innerHTML = `<div class="config-empty">${t("chat.heartbeat_not_configured")}</div>`;
+    }
+  }
+
+  async function loadCronConfig() {
+    const el = $root("chatCronContent");
+    if (!el) return;
+    if (!state.selectedAnima) {
+      el.innerHTML = `<div class="loading-placeholder">${t("chat.anima_select_first")}</div>`;
+      return;
+    }
+    el.innerHTML = `<div class="loading-placeholder">${t("chat.loading_config")}</div>`;
+    try {
+      const data = await api(`/api/animas/${encodeURIComponent(state.selectedAnima)}/cron`);
+      if (!data.content) {
+        el.innerHTML = `<div class="config-empty">${t("chat.cron_not_configured")}</div>`;
+        return;
+      }
+      const { renderMarkdown } = deps;
+      el.innerHTML = renderMarkdown(data.content, state.selectedAnima);
+    } catch {
+      el.innerHTML = `<div class="config-empty">${t("chat.cron_not_configured")}</div>`;
+    }
+  }
+
+  return { addLocalActivity, loadActivity, renderAnimaState, loadHeartbeatConfig, loadCronConfig };
 }

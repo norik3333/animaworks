@@ -896,7 +896,7 @@ class TestAssemblyWithTags:
             if stripped.startswith("```"):
                 continue
             if stripped.startswith("# ") and not stripped.startswith("## "):
-                assert False, f"H1 heading found in output: {line!r}"
+                raise AssertionError(f"H1 heading found in output: {line!r}")
 
     def test_no_triple_dash_separator(self, tmp_path, data_dir):
         """Sections should not be joined by --- separators."""

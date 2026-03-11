@@ -48,7 +48,14 @@ class ContextMixin:
     def _build_llm_kwargs(self) -> dict[str, Any]:
         """Credential + model kwargs for ``litellm.acompletion``."""
         from core.config.models import resolve_max_tokens
-        from core.execution.base import is_adaptive_model, is_anthropic_claude, resolve_thinking_effort
+        from core.execution.base import (
+            is_adaptive_model,
+            is_anthropic_claude,
+            is_bedrock_glm,
+            is_bedrock_kimi,
+            is_bedrock_qwen,
+            resolve_thinking_effort,
+        )
 
         _eff_max = resolve_max_tokens(
             self._model_config.model,
@@ -70,7 +77,20 @@ class ContextMixin:
         # Extended thinking / reasoning control
         if self._model_config.thinking is not None:
             model = self._model_config.model
-            if model.startswith("bedrock/"):
+            if is_bedrock_kimi(model):
+                # Kimi K2.5 on Bedrock: pass reasoning_config which LiteLLM
+                # forwards to additionalModelRequestFields in Converse API.
+                # Supported values: "high" (enables thinking mode).
+                if self._model_config.thinking:
+                    kwargs["reasoning_config"] = resolve_thinking_effort(
+                        model,
+                        self._model_config.thinking_effort,
+                    )
+            elif is_bedrock_qwen(model) or is_bedrock_glm(model):
+                # Qwen / GLM on Bedrock: pass enable_thinking which LiteLLM
+                # forwards to additionalModelRequestFields in the Converse API
+                kwargs["enable_thinking"] = self._model_config.thinking
+            elif model.startswith("bedrock/"):
                 if self._model_config.thinking:
                     kwargs["reasoning_effort"] = resolve_thinking_effort(
                         model,
@@ -87,6 +107,11 @@ class ContextMixin:
                     else:
                         kwargs["thinking"] = {"type": "enabled", "budget_tokens": 10000}
                     kwargs["temperature"] = 1
+            elif model.startswith("openai/"):
+                kwargs.setdefault("extra_body", {})
+                kwargs["extra_body"]["enable_thinking"] = self._model_config.thinking
+                kwargs["extra_body"].setdefault("chat_template_kwargs", {})
+                kwargs["extra_body"]["chat_template_kwargs"]["enable_thinking"] = self._model_config.thinking
             else:
                 kwargs["think"] = self._model_config.thinking
         elif self._model_config.model.startswith("ollama/"):
@@ -94,6 +119,15 @@ class ContextMixin:
         # Ollama num_ctx: explicitly set context window to prevent silent truncation
         if self._model_config.model.startswith("ollama/"):
             kwargs["num_ctx"] = self._resolve_cw()
+        # ── Repetition penalty parameters ──
+        from core.config.models import resolve_penalties
+
+        penalties = resolve_penalties(self._model_config.model)
+        if self._model_config.frequency_penalty is not None:
+            penalties["frequency_penalty"] = self._model_config.frequency_penalty
+        if self._model_config.presence_penalty is not None:
+            penalties["presence_penalty"] = self._model_config.presence_penalty
+        kwargs.update(penalties)
         return kwargs
 
     def _build_initial_messages(

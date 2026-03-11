@@ -20,8 +20,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from core.supervisor.ipc import IPCRequest, IPCResponse
-from core.supervisor.process_handle import ProcessHandle, ProcessState, ProcessStats
+from core.supervisor.ipc import IPCRequest
+from core.supervisor.process_handle import ProcessHandle, ProcessState
 
 
 # ── A2: StreamingIPCHandler BaseException safety valve ──────────
@@ -43,7 +43,7 @@ class TestStreamingHandlerBaseException:
 
         async def mock_stream(*args, **kwargs):
             raise SystemExit(1)
-            yield  # noqa: unreachable - make async generator
+            yield  # noqa
 
         handler._anima.process_message_stream = mock_stream
         handler._anima.needs_bootstrap = False
@@ -83,7 +83,7 @@ class TestStreamingHandlerBaseException:
 
         async def mock_stream(*args, **kwargs):
             raise asyncio.CancelledError()
-            yield  # noqa: unreachable
+            yield  # noqa
 
         handler._anima.process_message_stream = mock_stream
         handler._anima.needs_bootstrap = False
@@ -122,7 +122,7 @@ class TestStreamingHandlerBaseException:
 
         async def mock_stream(*args, **kwargs):
             raise KeyboardInterrupt()
-            yield  # noqa: unreachable
+            yield  # noqa
 
         handler._anima.process_message_stream = mock_stream
         handler._anima.needs_bootstrap = False

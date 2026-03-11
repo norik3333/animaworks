@@ -22,6 +22,7 @@ Implementation is split across Mixin modules:
 """
 
 import asyncio
+import json as _json
 import logging
 from collections.abc import AsyncGenerator
 from functools import partial
@@ -126,6 +127,8 @@ class LiteLLMExecutor(
         """
         import litellm
 
+        litellm.modify_params = True
+
         tools = self._build_base_tools()
         _active_categories: set[str] = set()
         context_window = self._resolve_cw()
@@ -188,7 +191,16 @@ class LiteLLMExecutor(
                 "messages": messages,
                 **iter_kwargs,
             }
-            if not is_final_iteration:
+            # Bedrock requires toolConfig in every request that has toolUse/toolResult
+            # in the conversation history — omitting tools causes ValidationException.
+            _has_tool_history = any(
+                msg.get("role") == "tool" or (msg.get("role") == "assistant" and msg.get("tool_calls"))
+                for msg in messages
+            )
+            _bedrock_needs_tools = (
+                is_final_iteration and _has_tool_history and self._model_config.model.startswith("bedrock/")
+            )
+            if not is_final_iteration or _bedrock_needs_tools:
                 call_kwargs["tools"] = tools
 
             try:
@@ -278,9 +290,39 @@ class LiteLLMExecutor(
                 iteration,
                 ", ".join(tc.function.name or "unknown" for tc in tool_calls),
             )
-            messages.append(message.model_dump())
 
             parsed_calls = _convert_litellm_tool_calls(tool_calls)
+
+            # Reconstruct assistant message with repaired arguments.
+            # model_dump() would preserve malformed JSON that some models
+            # (e.g. GLM-4.7) produce, causing 400 errors on the next
+            # API call.  Re-serialize through json.dumps instead.
+            _assistant_tc = []
+            for tc in parsed_calls:
+                if tc["arguments"] is not None:
+                    _args_str = _json.dumps(tc["arguments"], ensure_ascii=False)
+                else:
+                    _args_str = "{}"
+                _assistant_tc.append(
+                    {
+                        "id": tc["id"],
+                        "type": "function",
+                        "function": {
+                            "name": tc["name"],
+                            "arguments": _args_str,
+                        },
+                    }
+                )
+            _content = message.content
+            if _content:
+                _, _content = strip_thinking_tags(_content)
+            messages.append(
+                {
+                    "role": "assistant",
+                    "content": _content or None,
+                    "tool_calls": _assistant_tc,
+                }
+            )
             async for _event in self._process_streaming_tool_calls(
                 parsed_calls,
                 messages,

@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import time
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -19,9 +18,6 @@ import pytest
 from core.supervisor.ipc import IPCClient, IPCRequest, IPCResponse
 from core.supervisor.streaming_handler import (
     StreamingIPCHandler,
-    _DEFAULT_KEEPALIVE_INTERVAL,
-    _SENTINEL,
-    _Sentinel,
 )
 
 

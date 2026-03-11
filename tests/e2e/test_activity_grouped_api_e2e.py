@@ -6,11 +6,10 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, UTC
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
 from httpx import ASGITransport, AsyncClient
 
 
@@ -46,8 +45,10 @@ def _create_app(tmp_path: Path, anima_names: list[str] | None = None):
         ws_manager.active_connections = []
         mock_ws_cls.return_value = ws_manager
         from server.app import create_app
+
         app = create_app(animas_dir, shared_dir)
     import server.app as _sa
+
     _auth = MagicMock()
     _auth.auth_mode = "local_trust"
     _sa.load_auth = lambda: _auth
@@ -86,10 +87,14 @@ class TestGroupedFalseBackwardCompat:
     async def test_default_returns_flat_events(self, tmp_path: Path) -> None:
         animas_dir = tmp_path / "animas"
         _setup_anima(animas_dir, "alice")
-        now = datetime.now(timezone.utc)
-        _write_activity(animas_dir, "alice", [
-            {"ts": now.isoformat(), "type": "heartbeat_start", "summary": "HB", "content": ""},
-        ])
+        now = datetime.now(UTC)
+        _write_activity(
+            animas_dir,
+            "alice",
+            [
+                {"ts": now.isoformat(), "type": "heartbeat_start", "summary": "HB", "content": ""},
+            ],
+        )
         app = _create_app(tmp_path, anima_names=["alice"])
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -119,12 +124,21 @@ class TestGroupedResponseStructure:
     async def test_grouped_response_fields(self, tmp_path: Path) -> None:
         animas_dir = tmp_path / "animas"
         _setup_anima(animas_dir, "alice")
-        now = datetime.now(timezone.utc)
-        _write_activity(animas_dir, "alice", [
-            {"ts": (now - timedelta(seconds=3)).isoformat(), "type": "heartbeat_start", "summary": "HB start"},
-            {"ts": (now - timedelta(seconds=2)).isoformat(), "type": "channel_read", "summary": "read general", "channel": "general"},
-            {"ts": (now - timedelta(seconds=1)).isoformat(), "type": "heartbeat_end", "summary": "ok"},
-        ])
+        now = datetime.now(UTC)
+        _write_activity(
+            animas_dir,
+            "alice",
+            [
+                {"ts": (now - timedelta(seconds=3)).isoformat(), "type": "heartbeat_start", "summary": "HB start"},
+                {
+                    "ts": (now - timedelta(seconds=2)).isoformat(),
+                    "type": "channel_read",
+                    "summary": "read general",
+                    "channel": "general",
+                },
+                {"ts": (now - timedelta(seconds=1)).isoformat(), "type": "heartbeat_end", "summary": "ok"},
+            ],
+        )
         app = _create_app(tmp_path, anima_names=["alice"])
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -143,18 +157,21 @@ class TestGroupedResponseStructure:
     async def test_group_contains_expected_fields(self, tmp_path: Path) -> None:
         animas_dir = tmp_path / "animas"
         _setup_anima(animas_dir, "alice")
-        now = datetime.now(timezone.utc)
-        _write_activity(animas_dir, "alice", [
-            {"ts": now.isoformat(), "type": "heartbeat_start", "summary": "HB"},
-        ])
+        now = datetime.now(UTC)
+        _write_activity(
+            animas_dir,
+            "alice",
+            [
+                {"ts": now.isoformat(), "type": "heartbeat_start", "summary": "HB"},
+            ],
+        )
         app = _create_app(tmp_path, anima_names=["alice"])
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.get("/api/activity/recent?grouped=true")
         data = resp.json()
         grp = data["groups"][0]
-        for field in ("id", "type", "anima", "start_ts", "end_ts",
-                       "summary", "event_count", "is_open", "events"):
+        for field in ("id", "type", "anima", "start_ts", "end_ts", "summary", "event_count", "is_open", "events"):
             assert field in grp, f"Missing field: {field}"
 
     async def test_empty_returns_zero_groups(self, tmp_path: Path) -> None:
@@ -176,11 +193,15 @@ class TestGroupTypes:
     async def test_heartbeat_group_type(self, tmp_path: Path) -> None:
         animas_dir = tmp_path / "animas"
         _setup_anima(animas_dir, "alice")
-        now = datetime.now(timezone.utc)
-        _write_activity(animas_dir, "alice", [
-            {"ts": (now - timedelta(seconds=2)).isoformat(), "type": "heartbeat_start", "summary": "HB start"},
-            {"ts": (now - timedelta(seconds=1)).isoformat(), "type": "heartbeat_end", "summary": "ok"},
-        ])
+        now = datetime.now(UTC)
+        _write_activity(
+            animas_dir,
+            "alice",
+            [
+                {"ts": (now - timedelta(seconds=2)).isoformat(), "type": "heartbeat_start", "summary": "HB start"},
+                {"ts": (now - timedelta(seconds=1)).isoformat(), "type": "heartbeat_end", "summary": "ok"},
+            ],
+        )
         app = _create_app(tmp_path, anima_names=["alice"])
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -192,13 +213,27 @@ class TestGroupTypes:
     async def test_chat_group_type(self, tmp_path: Path) -> None:
         animas_dir = tmp_path / "animas"
         _setup_anima(animas_dir, "alice")
-        now = datetime.now(timezone.utc)
-        _write_activity(animas_dir, "alice", [
-            {"ts": (now - timedelta(seconds=2)).isoformat(), "type": "message_received",
-             "summary": "hi", "content": "hi", "from": "admin", "meta": {"from_type": "human"}},
-            {"ts": (now - timedelta(seconds=1)).isoformat(), "type": "response_sent",
-             "summary": "hello", "content": "hello"},
-        ])
+        now = datetime.now(UTC)
+        _write_activity(
+            animas_dir,
+            "alice",
+            [
+                {
+                    "ts": (now - timedelta(seconds=2)).isoformat(),
+                    "type": "message_received",
+                    "summary": "hi",
+                    "content": "hi",
+                    "from": "admin",
+                    "meta": {"from_type": "human"},
+                },
+                {
+                    "ts": (now - timedelta(seconds=1)).isoformat(),
+                    "type": "response_sent",
+                    "summary": "hello",
+                    "content": "hello",
+                },
+            ],
+        )
         app = _create_app(tmp_path, anima_names=["alice"])
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -209,11 +244,19 @@ class TestGroupTypes:
     async def test_cron_group_type(self, tmp_path: Path) -> None:
         animas_dir = tmp_path / "animas"
         _setup_anima(animas_dir, "alice")
-        now = datetime.now(timezone.utc)
-        _write_activity(animas_dir, "alice", [
-            {"ts": now.isoformat(), "type": "cron_executed",
-             "summary": "check mail", "meta": {"task_name": "check_mail"}},
-        ])
+        now = datetime.now(UTC)
+        _write_activity(
+            animas_dir,
+            "alice",
+            [
+                {
+                    "ts": now.isoformat(),
+                    "type": "cron_executed",
+                    "summary": "check mail",
+                    "meta": {"task_name": "check_mail"},
+                },
+            ],
+        )
         app = _create_app(tmp_path, anima_names=["alice"])
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -231,17 +274,23 @@ class TestGroupPagination:
     async def test_group_limit(self, tmp_path: Path) -> None:
         animas_dir = tmp_path / "animas"
         _setup_anima(animas_dir, "alice")
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         entries = []
         for i in range(10):
-            entries.append({
-                "ts": (now - timedelta(minutes=10 - i)).isoformat(),
-                "type": "heartbeat_start", "summary": f"HB {i}",
-            })
-            entries.append({
-                "ts": (now - timedelta(minutes=10 - i, seconds=-30)).isoformat(),
-                "type": "heartbeat_end", "summary": f"ok {i}",
-            })
+            entries.append(
+                {
+                    "ts": (now - timedelta(minutes=10 - i)).isoformat(),
+                    "type": "heartbeat_start",
+                    "summary": f"HB {i}",
+                }
+            )
+            entries.append(
+                {
+                    "ts": (now - timedelta(minutes=10 - i, seconds=-30)).isoformat(),
+                    "type": "heartbeat_end",
+                    "summary": f"ok {i}",
+                }
+            )
         _write_activity(animas_dir, "alice", entries)
         app = _create_app(tmp_path, anima_names=["alice"])
         transport = ASGITransport(app=app)
@@ -255,17 +304,23 @@ class TestGroupPagination:
     async def test_group_offset(self, tmp_path: Path) -> None:
         animas_dir = tmp_path / "animas"
         _setup_anima(animas_dir, "alice")
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         entries = []
         for i in range(5):
-            entries.append({
-                "ts": (now - timedelta(minutes=5 - i)).isoformat(),
-                "type": "heartbeat_start", "summary": f"HB {i}",
-            })
-            entries.append({
-                "ts": (now - timedelta(minutes=5 - i, seconds=-10)).isoformat(),
-                "type": "heartbeat_end", "summary": f"ok {i}",
-            })
+            entries.append(
+                {
+                    "ts": (now - timedelta(minutes=5 - i)).isoformat(),
+                    "type": "heartbeat_start",
+                    "summary": f"HB {i}",
+                }
+            )
+            entries.append(
+                {
+                    "ts": (now - timedelta(minutes=5 - i, seconds=-10)).isoformat(),
+                    "type": "heartbeat_end",
+                    "summary": f"ok {i}",
+                }
+            )
         _write_activity(animas_dir, "alice", entries)
         app = _create_app(tmp_path, anima_names=["alice"])
         transport = ASGITransport(app=app)
@@ -285,19 +340,29 @@ class TestToolPairingApi:
     async def test_tool_result_attached(self, tmp_path: Path) -> None:
         animas_dir = tmp_path / "animas"
         _setup_anima(animas_dir, "alice")
-        now = datetime.now(timezone.utc)
-        _write_activity(animas_dir, "alice", [
-            {"ts": (now - timedelta(seconds=3)).isoformat(),
-             "type": "heartbeat_start", "summary": "HB"},
-            {"ts": (now - timedelta(seconds=2)).isoformat(),
-             "type": "tool_use", "tool": "web_search", "summary": "search",
-             "meta": {"tool_use_id": "tu_1"}},
-            {"ts": (now - timedelta(seconds=1, milliseconds=500)).isoformat(),
-             "type": "tool_result", "tool": "web_search", "content": "3 results found",
-             "meta": {"tool_use_id": "tu_1"}},
-            {"ts": (now - timedelta(seconds=1)).isoformat(),
-             "type": "heartbeat_end", "summary": "done"},
-        ])
+        now = datetime.now(UTC)
+        _write_activity(
+            animas_dir,
+            "alice",
+            [
+                {"ts": (now - timedelta(seconds=3)).isoformat(), "type": "heartbeat_start", "summary": "HB"},
+                {
+                    "ts": (now - timedelta(seconds=2)).isoformat(),
+                    "type": "tool_use",
+                    "tool": "web_search",
+                    "summary": "search",
+                    "meta": {"tool_use_id": "tu_1"},
+                },
+                {
+                    "ts": (now - timedelta(seconds=1, milliseconds=500)).isoformat(),
+                    "type": "tool_result",
+                    "tool": "web_search",
+                    "content": "3 results found",
+                    "meta": {"tool_use_id": "tu_1"},
+                },
+                {"ts": (now - timedelta(seconds=1)).isoformat(), "type": "heartbeat_end", "summary": "done"},
+            ],
+        )
         app = _create_app(tmp_path, anima_names=["alice"])
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -324,15 +389,27 @@ class TestGroupedAnimaFilter:
         animas_dir = tmp_path / "animas"
         _setup_anima(animas_dir, "alice")
         _setup_anima(animas_dir, "bob")
-        now = datetime.now(timezone.utc)
-        _write_activity(animas_dir, "alice", [
-            {"ts": (now - timedelta(seconds=2)).isoformat(), "type": "heartbeat_start", "summary": "alice HB"},
-            {"ts": (now - timedelta(seconds=1)).isoformat(), "type": "heartbeat_end", "summary": "alice ok"},
-        ])
-        _write_activity(animas_dir, "bob", [
-            {"ts": now.isoformat(), "type": "cron_executed", "summary": "bob cron",
-             "meta": {"task_name": "backup"}},
-        ])
+        now = datetime.now(UTC)
+        _write_activity(
+            animas_dir,
+            "alice",
+            [
+                {"ts": (now - timedelta(seconds=2)).isoformat(), "type": "heartbeat_start", "summary": "alice HB"},
+                {"ts": (now - timedelta(seconds=1)).isoformat(), "type": "heartbeat_end", "summary": "alice ok"},
+            ],
+        )
+        _write_activity(
+            animas_dir,
+            "bob",
+            [
+                {
+                    "ts": now.isoformat(),
+                    "type": "cron_executed",
+                    "summary": "bob cron",
+                    "meta": {"task_name": "backup"},
+                },
+            ],
+        )
         app = _create_app(tmp_path, anima_names=["alice", "bob"])
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -351,13 +428,21 @@ class TestGroupTypeFilter:
     async def test_filter_by_single_group_type(self, tmp_path: Path) -> None:
         animas_dir = tmp_path / "animas"
         _setup_anima(animas_dir, "alice")
-        now = datetime.now(timezone.utc)
-        _write_activity(animas_dir, "alice", [
-            {"ts": (now - timedelta(seconds=3)).isoformat(), "type": "heartbeat_start", "summary": "HB"},
-            {"ts": (now - timedelta(seconds=2)).isoformat(), "type": "heartbeat_end", "summary": "ok"},
-            {"ts": (now - timedelta(seconds=1)).isoformat(), "type": "cron_executed", "summary": "Cron",
-             "meta": {"task_name": "backup"}},
-        ])
+        now = datetime.now(UTC)
+        _write_activity(
+            animas_dir,
+            "alice",
+            [
+                {"ts": (now - timedelta(seconds=3)).isoformat(), "type": "heartbeat_start", "summary": "HB"},
+                {"ts": (now - timedelta(seconds=2)).isoformat(), "type": "heartbeat_end", "summary": "ok"},
+                {
+                    "ts": (now - timedelta(seconds=1)).isoformat(),
+                    "type": "cron_executed",
+                    "summary": "Cron",
+                    "meta": {"task_name": "backup"},
+                },
+            ],
+        )
         app = _create_app(tmp_path, anima_names=["alice"])
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -369,15 +454,28 @@ class TestGroupTypeFilter:
     async def test_filter_by_multiple_group_types(self, tmp_path: Path) -> None:
         animas_dir = tmp_path / "animas"
         _setup_anima(animas_dir, "alice")
-        now = datetime.now(timezone.utc)
-        _write_activity(animas_dir, "alice", [
-            {"ts": (now - timedelta(seconds=4)).isoformat(), "type": "heartbeat_start", "summary": "HB"},
-            {"ts": (now - timedelta(seconds=3)).isoformat(), "type": "heartbeat_end", "summary": "ok"},
-            {"ts": (now - timedelta(seconds=2)).isoformat(), "type": "cron_executed", "summary": "Cron",
-             "meta": {"task_name": "backup"}},
-            {"ts": (now - timedelta(seconds=1)).isoformat(), "type": "channel_post", "summary": "post",
-             "channel": "general", "content": "hello"},
-        ])
+        now = datetime.now(UTC)
+        _write_activity(
+            animas_dir,
+            "alice",
+            [
+                {"ts": (now - timedelta(seconds=4)).isoformat(), "type": "heartbeat_start", "summary": "HB"},
+                {"ts": (now - timedelta(seconds=3)).isoformat(), "type": "heartbeat_end", "summary": "ok"},
+                {
+                    "ts": (now - timedelta(seconds=2)).isoformat(),
+                    "type": "cron_executed",
+                    "summary": "Cron",
+                    "meta": {"task_name": "backup"},
+                },
+                {
+                    "ts": (now - timedelta(seconds=1)).isoformat(),
+                    "type": "channel_post",
+                    "summary": "post",
+                    "channel": "general",
+                    "content": "hello",
+                },
+            ],
+        )
         app = _create_app(tmp_path, anima_names=["alice"])
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:

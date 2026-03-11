@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 # AnimaWorks - Digital Anima Framework
 # Copyright (C) 2026 AnimaWorks Authors
 # SPDX-License-Identifier: Apache-2.0
@@ -17,23 +18,45 @@ Tests cover:
 """
 
 import math
-import tempfile
 from datetime import datetime, timedelta
-from core.time_utils import now_jst
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from core.memory.rag.retriever import (
+    WEIGHT_FREQUENCY,
     MemoryRetriever,
     RetrievalResult,
-    WEIGHT_FREQUENCY,
-    WEIGHT_RECENCY,
 )
-
+from core.time_utils import now_jst
 
 # ── Fixtures ────────────────────────────────────────────────────────
+
+
+def _setup_collection_get(store, data_map: dict[str, dict] | None = None):
+    """Configure mock_vector_store.client.get_collection().get() to return metadata.
+
+    Args:
+        store: The mock vector store.
+        data_map: Mapping of collection name to {doc_id: {metadata dict}}.
+    """
+    if data_map is None:
+        data_map = {}
+
+    def _get_collection(name):
+        coll = MagicMock()
+        col_data = data_map.get(name, {})
+
+        def _get(ids=None, include=None):
+            result_ids = ids or list(col_data.keys())
+            result_metas = [col_data.get(did, {}) for did in result_ids]
+            return {"ids": result_ids, "metadatas": result_metas}
+
+        coll.get = _get
+        return coll
+
+    store.client.get_collection = _get_collection
 
 
 @pytest.fixture
@@ -42,6 +65,7 @@ def mock_vector_store():
     store = MagicMock()
     store.update_metadata = MagicMock()
     store.query = MagicMock(return_value=[])
+    _setup_collection_get(store)
     return store
 
 
@@ -102,10 +126,16 @@ class TestScoreAdjustmentsFrequency:
         recent = (now - timedelta(days=1)).isoformat()
 
         high_access = _make_result(
-            doc_id="high", score=0.5, access_count=10, updated_at=recent,
+            doc_id="high",
+            score=0.5,
+            access_count=10,
+            updated_at=recent,
         )
         zero_access = _make_result(
-            doc_id="zero", score=0.5, access_count=0, updated_at=recent,
+            doc_id="zero",
+            score=0.5,
+            access_count=0,
+            updated_at=recent,
         )
 
         results = retriever._apply_score_adjustments([high_access, zero_access])
@@ -128,7 +158,9 @@ class TestScoreAdjustmentsFrequency:
     def test_score_adjustments_frequency_zero_access(self, retriever):
         """Test that access_count=0 gives frequency_boost=0 (log1p(0) == 0)."""
         result = _make_result(
-            doc_id="zero", score=0.5, access_count=0,
+            doc_id="zero",
+            score=0.5,
+            access_count=0,
             updated_at=now_jst().isoformat(),
         )
 
@@ -147,10 +179,16 @@ class TestScoreAdjustmentsFrequency:
         now_iso = now_jst().isoformat()
 
         one_access = _make_result(
-            doc_id="one", score=0.5, access_count=1, updated_at=now_iso,
+            doc_id="one",
+            score=0.5,
+            access_count=1,
+            updated_at=now_iso,
         )
         hundred_access = _make_result(
-            doc_id="hundred", score=0.5, access_count=100, updated_at=now_iso,
+            doc_id="hundred",
+            score=0.5,
+            access_count=100,
+            updated_at=now_iso,
         )
 
         results = retriever._apply_score_adjustments([one_access, hundred_access])
@@ -162,9 +200,7 @@ class TestScoreAdjustmentsFrequency:
         assert one_freq > 0
         assert hundred_freq > one_freq
         ratio = hundred_freq / one_freq
-        assert ratio < 10, (
-            f"Expected logarithmic scaling (ratio < 10), got ratio={ratio:.2f}"
-        )
+        assert ratio < 10, f"Expected logarithmic scaling (ratio < 10), got ratio={ratio:.2f}"
 
         # Verify exact expected values
         expected_one = WEIGHT_FREQUENCY * math.log1p(1)
@@ -182,12 +218,20 @@ class TestRecordAccess:
     def test_record_access_updates_metadata(self, retriever, mock_vector_store):
         """Test that record_access calls update_metadata with correct arguments.
 
-        Should increment access_count and set last_accessed_at to current ISO
-        timestamp.
+        Should read current access_count from DB and increment by 1.
         """
+        _setup_collection_get(
+            mock_vector_store,
+            {
+                "test_anima_knowledge": {"doc1": {"access_count": 3}},
+            },
+        )
+
         result = _make_result(
-            doc_id="doc1", access_count=3,
-            memory_type="knowledge", anima="test_anima",
+            doc_id="doc1",
+            access_count=3,
+            memory_type="knowledge",
+            anima="test_anima",
         )
 
         fixed_now = datetime(2026, 2, 15, 12, 0, 0)
@@ -212,13 +256,25 @@ class TestRecordAccess:
         Results from different memory types should produce separate
         update_metadata calls.
         """
+        _setup_collection_get(
+            mock_vector_store,
+            {
+                "test_anima_knowledge": {"k1": {"access_count": 0}},
+                "test_anima_episodes": {"e1": {"access_count": 2}},
+            },
+        )
+
         knowledge_result = _make_result(
-            doc_id="k1", access_count=0,
-            memory_type="knowledge", anima="test_anima",
+            doc_id="k1",
+            access_count=0,
+            memory_type="knowledge",
+            anima="test_anima",
         )
         episode_result = _make_result(
-            doc_id="e1", access_count=2,
-            memory_type="episodes", anima="test_anima",
+            doc_id="e1",
+            access_count=2,
+            memory_type="episodes",
+            anima="test_anima",
         )
 
         retriever.record_access([knowledge_result, episode_result], "test_anima")
@@ -243,8 +299,10 @@ class TestRecordAccess:
         mock_vector_store.update_metadata.side_effect = RuntimeError("DB error")
 
         result = _make_result(
-            doc_id="doc1", access_count=0,
-            memory_type="knowledge", anima="test_anima",
+            doc_id="doc1",
+            access_count=0,
+            memory_type="knowledge",
+            anima="test_anima",
         )
 
         # Should not raise
@@ -326,7 +384,7 @@ class TestUpdateMetadataOnVectorStore:
         update_metadata to change a field, then queries back and verifies
         the metadata was updated.
         """
-        chromadb = pytest.importorskip(
+        pytest.importorskip(
             "chromadb",
             reason="ChromaDB not installed. Install with: pip install 'animaworks[rag]'",
         )
@@ -362,10 +420,12 @@ class TestUpdateMetadataOnVectorStore:
         store.update_metadata(
             "test_col",
             ids=["doc1"],
-            metadatas=[{
-                "access_count": 5,
-                "last_accessed_at": new_ts,
-            }],
+            metadatas=[
+                {
+                    "access_count": 5,
+                    "last_accessed_at": new_ts,
+                }
+            ],
         )
 
         # Query back and verify

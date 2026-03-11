@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import json
 
-import pytest
 
 from core.memory.conversation import ConversationMemory, ConversationTurn
 from core.schemas import ModelConfig

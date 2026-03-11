@@ -6,7 +6,7 @@ from __future__ import annotations
 """Tests for call_human reply routing (notification_map + sanitization)."""
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, UTC
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -22,7 +22,8 @@ from core.notification.reply_routing import route_thread_reply
 def routing_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Redirect get_data_dir() to a temp directory."""
     monkeypatch.setattr(
-        "core.notification.reply_routing.get_data_dir", lambda: tmp_path,
+        "core.notification.reply_routing.get_data_dir",
+        lambda: tmp_path,
     )
     return tmp_path
 
@@ -100,7 +101,7 @@ class TestPruning:
         map_path = routing_dir / "run" / "notification_map.json"
         map_path.parent.mkdir(parents=True, exist_ok=True)
 
-        old_ts = (datetime.now(timezone.utc) - timedelta(days=10)).isoformat()
+        old_ts = (datetime.now(UTC) - timedelta(days=10)).isoformat()
         data = {
             "old.entry": {
                 "anima": "stale",
@@ -136,8 +137,8 @@ class TestPruning:
         map_path = routing_dir / "run" / "notification_map.json"
         map_path.parent.mkdir(parents=True, exist_ok=True)
 
-        old_ts = (datetime.now(timezone.utc) - timedelta(days=10)).isoformat()
-        new_ts = datetime.now(timezone.utc).isoformat()
+        old_ts = (datetime.now(UTC) - timedelta(days=10)).isoformat()
+        new_ts = datetime.now(UTC).isoformat()
         data = {
             "old.one": {"anima": "a", "channel": "C1", "created_at": old_ts},
             "new.one": {"anima": "b", "channel": "C2", "created_at": new_ts},

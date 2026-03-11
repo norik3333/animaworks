@@ -24,7 +24,6 @@ from datetime import timedelta
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
 
 from core.background import _rotate_dm_logs_sync
 from core.time_utils import now_jst
@@ -62,7 +61,7 @@ class TestRotateDmLogs:
         """7日超のエントリがアーカイブファイルに移動される。"""
         dm_logs = tmp_path / "dm_logs"
         base = now_jst()
-        with patch("core.time_utils.now_jst", return_value=base):
+        with patch("core.time_utils.now_local", return_value=base):
             old_ts = (base - timedelta(days=8)).isoformat()
             recent_ts = (base - timedelta(days=3)).isoformat()
             _write_dm_entries(

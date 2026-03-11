@@ -10,16 +10,13 @@ Issue: 20260218_episode-dedup-state-autoupdate-resolution-propagation
 """
 
 import json
-import re
-from datetime import datetime, timedelta
-from core.time_utils import now_jst
-from pathlib import Path
+from datetime import timedelta
+from core.time_utils import now_jst, today_local
 
 import pytest
 
 from core.memory.conversation import (
     ConversationMemory,
-    ConversationState,
     ConversationTurn,
     ParsedSessionSummary,
     SESSION_GAP_MINUTES,
@@ -156,8 +153,7 @@ class TestFinalizeSession:
         assert loaded.last_finalized_turn_index == 6
 
         # Verify episode was written
-        from datetime import date
-        episode_file = anima_dir / "episodes" / f"{date.today().isoformat()}.md"
+        episode_file = anima_dir / "episodes" / f"{today_local().isoformat()}.md"
         assert episode_file.exists()
         content = episode_file.read_text(encoding="utf-8")
         assert "テスト会話" in content

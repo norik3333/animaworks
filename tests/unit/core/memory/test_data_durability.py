@@ -18,13 +18,12 @@ Covers:
 """
 
 import json
-import os
 from pathlib import Path
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 
 import pytest
 
-from core.memory.streaming_journal import StreamingJournal, JournalRecovery
+from core.memory.streaming_journal import StreamingJournal
 from core.schemas import ModelConfig
 
 
@@ -62,7 +61,9 @@ class TestConversationAtomicSave:
     """Tests that ConversationMemory.save() uses atomic writes."""
 
     def test_save_creates_valid_json(
-        self, anima_dir: Path, model_config: ModelConfig,
+        self,
+        anima_dir: Path,
+        model_config: ModelConfig,
     ):
         """After save(), the conversation.json file exists and is valid JSON."""
         from core.memory.conversation import ConversationMemory
@@ -84,7 +85,9 @@ class TestConversationAtomicSave:
         assert data["turns"][1]["content"] == "Hi there!"
 
     def test_no_tmp_files_remain_after_save(
-        self, anima_dir: Path, model_config: ModelConfig,
+        self,
+        anima_dir: Path,
+        model_config: ModelConfig,
     ):
         """No .tmp files should remain in the state directory after save()."""
         from core.memory.conversation import ConversationMemory
@@ -98,7 +101,9 @@ class TestConversationAtomicSave:
         assert tmp_files == [], f"Stale .tmp files found: {tmp_files}"
 
     def test_crash_during_save_preserves_original(
-        self, anima_dir: Path, model_config: ModelConfig,
+        self,
+        anima_dir: Path,
+        model_config: ModelConfig,
     ):
         """If atomic_write_text raises mid-write, the original data is preserved.
 
@@ -174,7 +179,8 @@ class TestManagerKnowledgeAtomicWrite:
         return mgr
 
     def test_write_knowledge_creates_file_with_frontmatter(
-        self, memory_manager,
+        self,
+        memory_manager,
     ):
         """write_knowledge_with_meta() creates a file with YAML frontmatter."""
         path = memory_manager.knowledge_dir / "test_topic.md"
@@ -193,7 +199,8 @@ class TestManagerKnowledgeAtomicWrite:
         assert "Some content here." in text
 
     def test_no_tmp_files_after_knowledge_write(
-        self, memory_manager,
+        self,
+        memory_manager,
     ):
         """No .tmp files should remain after write_knowledge_with_meta()."""
         path = memory_manager.knowledge_dir / "clean_write.md"
@@ -265,7 +272,9 @@ class TestActivityLoggerFsync:
         return ActivityLogger(anima_dir)
 
     def test_single_entry_triggers_fsync(
-        self, activity_logger, anima_dir: Path,
+        self,
+        activity_logger,
+        anima_dir: Path,
     ):
         """Every single append should trigger fsync."""
         with patch("core.memory.activity.os.fsync") as mock_fsync:
@@ -274,18 +283,20 @@ class TestActivityLoggerFsync:
         mock_fsync.assert_called_once()
 
     def test_multiple_entries_fsync_every_time(
-        self, activity_logger, anima_dir: Path,
+        self,
+        activity_logger,
+        anima_dir: Path,
     ):
         """Each append call should produce its own fsync."""
         with patch("core.memory.activity.os.fsync") as mock_fsync:
             for i in range(5):
                 activity_logger.log(
-                    "message_received", content=f"entry {i}",
+                    "message_received",
+                    content=f"entry {i}",
                 )
 
         assert mock_fsync.call_count == 5, (
-            f"Expected fsync called 5 times (once per entry), "
-            f"but was called {mock_fsync.call_count} times"
+            f"Expected fsync called 5 times (once per entry), but was called {mock_fsync.call_count} times"
         )
 
 
@@ -301,7 +312,9 @@ class TestStreamingJournalConfirmRecovery:
         return StreamingJournal(anima_dir)
 
     def test_recover_no_longer_deletes_journal(
-        self, journal: StreamingJournal, anima_dir: Path,
+        self,
+        journal: StreamingJournal,
+        anima_dir: Path,
     ):
         """recover() should read the journal but NOT delete it.
 
@@ -322,12 +335,13 @@ class TestStreamingJournalConfirmRecovery:
 
         # Key assertion: file still exists after recover()
         assert journal_path.exists(), (
-            "Journal file should NOT be deleted by recover() — "
-            "caller must use confirm_recovery()"
+            "Journal file should NOT be deleted by recover() — caller must use confirm_recovery()"
         )
 
     def test_confirm_recovery_deletes_journal(
-        self, journal: StreamingJournal, anima_dir: Path,
+        self,
+        journal: StreamingJournal,
+        anima_dir: Path,
     ):
         """confirm_recovery() should delete the journal file."""
         journal.open(trigger="chat")
@@ -343,12 +357,12 @@ class TestStreamingJournalConfirmRecovery:
         assert journal_path.exists(), "recover() should not delete the file"
 
         StreamingJournal.confirm_recovery(anima_dir)
-        assert not journal_path.exists(), (
-            "Journal file should be deleted after confirm_recovery()"
-        )
+        assert not journal_path.exists(), "Journal file should be deleted after confirm_recovery()"
 
     def test_recover_then_confirm_full_sequence(
-        self, journal: StreamingJournal, anima_dir: Path,
+        self,
+        journal: StreamingJournal,
+        anima_dir: Path,
     ):
         """Full two-step sequence: recover() -> use data -> confirm_recovery()."""
         journal.open(trigger="heartbeat", from_person="cron")
@@ -393,7 +407,7 @@ class TestStreamingJournalConfirmRecovery:
 # ── 6. TestRunnerToolUseRecovery ────────────────────────────────────
 
 
-def _make_runner(anima_dir: Path) -> "AnimaRunner":
+def _make_runner(anima_dir: Path) -> AnimaRunner:
     """Create a minimal AnimaRunner with mocked anima for recovery tests.
 
     Reuses the pattern from tests/test_streaming_journal.py.
@@ -424,7 +438,9 @@ class TestRunnerToolUseRecovery:
         return StreamingJournal(anima_dir)
 
     def test_tool_calls_logged_as_tool_use_events(
-        self, journal: StreamingJournal, anima_dir: Path,
+        self,
+        journal: StreamingJournal,
+        anima_dir: Path,
     ):
         """Orphaned journal with tool calls should produce tool_use activity log entries.
 
@@ -444,23 +460,21 @@ class TestRunnerToolUseRecovery:
         runner = _make_runner(anima_dir)
         mock_activity = MagicMock()
 
-        with patch(
-            "core.memory.conversation.ConversationMemory",
-            return_value=MagicMock(),
-        ), patch(
-            "core.memory.activity.ActivityLogger",
-            return_value=mock_activity,
+        with (
+            patch(
+                "core.memory.conversation.ConversationMemory",
+                return_value=MagicMock(),
+            ),
+            patch(
+                "core.memory.activity.ActivityLogger",
+                return_value=mock_activity,
+            ),
         ):
             runner._recover_streaming_journal()
 
         # Find all log calls with event_type "tool_use"
-        tool_use_calls = [
-            c for c in mock_activity.log.call_args_list
-            if c[0][0] == "tool_use"
-        ]
-        assert len(tool_use_calls) == 2, (
-            f"Expected 2 tool_use log calls, got {len(tool_use_calls)}"
-        )
+        tool_use_calls = [c for c in mock_activity.log.call_args_list if c[0][0] == "tool_use"]
+        assert len(tool_use_calls) == 2, f"Expected 2 tool_use log calls, got {len(tool_use_calls)}"
 
         # Verify first tool_use entry
         first_call = tool_use_calls[0]
@@ -475,7 +489,9 @@ class TestRunnerToolUseRecovery:
         assert second_call[1]["meta"]["recovered"] is True
 
     def test_confirm_recovery_called_after_save(
-        self, journal: StreamingJournal, anima_dir: Path,
+        self,
+        journal: StreamingJournal,
+        anima_dir: Path,
     ):
         """After saving recovered data, confirm_recovery() should be called
         to delete the journal file.
@@ -488,17 +504,21 @@ class TestRunnerToolUseRecovery:
         runner = _make_runner(anima_dir)
         mock_conv = MagicMock()
 
-        with patch(
-            "core.memory.conversation.ConversationMemory",
-            return_value=mock_conv,
-        ), patch(
-            "core.memory.activity.ActivityLogger",
-            return_value=MagicMock(),
-        ), patch.object(
-            StreamingJournal,
-            "confirm_recovery",
-            wraps=StreamingJournal.confirm_recovery,
-        ) as mock_confirm:
+        with (
+            patch(
+                "core.memory.conversation.ConversationMemory",
+                return_value=mock_conv,
+            ),
+            patch(
+                "core.memory.activity.ActivityLogger",
+                return_value=MagicMock(),
+            ),
+            patch.object(
+                StreamingJournal,
+                "confirm_recovery",
+                wraps=StreamingJournal.confirm_recovery,
+            ) as mock_confirm,
+        ):
             runner._recover_streaming_journal()
 
         # confirm_recovery should have been called
@@ -508,7 +528,8 @@ class TestRunnerToolUseRecovery:
         mock_conv.save.assert_called_once()
 
     def test_confirm_recovery_called_even_without_text(
-        self, anima_dir: Path,
+        self,
+        anima_dir: Path,
     ):
         """When journal has no text but exists, confirm_recovery is still called.
 
@@ -537,9 +558,7 @@ class TestRunnerToolUseRecovery:
             runner._recover_streaming_journal()
 
         # Journal file should be cleaned up via confirm_recovery
-        assert not journal_path.exists(), (
-            "Journal file should be deleted even when no text is recovered"
-        )
+        assert not journal_path.exists(), "Journal file should be deleted even when no text is recovered"
 
 
 # ── 7. TestStartupTmpCleanup ──────────────────────────────────────
@@ -560,15 +579,9 @@ class TestStartupTmpCleanup:
         from core.supervisor.runner import AnimaRunner
 
         source = inspect.getsource(AnimaRunner.run)
-        assert "cleanup_tmp_files" in source, (
-            "AnimaRunner.run() must call cleanup_tmp_files()"
-        )
-        assert '"state"' in source, (
-            "AnimaRunner.run() must clean up state/ directory"
-        )
-        assert '"knowledge"' in source, (
-            "AnimaRunner.run() must clean up knowledge/ directory"
-        )
+        assert "cleanup_tmp_files" in source, "AnimaRunner.run() must call cleanup_tmp_files()"
+        assert '"state"' in source, "AnimaRunner.run() must clean up state/ directory"
+        assert '"knowledge"' in source, "AnimaRunner.run() must clean up knowledge/ directory"
 
     def test_stale_tmp_files_actually_removed(self, anima_dir: Path):
         """End-to-end: create stale .tmp files and verify cleanup removes them."""

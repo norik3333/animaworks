@@ -12,14 +12,14 @@ Usage:
     # 確認のみ（ファイル変更なし）
     python scripts/generate_changelog.py --dry-run
 """
+
 from __future__ import annotations
 
 import argparse
 import re
 import subprocess
-import sys
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -48,7 +48,9 @@ SKIP_PATTERNS: list[str] = [
 def git(*args: str) -> str:
     result = subprocess.run(
         ["git", "-C", str(ROOT), *args],
-        capture_output=True, text=True, check=True,
+        capture_output=True,
+        text=True,
+        check=True,
     )
     return result.stdout.strip()
 
@@ -133,7 +135,7 @@ def update_changelog(new_unreleased: str, release: str | None = None) -> str:
         raise FileNotFoundError(f"{CHANGELOG} not found")
 
     text = CHANGELOG.read_text()
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = datetime.now(UTC).strftime("%Y-%m-%d")
 
     unreleased_re = re.compile(
         r"(## \[Unreleased\]\n)(.*?)(?=\n## \[|\n\[Unreleased\]:|\Z)",
@@ -149,11 +151,7 @@ def update_changelog(new_unreleased: str, release: str | None = None) -> str:
         if not content:
             content = m.group(2).strip()
 
-        replacement = (
-            f"## [Unreleased]\n\n"
-            f"## [{release}] - {today}\n\n"
-            f"{content}\n\n"
-        )
+        replacement = f"## [Unreleased]\n\n## [{release}] - {today}\n\n{content}\n\n"
         text = unreleased_re.sub(replacement, text)
 
         repo_url = "https://github.com/xuiltul/animaworks"
@@ -165,8 +163,7 @@ def update_changelog(new_unreleased: str, release: str | None = None) -> str:
             f"[{release}]: {repo_url}/compare/v{last_ver}...v{release}"
             if last_ver
             else (
-                f"[Unreleased]: {repo_url}/compare/v{release}...HEAD\n"
-                f"[{release}]: {repo_url}/releases/tag/v{release}"
+                f"[Unreleased]: {repo_url}/compare/v{release}...HEAD\n[{release}]: {repo_url}/releases/tag/v{release}"
             )
         )
         m_links = links_section.search(text)
@@ -183,8 +180,11 @@ def update_pyproject_version(version: str) -> None:
     """pyproject.toml の version を更新する。"""
     text = PYPROJECT.read_text()
     text = re.sub(
-        r'^(version\s*=\s*")[^"]*(")', rf"\g<1>{version}\2",
-        text, count=1, flags=re.MULTILINE,
+        r'^(version\s*=\s*")[^"]*(")',
+        rf"\g<1>{version}\2",
+        text,
+        count=1,
+        flags=re.MULTILINE,
     )
     PYPROJECT.write_text(text)
 
@@ -229,7 +229,10 @@ def resolve_release_version(release_arg: str | None) -> str | None:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Generate CHANGELOG.md from git commits")
     parser.add_argument(
-        "--release", metavar="VERSION_OR_BUMP", nargs="?", const="patch",
+        "--release",
+        metavar="VERSION_OR_BUMP",
+        nargs="?",
+        const="patch",
         help="Cut a release. 'patch' (default if no value), 'minor', 'major', or explicit version (e.g. 0.4.7)",
     )
     parser.add_argument("--dry-run", action="store_true", help="Print output without modifying files")
@@ -261,8 +264,8 @@ def main() -> None:
     if release_version:
         update_pyproject_version(release_version)
         print(f"Updated {PYPROJECT} version to {release_version}")
-        print(f"\nNext steps:")
-        print(f"  git add CHANGELOG.md pyproject.toml")
+        print("\nNext steps:")
+        print("  git add CHANGELOG.md pyproject.toml")
         print(f"  git commit -m 'release: v{release_version}'")
         print(f"  git tag v{release_version}")
 

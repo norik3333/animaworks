@@ -116,6 +116,11 @@ def _match_tier2(desc_norm: str, message_norm: str) -> bool:
     return match_count >= 2
 
 
+def _sort_personal_first(skills: list[SkillMeta]) -> list[SkillMeta]:
+    """Stable-sort so personal skills (is_common=False) appear before common."""
+    return sorted(skills, key=lambda s: s.is_common)
+
+
 def match_skills_by_description(
     message: str,
     skills: list[SkillMeta],
@@ -130,12 +135,13 @@ def match_skills_by_description(
     Tier 3: Vector search via RAG retriever (semantic similarity).
 
     Each tier is applied only to skills not yet matched by prior tiers.
-    Results are deduplicated and returned in tier priority order.
+    Results are deduplicated, tier priority preserved, and within each tier
+    personal skills appear before common tools.
     """
     if not message:
         return []
     message_norm = _normalize_text(message)
-    matched: list[SkillMeta] = []
+    tier1: list[SkillMeta] = []
     matched_names: set[str] = set()
     remaining: list[SkillMeta] = []
 
@@ -146,12 +152,13 @@ def match_skills_by_description(
             continue
         desc_norm = _normalize_text(skill.description)
         if _match_tier1(desc_norm, message_norm):
-            matched.append(skill)
+            tier1.append(skill)
             matched_names.add(skill.name)
         else:
             remaining.append(skill)
 
     # -- Tier 2: Description vocabulary match --
+    tier2: list[SkillMeta] = []
     still_remaining: list[SkillMeta] = []
     for skill in remaining:
         if not skill.description:
@@ -160,28 +167,38 @@ def match_skills_by_description(
         desc_norm = _normalize_text(skill.description)
         if _match_tier2(desc_norm, message_norm):
             if skill.name not in matched_names:
-                matched.append(skill)
+                tier2.append(skill)
                 matched_names.add(skill.name)
         else:
             still_remaining.append(skill)
 
     # -- Tier 3: Vector search (semantic match) --
+    tier3: list[SkillMeta] = []
     if retriever is not None and anima_name and still_remaining:
+        _min_score: float | None = None
+        try:
+            from core.config import load_config
+
+            _min_score = load_config().rag.skill_match_min_score
+        except Exception:
+            logger.debug("Failed to load rag.skill_match_min_score, using default")
+
         try:
             vector_matched = _match_tier3_vector(
                 message,
                 still_remaining,
                 retriever,
                 anima_name,
+                min_score=_min_score,
             )
             for skill in vector_matched:
                 if skill.name not in matched_names:
-                    matched.append(skill)
+                    tier3.append(skill)
                     matched_names.add(skill.name)
         except Exception as e:
             logger.warning("Tier 3 vector search failed: %s", e)
 
-    return matched
+    return _sort_personal_first(tier1) + _sort_personal_first(tier2) + _sort_personal_first(tier3)
 
 
 def _match_tier3_vector(
@@ -190,9 +207,16 @@ def _match_tier3_vector(
     retriever: object,
     anima_name: str,
     top_k: int = 3,
-    min_score: float = 0.88,
+    min_score: float | None = None,
 ) -> list[SkillMeta]:
-    """Tier 3: Use RAG vector search to find semantically matching skills."""
+    """Tier 3: Use RAG vector search to find semantically matching skills.
+
+    Args:
+        min_score: Minimum post-processed score threshold. ``None`` falls back
+            to the ``RAGConfig.skill_match_min_score`` default (0.75).
+    """
+    if min_score is None:
+        min_score = 0.75
     from core.memory.rag.retriever import MemoryRetriever
 
     if not isinstance(retriever, MemoryRetriever):

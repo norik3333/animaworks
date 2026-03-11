@@ -95,13 +95,16 @@ merge_templates(Path('$DATA_DIR'))
     python3 -c "
 import json, sys, glob
 data_dir = sys.argv[1]
-demo_model = 'claude-sonnet-4-6'
-demo_bg_model = 'claude-haiku-4-5-20251001'
 for status_path in glob.glob(f'{data_dir}/animas/*/status.json'):
     with open(status_path) as f:
         status = json.load(f)
-    status['model'] = demo_model
-    status['background_model'] = demo_bg_model
+    role = status.get('role', 'general')
+    if role in ('manager', 'engineer', 'writer', 'researcher'):
+        status['model'] = 'claude-sonnet-4-6'
+        status['background_model'] = 'claude-haiku-4-5-20251001'
+    else:
+        status['model'] = 'claude-haiku-4-5-20251001'
+        status['background_model'] = 'claude-haiku-4-5-20251001'
     with open(status_path, 'w') as f:
         json.dump(status, f, indent=2, ensure_ascii=False)
 " "$DATA_DIR"
@@ -207,6 +210,12 @@ with open(cfg_path, 'w') as f:
 " "$CONFIG_JSON"
     echo "API key injected into config."
 fi
+
+# ── Clean stale PID file ──────────────────────────────────
+# In Docker, PID 1 always exists (it's the entrypoint itself), so a
+# leftover server.pid from a previous container run would trick the
+# "already running" check.  Remove it unconditionally before starting.
+rm -f "${DATA_DIR}/server.pid"
 
 # ── Start server ──────────────────────────────────────────
 echo "Starting AnimaWorks server on port 18501..."

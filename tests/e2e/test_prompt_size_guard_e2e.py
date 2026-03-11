@@ -10,14 +10,11 @@ ConversationMemory, prompt building, and pre-flight size checks.
 
 from __future__ import annotations
 
-import json
-from pathlib import Path
 
 import pytest
 
 from core.memory.conversation import (
     ConversationMemory,
-    _MAX_HUMAN_CHARS_IN_HISTORY,
     _MAX_STORED_CONTENT_CHARS,
 )
 from core.schemas import ModelConfig

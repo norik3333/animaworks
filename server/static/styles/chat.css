@@ -13,6 +13,7 @@
 .chat-messages {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 16px 20px;
   min-height: 0;
 }
@@ -33,6 +34,7 @@
   display: flex;
   align-items: flex-start;
   gap: 8px;
+  min-width: 0;
 }
 
 .chat-msg-row.user {
@@ -919,12 +921,16 @@
 
 .chat-bubble {
   width: 100%;
+  min-width: 0;
   padding: 10px 14px;
   border-radius: 0;
   font-size: 0.92rem;
   line-height: 1.55;
   word-wrap: break-word;
+  overflow-wrap: anywhere;
+  word-break: break-word;
   white-space: pre-wrap;
+  overflow: hidden;
 }
 
 .chat-bubble.user {
@@ -1044,6 +1050,7 @@
   border-radius: 3px;
   font-size: 0.85em;
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  word-break: break-word;
 }
 .chat-bubble.assistant pre {
   background: var(--aw-color-code-bg);
@@ -1054,6 +1061,9 @@
   margin: 0.4em 0;
   font-size: 0.82em;
   line-height: 1.5;
+  max-width: 100%;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 .chat-bubble.assistant pre code {
   background: none;
@@ -1071,6 +1081,9 @@
   border-collapse: collapse;
   margin: 0.4em 0;
   font-size: 0.85em;
+  max-width: 100%;
+  display: block;
+  overflow-x: auto;
 }
 .chat-bubble.assistant th,
 .chat-bubble.assistant td {
@@ -1682,6 +1695,38 @@
 
 .tool-activity-item--error:not(.tool-activity-item--running) {
   animation: aw-slide-in 0.2s ease-out, aw-flash-error 0.6s ease-out;
+}
+
+/* Suppress animations during streaming to prevent flicker */
+.chat-bubble.streaming .tool-activity-item {
+  animation: none;
+}
+.chat-bubble.streaming .tool-activity-item--running::before {
+  animation: aw-progress-dots 1.2s ease-in-out infinite;
+}
+
+/* Completed tools collapsible section */
+.tool-activity-completed {
+  font-size: 0.75rem;
+}
+.tool-activity-completed-summary {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  cursor: pointer;
+  color: var(--aw-color-text-muted);
+  user-select: none;
+  list-style: none;
+}
+.tool-activity-completed-summary::-webkit-details-marker { display: none; }
+.tool-activity-completed-summary::before {
+  content: "\25B6";
+  font-size: 0.6rem;
+  transition: transform 0.15s;
+}
+.tool-activity-completed[open] > .tool-activity-completed-summary::before {
+  transform: rotate(90deg);
 }
 
 /* details smooth open/close */
@@ -2412,6 +2457,117 @@
   font-size: 0.7rem;
 }
 
+/* ── Background Session Groups (collapsible) ── */
+
+.bg-session-group {
+  margin: 8px 0;
+}
+
+.bg-session-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.78rem;
+  user-select: none;
+  transition: filter 0.1s ease;
+  width: fit-content;
+  max-width: 70%;
+  min-width: 200px;
+}
+
+.bg-session-header:hover,
+.bg-session-header:active {
+  filter: brightness(0.92);
+}
+
+.bg-session-chevron {
+  flex-shrink: 0;
+  font-size: 0.6rem;
+  transition: transform 0.15s ease;
+  opacity: 0.7;
+}
+
+.bg-session-group.expanded .bg-session-chevron {
+  transform: rotate(90deg);
+}
+
+.bg-session-label {
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.bg-session-time {
+  margin-left: auto;
+  opacity: 0.6;
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.bg-session-body {
+  padding: 6px 12px 6px 22px;
+  margin-top: 2px;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  font-style: italic;
+  color: var(--aw-color-text-muted);
+}
+
+/* Heartbeat / Task body - markdown content */
+.bg-session-group--heartbeat .bg-session-body,
+.bg-session-group--task .bg-session-body {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.bg-session-message {
+  margin-bottom: 8px;
+}
+
+.bg-session-message:last-child {
+  margin-bottom: 0;
+}
+
+/* Cron/Task body - compact item list */
+.bg-session-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 0;
+  opacity: 0.85;
+}
+
+.bg-session-item-ts {
+  margin-left: auto;
+  font-size: 0.68rem;
+  opacity: 0.5;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ── Type-specific header colors (subtle tints) ── */
+
+.bg-session-header--heartbeat {
+  background: color-mix(in srgb, var(--aw-color-success-text, #68d391) 5%, transparent);
+  border: 1px solid color-mix(in srgb, var(--aw-color-success-text, #68d391) 15%, transparent);
+  color: var(--aw-color-text-muted);
+}
+
+.bg-session-header--cron {
+  background: color-mix(in srgb, var(--aw-color-info-text, #63b3ed) 5%, transparent);
+  border: 1px solid color-mix(in srgb, var(--aw-color-info-text, #63b3ed) 15%, transparent);
+  color: var(--aw-color-text-muted);
+}
+
+.bg-session-header--task {
+  background: color-mix(in srgb, var(--aw-color-accent, #b794f4) 5%, transparent);
+  border: 1px solid color-mix(in srgb, var(--aw-color-accent, #b794f4) 15%, transparent);
+  color: var(--aw-color-text-muted);
+}
+
 /* ── History Loading More (Infinite Scroll) ── */
 
 .history-loading-more {
@@ -2499,7 +2655,17 @@
   white-space: pre-wrap;
   word-break: break-word;
   font-style: italic;
+  max-height: calc(1.5em * 5);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--aw-color-border-medium) transparent;
 }
+.thinking-inline-preview::-webkit-scrollbar { width: 4px; }
+.thinking-inline-preview::-webkit-scrollbar-thumb {
+  background: var(--aw-color-border-medium);
+  border-radius: 2px;
+}
+.thinking-inline-preview::-webkit-scrollbar-track { background: transparent; }
 
 /* Dark mode overrides */
 @media (prefers-color-scheme: dark) {

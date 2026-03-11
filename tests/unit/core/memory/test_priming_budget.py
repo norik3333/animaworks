@@ -9,6 +9,8 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
+from core.time_utils import today_local
+
 import pytest
 
 from core.memory.priming import PrimingEngine
@@ -114,8 +116,7 @@ async def test_dynamic_budget_in_priming(temp_anima_dir):
 
     # Create sample episode file
     episodes_dir = temp_anima_dir / "episodes"
-    from datetime import date
-    today = date.today()
+    today = today_local()
     episode_file = episodes_dir / f"{today.isoformat()}.md"
     episode_file.write_text("## 10:00 — テスト\n\nテストエピソード内容" * 100)
 

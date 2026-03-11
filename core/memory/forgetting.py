@@ -27,7 +27,7 @@ from pathlib import Path
 from typing import Any
 
 from core.paths import load_prompt
-from core.time_utils import ensure_aware, now_jst
+from core.time_utils import ensure_aware, now_local
 
 logger = logging.getLogger("animaworks.forgetting")
 
@@ -171,7 +171,11 @@ class ForgettingEngine:
         return False
 
     def _get_vector_store(self):
-        """Get vector store singleton."""
+        """Get vector store singleton.
+
+        Returns:
+            ChromaVectorStore instance, or ``None`` if ChromaDB is unavailable.
+        """
         from core.memory.rag.singleton import get_vector_store
 
         return get_vector_store(self.anima_name)
@@ -207,11 +211,18 @@ class ForgettingEngine:
         Skip: Protected memory types, important chunks, already low
         """
         logger.info("Starting synaptic downscaling for anima=%s", self.anima_name)
-        now = now_jst()
+        now = now_local()
         now_iso_str = now.isoformat()
         total_scanned = 0
         total_marked = 0
         store = self._get_vector_store()
+
+        if store is None:
+            logger.warning(
+                "Skipping synaptic downscaling for anima=%s: RAG/ChromaDB unavailable",
+                self.anima_name,
+            )
+            return {"scanned": 0, "marked_low": 0, "skipped_reason": "rag_unavailable"}
 
         # Scan all relevant collections (including procedures)
         for memory_type in ("knowledge", "episodes", "procedures"):
@@ -323,6 +334,14 @@ class ForgettingEngine:
             model = get_consolidation_llm_kwargs()["model"]
         logger.info("Starting neurogenesis reorganization for anima=%s", self.anima_name)
         store = self._get_vector_store()
+
+        if store is None:
+            logger.warning(
+                "Skipping neurogenesis reorganization for anima=%s: RAG/ChromaDB unavailable",
+                self.anima_name,
+            )
+            return {"merged_count": 0, "merged_pairs": [], "skipped_reason": "rag_unavailable"}
+
         total_merged = 0
         merged_pairs: list[str] = []
 
@@ -493,14 +512,17 @@ class ForgettingEngine:
             from core.memory.rag.store import Document
 
             store = get_vector_store(self.anima_name)
+            if store is None:
+                logger.debug("RAG vector store unavailable, skipping merged chunk indexing")
+                return
             indexer = MemoryIndexer(store, self.anima_name, self.anima_dir)
 
             # Generate new ID
-            merged_id = f"{self.anima_name}/{memory_type}/merged_{now_jst().strftime('%Y%m%d_%H%M%S')}#0"
+            merged_id = f"{self.anima_name}/{memory_type}/merged_{now_local().strftime('%Y%m%d_%H%M%S')}#0"
 
             embedding = indexer._generate_embeddings([content])[0]
 
-            now_iso_str = now_jst().isoformat()
+            now_iso_str = now_local().isoformat()
             metadata = {
                 "anima": self.anima_name,
                 "memory_type": memory_type,
@@ -561,7 +583,7 @@ class ForgettingEngine:
         # Archive directory for merged originals
         archive_dir = self.anima_dir / "archive" / "merged"
         archive_dir.mkdir(parents=True, exist_ok=True)
-        timestamp = now_jst().strftime("%Y%m%d_%H%M%S")
+        timestamp = now_local().strftime("%Y%m%d_%H%M%S")
 
         # Archive primary original
         if primary_path.exists():
@@ -606,8 +628,16 @@ class ForgettingEngine:
         Action: Move source file to archive/forgotten/, delete from vector index
         """
         logger.info("Starting complete forgetting for anima=%s", self.anima_name)
-        now = now_jst()
+        now = now_local()
         store = self._get_vector_store()
+
+        if store is None:
+            logger.warning(
+                "Skipping complete forgetting for anima=%s: RAG/ChromaDB unavailable",
+                self.anima_name,
+            )
+            return {"forgotten_chunks": 0, "archived_files": [], "skipped_reason": "rag_unavailable"}
+
         total_forgotten = 0
         archived_files: list[str] = []
 
@@ -695,7 +725,7 @@ class ForgettingEngine:
 
         # Add timestamp suffix if destination exists
         if dest_path.exists():
-            timestamp = now_jst().strftime("%Y%m%d_%H%M%S")
+            timestamp = now_local().strftime("%Y%m%d_%H%M%S")
             dest_path = self.archive_dir / f"{source_path.stem}_{timestamp}{source_path.suffix}"
 
         try:

@@ -12,15 +12,12 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-import pytest
 
 from core.anima_factory import create_from_md
 from core.config import (
-    AnimaModelConfig,
     invalidate_cache,
     load_config,
     resolve_anima_config,
-    save_config,
 )
 from core.memory import MemoryManager
 from core.prompt.builder import build_system_prompt
@@ -259,7 +256,6 @@ class TestCreateFromMdResearcherRole:
     ):
         """status.json should contain values from researcher/defaults.json."""
         from pathlib import Path as _P
-        import importlib.resources
 
         # Read expected values from the template itself
         template_defaults_path = (

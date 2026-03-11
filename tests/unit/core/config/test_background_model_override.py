@@ -13,7 +13,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
 
 from core.config.models import (
     AnimaDefaults,
@@ -21,7 +20,6 @@ from core.config.models import (
     CredentialConfig,
     HeartbeatConfig,
     _load_status_json,
-    load_model_config,
     resolve_anima_config,
     update_status_model,
 )

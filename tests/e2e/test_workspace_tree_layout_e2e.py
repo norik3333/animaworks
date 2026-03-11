@@ -87,7 +87,7 @@ def _create_app_with_config(
     app.state.anima_names = anima_names
 
     # Patch load_config in the animas route module to use our config file
-    from core.config.models import AnimaWorksConfig, load_config, invalidate_cache
+    from core.config.models import load_config, invalidate_cache
 
     invalidate_cache()
     real_config = load_config(config_path)

@@ -8,7 +8,6 @@ from __future__ import annotations
 
 """Unit tests for Phase 1: Procedure frontmatter foundation."""
 
-import tempfile
 from pathlib import Path
 
 import pytest

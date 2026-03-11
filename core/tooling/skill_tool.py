@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from core.i18n import t
-from core.time_utils import now_jst
+from core.time_utils import now_local
 
 logger = logging.getLogger("animaworks.skill_tool")
 
@@ -21,7 +21,7 @@ logger = logging.getLogger("animaworks.skill_tool")
 def _resolve_builtins(anima_dir: Path) -> dict[str, str]:
     """Return builtin placeholder values."""
     return {
-        "now_jst": now_jst().isoformat(),
+        "now_local": now_local().isoformat(),
         "anima_name": anima_dir.name,
         "anima_dir": str(anima_dir),
     }
@@ -120,6 +120,12 @@ def load_and_render_skill(
     builtins = _resolve_builtins(anima_dir)
     content = apply_builtins(content, builtins)
 
+    # Filter gated CLI lines for external tool skills
+    tool_name = _skill_name_to_tool_name(skill_name)
+    if tool_name:
+        permitted = _load_permitted_tools(anima_dir)
+        content = _filter_guide_for_tool(content, tool_name, permitted)
+
     # Build response
     parts: list[str] = []
     parts.append(content)
@@ -140,6 +146,42 @@ def load_and_render_skill(
 
 
 # ── Internal helpers ─────────────────────────────────────
+
+
+def _skill_name_to_tool_name(skill_name: str) -> str | None:
+    """Map skill name to tool module name if it is an external tool skill.
+
+    e.g. gmail-tool -> gmail, image-gen-tool -> image_gen.
+    """
+    if not skill_name.endswith("-tool"):
+        return None
+    base = skill_name[:-5]
+    return base.replace("-", "_") if base else None
+
+
+def _load_permitted_tools(anima_dir: Path) -> set[str]:
+    """Load permitted tool/action set from permissions.md."""
+    from core.tooling.permissions import parse_permitted_tools
+
+    perm_path = anima_dir / "permissions.md"
+    if not perm_path.is_file():
+        return set()
+    try:
+        return parse_permitted_tools(perm_path.read_text(encoding="utf-8"))
+    except Exception:
+        logger.debug("Failed to parse permissions.md", exc_info=True)
+        return set()
+
+
+def _filter_guide_for_tool(
+    content: str,
+    tool_name: str,
+    permitted: set[str],
+) -> str:
+    """Filter gated action lines from content for the given tool."""
+    from core.tooling.guide import filter_gated_from_guide
+
+    return filter_gated_from_guide(content, tool_name, permitted)
 
 
 def _resolve_skill_path(

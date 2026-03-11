@@ -14,13 +14,17 @@ import logging
 from pathlib import Path
 
 from core.supervisor.process_handle import ProcessHandle, ProcessState
-from core.time_utils import ensure_aware, now_jst
+from core.time_utils import ensure_aware, now_local
 
 logger = logging.getLogger(__name__)
 
 
 class HealthMixin:
     """Health-check loop, failure handling, and hang detection."""
+
+    def is_bootstrapping(self, anima_name: str) -> bool:
+        """Return True if the anima is currently in bootstrap mode."""
+        return anima_name in getattr(self, "_bootstrapping", set())
 
     async def _health_check_loop(self) -> None:
         """Periodically pings all processes and handles failures."""
@@ -69,7 +73,7 @@ class HealthMixin:
         if handle.state == ProcessState.STOPPING:
             if not handle.stopping_since:
                 return
-            stopping_duration = (now_jst() - ensure_aware(handle.stopping_since)).total_seconds()
+            stopping_duration = (now_local() - ensure_aware(handle.stopping_since)).total_seconds()
             if stopping_duration > 30:
                 logger.error(
                     "Process stuck in STOPPING state: %s (%.0fs)",
@@ -106,7 +110,7 @@ class HealthMixin:
             # Streaming duration timeout
             started_at = handle.streaming_started_at
             if started_at is not None:
-                streaming_sec = (now_jst() - ensure_aware(started_at)).total_seconds()
+                streaming_sec = (now_local() - ensure_aware(started_at)).total_seconds()
                 if streaming_sec > self._max_streaming_duration_sec:
                     logger.error(
                         "Streaming timeout for %s (%.0fs > %ds)",
@@ -118,7 +122,7 @@ class HealthMixin:
             return
 
         # Skip if in startup grace period
-        uptime = (now_jst() - ensure_aware(handle.stats.started_at)).total_seconds()
+        uptime = (now_local() - ensure_aware(handle.stats.started_at)).total_seconds()
         if uptime < self.health_config.startup_grace_sec:
             logger.debug("Skipping health check for %s (startup grace)", anima_name)
             return
@@ -166,6 +170,13 @@ class HealthMixin:
         if success:
             if is_busy:
                 handle.stats.missed_pings = 0
+                # Skip hang detection during bootstrap (LLM may take a long time)
+                if self.is_bootstrapping(anima_name):
+                    logger.debug(
+                        "Skipping hang detection for %s (bootstrapping)",
+                        anima_name,
+                    )
+                    return
                 last_progress_iso = ping_result.get("last_progress_at")
                 if last_progress_iso:
                     from datetime import datetime as _dt
@@ -181,7 +192,7 @@ class HealthMixin:
                         last_progress = None
 
                     if last_progress is not None:
-                        idle_sec = (now_jst() - last_progress).total_seconds()
+                        idle_sec = (now_local() - last_progress).total_seconds()
                         if idle_sec > self.health_config.busy_hang_threshold_sec:
                             logger.error(
                                 "Process busy hang (no progress): %s (idle=%.0fs > %ds)",
@@ -192,8 +203,8 @@ class HealthMixin:
                             asyncio.create_task(self._handle_process_hang(anima_name, handle))
                         return
                 if handle.stats.last_busy_since is None:
-                    handle.stats.last_busy_since = now_jst()
-                busy_duration = (now_jst() - handle.stats.last_busy_since).total_seconds()
+                    handle.stats.last_busy_since = now_local()
+                busy_duration = (now_local() - handle.stats.last_busy_since).total_seconds()
                 if busy_duration > self.health_config.busy_hang_threshold_sec:
                     logger.error(
                         "Process busy hang (no progress info, fallback): %s (busy=%.0fs > %ds)",

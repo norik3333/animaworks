@@ -19,7 +19,7 @@ from core.exceptions import AnimaNotFoundError  # noqa: F401
 from core.exceptions import IPCConnectionError as IPCConnError
 from core.i18n import t
 from core.schemas import ImageData
-from core.time_utils import now_jst
+from core.time_utils import now_local
 from server.events import emit, emit_direct, emit_notification, emit_notification_direct
 from server.stream_registry import StreamRegistry, format_sse_with_id
 
@@ -95,7 +95,7 @@ def save_images(anima_name: str, images: list[ImageAttachment]) -> list[str]:
     attachments_dir.mkdir(parents=True, exist_ok=True)
 
     paths: list[str] = []
-    ts = now_jst().strftime("%Y%m%d_%H%M%S")
+    ts = now_local().strftime("%Y%m%d_%H%M%S")
     for i, img in enumerate(images):
         ext = MIME_TO_EXT.get(img.media_type, "png")
         filename = f"{ts}_{i}.{ext}"
@@ -305,6 +305,9 @@ def _handle_chunk(
         clean_text, emotion = extract_emotion(response_text)
         cycle_result["summary"] = clean_text
         cycle_result["emotion"] = emotion
+        thinking_raw = cycle_result.pop("thinking_text", "") or ""
+        cycle_result.pop("tool_call_records", None)
+        cycle_result["thinking_summary"] = thinking_raw[:500] if thinking_raw else None
         return _format_sse("done", cycle_result), clean_text
 
     if event_type == "error":
@@ -372,6 +375,9 @@ def _chunk_to_event(chunk: dict[str, Any]) -> tuple[str, dict[str, Any]] | None:
         clean_text, emotion = extract_emotion(response_text)
         cycle_result["summary"] = clean_text
         cycle_result["emotion"] = emotion
+        thinking_raw = cycle_result.pop("thinking_text", "") or ""
+        cycle_result.pop("tool_call_records", None)
+        cycle_result["thinking_summary"] = thinking_raw[:500] if thinking_raw else None
         return "done", cycle_result
     if event_type == "error":
         payload = {"message": chunk.get("message", "Unknown error")}

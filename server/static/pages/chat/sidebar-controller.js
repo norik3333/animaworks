@@ -62,7 +62,13 @@ export function createSidebarController(ctx) {
 
   function switchRightTab(tab) {
     state.activeRightTab = tab;
-    const tabs = { state: "chatPaneState", activity: "chatPaneActivity", history: "chatPaneHistory" };
+    const tabs = {
+      state: "chatPaneState",
+      activity: "chatPaneActivity",
+      history: "chatPaneHistory",
+      heartbeat: "chatPaneHeartbeat",
+      cron: "chatPaneCron",
+    };
 
     for (const btn of (state.container?.querySelectorAll(".right-tab") || [])) {
       btn.classList.toggle("active", btn.dataset.tab === tab);
@@ -80,6 +86,8 @@ export function createSidebarController(ctx) {
       ctx.controllers.history.loadSessionList();
     }
     if (tab === "activity") ctx.controllers.activity.loadActivity();
+    if (tab === "heartbeat") ctx.controllers.activity.loadHeartbeatConfig();
+    if (tab === "cron") ctx.controllers.activity.loadCronConfig();
   }
 
   return { switchMobileTab, switchRightTab, toggleRightPane, initRightPaneVisibility };

@@ -167,7 +167,7 @@ def main() -> int:
             for fn, mt in s["pending_files"]:
                 print(f"    pending (12h): {fn} @ {mt}")
         if not s["current_task"] and not s["pending_files"] and s["heartbeat_tasks_12h"] == 0 and name in heartbeat_tokens:
-            print(f"    (no state changes in 12h)")
+            print("    (no state changes in 12h)")
 
     # 3. Pending files created in last 12h
     print("\n## 3. PENDING FILES CREATED IN LAST 12h")
@@ -216,7 +216,7 @@ def main() -> int:
         print("  Ratio: N/A")
 
     if high_output_animas:
-        print("\n  Animas with high output tokens (>{} per session):".format(args.threshold))
+        print(f"\n  Animas with high output tokens (>{args.threshold} per session):")
         for name, total, sessions in sorted(high_output_animas, key=lambda x: -x[1]):
             pending_for = len(state_summaries.get(name, {}).get("pending_files", []))
             verdict = "justified" if pending_for > 0 else "LOW YIELD (no tasks created)"

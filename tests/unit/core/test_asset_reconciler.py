@@ -6,7 +6,6 @@
 
 from __future__ import annotations
 
-import asyncio
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -302,7 +301,8 @@ class TestExtractPrompt:
         mock_model_config.api_base_url = None
 
         with patch("core.config.models.load_model_config", return_value=mock_model_config), \
-             patch("litellm.acompletion", new_callable=AsyncMock, side_effect=RuntimeError("API error")):
+             patch("litellm.acompletion", new_callable=AsyncMock, side_effect=RuntimeError("API error")), \
+             patch("core.memory._llm_utils._try_agent_sdk", new_callable=AsyncMock, side_effect=RuntimeError("Agent SDK error")):
             result = await _extract_prompt(anima_dir)
 
         assert result is None

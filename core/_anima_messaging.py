@@ -15,7 +15,6 @@ import logging
 import re
 import time
 from collections.abc import AsyncGenerator
-from datetime import date
 from typing import Any
 
 from core.exceptions import (
@@ -30,8 +29,8 @@ from core.image_artifacts import extract_image_artifacts_from_tool_records
 from core.memory.conversation import ConversationMemory, ToolRecord
 from core.memory.streaming_journal import StreamingJournal
 from core.paths import load_prompt
-from core.schemas import VALID_EMOTIONS, CycleResult, ImageData
-from core.time_utils import now_jst
+from core.schemas import EXTERNAL_PLATFORM_SOURCES, VALID_EMOTIONS, CycleResult, ImageData
+from core.time_utils import now_local, today_local
 
 logger = logging.getLogger("animaworks.anima")
 
@@ -56,11 +55,11 @@ class MessagingMixin:
             shared_dir = self.anima_dir.parent.parent / "shared" / "users" / from_person / "conversations"
             shared_dir.mkdir(parents=True, exist_ok=True)
 
-            today = date.today().isoformat()
+            today = today_local().isoformat()
             log_file = shared_dir / f"{today}.jsonl"
 
             record = {
-                "ts": now_jst().isoformat(),
+                "ts": now_local().isoformat(),
                 "anima": self.name,
                 "content": content,
                 "thread_id": thread_id,
@@ -110,7 +109,19 @@ class MessagingMixin:
 
                 try:
                     result = await self.agent.run_cycle(prompt, trigger="bootstrap")
-                    self._last_activity = now_jst()
+                    self._last_activity = now_local()
+
+                    # Safety net: if bootstrap.md still exists after the cycle,
+                    # rename it to prevent re-triggering on next restart.
+                    bootstrap_file = self.anima_dir / "bootstrap.md"
+                    if bootstrap_file.exists():
+                        resolved_file = bootstrap_file.with_suffix(".md.auto_resolved")
+                        bootstrap_file.rename(resolved_file)
+                        logger.warning(
+                            "[%s] bootstrap.md was NOT deleted by agent; auto-renamed to %s to prevent loop",
+                            self.name,
+                            resolved_file.name,
+                        )
 
                     logger.info(
                         "[%s] run_bootstrap END duration_ms=%d",
@@ -137,6 +148,7 @@ class MessagingMixin:
         intent: str = "",
         thread_id: str = "default",
         include_cycle_result: bool = False,
+        source: str = "",
     ) -> str | dict[str, Any]:
         self._validate_thread_id(thread_id)
         # Auto-interrupt: if a session is already running on this thread,
@@ -232,6 +244,10 @@ class MessagingMixin:
                     origin=ORIGIN_HUMAN,
                 )
 
+                if source and source in EXTERNAL_PLATFORM_SOURCES:
+                    _ctx = t("anima.platform_context", source=source)
+                    prompt = f"{_ctx}\n\n{prompt}"
+
                 try:
                     result = await self.agent.run_cycle(
                         prompt,
@@ -241,7 +257,7 @@ class MessagingMixin:
                         prior_messages=prior_messages,
                         thread_id=thread_id,
                     )
-                    self._last_activity = now_jst()
+                    self._last_activity = now_local()
 
                     # Record assistant response with tool records
                     tool_records = [ToolRecord.from_dict(r) for r in result.tool_call_records]
@@ -326,6 +342,7 @@ class MessagingMixin:
         attachment_paths: list[str] | None = None,
         intent: str = "",
         thread_id: str = "default",
+        source: str = "",
     ) -> AsyncGenerator[dict, None]:
         """Streaming version of process_message.
 
@@ -445,6 +462,10 @@ class MessagingMixin:
                     origin=ORIGIN_HUMAN,
                 )
 
+                if source and source in EXTERNAL_PLATFORM_SOURCES:
+                    _ctx = t("anima.platform_context", source=source)
+                    prompt = f"{_ctx}\n\n{prompt}"
+
                 # Streaming journal: write-ahead log for crash recovery
                 journal = StreamingJournal(self.anima_dir, thread_id=thread_id)
                 journal.open(
@@ -482,7 +503,7 @@ class MessagingMixin:
 
                         if chunk.get("type") == "cycle_done":
                             cycle_done = True
-                            self._last_activity = now_jst()
+                            self._last_activity = now_local()
                             # Record assistant response with tool records
                             cycle_result = chunk.get("cycle_result", {})
                             summary = cycle_result.get("summary", "")
@@ -659,7 +680,7 @@ class MessagingMixin:
                     prompt,
                     trigger="greet:user",
                 )
-                self._last_activity = now_jst()
+                self._last_activity = now_local()
 
                 # Extract emotion from response
                 _em_pat = re.compile(r"<!--\s*emotion:\s*(\{.*?\})\s*-->", re.DOTALL)

@@ -14,10 +14,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from core.config.models import HeartbeatConfig
-from core.execution._sdk_session import (
-    SESSION_RESUME_TIMEOUT_MIN,
-    _load_session_id,
-)
+from core.execution._sdk_session import _load_session_id
 from core.execution.codex_sdk import CodexSDKExecutor
 from core.schemas import ModelConfig
 from core.session_compactor import (
@@ -171,41 +168,33 @@ class TestSessionCompactor:
         assert key not in compactor._timers
 
 
-# ── _load_session_id skip_timeout_check ──────────────────────────────────────
+# ── _load_session_id immortal sessions ──────────────────────────────────────
 
 
-class TestLoadSessionIdSkipTimeoutCheck:
-    """_load_session_id with skip_timeout_check parameter."""
+class TestLoadSessionIdImmortal:
+    """_load_session_id returns session ID regardless of age (no TTL)."""
 
-    def test_skip_timeout_check_true_returns_old_session(self, tmp_path: Path) -> None:
-        """When skip_timeout_check=True, session_id returned even when older than threshold."""
+    def test_old_session_returns_id(self, tmp_path: Path) -> None:
+        """Old sessions are always returned (TTL was removed)."""
         anima_dir = tmp_path / "animas" / "test-sdk"
         (anima_dir / "state").mkdir(parents=True)
         path = anima_dir / "state" / "current_session_chat.json"
-        old_ts = (datetime.now(UTC) - timedelta(minutes=SESSION_RESUME_TIMEOUT_MIN + 10)).isoformat()
+        old_ts = (datetime.now(UTC) - timedelta(hours=24)).isoformat()
         path.write_text(
             json.dumps({"session_id": "sess-old", "timestamp": old_ts}),
             encoding="utf-8",
         )
 
-        result = _load_session_id(anima_dir, "chat", skip_timeout_check=True)
+        result = _load_session_id(anima_dir, "chat")
 
         assert result == "sess-old"
 
-    def test_skip_timeout_check_false_returns_none_for_old_session(self, tmp_path: Path) -> None:
-        """When skip_timeout_check=False (default), old session returns None."""
-        anima_dir = tmp_path / "animas" / "test-sdk"
-        (anima_dir / "state").mkdir(parents=True)
-        path = anima_dir / "state" / "current_session_chat.json"
-        old_ts = (datetime.now(UTC) - timedelta(minutes=SESSION_RESUME_TIMEOUT_MIN + 5)).isoformat()
-        path.write_text(
-            json.dumps({"session_id": "sess-old", "timestamp": old_ts}),
-            encoding="utf-8",
-        )
+    def test_no_skip_timeout_check_param(self) -> None:
+        """skip_timeout_check parameter was removed from _load_session_id."""
+        import inspect
 
-        result = _load_session_id(anima_dir, "chat", skip_timeout_check=False)
-
-        assert result is None
+        sig = inspect.signature(_load_session_id)
+        assert "skip_timeout_check" not in sig.parameters
 
 
 # ── HeartbeatConfig.idle_compaction_minutes ───────────────────────────────────

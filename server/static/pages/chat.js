@@ -36,6 +36,8 @@ export function render(container) {
           <button class="right-tab active" data-tab="state" data-chat-id="chatTabState">${t("chat.state_current")}</button>
           <button class="right-tab" data-tab="activity" data-chat-id="chatTabActivity">${t("nav.activity")}</button>
           <button class="right-tab" data-tab="history" data-chat-id="chatTabHistory">${t("chat.history_conversation")}</button>
+          <button class="right-tab" data-tab="heartbeat" data-chat-id="chatTabHeartbeat">${t("chat.tab_heartbeat")}</button>
+          <button class="right-tab" data-tab="cron" data-chat-id="chatTabCron">${t("chat.tab_cron")}</button>
         </nav>
 
         <div data-chat-id="chatRightTabContent" style="padding:0.75rem;">
@@ -55,6 +57,16 @@ export function render(container) {
               <button class="memory-back-btn" data-chat-id="chatHistoryBackBtn">&larr; ${t("chat.back_list")}</button>
               <h3 data-chat-id="chatHistoryDetailTitle" style="margin:0.5rem 0;"></h3>
               <div data-chat-id="chatHistoryConversation" style="max-height:400px; overflow-y:auto;"></div>
+            </div>
+          </div>
+          <div data-chat-id="chatPaneHeartbeat" style="display:none;">
+            <div data-chat-id="chatHeartbeatContent" class="md-config-content">
+              <div class="loading-placeholder">${t("chat.anima_select_first")}</div>
+            </div>
+          </div>
+          <div data-chat-id="chatPaneCron" style="display:none;">
+            <div data-chat-id="chatCronContent" class="md-config-content">
+              <div class="loading-placeholder">${t("chat.anima_select_first")}</div>
             </div>
           </div>
 

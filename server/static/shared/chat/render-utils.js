@@ -3,6 +3,132 @@
 // All functions are DOM-independent (return HTML strings) except bindToolCallHandlers.
 import { t } from "../i18n.js";
 
+// ── TextAnimator ──────────────────────────────────────
+// Buffers incoming text deltas and drips them at a constant rate
+// via requestAnimationFrame to smooth out bursty API token delivery.
+// Adapts display speed dynamically based on measured incoming chunk rate.
+
+const _DEFAULT_CHAR_INTERVAL_MS = 14;
+const _MIN_CHAR_INTERVAL_MS = 4;
+const _MAX_CHAR_INTERVAL_MS = 100;
+const _CATCHUP_THRESHOLD_FAST = 300;
+const _CATCHUP_THRESHOLD_MED = 150;
+const _RATE_WINDOW_SIZE = 6;
+const _RATE_DRAIN_FACTOR = 3;
+
+export class TextAnimator {
+  /**
+   * @param {object} opts
+   * @param {number}  [opts.charIntervalMs=8] - Initial ms per character (auto-adjusted)
+   * @param {function(string, string): void} opts.onUpdate - (displayText, fullBuffer) called on each animation step
+   */
+  constructor({ charIntervalMs = _DEFAULT_CHAR_INTERVAL_MS, onUpdate } = {}) {
+    this._buffer = "";
+    this._displayLen = 0;
+    this._charInterval = charIntervalMs;
+    this._baseInterval = charIntervalMs;
+    this._onUpdate = onUpdate;
+    this._rafId = null;
+    this._lastStepTime = 0;
+    this._remainder = 0;
+    this._running = false;
+    this._pushHistory = [];
+  }
+
+  start() {
+    this._buffer = "";
+    this._displayLen = 0;
+    this._running = true;
+    this._lastStepTime = performance.now();
+    this._remainder = 0;
+    this._pushHistory = [];
+    this._charInterval = this._baseInterval;
+    this._scheduleTick();
+  }
+
+  push(delta) {
+    if (!delta) return;
+    this._buffer += delta;
+    const now = performance.now();
+    this._pushHistory.push({ t: now, len: delta.length });
+    if (this._pushHistory.length > _RATE_WINDOW_SIZE) {
+      this._pushHistory.shift();
+    }
+    if (this._pushHistory.length >= 3) {
+      this._adaptRate();
+    }
+  }
+
+  flush() {
+    this._displayLen = this._buffer.length;
+    this._running = false;
+    this._cancelTick();
+    if (this._onUpdate) this._onUpdate(this._buffer, this._buffer);
+  }
+
+  stop() {
+    this._running = false;
+    this._cancelTick();
+  }
+
+  get displayText() { return this._buffer.slice(0, this._displayLen); }
+  get isAnimating() { return this._displayLen < this._buffer.length; }
+
+  _adaptRate() {
+    const h = this._pushHistory;
+    if (h.length < 3) return;
+    const span = h[h.length - 1].t - h[0].t;
+    if (span <= 0) return;
+    let totalChars = 0;
+    for (let i = 0; i < h.length; i++) totalChars += h[i].len;
+    const incomingMsPerChar = span / totalChars;
+    this._charInterval = Math.max(
+      _MIN_CHAR_INTERVAL_MS,
+      Math.min(_MAX_CHAR_INTERVAL_MS, incomingMsPerChar * _RATE_DRAIN_FACTOR),
+    );
+  }
+
+  _scheduleTick() {
+    if (this._rafId != null) return;
+    this._rafId = requestAnimationFrame((now) => {
+      this._rafId = null;
+      this._step(now);
+    });
+  }
+
+  _cancelTick() {
+    if (this._rafId != null) {
+      cancelAnimationFrame(this._rafId);
+      this._rafId = null;
+    }
+  }
+
+  _step(now) {
+    const pending = this._buffer.length - this._displayLen;
+    if (pending > 0) {
+      const elapsed = now - this._lastStepTime;
+      this._lastStepTime = now;
+      let interval = this._charInterval;
+      if (pending > _CATCHUP_THRESHOLD_FAST) interval = this._charInterval / 4;
+      else if (pending > _CATCHUP_THRESHOLD_MED) interval = this._charInterval / 2;
+
+      this._remainder += elapsed;
+      const charsToAdd = Math.floor(this._remainder / Math.max(interval, 1));
+      if (charsToAdd > 0) {
+        this._remainder -= charsToAdd * interval;
+        const prev = this._displayLen;
+        this._displayLen = Math.min(this._displayLen + charsToAdd, this._buffer.length);
+        if (this._displayLen !== prev && this._onUpdate) {
+          this._onUpdate(this.displayText, this._buffer);
+        }
+      }
+    }
+    if (this._running || this._displayLen < this._buffer.length) {
+      this._scheduleTick();
+    }
+  }
+}
+
 const DEFAULT_TOOL_RESULT_TRUNCATE = 500;
 
 // ── Bubble Action Helpers ──────────────────────
@@ -79,21 +205,28 @@ export function renderHistoryMessage(msg, opts) {
     const content = rawText ? renderMarkdown(rawText, opts.animaName) : "";
     const toolHtml = renderToolCalls(msg.tool_calls, { escapeHtml, truncateLen: truncLen });
     const imagesHtml = renderImages(msg.images, { animaName: opts.animaName });
+    let thinkingHtml = "";
+    if (msg.thinking_text) {
+      thinkingHtml = `<details class="thinking-block"><summary class="thinking-summary">\u{1F4AD} Thinking</summary><pre class="thinking-content">${escapeHtml(msg.thinking_text)}</pre></details>`;
+    }
     const toLabel = msg.to_person
       ? `<div style="font-size:0.72rem; opacity:0.7; margin-bottom:2px;">→ ${escapeHtml(msg.to_person)}</div>`
       : "";
     const actionsHtml = _bubbleActionsHtml(rawText);
     const dataAttr = rawText ? ` data-raw-text="${_escapeAttr(rawText)}"` : "";
-    const bubble = `<div class="chat-bubble assistant"${dataAttr}>${actionsHtml}${toLabel}${content}${imagesHtml}${toolHtml}${tsHtml}</div>`;
+    const bubble = `<div class="chat-bubble assistant"${dataAttr}>${actionsHtml}${toLabel}${thinkingHtml}${content}${imagesHtml}${toolHtml}${tsHtml}</div>`;
     return _wrapRow("assistant", bubble, _renderAvatar(opts.animaName, avatarMap));
   }
 
-  const fromLabel = msg.from_person && msg.from_person !== "human"
+  const isAnima = msg.from_person && msg.from_person !== "human";
+  const fromLabel = isAnima
     ? `<div style="font-size:0.72rem; opacity:0.7; margin-bottom:2px;">${escapeHtml(msg.from_person)}</div>`
     : "";
   const userContent = _stripVoiceSuffix(msg.content || "");
-  const bubble = `<div class="chat-bubble user">${fromLabel}<div class="chat-text">${escapeHtml(userContent)}</div>${tsHtml}</div>`;
-  const isAnima = msg.from_person && msg.from_person !== "human";
+  const contentHtml = isAnima
+    ? renderMarkdown(userContent)
+    : `<div class="chat-text">${escapeHtml(userContent)}</div>`;
+  const bubble = `<div class="chat-bubble user">${fromLabel}${contentHtml}${tsHtml}</div>`;
   const avatarHtml = _renderAvatar(isAnima ? msg.from_person : null, avatarMap);
   return _wrapRow("user", bubble, avatarHtml);
 }
@@ -240,6 +373,83 @@ export function bindToolCallHandlers(container) {
 }
 
 /**
+ * Render a collapsible background session group (heartbeat/cron/task).
+ * @param {Array} sessions - Array of session objects (1 for heartbeat/task, possibly multiple for grouped cron)
+ * @param {string} type - "heartbeat" | "cron" | "task"
+ * @param {object} opts - Same opts as renderHistoryMessage (escapeHtml, renderMarkdown, smartTimestamp)
+ * @returns {string} HTML string
+ */
+export function renderCollapsibleSession(sessions, type, opts) {
+  const { escapeHtml, renderMarkdown, smartTimestamp } = opts;
+
+  const allMessages = sessions.flatMap((s) => s.messages || []);
+  if (allMessages.length === 0) return "";
+
+  const startTs = sessions[0]?.session_start;
+  const endTs = sessions[sessions.length - 1]?.session_end;
+  const timeLabel = startTs ? smartTimestamp(startTs) : "";
+  const timeRange =
+    startTs && endTs && startTs !== endTs
+      ? `${smartTimestamp(startTs)} \u301C ${smartTimestamp(endTs)}`
+      : timeLabel;
+
+  let headerLabel = "";
+  if (type === "heartbeat") {
+    headerLabel = t("chat.heartbeat_activity");
+  } else if (type === "cron") {
+    headerLabel = t("chat.bg_tasks_count", { count: allMessages.length });
+  } else if (type === "task") {
+    headerLabel = t("chat.task_exec_activity");
+  }
+
+  let bodyHtml = "";
+  if (type === "heartbeat" || type === "task") {
+    for (const msg of allMessages) {
+      const content = msg.content || "";
+      if (content) {
+        bodyHtml += `<div class="bg-session-message">${renderMarkdown(escapeHtml(content))}</div>`;
+      }
+    }
+  } else {
+    for (const msg of allMessages) {
+      const ts = msg.ts ? smartTimestamp(msg.ts) : "";
+      const tsHtml = ts ? `<span class="bg-session-item-ts">${escapeHtml(ts)}</span>` : "";
+      bodyHtml += `<div class="bg-session-item">${escapeHtml(msg.content || "")}${tsHtml}</div>`;
+    }
+  }
+
+  return (
+    `<div class="bg-session-group bg-session-group--${type}">` +
+    `<div class="bg-session-header bg-session-header--${type}">` +
+    `<span class="bg-session-chevron">\u25B6</span>` +
+    `<span class="bg-session-label">${escapeHtml(headerLabel)}</span>` +
+    `<span class="bg-session-time">${escapeHtml(timeRange)}</span>` +
+    `</div>` +
+    `<div class="bg-session-body" style="display:none;">${bodyHtml}</div>` +
+    `</div>`
+  );
+}
+
+/**
+ * Bind expand/collapse handlers for collapsible background session groups.
+ * @param {HTMLElement|null} container
+ */
+export function bindCollapsibleSessionHandlers(container) {
+  if (!container) return;
+  container.querySelectorAll(".bg-session-header").forEach((header) => {
+    header.addEventListener("click", () => {
+      const group = header.parentElement;
+      if (!group) return;
+      const body = group.querySelector(".bg-session-body");
+      if (!body) return;
+      const isExpanded = group.classList.contains("expanded");
+      group.classList.toggle("expanded", !isExpanded);
+      body.style.display = isExpanded ? "none" : "";
+    });
+  });
+}
+
+/**
  * Render a live (current session) chat bubble to HTML.
  * @param {object} msg - Live message with role, text, streaming, activeTool, images, etc.
  * @param {object} opts
@@ -285,6 +495,8 @@ export function renderLiveBubble(msg, opts) {
   let thinkingHtml = "";
   if (msg.thinking && msg.thinkingText) {
     thinkingHtml = `<div class="thinking-inline-preview">${escapeHtml(msg.thinkingText)}</div>`;
+  } else if (!msg.thinking && msg.thinkingText && !msg.streaming) {
+    thinkingHtml = `<details class="thinking-block"><summary class="thinking-summary">\u{1F4AD} Thinking</summary><pre class="thinking-content">${escapeHtml(msg.thinkingText)}</pre></details>`;
   }
 
   const streamingCursor = '<span class="streaming-cursor">▌</span>';
@@ -343,12 +555,14 @@ export function updateStreamingZone(bubble, msg, opts, zone = "all") {
   if (!bubble) return;
   if (zone === "all") {
     bubble.innerHTML = renderStreamingBubbleInner(msg, opts);
+    _autoScrollThinking(bubble);
     return;
   }
   const sel = `.streaming-zone-${zone}`;
   const el = bubble.querySelector(sel);
   if (!el) {
     bubble.innerHTML = renderStreamingBubbleInner(msg, opts);
+    _autoScrollThinking(bubble);
     return;
   }
   if (zone === "subordinate") {
@@ -357,14 +571,17 @@ export function updateStreamingZone(bubble, msg, opts, zone = "all") {
   }
 
   // Fast path: append-only textContent update (no innerHTML replacement)
-  if (zone === "text" && msg.streaming && msg.text && msg._mdCache) {
-    const c = msg._mdCache;
-    const now = performance.now();
-    if ((now - c.t < _MD_RERENDER_MS) && (msg.text.length - c.len < _MD_RERENDER_CHARS)) {
-      const tailEl = el.querySelector(".streaming-tail");
-      if (tailEl) {
-        tailEl.textContent = msg.text.slice(c.len);
-        return;
+  if (zone === "text" && msg.streaming && msg._mdCache) {
+    const visibleText = msg._displayText || msg.text;
+    if (visibleText) {
+      const c = msg._mdCache;
+      const now = performance.now();
+      if ((now - c.t < _MD_RERENDER_MS) && (visibleText.length - c.len < _MD_RERENDER_CHARS)) {
+        const tailEl = el.querySelector(".streaming-tail");
+        if (tailEl) {
+          tailEl.textContent = visibleText.slice(c.len);
+          return;
+        }
       }
     }
   }
@@ -375,7 +592,17 @@ export function updateStreamingZone(bubble, msg, opts, zone = "all") {
     thinking: _renderThinkingZoneContent,
   };
   const fn = renderers[zone];
-  if (fn) el.innerHTML = fn(msg, opts);
+  if (fn) {
+    el.innerHTML = fn(msg, opts);
+    if (zone === "thinking") _autoScrollThinking(el);
+  }
+}
+
+function _autoScrollThinking(container) {
+  requestAnimationFrame(() => {
+    const el = container.querySelector(".thinking-inline-preview");
+    if (el) el.scrollTop = el.scrollHeight;
+  });
 }
 
 function _renderTextZoneContent(msg, opts) {
@@ -392,10 +619,11 @@ function _renderTextZoneContent(msg, opts) {
     const doneLabel = labels.heartbeatRelayDone || t("chat.heartbeat_relay_done");
     return `<div class="heartbeat-relay-indicator"><span class="tool-spinner"></span>${doneLabel}</div>`;
   }
-  if (msg.text) {
-    let html = renderMarkdown(msg.text, opts.animaName);
+  const visibleText = msg._displayText || msg.text;
+  if (visibleText) {
+    let html = renderMarkdown(visibleText, opts.animaName);
     if (msg.streaming) {
-      msg._mdCache = { html, len: msg.text.length, t: performance.now() };
+      msg._mdCache = { html, len: visibleText.length, t: performance.now() };
       html += '<span class="streaming-tail"></span>';
     } else {
       delete msg._mdCache;
@@ -496,48 +724,60 @@ function _patchSubordinateZone(container, msg, opts) {
 
 function _renderThinkingZoneContent(msg, opts) {
   const { escapeHtml } = opts;
-  if (msg.thinking && msg.thinkingText) {
-    return `<div class="thinking-inline-preview">${escapeHtml(msg.thinkingText)}</div>`;
+  const visibleThinking = msg._displayThinkingText || msg.thinkingText;
+
+  // ストリーミング中: インラインプレビュー
+  if (msg.thinking && visibleThinking) {
+    return `<div class="thinking-inline-preview">${escapeHtml(visibleThinking)}</div>`;
   }
+
+  // 完了後: 折りたたみブロック（thinkingTextが残っている場合）
+  if (!msg.thinking && msg.thinkingText && msg.streaming === false) {
+    return `<details class="thinking-block"><summary class="thinking-summary">\u{1F4AD} Thinking</summary><pre class="thinking-content">${escapeHtml(msg.thinkingText)}</pre></details>`;
+  }
+
   return "";
 }
 
 /**
- * Render a collapsible tool activity timeline.
+ * Render a compact tool activity timeline.
+ * Running tools are always visible; completed tools are collapsed behind a count.
  */
 function renderToolActivityTimeline(history, activeTool, { escapeHtml, labels }) {
-  const completedCount = history.filter(e => e.completed).length;
-  const totalCount = history.length;
+  const completedEntries = history.filter(e => e.completed);
+  const runningEntries = history.filter(e => !e.completed);
+  const completedCount = completedEntries.length;
 
-  let items = "";
-  for (const entry of history) {
-    if (entry.completed) {
+  let runningHtml = "";
+  for (const entry of runningEntries) {
+    const detailSpan = entry.detail
+      ? `<span class="tool-activity-detail">${escapeHtml(entry.detail.slice(0, 120))}</span>`
+      : "";
+    runningHtml += `<div class="tool-activity-item tool-activity-item--running"><span class="tool-spinner"></span><span class="tool-activity-name">${escapeHtml(entry.tool_name)}</span>${detailSpan}<span class="tool-activity-dur">${t("chat.tool_running_label")}</span></div>`;
+  }
+
+  const summaryLabel = activeTool
+    ? t("chat.tools_progress", { tool: activeTool, completed: completedCount, total: history.length })
+    : t("chat.tools_completed", { count: completedCount });
+
+  let completedHtml = "";
+  if (completedCount > 0) {
+    let completedItems = "";
+    for (const entry of completedEntries) {
       const icon = entry.is_error
-        ? '<span class="tool-activity-icon tool-activity-error">✗</span>'
-        : '<span class="tool-activity-icon tool-activity-ok">✓</span>';
+        ? '<span class="tool-activity-icon tool-activity-error">\u2717</span>'
+        : '<span class="tool-activity-icon tool-activity-ok">\u2713</span>';
       const dur = entry.duration_ms != null ? `<span class="tool-activity-dur">${_formatDuration(entry.duration_ms)}</span>` : "";
       const summary = entry.result_summary
         ? `<span class="tool-activity-summary">${escapeHtml(entry.result_summary.slice(0, 120))}</span>`
         : "";
-      items += `<div class="tool-activity-item${entry.is_error ? " tool-activity-item--error" : ""}">${icon}<span class="tool-activity-name">${escapeHtml(entry.tool_name)}</span>${dur}${summary}</div>`;
-    } else {
-      const detailSpan = entry.detail
-        ? `<span class="tool-activity-detail">${escapeHtml(entry.detail.slice(0, 120))}</span>`
-        : "";
-      items += `<div class="tool-activity-item tool-activity-item--running"><span class="tool-spinner"></span><span class="tool-activity-name">${escapeHtml(entry.tool_name)}</span>${detailSpan}<span class="tool-activity-dur">${t("chat.tool_running_label")}</span></div>`;
+      completedItems += `<div class="tool-activity-item${entry.is_error ? " tool-activity-item--error" : ""}">${icon}<span class="tool-activity-name">${escapeHtml(entry.tool_name)}</span>${dur}${summary}</div>`;
     }
+    const completedLabel = t("chat.tools_completed_details", { count: completedCount });
+    completedHtml = `<details class="tool-activity-completed"><summary class="tool-activity-completed-summary">${completedLabel}</summary><div class="tool-activity-list">${completedItems}</div></details>`;
   }
 
-  const summaryLabel = activeTool
-    ? t("chat.tools_progress", { tool: activeTool, completed: completedCount, total: totalCount })
-    : t("chat.tools_completed", { count: completedCount });
-
-  return `<div class="tool-activity-timeline">
-    <details${activeTool ? " open" : ""}>
-      <summary class="tool-activity-header"><span class="tool-spinner"${activeTool ? "" : ' style="display:none"'}></span>${summaryLabel}</summary>
-      <div class="tool-activity-list">${items}</div>
-    </details>
-  </div>`;
+  return `<div class="tool-activity-timeline"><div class="tool-activity-header"><span class="tool-spinner"${activeTool ? "" : ' style="display:none"'}></span>${summaryLabel}</div>${runningHtml}${completedHtml}</div>`;
 }
 
 function _formatDuration(ms) {

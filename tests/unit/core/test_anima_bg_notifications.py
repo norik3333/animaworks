@@ -6,9 +6,8 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
-import pytest
 
 from core.background import BackgroundTask, TaskStatus
 

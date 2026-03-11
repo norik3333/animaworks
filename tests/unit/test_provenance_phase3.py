@@ -19,9 +19,7 @@ from core.execution._sanitize import (
     ORIGIN_EXTERNAL_PLATFORM,
     ORIGIN_HUMAN,
     ORIGIN_SYSTEM,
-    ORIGIN_UNKNOWN,
 )
-from core.schemas import Message
 
 
 # ── Messenger.send() origin_chain ─────────────────────────────

@@ -13,11 +13,10 @@ Covers:
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, UTC
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
 
 from core.auth.manager import (
     create_session,
@@ -60,7 +59,7 @@ class TestValidateSessionTTL:
         )
         config.sessions["old-token"] = Session(
             username="admin",
-            created_at=datetime.now(timezone.utc) - timedelta(days=8),
+            created_at=datetime.now(UTC) - timedelta(days=8),
         )
         save_auth(config)
 
@@ -80,7 +79,7 @@ class TestValidateSessionTTL:
         )
         config.sessions["ancient-token"] = Session(
             username="admin",
-            created_at=datetime.now(timezone.utc) - timedelta(days=365),
+            created_at=datetime.now(UTC) - timedelta(days=365),
         )
         save_auth(config)
 
@@ -112,7 +111,7 @@ class TestValidateSessionTTL:
         )
         config.sessions["boundary-token"] = Session(
             username="admin",
-            created_at=datetime.now(timezone.utc) - timedelta(days=7, seconds=1),
+            created_at=datetime.now(UTC) - timedelta(days=7, seconds=1),
         )
         save_auth(config)
 
@@ -166,7 +165,6 @@ class TestChangePasswordRevokesSession:
 
     def _create_test_app(self, data_dir: Path):
         import json
-        from unittest.mock import MagicMock
         from server.app import create_app
 
         animas_dir = data_dir / "animas"
@@ -183,11 +181,14 @@ class TestChangePasswordRevokesSession:
         config_path.write_text(json.dumps(config_data), encoding="utf-8")
 
         from core.config import invalidate_cache
+
         invalidate_cache()
 
-        with patch("core.paths.get_data_dir", return_value=data_dir), \
-             patch("server.app.ProcessSupervisor"), \
-             patch("server.app.WebSocketManager"):
+        with (
+            patch("core.paths.get_data_dir", return_value=data_dir),
+            patch("server.app.ProcessSupervisor"),
+            patch("server.app.WebSocketManager"),
+        ):
             app = create_app(animas_dir, shared_dir)
         return app
 
@@ -208,15 +209,21 @@ class TestChangePasswordRevokesSession:
 
         app = self._create_test_app(data_dir)
         client = TestClient(app)
-        client.post("/api/auth/login", json={
-            "username": "admin",
-            "password": "oldpw",
-        })
+        client.post(
+            "/api/auth/login",
+            json={
+                "username": "admin",
+                "password": "oldpw",
+            },
+        )
 
-        resp = client.put("/api/users/me/password", json={
-            "current_password": "oldpw",
-            "new_password": "newpw123",
-        })
+        resp = client.put(
+            "/api/users/me/password",
+            json={
+                "current_password": "oldpw",
+                "new_password": "newpw123",
+            },
+        )
         assert resp.status_code == 200
 
         reloaded = load_auth()
@@ -224,7 +231,8 @@ class TestChangePasswordRevokesSession:
         assert token2 not in reloaded.sessions
 
     def test_change_password_local_trust_upgrade_creates_new_session(
-        self, data_dir: Path,
+        self,
+        data_dir: Path,
     ):
         from fastapi.testclient import TestClient
 
@@ -238,10 +246,13 @@ class TestChangePasswordRevokesSession:
         app = self._create_test_app(data_dir)
         client = TestClient(app)
 
-        resp = client.put("/api/users/me/password", json={
-            "current_password": "",
-            "new_password": "newpw123",
-        })
+        resp = client.put(
+            "/api/users/me/password",
+            json={
+                "current_password": "",
+                "new_password": "newpw123",
+            },
+        )
         assert resp.status_code == 200
 
         reloaded = load_auth()

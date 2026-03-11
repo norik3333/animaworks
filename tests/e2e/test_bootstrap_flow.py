@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-from datetime import datetime
 from core.time_utils import now_jst
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -131,7 +130,9 @@ class TestBootstrapLifecycle:
     """Test the full bootstrap lifecycle through ProcessSupervisor."""
 
     async def test_bootstrap_detected_and_launched(
-        self, supervisor: ProcessSupervisor, mock_ws_manager: MagicMock,
+        self,
+        supervisor: ProcessSupervisor,
+        mock_ws_manager: MagicMock,
     ):
         """When start_anima finds needs_bootstrap=True, a background
         bootstrap task is launched and runs to completion."""
@@ -176,14 +177,13 @@ class TestBootstrapLifecycle:
         assert supervisor.is_bootstrapping("alice") is False
 
         # Verify run_bootstrap was called via IPC
-        bootstrap_calls = [
-            call for call in mock_handle.send_request.call_args_list
-            if call.args[0] == "run_bootstrap"
-        ]
+        bootstrap_calls = [call for call in mock_handle.send_request.call_args_list if call.args[0] == "run_bootstrap"]
         assert len(bootstrap_calls) == 1
 
     async def test_bootstrap_websocket_events(
-        self, supervisor: ProcessSupervisor, mock_ws_manager: MagicMock,
+        self,
+        supervisor: ProcessSupervisor,
+        mock_ws_manager: MagicMock,
     ):
         """WebSocket broadcasts started and completed events during bootstrap."""
         mock_handle = _make_mock_handle("bob", needs_bootstrap=True, bootstrap_delay=0.05)
@@ -198,18 +198,13 @@ class TestBootstrapLifecycle:
         await asyncio.sleep(0.3)
 
         # Collect all broadcast calls
-        broadcast_calls = [
-            call.args[0] for call in mock_ws_manager.broadcast.call_args_list
-        ]
+        broadcast_calls = [call.args[0] for call in mock_ws_manager.broadcast.call_args_list]
 
         # Filter for anima.bootstrap events
-        bootstrap_events = [
-            c for c in broadcast_calls if c.get("type") == "anima.bootstrap"
-        ]
+        bootstrap_events = [c for c in broadcast_calls if c.get("type") == "anima.bootstrap"]
 
         assert len(bootstrap_events) == 2, (
-            f"Expected 2 bootstrap events (started + completed), got {len(bootstrap_events)}: "
-            f"{bootstrap_events}"
+            f"Expected 2 bootstrap events (started + completed), got {len(bootstrap_events)}: {bootstrap_events}"
         )
 
         statuses = [e["data"]["status"] for e in bootstrap_events]
@@ -221,7 +216,8 @@ class TestBootstrapLifecycle:
             assert event["data"]["name"] == "bob"
 
     async def test_is_bootstrapping_transitions(
-        self, supervisor: ProcessSupervisor,
+        self,
+        supervisor: ProcessSupervisor,
     ):
         """is_bootstrapping() transitions from False -> True -> False."""
         bootstrap_event = asyncio.Event()
@@ -267,7 +263,9 @@ class TestBootstrapLifecycle:
         assert supervisor.is_bootstrapping("carol") is False
 
     async def test_no_bootstrap_when_not_needed(
-        self, supervisor: ProcessSupervisor, mock_ws_manager: MagicMock,
+        self,
+        supervisor: ProcessSupervisor,
+        mock_ws_manager: MagicMock,
     ):
         """When needs_bootstrap=False, no bootstrap task is launched."""
         mock_handle = _make_mock_handle("dave", needs_bootstrap=False)
@@ -284,10 +282,7 @@ class TestBootstrapLifecycle:
         assert supervisor.is_bootstrapping("dave") is False
 
         # run_bootstrap should never have been called
-        bootstrap_calls = [
-            call for call in mock_handle.send_request.call_args_list
-            if call.args[0] == "run_bootstrap"
-        ]
+        bootstrap_calls = [call for call in mock_handle.send_request.call_args_list if call.args[0] == "run_bootstrap"]
         assert len(bootstrap_calls) == 0
 
         # No anima.bootstrap events should have been broadcast
@@ -299,7 +294,9 @@ class TestBootstrapLifecycle:
         assert len(bootstrap_events) == 0
 
     async def test_bootstrap_failure_broadcasts_failed(
-        self, supervisor: ProcessSupervisor, mock_ws_manager: MagicMock,
+        self,
+        supervisor: ProcessSupervisor,
+        mock_ws_manager: MagicMock,
     ):
         """When bootstrap IPC returns an error, a 'failed' event is broadcast."""
         mock_handle = _make_mock_handle("eve", needs_bootstrap=True)
@@ -329,19 +326,16 @@ class TestBootstrapLifecycle:
         assert supervisor.is_bootstrapping("eve") is False
 
         # Check that failed event was broadcast
-        broadcast_calls = [
-            call.args[0] for call in mock_ws_manager.broadcast.call_args_list
-        ]
-        bootstrap_events = [
-            c for c in broadcast_calls if c.get("type") == "anima.bootstrap"
-        ]
+        broadcast_calls = [call.args[0] for call in mock_ws_manager.broadcast.call_args_list]
+        bootstrap_events = [c for c in broadcast_calls if c.get("type") == "anima.bootstrap"]
 
         statuses = [e["data"]["status"] for e in bootstrap_events]
         assert "started" in statuses
         assert "failed" in statuses
 
     async def test_get_process_status_during_bootstrap(
-        self, supervisor: ProcessSupervisor,
+        self,
+        supervisor: ProcessSupervisor,
     ):
         """get_process_status returns 'bootstrapping' status during bootstrap."""
         bootstrap_proceed = asyncio.Event()
@@ -386,7 +380,7 @@ class TestBootstrapLifecycle:
 # ── Chat Guard Tests ─────────────────────────────────────────
 
 
-def _make_test_app_with_supervisor(supervisor: ProcessSupervisor) -> "FastAPI":
+def _make_test_app_with_supervisor(supervisor: ProcessSupervisor) -> FastAPI:
     """Build a test FastAPI app wired to the given supervisor."""
     from fastapi import FastAPI
 
@@ -406,7 +400,8 @@ class TestChatGuardDuringBootstrap:
     """Test that chat endpoints reject requests during bootstrap."""
 
     async def test_chat_stream_returns_busy_during_bootstrap(
-        self, supervisor: ProcessSupervisor,
+        self,
+        supervisor: ProcessSupervisor,
     ):
         """POST /animas/{name}/chat/stream returns bootstrap busy SSE
         while anima is bootstrapping."""
@@ -439,7 +434,8 @@ class TestChatGuardDuringBootstrap:
         app = _make_test_app_with_supervisor(supervisor)
         transport = ASGITransport(app=app)
         async with AsyncClient(
-            transport=transport, base_url="http://test",
+            transport=transport,
+            base_url="http://test",
         ) as client:
             resp = await client.post(
                 "/api/animas/alice/chat/stream",
@@ -457,7 +453,8 @@ class TestChatGuardDuringBootstrap:
         await asyncio.sleep(0.1)
 
     async def test_chat_returns_503_during_bootstrap(
-        self, supervisor: ProcessSupervisor,
+        self,
+        supervisor: ProcessSupervisor,
     ):
         """POST /animas/{name}/chat returns 503 while anima is bootstrapping."""
         bootstrap_proceed = asyncio.Event()
@@ -489,7 +486,8 @@ class TestChatGuardDuringBootstrap:
         app = _make_test_app_with_supervisor(supervisor)
         transport = ASGITransport(app=app)
         async with AsyncClient(
-            transport=transport, base_url="http://test",
+            transport=transport,
+            base_url="http://test",
         ) as client:
             resp = await client.post(
                 "/api/animas/alice/chat",
@@ -505,7 +503,9 @@ class TestChatGuardDuringBootstrap:
         await asyncio.sleep(0.1)
 
     async def test_chat_stream_works_after_bootstrap(
-        self, supervisor: ProcessSupervisor, mock_ws_manager: MagicMock,
+        self,
+        supervisor: ProcessSupervisor,
+        mock_ws_manager: MagicMock,
     ):
         """After bootstrap completes, chat/stream works normally."""
         mock_handle = _make_mock_handle("alice", needs_bootstrap=True, bootstrap_delay=0.05)
@@ -552,7 +552,8 @@ class TestChatGuardDuringBootstrap:
 
         transport = ASGITransport(app=app)
         async with AsyncClient(
-            transport=transport, base_url="http://test",
+            transport=transport,
+            base_url="http://test",
         ) as client:
             resp = await client.post(
                 "/api/animas/alice/chat/stream",
@@ -569,7 +570,8 @@ class TestChatGuardDuringBootstrap:
         assert "event: text_delta" in body or "event: done" in body
 
     async def test_chat_returns_normal_after_bootstrap(
-        self, supervisor: ProcessSupervisor,
+        self,
+        supervisor: ProcessSupervisor,
     ):
         """After bootstrap completes, POST /animas/{name}/chat returns
         a normal 200 response."""
@@ -588,7 +590,8 @@ class TestChatGuardDuringBootstrap:
         app = _make_test_app_with_supervisor(supervisor)
         transport = ASGITransport(app=app)
         async with AsyncClient(
-            transport=transport, base_url="http://test",
+            transport=transport,
+            base_url="http://test",
         ) as client:
             resp = await client.post(
                 "/api/animas/alice/chat",
@@ -608,7 +611,8 @@ class TestMultipleAnimasBootstrap:
     """Test bootstrap with multiple animas running concurrently."""
 
     async def test_independent_bootstrap_tracking(
-        self, supervisor: ProcessSupervisor,
+        self,
+        supervisor: ProcessSupervisor,
     ):
         """Each anima's bootstrap state is tracked independently."""
         alice_proceed = asyncio.Event()

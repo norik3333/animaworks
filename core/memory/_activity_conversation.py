@@ -23,9 +23,27 @@ from core.memory._activity_models import (
     find_tool_result_fallback,
     time_diff,
 )
-from core.time_utils import now_jst
+from core.time_utils import now_local
 
 logger = logging.getLogger("animaworks.activity")
+
+
+_TOOL_RESULT_TRUNCATE = 1500
+_TOOL_INPUT_TRUNCATE = 500
+
+
+def _truncate_tool_field(value: Any, limit: int) -> Any:
+    """Truncate tool input/result for the conversation view API."""
+    if isinstance(value, str):
+        if len(value) <= limit:
+            return value
+        return value[:limit] + f"\n…({len(value) - limit} chars truncated)"
+    if isinstance(value, (dict, list)):
+        s = json.dumps(value, ensure_ascii=False)
+        if len(s) <= limit:
+            return value
+        return s[:limit] + f"\n…({len(s) - limit} chars truncated)"
+    return value
 
 
 class ConversationMixin:
@@ -40,6 +58,8 @@ class ConversationMixin:
         "heartbeat_start",
         "heartbeat_end",
         "cron_executed",
+        "task_exec_start",
+        "task_exec_end",
         "error",
     }
 
@@ -81,6 +101,16 @@ class ConversationMixin:
         )
         messages = self._entries_to_messages(entries)
 
+        if len(messages) <= limit and entries:
+            entries = self._load_conversation_entries(
+                before=before,
+                limit=limit,
+                thread_id=thread_id,
+                strict_thread=strict_thread,
+                _target_multiplier=15,
+            )
+            messages = self._entries_to_messages(entries)
+
         has_more = len(messages) > limit
         if has_more:
             messages = messages[-limit:]
@@ -104,20 +134,21 @@ class ConversationMixin:
         limit: int = 50,
         thread_id: str | None = None,
         strict_thread: bool = False,
+        _target_multiplier: int = 3,
     ) -> list[ActivityEntry]:
         """Load conversation-relevant entries, scanning backwards.
 
         Returns entries in chronological order.  Scans enough days to
-        collect at least ``limit * 3`` raw entries (to account for
-        tool_use/tool_result pairs being folded into messages).
+        collect at least ``limit * _target_multiplier`` raw entries (to
+        account for tool_use/tool_result pairs being folded into messages).
 
         When *thread_id* is given, only entries whose ``meta.thread_id``
         matches are returned.  Entries without the field are treated as
         belonging to ``"default"`` unless *strict_thread* is True.
         """
-        target_raw = limit * 3 + 50
+        target_raw = limit * _target_multiplier + 50
         entries: list[ActivityEntry] = []
-        today = now_jst().date()
+        today = now_local().date()
         max_scan_days = 365
 
         for day_offset in range(max_scan_days):
@@ -162,7 +193,13 @@ class ConversationMixin:
                         raw["from_person"] = raw.pop("from")
                     if "to" in raw:
                         raw["to_person"] = raw.pop("to")
-                    entry = ActivityEntry(**{k: v for k, v in raw.items() if k in ActivityEntry.__dataclass_fields__})
+                    try:
+                        entry = ActivityEntry(
+                            **{k: v for k, v in raw.items() if k in ActivityEntry.__dataclass_fields__}
+                        )
+                    except (TypeError, ValueError, KeyError):
+                        logger.debug("Skipping malformed entry at line %d in %s", line_num, path)
+                        continue
                     entry._line_number = line_num
                     day_entries.append(entry)
             except Exception:
@@ -242,11 +279,13 @@ class ConversationMixin:
                 result_entry = tool_results.get(tid) if tid else None
                 if not result_entry:
                     result_entry = find_tool_result_fallback(entries, e)
+                raw_input = e.meta.get("args", e.content)
+                raw_result = result_entry.content if result_entry else ""
                 tc: dict[str, Any] = {
                     "tool_use_id": tid,
                     "tool_name": e.tool,
-                    "input": e.meta.get("args", e.content),
-                    "result": result_entry.content if result_entry else "",
+                    "input": _truncate_tool_field(raw_input, _TOOL_INPUT_TRUNCATE),
+                    "result": _truncate_tool_field(raw_result, _TOOL_RESULT_TRUNCATE),
                     "is_error": (result_entry.meta.get("is_error", False) if result_entry else False),
                 }
                 if e.meta.get("blocked"):
@@ -298,6 +337,32 @@ class ConversationMixin:
                     }
                 )
 
+            elif e.type == "task_exec_start":
+                self._flush_tool_calls(messages, pending_tool_calls)
+                messages.append(
+                    {
+                        "ts": e.ts,
+                        "role": "system",
+                        "content": e.summary or t("activity.task_exec_start_label"),
+                        "from_person": "",
+                        "tool_calls": [],
+                        "_trigger": "task",
+                    }
+                )
+
+            elif e.type == "task_exec_end":
+                self._flush_tool_calls(messages, pending_tool_calls)
+                messages.append(
+                    {
+                        "ts": e.ts,
+                        "role": "system",
+                        "content": e.summary or e.content or t("activity.task_exec_end_label"),
+                        "from_person": "",
+                        "tool_calls": [],
+                        "_trigger": "task",
+                    }
+                )
+
             elif e.type == "error":
                 self._flush_tool_calls(messages, pending_tool_calls)
                 messages.append(
@@ -334,7 +399,15 @@ class ConversationMixin:
         messages: list[dict[str, Any]],
         gap_minutes: int,
     ) -> list[dict[str, Any]]:
-        """Group messages into sessions based on time gaps."""
+        """Group messages into sessions based on time gaps and trigger changes.
+
+        Sessions are split when either:
+        - The time gap between consecutive messages exceeds *gap_minutes*, or
+        - The trigger type changes (e.g. heartbeat → chat, chat → cron).
+
+        This ensures background sessions (heartbeat/cron/task) never contain
+        chat messages and vice versa.
+        """
         if not messages:
             return []
 
@@ -345,12 +418,14 @@ class ConversationMixin:
 
         for msg in messages:
             msg_trigger = msg.pop("_trigger", None)
-            if msg_trigger:
-                current_trigger = msg_trigger
+            effective_trigger = msg_trigger or "chat"
 
             if current_msgs:
                 prev_ts = current_msgs[-1]["ts"]
-                if time_diff(prev_ts, msg["ts"]) >= gap_seconds:
+                trigger_changed = effective_trigger != current_trigger
+                time_gap = time_diff(prev_ts, msg["ts"]) >= gap_seconds
+
+                if trigger_changed or time_gap:
                     sessions.append(
                         {
                             "session_start": current_msgs[0]["ts"],
@@ -360,8 +435,8 @@ class ConversationMixin:
                         }
                     )
                     current_msgs = []
-                    current_trigger = msg_trigger or "chat"
 
+            current_trigger = effective_trigger
             current_msgs.append(msg)
 
         if current_msgs:

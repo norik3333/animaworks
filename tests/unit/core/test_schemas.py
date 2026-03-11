@@ -6,19 +6,19 @@
 from __future__ import annotations
 
 from datetime import datetime
-from core.time_utils import now_jst
 
 import pytest
+from pydantic import ValidationError
 
 from core.schemas import (
+    AnimaConfig,
+    AnimaStatus,
     CronTask,
     CycleResult,
     Message,
     ModelConfig,
-    AnimaConfig,
-    AnimaStatus,
 )
-
+from core.time_utils import now_jst
 
 # ── CronTask ──────────────────────────────────────────────
 
@@ -31,7 +31,7 @@ class TestCronTask:
         assert task.description == "Run daily"
 
     def test_required_fields(self):
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             CronTask()  # type: ignore[call-arg]
 
 

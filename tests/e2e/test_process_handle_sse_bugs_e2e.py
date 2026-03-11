@@ -12,11 +12,11 @@ Tests three bug fixes:
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timedelta
+from datetime import timedelta
 from core.time_utils import now_jst
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 import pytest
 

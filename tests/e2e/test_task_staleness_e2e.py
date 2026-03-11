@@ -15,7 +15,6 @@ from __future__ import annotations
 import json
 from datetime import datetime, timedelta
 from pathlib import Path
-from unittest.mock import MagicMock
 
 import pytest
 
@@ -26,7 +25,6 @@ from core.memory.task_queue import (
     _parse_deadline,
 )
 from core.paths import load_prompt, _prompt_cache
-from core.schemas import TaskEntry
 
 
 # ── Fixtures ──────────────────────────────────────────────────

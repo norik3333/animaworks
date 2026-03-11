@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import json
-from datetime import date, timedelta, timezone
+from datetime import timedelta, timezone
 from pathlib import Path
 
 import pytest
 
 from core.execution.base import TokenUsage
-from core.memory.token_usage import DEFAULT_PRICING, TokenUsageLogger
+from core.memory.token_usage import TokenUsageLogger
 
 JST = timezone(timedelta(hours=9))
 

@@ -17,9 +17,8 @@ from __future__ import annotations
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 
-from core.config.models import AnimaWorksConfig, HeartbeatConfig
+from core.config.models import AnimaWorksConfig
 from core.lifecycle import LifecycleManager
 from core.schemas import Message
 from core.supervisor.inbox_rate_limiter import InboxRateLimiter

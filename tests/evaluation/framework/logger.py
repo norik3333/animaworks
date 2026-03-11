@@ -12,7 +12,7 @@ recording all metrics to JSON files for later analysis.
 
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from pathlib import Path
 from typing import Any
 
@@ -97,8 +97,7 @@ class ExperimentLogger:
         self._save_metadata()
 
         logger.info(
-            f"ExperimentLogger initialized: {experiment_id}, "
-            f"condition={condition}, participant={participant_id}"
+            f"ExperimentLogger initialized: {experiment_id}, condition={condition}, participant={participant_id}"
         )
 
     def _save_metadata(self) -> None:
@@ -108,7 +107,7 @@ class ExperimentLogger:
             "experiment_id": self.experiment_id,
             "condition": self.condition,
             "participant_id": self.participant_id,
-            "created_at": datetime.now(timezone.utc).isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
             **self.metadata,
         }
         with open(metadata_file, "w", encoding="utf-8") as f:
@@ -124,7 +123,7 @@ class ExperimentLogger:
             Log entry with metadata
         """
         return {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "experiment_id": self.experiment_id,
             "condition": self.condition,
             "participant_id": self.participant_id,
@@ -141,12 +140,11 @@ class ExperimentLogger:
         """
         if self.current_conversation_id is not None:
             logger.warning(
-                f"Starting new conversation {conversation_id} "
-                f"while {self.current_conversation_id} is still active"
+                f"Starting new conversation {conversation_id} while {self.current_conversation_id} is still active"
             )
 
         self.current_conversation_id = conversation_id
-        self.current_conversation_start = datetime.now(timezone.utc).timestamp()
+        self.current_conversation_start = datetime.now(UTC).timestamp()
         self.current_turn_metrics = []
 
         logger.info(f"Started conversation: {conversation_id}")

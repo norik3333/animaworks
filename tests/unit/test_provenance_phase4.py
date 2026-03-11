@@ -348,11 +348,13 @@ class TestChannelCTrustSeparation:
         """Mixed origins → split between medium and untrusted."""
         results = [
             FakeSearchResult(
+                doc_id="consolidated#0",
                 content="Consolidated knowledge",
                 score=0.95,
                 metadata={"anima": "test-anima", "origin": "consolidation"},
             ),
             FakeSearchResult(
+                doc_id="external#0",
                 content="External data from Slack",
                 score=0.85,
                 metadata={"anima": "test-anima", "origin": "external_platform"},

@@ -9,7 +9,7 @@ import inspect
 import os
 import sys
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -18,10 +18,11 @@ from core.schemas import ModelConfig
 
 # ── Helpers ──────────────────────────────────────────────────
 
+
 def _make_executor(
     anima_dir: Path,
     model: str = "claude-sonnet-4-6",
-) -> "AgentSDKExecutor":
+) -> AgentSDKExecutor:
     """Create an AgentSDKExecutor with minimal config."""
     from core.execution.agent_sdk import AgentSDKExecutor
 
@@ -153,16 +154,21 @@ class TestMcpServerConfig:
 
     @pytest.mark.asyncio
     async def test_options_include_mcp_servers_with_aw(
-        self, tmp_path: Path, mock_sdk,
+        self,
+        tmp_path: Path,
+        mock_sdk,
     ) -> None:
         """ClaudeAgentOptions is called with mcp_servers containing 'aw' server."""
         mock_module, mock_types, captured_options = mock_sdk
         executor = _make_executor(tmp_path / "animas" / "test-anima")
 
-        with patch.dict("sys.modules", {
-            "claude_agent_sdk": mock_module,
-            "claude_agent_sdk.types": mock_types,
-        }):
+        with patch.dict(
+            "sys.modules",
+            {
+                "claude_agent_sdk": mock_module,
+                "claude_agent_sdk.types": mock_types,
+            },
+        ):
             await executor.execute(prompt="hello", system_prompt="sys")
 
         assert "mcp_servers" in captured_options
@@ -170,16 +176,21 @@ class TestMcpServerConfig:
 
     @pytest.mark.asyncio
     async def test_aw_server_uses_sys_executable(
-        self, tmp_path: Path, mock_sdk,
+        self,
+        tmp_path: Path,
+        mock_sdk,
     ) -> None:
         """The 'aw' MCP server uses sys.executable as command."""
         mock_module, mock_types, captured_options = mock_sdk
         executor = _make_executor(tmp_path / "animas" / "test-anima")
 
-        with patch.dict("sys.modules", {
-            "claude_agent_sdk": mock_module,
-            "claude_agent_sdk.types": mock_types,
-        }):
+        with patch.dict(
+            "sys.modules",
+            {
+                "claude_agent_sdk": mock_module,
+                "claude_agent_sdk.types": mock_types,
+            },
+        ):
             await executor.execute(prompt="hello", system_prompt="sys")
 
         aw_config = captured_options["mcp_servers"]["aw"]
@@ -187,16 +198,21 @@ class TestMcpServerConfig:
 
     @pytest.mark.asyncio
     async def test_aw_server_uses_correct_args(
-        self, tmp_path: Path, mock_sdk,
+        self,
+        tmp_path: Path,
+        mock_sdk,
     ) -> None:
         """The 'aw' MCP server uses ['-m', 'core.mcp.server'] as args."""
         mock_module, mock_types, captured_options = mock_sdk
         executor = _make_executor(tmp_path / "animas" / "test-anima")
 
-        with patch.dict("sys.modules", {
-            "claude_agent_sdk": mock_module,
-            "claude_agent_sdk.types": mock_types,
-        }):
+        with patch.dict(
+            "sys.modules",
+            {
+                "claude_agent_sdk": mock_module,
+                "claude_agent_sdk.types": mock_types,
+            },
+        ):
             await executor.execute(prompt="hello", system_prompt="sys")
 
         aw_config = captured_options["mcp_servers"]["aw"]
@@ -204,16 +220,21 @@ class TestMcpServerConfig:
 
     @pytest.mark.asyncio
     async def test_allowed_tools_include_mcp_wildcard(
-        self, tmp_path: Path, mock_sdk,
+        self,
+        tmp_path: Path,
+        mock_sdk,
     ) -> None:
         """allowed_tools includes 'mcp__aw__*' wildcard."""
         mock_module, mock_types, captured_options = mock_sdk
         executor = _make_executor(tmp_path / "animas" / "test-anima")
 
-        with patch.dict("sys.modules", {
-            "claude_agent_sdk": mock_module,
-            "claude_agent_sdk.types": mock_types,
-        }):
+        with patch.dict(
+            "sys.modules",
+            {
+                "claude_agent_sdk": mock_module,
+                "claude_agent_sdk.types": mock_types,
+            },
+        ):
             await executor.execute(prompt="hello", system_prompt="sys")
 
         assert "mcp__aw__*" in captured_options["allowed_tools"]
@@ -297,7 +318,9 @@ class TestMcpStatusLogging:
 
     @pytest.mark.asyncio
     async def test_connected_status_logs_info(
-        self, tmp_path: Path, mock_sdk_with_system_message,
+        self,
+        tmp_path: Path,
+        mock_sdk_with_system_message,
     ) -> None:
         """When MCP server status is 'connected', should log info."""
         mock_module, mock_types, FakeSystemMessage = mock_sdk_with_system_message
@@ -331,16 +354,21 @@ class TestMcpStatusLogging:
 
         executor = _make_executor(tmp_path / "animas" / "test-anima")
 
-        with patch.dict("sys.modules", {
-            "claude_agent_sdk": mock_module,
-            "claude_agent_sdk.types": mock_types,
-        }), patch(
-            "core.execution.agent_sdk.logger"
-        ) as mock_logger:
+        with (
+            patch.dict(
+                "sys.modules",
+                {
+                    "claude_agent_sdk": mock_module,
+                    "claude_agent_sdk.types": mock_types,
+                },
+            ),
+            patch("core.execution.agent_sdk.logger") as mock_logger,
+        ):
             await executor.execute(prompt="hello", system_prompt="sys")
 
         mock_logger.info.assert_any_call(
-            "MCP server '%s' connected successfully", "aw",
+            "MCP server '%s' connected successfully",
+            "aw",
         )
         # Ensure error was NOT called for the MCP server status
         for c in mock_logger.error.call_args_list:
@@ -348,7 +376,9 @@ class TestMcpStatusLogging:
 
     @pytest.mark.asyncio
     async def test_non_connected_status_logs_error(
-        self, tmp_path: Path, mock_sdk_with_system_message,
+        self,
+        tmp_path: Path,
+        mock_sdk_with_system_message,
     ) -> None:
         """When MCP server status is not 'connected', should log error."""
         mock_module, mock_types, FakeSystemMessage = mock_sdk_with_system_message
@@ -382,15 +412,20 @@ class TestMcpStatusLogging:
 
         executor = _make_executor(tmp_path / "animas" / "test-anima")
 
-        with patch.dict("sys.modules", {
-            "claude_agent_sdk": mock_module,
-            "claude_agent_sdk.types": mock_types,
-        }), patch(
-            "core.execution.agent_sdk.logger"
-        ) as mock_logger:
+        with (
+            patch.dict(
+                "sys.modules",
+                {
+                    "claude_agent_sdk": mock_module,
+                    "claude_agent_sdk.types": mock_types,
+                },
+            ),
+            patch("core.execution.agent_sdk.logger") as mock_logger,
+        ):
             await executor.execute(prompt="hello", system_prompt="sys")
 
         mock_logger.error.assert_any_call(
             "MCP server '%s' failed to connect: status=%s",
-            "aw", "error",
+            "aw",
+            "error",
         )

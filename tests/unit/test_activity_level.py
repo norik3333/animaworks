@@ -17,10 +17,10 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+from pydantic import ValidationError
 
 from core._anima_heartbeat import _calc_effective_max_turns
 from core.config.models import AnimaWorksConfig, HeartbeatConfig
-
 
 # ── _calc_effective_max_turns ─────────────────────────────────
 
@@ -59,7 +59,6 @@ class TestCalcEffectiveMaxTurns:
 
     def test_base_turns_3_at_50(self):
         result = _calc_effective_max_turns(3, 50)
-        expected = max(3, math.ceil(3 * 50 / 100))
         assert result == 3  # ceil(1.5)=2 but clamp to 3
 
     def test_large_base_turns(self):
@@ -86,15 +85,15 @@ class TestActivityLevelConfig:
         assert config.activity_level == 400
 
     def test_below_min_raises(self):
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             AnimaWorksConfig(activity_level=9)
 
     def test_above_max_raises(self):
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             AnimaWorksConfig(activity_level=401)
 
     def test_zero_raises(self):
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             AnimaWorksConfig(activity_level=0)
 
     def test_json_roundtrip(self):
@@ -125,7 +124,7 @@ class TestHeartbeatIntervalExtended:
         assert config.interval_minutes == 1440
 
     def test_above_1440_raises(self):
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             HeartbeatConfig(interval_minutes=1441)
 
 

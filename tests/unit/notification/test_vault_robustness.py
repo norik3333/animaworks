@@ -9,10 +9,7 @@ Covers:
 """
 from __future__ import annotations
 
-import asyncio
-import html
 import logging
-from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 

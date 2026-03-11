@@ -6,11 +6,9 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from pathlib import Path
 
-import pytest
 
-from core.memory.activity import ActivityEntry, ActivityLogger, EntryGroup
+from core.memory.activity import ActivityEntry, ActivityLogger
 
 
 # ── Helpers ───────────────────────────────────────────────

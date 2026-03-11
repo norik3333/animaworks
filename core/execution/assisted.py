@@ -323,8 +323,17 @@ class AssistedExecutor(BaseExecutor):
         """Call LiteLLM ``acompletion`` without tools parameter."""
         import litellm
 
+        litellm.modify_params = True
+
         from core.config.models import resolve_max_tokens
-        from core.execution.base import is_adaptive_model, is_anthropic_claude, resolve_thinking_effort
+        from core.execution.base import (
+            is_adaptive_model,
+            is_anthropic_claude,
+            is_bedrock_glm,
+            is_bedrock_kimi,
+            is_bedrock_qwen,
+            resolve_thinking_effort,
+        )
 
         _eff_max = (
             max_tokens_override
@@ -353,7 +362,15 @@ class AssistedExecutor(BaseExecutor):
         # Extended thinking / reasoning control
         if self._model_config.thinking is not None:
             model = self._model_config.model
-            if model.startswith("bedrock/"):
+            if is_bedrock_kimi(model):
+                if self._model_config.thinking:
+                    kwargs["reasoning_config"] = resolve_thinking_effort(
+                        model,
+                        self._model_config.thinking_effort,
+                    )
+            elif is_bedrock_qwen(model) or is_bedrock_glm(model):
+                kwargs["enable_thinking"] = self._model_config.thinking
+            elif model.startswith("bedrock/"):
                 if self._model_config.thinking:
                     kwargs["reasoning_effort"] = resolve_thinking_effort(
                         model,
@@ -370,6 +387,9 @@ class AssistedExecutor(BaseExecutor):
                     else:
                         kwargs["thinking"] = {"type": "enabled", "budget_tokens": 10000}
                     kwargs["temperature"] = 1
+            elif model.startswith("openai/"):
+                kwargs.setdefault("extra_body", {})
+                kwargs["extra_body"]["enable_thinking"] = self._model_config.thinking
             else:
                 kwargs["think"] = self._model_config.thinking
         elif self._model_config.model.startswith("ollama/"):
@@ -656,7 +676,11 @@ class AssistedExecutor(BaseExecutor):
                 )
                 choice = response.choices[0]
                 content = choice.message.content or ""
-                _, content = strip_thinking_tags(content)
+                thinking, content = strip_thinking_tags(content)
+                if thinking:
+                    yield {"type": "thinking_start"}
+                    yield {"type": "thinking_delta", "text": thinking}
+                    yield {"type": "thinking_end"}
                 if hasattr(response, "usage") and response.usage:
                     _usage_acc_bs.input_tokens += response.usage.prompt_tokens or 0
                     _usage_acc_bs.output_tokens += response.usage.completion_tokens or 0

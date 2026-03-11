@@ -27,7 +27,7 @@ from core.memory.streaming_journal import StreamingJournal
 from core.messenger import InboxItem
 from core.paths import load_prompt
 from core.schemas import CycleResult
-from core.time_utils import now_jst
+from core.time_utils import now_local
 
 logger = logging.getLogger("animaworks.anima")
 
@@ -204,7 +204,7 @@ class InboxMixin:
                             suppress_board_fanout.reset(_fanout_token)
                         active_session_type.reset(_session_token)
 
-                    self._last_activity = now_jst()
+                    self._last_activity = now_local()
 
                     # Record inbox response as response_sent so it appears
                     # in the conversation view alongside message_received.
@@ -217,12 +217,21 @@ class InboxMixin:
                             meta={"trigger": "inbox"},
                         )
 
-                    # Archive processed messages
-                    await self._archive_processed_messages(
-                        inbox_result.inbox_items,
-                        inbox_result.senders,
-                        self.agent.replied_to,
-                    )
+                    # Archive processed messages — but NOT when the LLM
+                    # returned nothing (e.g. SDK empty response due to API
+                    # outage / rate limit).  Keeping them lets the next
+                    # inbox cycle retry.
+                    if accumulated_text.strip() or self.agent.replied_to:
+                        await self._archive_processed_messages(
+                            inbox_result.inbox_items,
+                            inbox_result.senders,
+                            self.agent.replied_to,
+                        )
+                    else:
+                        logger.warning(
+                            "[%s] Empty LLM response for inbox — messages NOT archived (will retry)",
+                            self.name,
+                        )
 
                     self._activity.log(
                         "inbox_processing_end",
@@ -411,7 +420,7 @@ class InboxMixin:
 
         # Record received message content to episodes so that
         # inter-Anima communications survive in episodic memory.
-        _msg_ts = now_jst().strftime("%H:%M")
+        _msg_ts = now_local().strftime("%H:%M")
         _recordable = [m for m in messages if m.type != "ack"]
         if len(_recordable) > 50:
             logger.warning(

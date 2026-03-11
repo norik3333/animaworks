@@ -14,7 +14,6 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 from core.prompt.builder import build_system_prompt
 from core.schemas import SkillMeta
@@ -28,15 +27,7 @@ from core.tooling.skill_tool import build_skill_tool_description, load_and_rende
 def _make_skill_file(path: Path, *, name: str, description: str, body: str) -> None:
     """Write a Claude Code format skill file with YAML frontmatter."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    content = (
-        f"---\n"
-        f"name: {name}\n"
-        f"description: >-\n"
-        f"  {description}\n"
-        f"---\n\n"
-        f"# {name}\n\n"
-        f"{body}\n"
-    )
+    content = f"---\nname: {name}\ndescription: >-\n  {description}\n---\n\n# {name}\n\n{body}\n"
     path.write_text(content, encoding="utf-8")
 
 
@@ -275,7 +266,9 @@ class TestUnifiedSkillTableE2E:
         )
 
         desc = build_skill_tool_description(
-            [personal_meta], [common_meta], [procedure_meta],
+            [personal_meta],
+            [common_meta],
+            [procedure_meta],
         )
 
         # Personal skill (no type label)
@@ -352,15 +345,14 @@ class TestHandleSkillIntegration:
     """Integration tests: invoke skill via ToolHandler._handle_skill."""
 
     @staticmethod
-    def _make_handler(anima_dir: Path, common_skills_dir: Path) -> "ToolHandler":
+    def _make_handler(anima_dir: Path, common_skills_dir: Path) -> ToolHandler:
         """Create a ToolHandler with minimal mocking."""
         from core.tooling.handler import ToolHandler
 
         memory = MagicMock()
         memory.anima_dir = anima_dir
 
-        with patch("core.tooling.handler.ActivityLogger"), \
-             patch("core.tooling.handler.ExternalToolDispatcher"):
+        with patch("core.tooling.handler.ActivityLogger"), patch("core.tooling.handler.ExternalToolDispatcher"):
             handler = ToolHandler(anima_dir=anima_dir, memory=memory)
         return handler
 

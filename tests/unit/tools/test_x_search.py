@@ -25,8 +25,9 @@ from core.tools.x_search import (
 
 
 @pytest.fixture(autouse=True)
-def _set_twitter_token(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setenv("TWITTER_BEARER_TOKEN", "test-bearer-token")
+def _set_twitter_token():
+    with patch("core.tools.x_search.get_credential", return_value="test-bearer-token"):
+        yield
 
 
 def _make_x_response(
@@ -67,10 +68,10 @@ class TestXSearchClient:
         client = XSearchClient()
         assert client.bearer_token == "test-bearer-token"
 
-    def test_init_missing_token(self, monkeypatch: pytest.MonkeyPatch):
-        monkeypatch.delenv("TWITTER_BEARER_TOKEN", raising=False)
-        with pytest.raises(ToolConfigError):
-            XSearchClient()
+    def test_init_missing_token(self):
+        with patch("core.tools.x_search.get_credential", side_effect=ToolConfigError("no token")):
+            with pytest.raises(ToolConfigError):
+                XSearchClient()
 
 
 class TestXSearchClientRequest:

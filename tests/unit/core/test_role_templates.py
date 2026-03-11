@@ -7,6 +7,7 @@ Tests _apply_role_defaults(), _create_status_json() with role parameter,
 _load_status_json(), resolve_anima_config() 3-layer merge,
 read_specialty_prompt(), and _PROTECTED_FILES in agent_sdk.
 """
+
 from __future__ import annotations
 
 import json
@@ -54,9 +55,7 @@ def _write_status_json(anima_dir: Path, data: dict[str, Any]) -> None:
 
 def _read_status_json(anima_dir: Path) -> dict[str, Any]:
     """Read and parse status.json from an anima directory."""
-    return json.loads(
-        (anima_dir / "status.json").read_text(encoding="utf-8")
-    )
+    return json.loads((anima_dir / "status.json").read_text(encoding="utf-8"))
 
 
 # ── 1. _apply_role_defaults ──────────────────────────────────────
@@ -78,13 +77,9 @@ class TestApplyRoleDefaults:
         role_dir = tmp_path / "roles" / role
         role_dir.mkdir(parents=True, exist_ok=True)
         if permissions_content is not None:
-            (role_dir / "permissions.md").write_text(
-                permissions_content, encoding="utf-8"
-            )
+            (role_dir / "permissions.md").write_text(permissions_content, encoding="utf-8")
         if specialty_content is not None:
-            (role_dir / "specialty_prompt.md").write_text(
-                specialty_content, encoding="utf-8"
-            )
+            (role_dir / "specialty_prompt.md").write_text(specialty_content, encoding="utf-8")
         if defaults_content is not None:
             (role_dir / "defaults.json").write_text(
                 json.dumps(defaults_content, ensure_ascii=False, indent=2),
@@ -96,14 +91,17 @@ class TestApplyRoleDefaults:
         """permissions.md is copied from role template to anima dir."""
         roles_root = tmp_path / "roles"
         self._make_role_dir(
-            tmp_path, "engineer",
+            tmp_path,
+            "engineer",
             permissions_content="# Engineer permissions\nAll tools allowed.\n",
         )
         anima_dir = tmp_path / "anima"
         anima_dir.mkdir()
 
-        with patch("core.anima_factory._get_roles_dir", return_value=roles_root), \
-             patch("core.anima_factory.SHARED_ROLES_DIR", roles_root):
+        with (
+            patch("core.anima_factory._get_roles_dir", return_value=roles_root),
+            patch("core.anima_factory.SHARED_ROLES_DIR", roles_root),
+        ):
             _apply_role_defaults(anima_dir, "engineer")
 
         perm_path = anima_dir / "permissions.md"
@@ -115,14 +113,17 @@ class TestApplyRoleDefaults:
         """specialty_prompt.md is copied from role template to anima dir."""
         roles_root = tmp_path / "roles"
         self._make_role_dir(
-            tmp_path, "researcher",
+            tmp_path,
+            "researcher",
             specialty_content="# Research guidelines\nFocus on accuracy.\n",
         )
         anima_dir = tmp_path / "anima"
         anima_dir.mkdir()
 
-        with patch("core.anima_factory._get_roles_dir", return_value=roles_root), \
-             patch("core.anima_factory.SHARED_ROLES_DIR", roles_root):
+        with (
+            patch("core.anima_factory._get_roles_dir", return_value=roles_root),
+            patch("core.anima_factory.SHARED_ROLES_DIR", roles_root),
+        ):
             _apply_role_defaults(anima_dir, "researcher")
 
         spec_path = anima_dir / "specialty_prompt.md"
@@ -135,14 +136,17 @@ class TestApplyRoleDefaults:
         """{name} placeholder in permissions.md is replaced with anima dir name."""
         roles_root = tmp_path / "roles"
         self._make_role_dir(
-            tmp_path, "engineer",
+            tmp_path,
+            "engineer",
             permissions_content="# Permissions: {name}\nAllowed tools for {name}.\n",
         )
         anima_dir = tmp_path / "mybot"
         anima_dir.mkdir()
 
-        with patch("core.anima_factory._get_roles_dir", return_value=roles_root), \
-             patch("core.anima_factory.SHARED_ROLES_DIR", roles_root):
+        with (
+            patch("core.anima_factory._get_roles_dir", return_value=roles_root),
+            patch("core.anima_factory.SHARED_ROLES_DIR", roles_root),
+        ):
             _apply_role_defaults(anima_dir, "engineer")
 
         content = (anima_dir / "permissions.md").read_text(encoding="utf-8")
@@ -155,15 +159,18 @@ class TestApplyRoleDefaults:
         """Unknown role falls back to 'general' template."""
         roles_root = tmp_path / "roles"
         self._make_role_dir(
-            tmp_path, "general",
+            tmp_path,
+            "general",
             permissions_content="# General permissions\n",
             specialty_content="# General specialty\n",
         )
         anima_dir = tmp_path / "anima"
         anima_dir.mkdir()
 
-        with patch("core.anima_factory._get_roles_dir", return_value=roles_root), \
-             patch("core.anima_factory.SHARED_ROLES_DIR", roles_root):
+        with (
+            patch("core.anima_factory._get_roles_dir", return_value=roles_root),
+            patch("core.anima_factory.SHARED_ROLES_DIR", roles_root),
+        ):
             _apply_role_defaults(anima_dir, "unknown_role")
 
         # Should have general permissions, not crash
@@ -180,8 +187,10 @@ class TestApplyRoleDefaults:
         anima_dir = tmp_path / "anima"
         anima_dir.mkdir()
 
-        with patch("core.anima_factory._get_roles_dir", return_value=roles_root), \
-             patch("core.anima_factory.SHARED_ROLES_DIR", roles_root):
+        with (
+            patch("core.anima_factory._get_roles_dir", return_value=roles_root),
+            patch("core.anima_factory.SHARED_ROLES_DIR", roles_root),
+        ):
             # Should not raise
             _apply_role_defaults(anima_dir, "engineer")
 
@@ -193,15 +202,18 @@ class TestApplyRoleDefaults:
         """Works when role template has specialty_prompt but no permissions.md."""
         roles_root = tmp_path / "roles"
         self._make_role_dir(
-            tmp_path, "writer",
+            tmp_path,
+            "writer",
             specialty_content="# Writing guidelines\n",
             # No permissions_content
         )
         anima_dir = tmp_path / "anima"
         anima_dir.mkdir()
 
-        with patch("core.anima_factory._get_roles_dir", return_value=roles_root), \
-             patch("core.anima_factory.SHARED_ROLES_DIR", roles_root):
+        with (
+            patch("core.anima_factory._get_roles_dir", return_value=roles_root),
+            patch("core.anima_factory.SHARED_ROLES_DIR", roles_root),
+        ):
             _apply_role_defaults(anima_dir, "writer")
 
         assert not (anima_dir / "permissions.md").exists()
@@ -211,15 +223,18 @@ class TestApplyRoleDefaults:
         """Works when role template has permissions.md but no specialty_prompt.md."""
         roles_root = tmp_path / "roles"
         self._make_role_dir(
-            tmp_path, "ops",
+            tmp_path,
+            "ops",
             permissions_content="# Ops permissions\n",
             # No specialty_content
         )
         anima_dir = tmp_path / "anima"
         anima_dir.mkdir()
 
-        with patch("core.anima_factory._get_roles_dir", return_value=roles_root), \
-             patch("core.anima_factory.SHARED_ROLES_DIR", roles_root):
+        with (
+            patch("core.anima_factory._get_roles_dir", return_value=roles_root),
+            patch("core.anima_factory.SHARED_ROLES_DIR", roles_root),
+        ):
             _apply_role_defaults(anima_dir, "ops")
 
         assert (anima_dir / "permissions.md").exists()
@@ -228,7 +243,7 @@ class TestApplyRoleDefaults:
     def test_valid_roles_constant(self) -> None:
         """VALID_ROLES contains all expected role names."""
         expected = {"engineer", "researcher", "manager", "writer", "ops", "general"}
-        assert VALID_ROLES == expected
+        assert expected == VALID_ROLES
 
 
 # ── 2. _create_status_json with role parameter ───────────────────
@@ -237,9 +252,7 @@ class TestApplyRoleDefaults:
 class TestCreateStatusJsonWithRole:
     """Tests for _create_status_json() with role defaults merging."""
 
-    def _make_roles_dir(
-        self, tmp_path: Path, role: str, defaults: dict[str, Any]
-    ) -> Path:
+    def _make_roles_dir(self, tmp_path: Path, role: str, defaults: dict[str, Any]) -> Path:
         """Create a role defaults.json and return the roles root directory."""
         roles_root = tmp_path / "roles"
         role_dir = roles_root / role
@@ -252,18 +265,24 @@ class TestCreateStatusJsonWithRole:
 
     def test_role_defaults_merged_into_status(self, tmp_path: Path) -> None:
         """defaults.json values from role template are merged into status.json."""
-        roles_root = self._make_roles_dir(tmp_path, "engineer", {
-            "model": "claude-opus-4-6",
-            "context_threshold": 0.80,
-            "max_turns": 200,
-            "max_chains": 10,
-            "conversation_history_threshold": 0.40,
-        })
+        roles_root = self._make_roles_dir(
+            tmp_path,
+            "engineer",
+            {
+                "model": "claude-opus-4-6",
+                "context_threshold": 0.80,
+                "max_turns": 200,
+                "max_chains": 10,
+                "conversation_history_threshold": 0.40,
+            },
+        )
         anima_dir = tmp_path / "anima"
         anima_dir.mkdir()
 
-        with patch("core.anima_factory._get_roles_dir", return_value=roles_root), \
-             patch("core.anima_factory.SHARED_ROLES_DIR", roles_root):
+        with (
+            patch("core.anima_factory._get_roles_dir", return_value=roles_root),
+            patch("core.anima_factory.SHARED_ROLES_DIR", roles_root),
+        ):
             _create_status_json(anima_dir, {}, role="engineer")
 
         status = _read_status_json(anima_dir)
@@ -275,19 +294,26 @@ class TestCreateStatusJsonWithRole:
         assert status["role"] == "engineer"
 
     def test_character_sheet_model_overrides_role_defaults(
-        self, tmp_path: Path,
+        self,
+        tmp_path: Path,
     ) -> None:
         """Character sheet model value takes priority over role defaults.json."""
-        roles_root = self._make_roles_dir(tmp_path, "engineer", {
-            "model": "claude-opus-4-6",
-            "max_turns": 200,
-        })
+        roles_root = self._make_roles_dir(
+            tmp_path,
+            "engineer",
+            {
+                "model": "claude-opus-4-6",
+                "max_turns": 200,
+            },
+        )
         anima_dir = tmp_path / "anima"
         anima_dir.mkdir()
 
         info = {"model": "openai/gpt-4o"}
-        with patch("core.anima_factory._get_roles_dir", return_value=roles_root), \
-             patch("core.anima_factory.SHARED_ROLES_DIR", roles_root):
+        with (
+            patch("core.anima_factory._get_roles_dir", return_value=roles_root),
+            patch("core.anima_factory.SHARED_ROLES_DIR", roles_root),
+        ):
             _create_status_json(anima_dir, info, role="engineer")
 
         status = _read_status_json(anima_dir)
@@ -297,18 +323,25 @@ class TestCreateStatusJsonWithRole:
         assert status["max_turns"] == 200
 
     def test_character_sheet_credential_overrides_role_defaults(
-        self, tmp_path: Path,
+        self,
+        tmp_path: Path,
     ) -> None:
         """Character sheet credential value takes priority over role defaults."""
-        roles_root = self._make_roles_dir(tmp_path, "engineer", {
-            "model": "claude-opus-4-6",
-        })
+        roles_root = self._make_roles_dir(
+            tmp_path,
+            "engineer",
+            {
+                "model": "claude-opus-4-6",
+            },
+        )
         anima_dir = tmp_path / "anima"
         anima_dir.mkdir()
 
         info = {"credential": "my_custom_key"}
-        with patch("core.anima_factory._get_roles_dir", return_value=roles_root), \
-             patch("core.anima_factory.SHARED_ROLES_DIR", roles_root):
+        with (
+            patch("core.anima_factory._get_roles_dir", return_value=roles_root),
+            patch("core.anima_factory.SHARED_ROLES_DIR", roles_root),
+        ):
             _create_status_json(anima_dir, info, role="engineer")
 
         status = _read_status_json(anima_dir)
@@ -321,11 +354,11 @@ class TestCreateStatusJsonWithRole:
         anima_dir.mkdir()
 
         info = {"supervisor": "tanaka"}
-        with patch("core.anima_factory._get_roles_dir", return_value=roles_root), \
-             patch("core.anima_factory.SHARED_ROLES_DIR", roles_root):
-            _create_status_json(
-                anima_dir, info, supervisor_override="yamada", role="general"
-            )
+        with (
+            patch("core.anima_factory._get_roles_dir", return_value=roles_root),
+            patch("core.anima_factory.SHARED_ROLES_DIR", roles_root),
+        ):
+            _create_status_json(anima_dir, info, supervisor_override="yamada", role="general")
 
         status = _read_status_json(anima_dir)
         assert status["supervisor"] == "yamada"
@@ -333,18 +366,24 @@ class TestCreateStatusJsonWithRole:
     def test_engineer_defaults_json_values_appear(self, tmp_path: Path) -> None:
         """With role='engineer', engineer defaults.json values appear in status.json."""
         # Use the actual engineer defaults from the repository
-        roles_root = self._make_roles_dir(tmp_path, "engineer", {
-            "model": "claude-opus-4-6",
-            "context_threshold": 0.80,
-            "max_turns": 200,
-            "max_chains": 10,
-            "conversation_history_threshold": 0.40,
-        })
+        roles_root = self._make_roles_dir(
+            tmp_path,
+            "engineer",
+            {
+                "model": "claude-opus-4-6",
+                "context_threshold": 0.80,
+                "max_turns": 200,
+                "max_chains": 10,
+                "conversation_history_threshold": 0.40,
+            },
+        )
         anima_dir = tmp_path / "anima"
         anima_dir.mkdir()
 
-        with patch("core.anima_factory._get_roles_dir", return_value=roles_root), \
-             patch("core.anima_factory.SHARED_ROLES_DIR", roles_root):
+        with (
+            patch("core.anima_factory._get_roles_dir", return_value=roles_root),
+            patch("core.anima_factory.SHARED_ROLES_DIR", roles_root),
+        ):
             _create_status_json(anima_dir, {}, role="engineer")
 
         status = _read_status_json(anima_dir)
@@ -364,8 +403,10 @@ class TestCreateStatusJsonWithRole:
         anima_dir = tmp_path / "anima"
         anima_dir.mkdir()
 
-        with patch("core.anima_factory._get_roles_dir", return_value=roles_root), \
-             patch("core.anima_factory.SHARED_ROLES_DIR", roles_root):
+        with (
+            patch("core.anima_factory._get_roles_dir", return_value=roles_root),
+            patch("core.anima_factory.SHARED_ROLES_DIR", roles_root),
+        ):
             _create_status_json(anima_dir, {}, role="engineer")
 
         status = _read_status_json(anima_dir)
@@ -384,8 +425,10 @@ class TestCreateStatusJsonWithRole:
         anima_dir = tmp_path / "anima"
         anima_dir.mkdir()
 
-        with patch("core.anima_factory._get_roles_dir", return_value=roles_root), \
-             patch("core.anima_factory.SHARED_ROLES_DIR", roles_root):
+        with (
+            patch("core.anima_factory._get_roles_dir", return_value=roles_root),
+            patch("core.anima_factory.SHARED_ROLES_DIR", roles_root),
+        ):
             # Should not raise
             _create_status_json(anima_dir, {}, role="engineer")
 
@@ -394,19 +437,26 @@ class TestCreateStatusJsonWithRole:
         assert status["enabled"] is True
 
     def test_empty_model_and_credential_not_overridden(
-        self, tmp_path: Path,
+        self,
+        tmp_path: Path,
     ) -> None:
         """Empty string model/credential from sheet do not override role defaults."""
-        roles_root = self._make_roles_dir(tmp_path, "engineer", {
-            "model": "claude-opus-4-6",
-        })
+        roles_root = self._make_roles_dir(
+            tmp_path,
+            "engineer",
+            {
+                "model": "claude-opus-4-6",
+            },
+        )
         anima_dir = tmp_path / "anima"
         anima_dir.mkdir()
 
         # Empty strings should not override
         info = {"model": "", "credential": ""}
-        with patch("core.anima_factory._get_roles_dir", return_value=roles_root), \
-             patch("core.anima_factory.SHARED_ROLES_DIR", roles_root):
+        with (
+            patch("core.anima_factory._get_roles_dir", return_value=roles_root),
+            patch("core.anima_factory.SHARED_ROLES_DIR", roles_root),
+        ):
             _create_status_json(anima_dir, info, role="engineer")
 
         status = _read_status_json(anima_dir)
@@ -425,16 +475,19 @@ class TestLoadStatusJson:
         """Extracts model config fields from a valid status.json."""
         anima_dir = tmp_path / "anima"
         anima_dir.mkdir()
-        _write_status_json(anima_dir, {
-            "model": "claude-opus-4-6",
-            "context_threshold": 0.80,
-            "max_turns": 200,
-            "max_chains": 10,
-            "conversation_history_threshold": 0.40,
-            "credential": "anthropic",
-            "execution_mode": "autonomous",
-            "supervisor": "kotoha",
-        })
+        _write_status_json(
+            anima_dir,
+            {
+                "model": "claude-opus-4-6",
+                "context_threshold": 0.80,
+                "max_turns": 200,
+                "max_chains": 10,
+                "conversation_history_threshold": 0.40,
+                "credential": "anthropic",
+                "execution_mode": "autonomous",
+                "supervisor": "kotoha",
+            },
+        )
 
         result = _load_status_json(anima_dir)
         assert result["model"] == "claude-opus-4-6"
@@ -459,9 +512,7 @@ class TestLoadStatusJson:
         """Returns empty dict when status.json contains invalid JSON."""
         anima_dir = tmp_path / "anima"
         anima_dir.mkdir()
-        (anima_dir / "status.json").write_text(
-            "this is not json", encoding="utf-8"
-        )
+        (anima_dir / "status.json").write_text("this is not json", encoding="utf-8")
 
         result = _load_status_json(anima_dir)
         assert result == {}
@@ -470,11 +521,14 @@ class TestLoadStatusJson:
         """Non-nullable fields with None are skipped; nullable fields are kept."""
         anima_dir = tmp_path / "anima"
         anima_dir.mkdir()
-        _write_status_json(anima_dir, {
-            "model": "claude-sonnet-4-6",
-            "supervisor": None,
-            "credential": None,
-        })
+        _write_status_json(
+            anima_dir,
+            {
+                "model": "claude-sonnet-4-6",
+                "supervisor": None,
+                "credential": None,
+            },
+        )
 
         result = _load_status_json(anima_dir)
         assert "model" in result
@@ -488,11 +542,14 @@ class TestLoadStatusJson:
         """Fields with empty string values are not included in the result."""
         anima_dir = tmp_path / "anima"
         anima_dir.mkdir()
-        _write_status_json(anima_dir, {
-            "model": "claude-sonnet-4-6",
-            "supervisor": "",
-            "credential": "",
-        })
+        _write_status_json(
+            anima_dir,
+            {
+                "model": "claude-sonnet-4-6",
+                "supervisor": "",
+                "credential": "",
+            },
+        )
 
         result = _load_status_json(anima_dir)
         assert "model" in result
@@ -503,12 +560,15 @@ class TestLoadStatusJson:
         """Only fields in the field_mapping are extracted; others are ignored."""
         anima_dir = tmp_path / "anima"
         anima_dir.mkdir()
-        _write_status_json(anima_dir, {
-            "model": "claude-sonnet-4-6",
-            "enabled": True,
-            "role": "engineer",
-            "unknown_field": "should_be_ignored",
-        })
+        _write_status_json(
+            anima_dir,
+            {
+                "model": "claude-sonnet-4-6",
+                "enabled": True,
+                "role": "engineer",
+                "unknown_field": "should_be_ignored",
+            },
+        )
 
         result = _load_status_json(anima_dir)
         assert "model" in result
@@ -521,11 +581,14 @@ class TestLoadStatusJson:
         """Only present recognized fields are extracted."""
         anima_dir = tmp_path / "anima"
         anima_dir.mkdir()
-        _write_status_json(anima_dir, {
-            "model": "openai/gpt-4o",
-            "max_turns": 50,
-            "enabled": True,
-        })
+        _write_status_json(
+            anima_dir,
+            {
+                "model": "openai/gpt-4o",
+                "max_turns": 50,
+                "enabled": True,
+            },
+        )
 
         result = _load_status_json(anima_dir)
         assert result == {"model": "openai/gpt-4o", "max_turns": 50}
@@ -547,10 +610,12 @@ class TestResolveAnimaConfig2Layer:
         """Build an AnimaWorksConfig with optional per-anima and default overrides."""
         config = AnimaWorksConfig()
         if defaults_overrides:
-            config.anima_defaults = AnimaDefaults(**{
-                **config.anima_defaults.model_dump(),
-                **defaults_overrides,
-            })
+            config.anima_defaults = AnimaDefaults(
+                **{
+                    **config.anima_defaults.model_dump(),
+                    **defaults_overrides,
+                }
+            )
         if anima_overrides:
             config.animas[anima_name] = AnimaModelConfig(**anima_overrides)
         return config
@@ -559,10 +624,13 @@ class TestResolveAnimaConfig2Layer:
         """status.json is the single source of truth for model config."""
         anima_dir = tmp_path / "testbot"
         anima_dir.mkdir()
-        _write_status_json(anima_dir, {
-            "model": "from-status-json",
-            "max_turns": 100,
-        })
+        _write_status_json(
+            anima_dir,
+            {
+                "model": "from-status-json",
+                "max_turns": 100,
+            },
+        )
 
         config = self._make_config(
             defaults_overrides={"model": "from-defaults", "max_turns": 20},
@@ -576,10 +644,13 @@ class TestResolveAnimaConfig2Layer:
         """status.json values override anima_defaults."""
         anima_dir = tmp_path / "testbot"
         anima_dir.mkdir()
-        _write_status_json(anima_dir, {
-            "model": "from-status-json",
-            "max_turns": 100,
-        })
+        _write_status_json(
+            anima_dir,
+            {
+                "model": "from-status-json",
+                "max_turns": 100,
+            },
+        )
 
         config = self._make_config(
             defaults_overrides={"model": "from-defaults", "max_turns": 20},
@@ -590,7 +661,8 @@ class TestResolveAnimaConfig2Layer:
         assert resolved.max_turns == 100
 
     def test_defaults_used_when_no_status(
-        self, tmp_path: Path,
+        self,
+        tmp_path: Path,
     ) -> None:
         """anima_defaults are used when status.json has no value."""
         anima_dir = tmp_path / "testbot"
@@ -609,11 +681,14 @@ class TestResolveAnimaConfig2Layer:
         """status.json fields override defaults; missing fields fall through."""
         anima_dir = tmp_path / "testbot"
         anima_dir.mkdir()
-        _write_status_json(anima_dir, {
-            "model": "status-model",
-            "max_turns": 150,
-            "max_chains": 8,
-        })
+        _write_status_json(
+            anima_dir,
+            {
+                "model": "status-model",
+                "max_turns": 150,
+                "max_chains": 8,
+            },
+        )
 
         config = self._make_config(
             defaults_overrides={
@@ -652,14 +727,18 @@ class TestResolveAnimaConfig2Layer:
         assert resolved.model == "default-model"
 
     def test_status_json_supervisor_used_when_no_config_override(
-        self, tmp_path: Path,
+        self,
+        tmp_path: Path,
     ) -> None:
         """supervisor from status.json is used when config has no override."""
         anima_dir = tmp_path / "testbot"
         anima_dir.mkdir()
-        _write_status_json(anima_dir, {
-            "supervisor": "kotoha",
-        })
+        _write_status_json(
+            anima_dir,
+            {
+                "supervisor": "kotoha",
+            },
+        )
 
         config = self._make_config()
 
@@ -667,14 +746,18 @@ class TestResolveAnimaConfig2Layer:
         assert resolved.supervisor == "kotoha"
 
     def test_status_json_supervisor_beats_config_override(
-        self, tmp_path: Path,
+        self,
+        tmp_path: Path,
     ) -> None:
         """status.json supervisor beats config.json per-anima override."""
         anima_dir = tmp_path / "testbot"
         anima_dir.mkdir()
-        _write_status_json(anima_dir, {
-            "supervisor": "from-status",
-        })
+        _write_status_json(
+            anima_dir,
+            {
+                "supervisor": "from-status",
+            },
+        )
 
         config = self._make_config(
             anima_overrides={"supervisor": "from-config"},
@@ -687,17 +770,18 @@ class TestResolveAnimaConfig2Layer:
         """Credential is correctly resolved through 3-layer merge."""
         anima_dir = tmp_path / "testbot"
         anima_dir.mkdir()
-        _write_status_json(anima_dir, {
-            "credential": "openai",
-        })
+        _write_status_json(
+            anima_dir,
+            {
+                "credential": "openai",
+            },
+        )
 
         config = self._make_config()
         # Make sure "openai" credential exists in config
         config.credentials["openai"] = CredentialConfig(api_key="test-key")
 
-        resolved, credential = resolve_anima_config(
-            config, "testbot", anima_dir=anima_dir
-        )
+        resolved, credential = resolve_anima_config(config, "testbot", anima_dir=anima_dir)
         assert resolved.credential == "openai"
         assert credential.api_key == "test-key"
 
@@ -712,10 +796,12 @@ class TestReadSpecialtyPrompt:
         """Create a MemoryManager with mock paths to avoid real FS dependencies."""
         from core.memory.manager import MemoryManager
 
-        with patch("core.memory.manager.get_company_dir", return_value=anima_dir / "company"), \
-             patch("core.memory.manager.get_common_skills_dir", return_value=anima_dir / "common_skills"), \
-             patch("core.memory.manager.get_common_knowledge_dir", return_value=anima_dir / "common_knowledge"), \
-             patch("core.memory.manager.get_shared_dir", return_value=anima_dir / "shared"):
+        with (
+            patch("core.memory.manager.get_company_dir", return_value=anima_dir / "company"),
+            patch("core.memory.manager.get_common_skills_dir", return_value=anima_dir / "common_skills"),
+            patch("core.memory.manager.get_common_knowledge_dir", return_value=anima_dir / "common_knowledge"),
+            patch("core.memory.manager.get_shared_dir", return_value=anima_dir / "shared"),
+        ):
             return MemoryManager(anima_dir)
 
     def test_reads_existing_specialty_prompt(self, tmp_path: Path) -> None:
@@ -756,6 +842,7 @@ class TestProtectedFiles:
     def test_other_protected_files_present(self) -> None:
         """All expected protected files are in the frozenset."""
         assert "permissions.md" in _PROTECTED_FILES
+        assert "identity.md" in _PROTECTED_FILES
         assert "bootstrap.md" in _PROTECTED_FILES
 
     def test_protected_files_is_frozenset(self) -> None:
@@ -774,28 +861,28 @@ class TestRoleTemplateIntegration:
         roles_root = tmp_path / "roles"
         engineer_dir = roles_root / "engineer"
         engineer_dir.mkdir(parents=True)
-        (engineer_dir / "permissions.md").write_text(
-            "# Permissions: {name}\nAll tools.\n", encoding="utf-8"
-        )
-        (engineer_dir / "specialty_prompt.md").write_text(
-            "# Engineer guidelines\n", encoding="utf-8"
-        )
+        (engineer_dir / "permissions.md").write_text("# Permissions: {name}\nAll tools.\n", encoding="utf-8")
+        (engineer_dir / "specialty_prompt.md").write_text("# Engineer guidelines\n", encoding="utf-8")
         (engineer_dir / "defaults.json").write_text(
-            json.dumps({
-                "model": "claude-opus-4-6",
-                "max_turns": 200,
-                "context_threshold": 0.80,
-                "max_chains": 10,
-                "conversation_history_threshold": 0.40,
-            }),
+            json.dumps(
+                {
+                    "model": "claude-opus-4-6",
+                    "max_turns": 200,
+                    "context_threshold": 0.80,
+                    "max_chains": 10,
+                    "conversation_history_threshold": 0.40,
+                }
+            ),
             encoding="utf-8",
         )
 
         anima_dir = tmp_path / "hinata"
         anima_dir.mkdir()
 
-        with patch("core.anima_factory._get_roles_dir", return_value=roles_root), \
-             patch("core.anima_factory.SHARED_ROLES_DIR", roles_root):
+        with (
+            patch("core.anima_factory._get_roles_dir", return_value=roles_root),
+            patch("core.anima_factory.SHARED_ROLES_DIR", roles_root),
+        ):
             _apply_role_defaults(anima_dir, "engineer")
             _create_status_json(anima_dir, {}, role="engineer")
 
@@ -814,34 +901,37 @@ class TestRoleTemplateIntegration:
         assert status["max_turns"] == 200
 
     def test_status_json_feeds_into_resolve_anima_config(
-        self, tmp_path: Path,
+        self,
+        tmp_path: Path,
     ) -> None:
         """status.json created by _create_status_json works with resolve_anima_config."""
         roles_root = tmp_path / "roles"
         engineer_dir = roles_root / "engineer"
         engineer_dir.mkdir(parents=True)
         (engineer_dir / "defaults.json").write_text(
-            json.dumps({
-                "model": "claude-opus-4-6",
-                "max_turns": 200,
-                "context_threshold": 0.80,
-            }),
+            json.dumps(
+                {
+                    "model": "claude-opus-4-6",
+                    "max_turns": 200,
+                    "context_threshold": 0.80,
+                }
+            ),
             encoding="utf-8",
         )
 
         anima_dir = tmp_path / "testbot"
         anima_dir.mkdir()
 
-        with patch("core.anima_factory._get_roles_dir", return_value=roles_root), \
-             patch("core.anima_factory.SHARED_ROLES_DIR", roles_root):
+        with (
+            patch("core.anima_factory._get_roles_dir", return_value=roles_root),
+            patch("core.anima_factory.SHARED_ROLES_DIR", roles_root),
+        ):
             _create_status_json(anima_dir, {}, role="engineer")
 
         # Now resolve with no config override
         config = AnimaWorksConfig()
 
-        resolved, _ = resolve_anima_config(
-            config, "testbot", anima_dir=anima_dir
-        )
+        resolved, _ = resolve_anima_config(config, "testbot", anima_dir=anima_dir)
         # status.json values should be picked up
         assert resolved.model == "claude-opus-4-6"
         assert resolved.max_turns == 200

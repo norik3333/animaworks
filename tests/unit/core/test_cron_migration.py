@@ -5,8 +5,6 @@
 
 from __future__ import annotations
 
-import pytest
-from pathlib import Path
 
 from core.config.migrate import (
     _convert_jp_schedule_to_cron,

@@ -9,7 +9,6 @@ import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-import pytest
 
 from core.memory.activity import ActivityLogger
 from core.schemas import CycleResult

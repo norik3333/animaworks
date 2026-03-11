@@ -19,7 +19,6 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from core.anima_factory import create_from_md
 from core.supervisor.manager import ProcessSupervisor
 
 # ── Sample character sheets ──────────────────────────────────

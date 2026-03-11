@@ -24,7 +24,6 @@ if TYPE_CHECKING:
 from core._agent_prompt_log import _save_prompt_log, _save_prompt_log_end
 from core.i18n import t
 from core.memory.shortterm import SessionState, ShortTermMemory
-from core.paths import load_prompt
 from core.prompt.builder import build_system_prompt, inject_shortterm
 from core.prompt.context import ContextTracker
 from core.schemas import CycleResult, ImageData
@@ -362,7 +361,7 @@ class CycleMixin:
         # Pre-flight: check prompt size to prevent Agent SDK buffer overflow
         from core.memory.conversation import ConversationMemory
 
-        conv_memory = ConversationMemory(self.anima_dir, self.model_config)
+        conv_memory = ConversationMemory(self.anima_dir, self.model_config, thread_id=thread_id)
         system_prompt, prompt, use_fallback = await self._preflight_size_check(
             system_prompt,
             prompt,
@@ -417,16 +416,14 @@ class CycleMixin:
         chain_count = 0
         accumulated_text = result.text
 
-        while tracker.threshold_exceeded and chain_count < self.model_config.max_chains:
-            session_chained = True
-            chain_count += 1
+        if tracker.threshold_exceeded:
+            # Save shortterm for the next message to pick up via inject_shortterm.
+            # Do NOT chain here — chaining mid-response causes the LLM to produce
+            # unnatural "session handoff" messages.
             logger.info(
-                "Session chain %d/%d: context at %.1f%%",
-                chain_count,
-                self.model_config.max_chains,
+                "Session context at %.1f%% — saving shortterm, will resume on next message",
                 tracker.usage_ratio * 100,
             )
-
             shortterm.clear()
             shortterm.save(
                 SessionState(
@@ -439,63 +436,22 @@ class CycleMixin:
                     turn_count=result_msg.num_turns if result_msg else 0,
                 )
             )
-
-            tracker.reset()
-            # Clear SDK session ID so the chained session starts fresh
+            # Clear SDK session ID so the next session starts fresh
             if mode == "s":
                 try:
-                    from core.execution.agent_sdk import clear_session_ids
+                    from core.execution._sdk_session import (
+                        _RESUMABLE_SESSION_TYPES,
+                        _clear_session_id,
+                        _resolve_session_type,
+                    )
 
-                    clear_session_ids(self.anima_dir, thread_id)
+                    _st = _resolve_session_type(trigger)
+                    if _st in _RESUMABLE_SESSION_TYPES:
+                        _clear_session_id(self.anima_dir, _st, thread_id)
                 except Exception:
-                    logger.debug("Failed to clear session IDs for chain", exc_info=True)
-            # Force TIER_LIGHT on chained sessions to reduce system prompt floor
-            _chain_cw = min(_ctx_window, 32_000)
-            system_prompt_2 = inject_shortterm(
-                build_system_prompt(
-                    self.memory,
-                    tool_registry=self._tool_registry,
-                    personal_tools=self._personal_tools,
-                    priming_section=priming_section,
-                    execution_mode=mode,
-                    message=prompt,
-                    retriever=self._get_retriever(),
-                    trigger=trigger,
-                    context_window=_chain_cw,
-                    pending_human_notifications=pending_human_notifications,
-                ).system_prompt,
-                shortterm,
-            )
-            continuation_prompt = load_prompt("session_continuation")
-            try:
-                result_2 = await self._executor.execute(
-                    prompt=continuation_prompt,
-                    system_prompt=system_prompt_2,
-                    tracker=tracker,
-                    max_turns_override=max_turns_override,
-                    thread_id=thread_id,
-                )
-                # Merge from chained session too
-                if result_2.replied_to_from_transcript:
-                    self._tool_handler.merge_replied_to(result_2.replied_to_from_transcript)
-            except Exception:
-                logger.exception(
-                    "Chained session %d failed; preserving short-term memory",
-                    chain_count,
-                )
-                break
-            accumulated_text = accumulated_text + "\n" + result_2.text
-            accumulated_tool_records.extend(_tool_records_to_dicts(result_2))
-            if result_2.usage:
-                if result.usage:
-                    result.usage.merge(result_2.usage)
-                else:
-                    result.usage = result_2.usage
-            result_msg = result_2.result_message
-            if result_msg:
-                total_turns += result_msg.num_turns
-
-        shortterm.clear()
+                    logger.debug("Failed to clear session ID for deferred chain", exc_info=True)
+        else:
+            shortterm.clear()
 
         _save_prompt_log_end(
             self.anima_dir,
@@ -645,7 +601,7 @@ class CycleMixin:
         # Pre-flight size check for streaming path
         from core.memory.conversation import ConversationMemory
 
-        conv_memory = ConversationMemory(self.anima_dir, self.model_config)
+        conv_memory = ConversationMemory(self.anima_dir, self.model_config, thread_id=thread_id)
         system_prompt, prompt, use_fallback = await self._preflight_size_check(
             system_prompt,
             prompt,
@@ -832,9 +788,15 @@ class CycleMixin:
 
                             clear_codex_thread_ids(self.anima_dir, thread_id)
                         else:
-                            from core.execution.agent_sdk import clear_session_ids
+                            from core.execution._sdk_session import (
+                                _RESUMABLE_SESSION_TYPES,
+                                _clear_session_id,
+                                _resolve_session_type,
+                            )
 
-                            clear_session_ids(self.anima_dir, thread_id)
+                            _st_retry = _resolve_session_type(trigger)
+                            if _st_retry in _RESUMABLE_SESSION_TYPES:
+                                _clear_session_id(self.anima_dir, _st_retry, thread_id)
                         logger.info("Session IDs cleared for retry 1 (fresh session forced)")
                     except Exception as e:
                         logger.warning("Failed to clear session IDs for retry: %s", e)
@@ -892,20 +854,16 @@ class CycleMixin:
         # Session chaining — force_chain from mid-session auto-compact.
         if _stream_force_chain and not tracker.threshold_exceeded:
             tracker.force_threshold()
-            logger.info("Context auto-compact (stream): forcing threshold_exceeded for session chaining")
+            logger.info("Context auto-compact (stream): forcing threshold_exceeded")
 
-        while tracker.threshold_exceeded and chain_count < self.model_config.max_chains:
-            session_chained = True
-            chain_count += 1
+        if tracker.threshold_exceeded:
+            # Save shortterm for the next message to pick up via inject_shortterm.
+            # Do NOT chain here — chaining mid-response causes the LLM to produce
+            # unnatural "session handoff" messages.
             logger.info(
-                "Session chain (stream) %d/%d: context at %.1f%%",
-                chain_count,
-                self.model_config.max_chains,
+                "Session context at %.1f%% — saving shortterm, will resume on next message (stream)",
                 tracker.usage_ratio * 100,
             )
-
-            yield {"type": "chain_start", "chain": chain_count}
-
             shortterm.clear()
             shortterm.save(
                 SessionState(
@@ -918,67 +876,22 @@ class CycleMixin:
                     turn_count=result_message.num_turns if result_message else 0,
                 )
             )
-
-            tracker.reset()
-            # Clear SDK session ID so the chained session starts fresh
-            # (resume would reload the full conversation history, defeating compaction)
+            # Clear SDK session ID so the next session starts fresh
             if mode == "s":
                 try:
-                    from core.execution.agent_sdk import clear_session_ids
+                    from core.execution._sdk_session import (
+                        _RESUMABLE_SESSION_TYPES,
+                        _clear_session_id,
+                        _resolve_session_type,
+                    )
 
-                    clear_session_ids(self.anima_dir, thread_id)
+                    _st = _resolve_session_type(trigger)
+                    if _st in _RESUMABLE_SESSION_TYPES:
+                        _clear_session_id(self.anima_dir, _st, thread_id)
                 except Exception:
-                    logger.debug("Failed to clear session IDs for chain", exc_info=True)
-            # Force TIER_LIGHT on chained sessions to reduce system prompt floor
-            _chain_cw = min(_ctx_window_s, 32_000)
-            system_prompt_2 = inject_shortterm(
-                build_system_prompt(
-                    self.memory,
-                    tool_registry=self._tool_registry,
-                    personal_tools=self._personal_tools,
-                    priming_section=priming_section,
-                    execution_mode=mode,
-                    message=prompt,
-                    retriever=self._get_retriever(),
-                    trigger=trigger,
-                    context_window=_chain_cw,
-                    pending_human_notifications=pending_human_notifications,
-                ).system_prompt,
-                shortterm,
-            )
-            continuation_prompt = load_prompt("session_continuation")
-
-            try:
-                async for chunk in self._executor.execute_streaming(
-                    system_prompt_2,
-                    continuation_prompt,
-                    tracker,
-                    max_turns_override=max_turns_override,
-                    trigger=trigger,
-                    thread_id=thread_id,
-                ):
-                    if chunk["type"] == "done":
-                        full_text_parts.append(chunk["full_text"])
-                        result_message = chunk["result_message"]
-                        all_tool_call_records.extend(chunk.get("tool_call_records", []))
-                        _merge_stream_usage(_stream_usage, chunk.get("usage"))
-                        if result_message:
-                            total_turns += result_message.num_turns
-                        # Merge transcript replied_to
-                        transcript_replied = chunk.get("replied_to_from_transcript", set())
-                        if transcript_replied:
-                            self._tool_handler.merge_replied_to(transcript_replied)
-                    else:
-                        yield chunk
-            except Exception:
-                logger.exception(
-                    "Chained session (stream) %d failed",
-                    chain_count,
-                )
-                yield {"type": "error", "message": f"Session chain {chain_count} failed"}
-                break
-
-        shortterm.clear()
+                    logger.debug("Failed to clear session ID for deferred chain", exc_info=True)
+        else:
+            shortterm.clear()
 
         _save_prompt_log_end(
             self.anima_dir,

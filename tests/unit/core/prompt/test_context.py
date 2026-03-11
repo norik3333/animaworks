@@ -5,8 +5,6 @@
 
 from __future__ import annotations
 
-import os
-from pathlib import Path
 
 import pytest
 
@@ -16,7 +14,6 @@ from core.prompt.context import (
     ContextTracker,
     _DEFAULT_CONTEXT_WINDOW,
     _THRESHOLD_CEILING,
-    _THRESHOLD_REFERENCE_WINDOW,
     _resolve_context_window,
     resolve_context_threshold,
 )

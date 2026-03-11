@@ -163,7 +163,6 @@ def demo_graph_construction():
         # Mock vector store and indexer
         class MockVectorStore:
             def query(self, collection, embedding, top_k):
-                from core.memory.rag.store import Document, QueryResult
                 # Return empty for simplicity
                 return []
 
@@ -175,15 +174,15 @@ def demo_graph_construction():
         graph_builder = KnowledgeGraph(MockVectorStore(), MockIndexer())
         graph = graph_builder.build_graph("demo", knowledge_dir)
 
-        print(f"\nGraph statistics:")
+        print("\nGraph statistics:")
         print(f"  Nodes: {graph.number_of_nodes()}")
         print(f"  Edges: {graph.number_of_edges()}")
 
-        print(f"\nNodes:")
+        print("\nNodes:")
         for node in sorted(graph.nodes()):
             print(f"  - {node}")
 
-        print(f"\nExplicit links:")
+        print("\nExplicit links:")
         for source, target, data in sorted(graph.edges(data=True)):
             if data.get("link_type") == "explicit":
                 print(f"  {source} -> {target}")

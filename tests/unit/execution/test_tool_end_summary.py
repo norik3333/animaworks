@@ -9,10 +9,8 @@ to tool_name when record is absent (Agent SDK path).
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Any
 
-import pytest
 
 from core.execution.base import ToolCallRecord
 

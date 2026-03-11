@@ -7,13 +7,140 @@ adhering to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-03-09
+
+### Added
+- add md_to_chatwork() Markdown sanitizer for Chatwork messages
+- add encapsulation boundary classification to anima-anatomy docs
+- add Heartbeat and Cron tabs to chat sidebar
+- slack_channel_post / slack_channel_update as gated external tool actions
+- gated external tool actions — default-deny safety valve for dangerous sub-actions
+- add TextAnimator for smooth FE streaming text display
+- internationalize timezone handling — auto-detect system TZ + configurable override
+- add "Enter to send" toggle in Settings page
+- dual-query RAG strategy + language-agnostic keyword extraction
+- add slack_react tool for emoji reactions (#22)
+- add daily RAG indexing to ProcessSupervisor and fix per-anima vectordb
+- add per-anima RAG index builder script
+- add GitHub Release workflow with LLM-generated release notes
+- recursive directory indexing for all memory types (#20)
+- change ChromaDB distance metric to cosine similarity (#19)
+- normalize system prompt heading hierarchy with XML tags
+- add .ragignore support and retriever min_score threshold (#18)
+- DK summary injection — replace full-text with title+description lists
+- restrict recent_tool_results injection to Mode B only
+- budget-aware timeline thinning for LLM activity report input
+- i18n audit timeline strings and send plain text to Activity Report LLM
+- unified timeline audit with cross-anima merged view
+- update LLM prompt for key_activities and add CLI audit --mode report
+- add qualitative fields (key_activities, top_tools) to AnimaAuditEntry
+- redesign audit report mode with priority-based category display
+- rewrite audit_subordinate to match Issue specification
+- add Activity Report page (#17)
+- add one_shot_completion() with LiteLLM → Agent SDK fallback
+- add time-based activity schedule (night mode)
+- add global Activity Level slider for heartbeat cost control
+- add generic Notion external tool
+- add profile subcommand for multi-instance management
+- unified outbound budget with role defaults + status.json override
+- add demo interactive onboarding with 3-layer experience
+- migrate ~480 hardcoded Japanese strings to i18n t() system
+
 ### Fixed
-- use setuptools find_packages for complete package discovery (Docker install fix)
-- skip CLAUDE.md test when file absent (public repo CI)
-- add Slack icon_url/username to all outbound message routes
+- remove stale server.pid before starting in Docker container
+- address review feedback (iteration 2)
+- protect identity.md from self-modification in Mode S
+- update environment.md rule 7 to document subordinate management file permissions
+- replace get_event_loop() with get_running_loop() in async contexts
+- skip malformed activity log entries instead of failing entire file
+- remap 'event' key to 'type' in activity log loader
+- use resp is not None instead of isinstance(resp, dict) for SlackResponse
+- correct indentation error in test_rag_e2e.py
+- assign haiku model to general-role animas in demo
+- add missing demo examples and adjust_dates.sh to Dockerfile
+- correct indentation error in test_heartbeat_decomposition_e2e.py
+- replace date.today() with today_local() in all e2e and housekeeping tests
+- force-reset _app_tz in conftest to prevent timezone state leakage
+- replace date.today() with today_local() across all test files
+- use today_local() in conversation transcript tests to match JST implementation
+- use today_local() instead of date.today() in activity log rotation tests
+- patch get_credential in x_search tests to isolate from shared/credentials.json
+- patch get_credential in web_search tests to isolate from shared/credentials.json
+- replace silent except-pass with debug log in asset reconciliation config load
+- replace silent except-pass with debug log in gated action permission check
+- update template file count test for usecases/ directory
+- use safe .get() for threadId in send_message response
+- propagate context and reply_to fields in plan_tasks batch handler
+- improve Channel D skill matching — configurable threshold & personal-first sort
+- add explicit None checks for remaining get_vector_store() callers
+- plan_tasks _wake() callback receives unwanted self argument
+- graceful degradation when RAG/ChromaDB fails to initialize
+- update scheduler E2E test for daily indexing cron job
+- robust indexing_time/enabled extraction from consolidation config
+- TextAnimator accumulator-based timing and rate calculation
+- widen onDone handler scan window in streaming indicator test
+- update org context E2E test assertions for refactored comm rules
+- align Mode B skill injection test with priming-based matching
+- fix TextAnimator timing bug — reset _lastStepTime on idle ticks
+- address review feedback (iteration 1)
+- update record_access unit tests for DB-read access_count
+- address review feedback (iteration 2)
+- read access_count from DB in record_access to prevent stale increment
+- remove CHUNK-DEBUG temporary logging from chat streaming
+- add missing mock attrs for indexing cron + resolve lint violations
+- replace silent except-Exception-pass with debug logging
+- resolve ruff lint and format violations
+- reset ToolPromptStore singleton between tests to prevent cache leak
+- unify anima_factory locale fallback to locale→en→ja
+- remove unnecessary noqa comment from error handler
+- suppress Slack Bolt 404 for unhandled events
+- align tests with communication-rules refactor and remove date-sensitive timestamps
+- increase asyncio StreamReader buffer for Codex subprocess pipes (#21)
+- address review feedback (iteration 2)
+- align skills hash pattern with SKILL.md-only indexing
+- address review feedback (iteration 1)
+- address review feedback (iteration 1)
+- update activity report tests for generate_org_timeline mock
+- exclude self-addressed messages from outbound limit count
+- preserve LLM utils fixes and initial truncation safety net
+- remove in-place meta mutation and dead meta_copy code in audit
+- add backward compatibility for legacy 'days' parameter
+- address review findings (C1/H1-H3/M1/M5)
+- add localStorage fallback for activity settings and fix demo splash link
+- raise on LLM failure in conversation _call_llm to preserve compression behavior
+- add error handling to settings page API calls (night mode save/load)
+- replace broad 'except Exception: pass' with KeyError in scheduler_manager
+- address review feedback (iteration 1)
+- resolve ruff lint (I001 import sort) and format violations
+- replace undefined CSS variables in demo splash and suggest cards
+- downgrade demo models from opus/sonnet to sonnet/haiku for cost savings
+- reuse httpx.Client, add CLI tests (coverage 65% → 92%)
+- address review feedback (iteration 1)
+- address review feedback (iteration 1)
+- centralize consolidation model for all internal LLM calls
+- prevent zombie process accumulation via explicit wait() and periodic reaper
+- reset _last_progress_at on lock acquisition to prevent busy-hang false positives
+- update _run_priming mock return value to match new tuple signature
+- correct expected Slack user ID in test_slack_prefix_case_insensitive
+- skip Group 6 header for task trigger in system prompt builder
+- improve chat renderer and chat styling
+- resolve flaky tests caused by hardcoded dates and dedup cache pollution
+- restore docs/images/ needed by README
+
+### Changed
+- compress communication rules & messaging prompts (~1,000 tokens saved)
+- compress environment.md prompt — remove Claude-redundant instructions
+- simplify memory_guide — remove skill list, use counts
+- move public design docs from docs/implemented/ to docs/specs/
+- i18n hardcoded Japanese strings in skill_creator and related modules
+
+### Performance
+- truncate tool fields in conversation API and optimize history poll diff
 
 ### Other
-- Full commit history now available — originally published as a squashed snapshot; complete development history (1,800+ commits) is now visible
+- bug fix indexer.py
+- modify debug systemprompt
+
 
 ## [0.5.1] - 2026-03-06
 
@@ -686,8 +813,8 @@ memory, and decision-making criteria.
 - Moved model mode patterns from config.json to models.json
 - Tool permissions changed from whitelist to default-allow (blacklist) model
 
-[Unreleased]: https://github.com/xuiltul/animaworks/compare/v0.5.1...HEAD
-[0.5.1]: https://github.com/xuiltul/animaworks/compare/v0.5.0...v0.5.1
+[Unreleased]: https://github.com/xuiltul/animaworks/compare/v0.5.2...HEAD
+[0.5.2]: https://github.com/xuiltul/animaworks/compare/v0.5.1...v0.5.2
 [0.4.3]: https://github.com/xuiltul/animaworks/compare/v0.4.2...v0.4.3
 [0.4.0]: https://github.com/xuiltul/animaworks/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/xuiltul/animaworks/compare/v0.3.0...v0.3.1

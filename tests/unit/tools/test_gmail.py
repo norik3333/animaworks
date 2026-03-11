@@ -6,11 +6,11 @@
 We mock google API modules before importing core.tools.gmail
 since the google packages are optional dependencies.
 """
+
 from __future__ import annotations
 
 import base64
 import importlib
-import json
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -74,8 +74,10 @@ def _mock_google_modules():
 # Now import from core.tools.gmail (after mocks are in place)
 # We use a function to get the module to avoid import-time issues
 
+
 def _get_gmail():
     import core.tools.gmail as gmail_mod
+
     return gmail_mod
 
 
@@ -101,16 +103,23 @@ class TestEmail:
     def test_with_body(self):
         gmail = _get_gmail()
         email = gmail.Email(
-            id="m1", thread_id="t1", from_addr="a@b.com",
-            subject="S", snippet="snip", body="Full body text",
+            id="m1",
+            thread_id="t1",
+            from_addr="a@b.com",
+            subject="S",
+            snippet="snip",
+            body="Full body text",
         )
         assert email.body == "Full body text"
 
     def test_with_new_fields(self):
         gmail = _get_gmail()
         email = gmail.Email(
-            id="m1", thread_id="t1", from_addr="a@b.com",
-            subject="S", snippet="snip",
+            id="m1",
+            thread_id="t1",
+            from_addr="a@b.com",
+            subject="S",
+            snippet="snip",
             to_addr="bob@example.com",
             date="Thu, 5 Mar 2026 10:00:00 +0900",
             label_ids=["INBOX", "UNREAD"],
@@ -123,8 +132,11 @@ class TestEmail:
         """Existing code that doesn't pass new fields should still work."""
         gmail = _get_gmail()
         email = gmail.Email(
-            id="m1", thread_id="t1", from_addr="a@b.com",
-            subject="S", snippet="snip",
+            id="m1",
+            thread_id="t1",
+            from_addr="a@b.com",
+            subject="S",
+            snippet="snip",
         )
         assert email.to_addr == ""
         assert email.date == ""
@@ -148,7 +160,32 @@ class TestDraftResult:
         assert r.error == "oops"
 
 
+# ── SendResult dataclass ────────────────────────────────────────
+
+
+class TestSendResult:
+    def test_success(self):
+        gmail = _get_gmail()
+        r = gmail.SendResult(message_id="m1", thread_id="t1", success=True)
+        assert r.success is True
+        assert r.message_id == "m1"
+        assert r.thread_id == "t1"
+        assert r.error is None
+
+    def test_failure(self):
+        gmail = _get_gmail()
+        r = gmail.SendResult(
+            message_id="",
+            thread_id="",
+            success=False,
+            error="send failed",
+        )
+        assert r.success is False
+        assert r.error == "send failed"
+
+
 # ── Helper: build mock Gmail API message ─────────────────────────
+
 
 def _make_msg(
     msg_id: str,
@@ -200,10 +237,8 @@ class TestGmailClient:
         mock_service.users().messages().list().execute.return_value = list_resp
 
         mock_service.users().messages().get().execute.side_effect = [
-            _make_msg("m1", "Subject 1", "alice@example.com",
-                      label_ids=["INBOX", "UNREAD"]),
-            _make_msg("m2", "Subject 2", "bob@example.com",
-                      label_ids=["INBOX", "UNREAD"]),
+            _make_msg("m1", "Subject 1", "alice@example.com", label_ids=["INBOX", "UNREAD"]),
+            _make_msg("m2", "Subject 2", "bob@example.com", label_ids=["INBOX", "UNREAD"]),
         ]
 
         emails = c.get_unread_emails(max_results=2)
@@ -237,10 +272,8 @@ class TestGmailClient:
         mock_service.users().messages().list().execute.return_value = list_resp
 
         mock_service.users().messages().get().execute.side_effect = [
-            _make_msg("m1", "Inbox 1", "alice@example.com",
-                      label_ids=["INBOX"]),
-            _make_msg("m2", "Inbox 2", "bob@example.com",
-                      label_ids=["INBOX", "UNREAD"]),
+            _make_msg("m1", "Inbox 1", "alice@example.com", label_ids=["INBOX"]),
+            _make_msg("m2", "Inbox 2", "bob@example.com", label_ids=["INBOX", "UNREAD"]),
         ]
 
         emails = c.get_inbox_emails(max_results=2)
@@ -274,9 +307,7 @@ class TestGmailClient:
         mock_service.users().messages().list().execute.return_value = list_resp
 
         mock_service.users().messages().get().execute.side_effect = [
-            _make_msg("s1", "Sent Subject", "me@example.com",
-                      to_addr="bob@example.com",
-                      label_ids=["SENT"]),
+            _make_msg("s1", "Sent Subject", "me@example.com", to_addr="bob@example.com", label_ids=["SENT"]),
         ]
 
         emails = c.get_sent_emails(max_results=5)
@@ -335,7 +366,9 @@ class TestGmailClient:
         c, mock_service = client
 
         mock_service.users().messages().get().execute.return_value = _make_msg(
-            "d1", "Detail Subject", "sender@example.com",
+            "d1",
+            "Detail Subject",
+            "sender@example.com",
             to_addr="dest@example.com",
             date="Wed, 4 Mar 2026 09:00:00 +0000",
             label_ids=["INBOX", "IMPORTANT"],
@@ -430,8 +463,11 @@ class TestGmailClient:
             "message": {"id": "m2"},
         }
         result = c.create_draft(
-            to="r@test.com", subject="Re: Thread", body="Reply",
-            thread_id="t1", in_reply_to="<msg@example.com>",
+            to="r@test.com",
+            subject="Re: Thread",
+            body="Reply",
+            thread_id="t1",
+            in_reply_to="<msg@example.com>",
         )
         assert result.success is True
 
@@ -441,6 +477,26 @@ class TestGmailClient:
         result = c.create_draft(to="a@b.com", subject="S", body="B")
         assert result.success is False
         assert "Draft error" in result.error
+
+    # ── send_message ─────────────────────────────────────────
+
+    def test_send_message_success(self, client):
+        c, mock_service = client
+        mock_service.users().messages().send().execute.return_value = {
+            "id": "m1",
+            "threadId": "t1",
+        }
+        result = c.send_message(to="r@test.com", subject="Test", body="Body")
+        assert result.success is True
+        assert result.message_id == "m1"
+        assert result.thread_id == "t1"
+
+    def test_send_message_error(self, client):
+        c, mock_service = client
+        mock_service.users().messages().send().execute.side_effect = Exception("Send error")
+        result = c.send_message(to="a@b.com", subject="S", body="B")
+        assert result.success is False
+        assert "Send error" in result.error
 
     # ── get_attachments ──────────────────────────────────────
 
@@ -507,9 +563,13 @@ class TestEmailToDict:
     def test_basic_conversion(self):
         gmail = _get_gmail()
         email = gmail.Email(
-            id="m1", thread_id="t1", from_addr="a@b.com",
-            subject="Sub", snippet="snip",
-            to_addr="c@d.com", date="Thu, 5 Mar 2026 10:00:00 +0900",
+            id="m1",
+            thread_id="t1",
+            from_addr="a@b.com",
+            subject="Sub",
+            snippet="snip",
+            to_addr="c@d.com",
+            date="Thu, 5 Mar 2026 10:00:00 +0900",
             label_ids=["INBOX"],
         )
         d = email.to_dict()
@@ -528,8 +588,11 @@ class TestEmailToDict:
     def test_no_label_ids(self):
         gmail = _get_gmail()
         email = gmail.Email(
-            id="m1", thread_id="t1", from_addr="a@b.com",
-            subject="Sub", snippet="snip",
+            id="m1",
+            thread_id="t1",
+            from_addr="a@b.com",
+            subject="Sub",
+            snippet="snip",
         )
         d = email.to_dict()
         assert "label_ids" not in d
@@ -537,8 +600,12 @@ class TestEmailToDict:
     def test_empty_label_ids(self):
         gmail = _get_gmail()
         email = gmail.Email(
-            id="m1", thread_id="t1", from_addr="a@b.com",
-            subject="Sub", snippet="snip", label_ids=[],
+            id="m1",
+            thread_id="t1",
+            from_addr="a@b.com",
+            subject="Sub",
+            snippet="snip",
+            label_ids=[],
         )
         d = email.to_dict()
         assert "label_ids" not in d
@@ -551,20 +618,29 @@ class TestDispatch:
     @pytest.fixture
     def mock_client(self):
         gmail = _get_gmail()
-        with patch.object(gmail.GmailClient, "_get_credentials", return_value=MagicMock()):
-            mock_service = MagicMock()
-            with patch.object(gmail, "build", return_value=mock_service):
-                with patch.object(gmail, "GmailClient") as MockCls:
-                    instance = MagicMock()
-                    MockCls.return_value = instance
-                    yield instance
+        mock_service = MagicMock()
+        with (
+            patch.object(gmail.GmailClient, "_get_credentials", return_value=MagicMock()),
+            patch.object(gmail, "build", return_value=mock_service),
+            patch.object(gmail, "GmailClient") as MockCls,
+        ):
+            instance = MagicMock()
+            MockCls.return_value = instance
+            yield instance
 
     def test_dispatch_gmail_unread(self, mock_client):
         gmail = _get_gmail()
         mock_client.get_unread_emails.return_value = [
-            gmail.Email(id="m1", thread_id="t1", from_addr="a@b.com",
-                        subject="S", snippet="snip", to_addr="c@d.com",
-                        date="date1", label_ids=["INBOX", "UNREAD"]),
+            gmail.Email(
+                id="m1",
+                thread_id="t1",
+                from_addr="a@b.com",
+                subject="S",
+                snippet="snip",
+                to_addr="c@d.com",
+                date="date1",
+                label_ids=["INBOX", "UNREAD"],
+            ),
         ]
         result = gmail.dispatch("gmail_unread", {"max_results": 5})
         mock_client.get_unread_emails.assert_called_once_with(max_results=5)
@@ -575,8 +651,7 @@ class TestDispatch:
     def test_dispatch_gmail_inbox(self, mock_client):
         gmail = _get_gmail()
         mock_client.get_inbox_emails.return_value = [
-            gmail.Email(id="m1", thread_id="t1", from_addr="a@b.com",
-                        subject="S", snippet="snip"),
+            gmail.Email(id="m1", thread_id="t1", from_addr="a@b.com", subject="S", snippet="snip"),
         ]
         result = gmail.dispatch("gmail_inbox", {"max_results": 10})
         mock_client.get_inbox_emails.assert_called_once_with(max_results=10)
@@ -585,8 +660,9 @@ class TestDispatch:
     def test_dispatch_gmail_sent(self, mock_client):
         gmail = _get_gmail()
         mock_client.get_sent_emails.return_value = [
-            gmail.Email(id="s1", thread_id="t1", from_addr="me@b.com",
-                        subject="Sent", snippet="snip", to_addr="bob@b.com"),
+            gmail.Email(
+                id="s1", thread_id="t1", from_addr="me@b.com", subject="Sent", snippet="snip", to_addr="bob@b.com"
+            ),
         ]
         result = gmail.dispatch("gmail_sent", {})
         mock_client.get_sent_emails.assert_called_once_with(max_results=20)
@@ -595,8 +671,7 @@ class TestDispatch:
     def test_dispatch_gmail_search(self, mock_client):
         gmail = _get_gmail()
         mock_client.search_emails.return_value = [
-            gmail.Email(id="q1", thread_id="t1", from_addr="a@b.com",
-                        subject="Found", snippet="snip"),
+            gmail.Email(id="q1", thread_id="t1", from_addr="a@b.com", subject="Found", snippet="snip"),
         ]
         result = gmail.dispatch("gmail_search", {"query": "from:a", "max_results": 3})
         mock_client.search_emails.assert_called_once_with(query="from:a", max_results=3)
@@ -613,13 +688,47 @@ class TestDispatch:
     def test_dispatch_gmail_draft(self, mock_client):
         gmail = _get_gmail()
         mock_client.create_draft.return_value = gmail.DraftResult(
-            draft_id="d1", message_id="m1", success=True,
+            draft_id="d1",
+            message_id="m1",
+            success=True,
         )
-        result = gmail.dispatch("gmail_draft", {
-            "to": "r@t.com", "subject": "S", "body": "B",
-        })
+        result = gmail.dispatch(
+            "gmail_draft",
+            {
+                "to": "r@t.com",
+                "subject": "S",
+                "body": "B",
+            },
+        )
         assert result["success"] is True
         assert result["draft_id"] == "d1"
+
+    def test_dispatch_gmail_send(self, mock_client):
+        gmail = _get_gmail()
+        mock_client.send_message.return_value = gmail.SendResult(
+            message_id="m1",
+            thread_id="t1",
+            success=True,
+        )
+        result = gmail.dispatch(
+            "gmail_send",
+            {
+                "to": "r@t.com",
+                "subject": "S",
+                "body": "B",
+            },
+        )
+        mock_client.send_message.assert_called_once_with(
+            to="r@t.com",
+            subject="S",
+            body="B",
+            thread_id=None,
+            in_reply_to=None,
+            attachments=None,
+        )
+        assert result["success"] is True
+        assert result["message_id"] == "m1"
+        assert result["thread_id"] == "t1"
 
     def test_dispatch_unknown_tool(self):
         gmail = _get_gmail()
@@ -633,8 +742,12 @@ class TestDispatch:
 class TestExecutionProfile:
     def test_has_all_subcommands(self):
         gmail = _get_gmail()
-        expected = {"unread", "inbox", "sent", "search", "read", "draft"}
+        expected = {"unread", "inbox", "sent", "search", "read", "draft", "send", "download"}
         assert set(gmail.EXECUTION_PROFILE.keys()) == expected
+
+    def test_send_profile_has_gated_true(self):
+        gmail = _get_gmail()
+        assert gmail.EXECUTION_PROFILE["send"]["gated"] is True
 
     def test_profile_values(self):
         gmail = _get_gmail()
@@ -642,6 +755,9 @@ class TestExecutionProfile:
             assert "expected_seconds" in profile
             assert "background_eligible" in profile
             assert isinstance(profile["expected_seconds"], int)
+            # send has gated; others may or may not
+            if key == "send":
+                assert profile.get("gated") is True
 
 
 # ── get_cli_guide ─────────────────────────────────────────────────
@@ -657,6 +773,12 @@ class TestGetCliGuide:
         assert "gmail unread" in guide
         assert "gmail read" in guide
         assert "gmail draft" in guide
+        assert "gmail send" in guide
+
+    def test_send_includes_warning(self):
+        gmail = _get_gmail()
+        guide = gmail.get_cli_guide()
+        assert "send はメールを即時送信します。取り消しできません。" in guide
 
 
 # ── cli_main ──────────────────────────────────────────────────────
@@ -674,9 +796,15 @@ class TestCliMain:
     def test_cli_inbox(self, mock_gmail_client, capsys):
         gmail = _get_gmail()
         mock_gmail_client.get_inbox_emails.return_value = [
-            gmail.Email(id="m1", thread_id="t1", from_addr="a@b.com",
-                        subject="Inbox Sub", snippet="snip",
-                        to_addr="c@d.com", date="date1"),
+            gmail.Email(
+                id="m1",
+                thread_id="t1",
+                from_addr="a@b.com",
+                subject="Inbox Sub",
+                snippet="snip",
+                to_addr="c@d.com",
+                date="date1",
+            ),
         ]
         gmail.cli_main(["inbox", "-n", "5"])
         mock_gmail_client.get_inbox_emails.assert_called_once_with(max_results=5)
@@ -686,9 +814,15 @@ class TestCliMain:
     def test_cli_sent(self, mock_gmail_client, capsys):
         gmail = _get_gmail()
         mock_gmail_client.get_sent_emails.return_value = [
-            gmail.Email(id="s1", thread_id="t1", from_addr="me@b.com",
-                        subject="Sent Sub", snippet="snip",
-                        to_addr="bob@b.com", date="date1"),
+            gmail.Email(
+                id="s1",
+                thread_id="t1",
+                from_addr="me@b.com",
+                subject="Sent Sub",
+                snippet="snip",
+                to_addr="bob@b.com",
+                date="date1",
+            ),
         ]
         gmail.cli_main(["sent", "-n", "3"])
         mock_gmail_client.get_sent_emails.assert_called_once_with(max_results=3)
@@ -698,13 +832,20 @@ class TestCliMain:
     def test_cli_search(self, mock_gmail_client, capsys):
         gmail = _get_gmail()
         mock_gmail_client.search_emails.return_value = [
-            gmail.Email(id="q1", thread_id="t1", from_addr="a@b.com",
-                        subject="Found", snippet="snip",
-                        to_addr="c@d.com", date="date1"),
+            gmail.Email(
+                id="q1",
+                thread_id="t1",
+                from_addr="a@b.com",
+                subject="Found",
+                snippet="snip",
+                to_addr="c@d.com",
+                date="date1",
+            ),
         ]
         gmail.cli_main(["search", "from:alice", "-n", "10"])
         mock_gmail_client.search_emails.assert_called_once_with(
-            query="from:alice", max_results=10,
+            query="from:alice",
+            max_results=10,
         )
         captured = capsys.readouterr()
         assert "Found" in captured.out
@@ -734,3 +875,22 @@ class TestCliMain:
         gmail = _get_gmail()
         with pytest.raises(SystemExit):
             gmail.cli_main([])
+
+    def test_cli_send(self, mock_gmail_client, capsys):
+        gmail = _get_gmail()
+        mock_gmail_client.send_message.return_value = gmail.SendResult(
+            message_id="m1",
+            thread_id="t1",
+            success=True,
+        )
+        gmail.cli_main(["send", "--to", "r@t.com", "--subject", "Sub", "--body", "Body"])
+        mock_gmail_client.send_message.assert_called_once_with(
+            to="r@t.com",
+            subject="Sub",
+            body="Body",
+            thread_id=None,
+            in_reply_to=None,
+            attachments=None,
+        )
+        captured = capsys.readouterr()
+        assert "Email sent: m1" in captured.out

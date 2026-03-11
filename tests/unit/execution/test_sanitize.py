@@ -6,7 +6,6 @@ from __future__ import annotations
 
 """Unit tests for core.execution._sanitize."""
 
-import pytest
 
 from core.execution._sanitize import (
     MAX_ORIGIN_CHAIN_LENGTH,

@@ -15,9 +15,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from core.config.models import (
-    AnimaDefaults,
     AnimaWorksConfig,
-    HeartbeatConfig,
     _load_status_json,
     resolve_anima_config,
     update_status_model,

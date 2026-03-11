@@ -5,7 +5,6 @@ from __future__ import annotations
 
 """Unit tests for core.execution.reminder — SystemReminderQueue."""
 
-import pytest
 
 from core.execution.reminder import SystemReminderQueue
 

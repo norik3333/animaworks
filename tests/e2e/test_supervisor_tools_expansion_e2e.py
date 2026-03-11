@@ -9,7 +9,6 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 from core.config.models import AnimaModelConfig
 from core.memory.manager import MemoryManager

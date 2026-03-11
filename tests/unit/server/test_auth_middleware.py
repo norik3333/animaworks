@@ -8,16 +8,14 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
 from fastapi.testclient import TestClient
 
-from core.auth.manager import hash_password, create_session, save_auth
+from core.auth.manager import hash_password, save_auth
 from core.auth.models import AuthConfig, AuthUser
 
 
 def _create_test_app(data_dir: Path):
     import json
-    from unittest.mock import MagicMock
     from server.app import create_app
 
     animas_dir = data_dir / "animas"

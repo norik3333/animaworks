@@ -13,7 +13,6 @@ import pytest
 from core.execution.agent_sdk import (
     _check_a1_bash_command,
     _log_tool_use,
-    _BASH_BLOCKED_PATTERNS,
 )
 
 

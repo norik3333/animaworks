@@ -19,7 +19,6 @@ corresponding methods are added.
 """
 
 import json
-from datetime import datetime, timedelta
 from core.time_utils import now_jst
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch

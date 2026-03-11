@@ -220,6 +220,35 @@ def cli_dispatch():
         _handle_submit(sys.argv[2:])
         return
 
+    # Gated action check (before loading tool module)
+    if anima_dir_str:
+        subcommand = ""
+        for arg in sys.argv[2:]:
+            if not arg.startswith("-"):
+                subcommand = arg
+                break
+        if subcommand:
+            try:
+                perm_path = Path(anima_dir_str) / "permissions.md"
+                if perm_path.is_file():
+                    text = perm_path.read_text(encoding="utf-8")
+                    from core.tooling.permissions import is_action_gated, parse_permitted_tools
+
+                    permitted = parse_permitted_tools(text)
+                    if is_action_gated(tool_name, subcommand, permitted):
+                        from core.i18n import t
+
+                        msg = t("tooling.gated_action_denied", tool=tool_name, action=subcommand)
+                        print(f"Error: {msg}", file=sys.stderr)
+                        sys.exit(1)
+            except Exception:
+                logger.debug(
+                    "CLI gated check failed for %s %s",
+                    tool_name,
+                    subcommand,
+                    exc_info=True,
+                )
+
     # Try core tools first
     if tool_name in TOOL_MODULES:
         import importlib

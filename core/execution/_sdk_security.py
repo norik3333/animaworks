@@ -38,6 +38,7 @@ _BASH_BLOCKED_PATTERNS: list[tuple[re.Pattern[str], str]] = [
 _PROTECTED_FILES = frozenset(
     {
         "permissions.md",
+        "identity.md",
         "bootstrap.md",
     }
 )

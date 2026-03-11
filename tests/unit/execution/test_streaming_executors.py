@@ -13,7 +13,6 @@ All LLM calls are mocked — no real API calls are made.
 from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch

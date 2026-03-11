@@ -14,7 +14,7 @@ import json
 
 import pytest
 
-from server.routes.chat import _format_sse, _handle_chunk
+from server.routes.chat import _handle_chunk
 
 pytestmark = pytest.mark.e2e
 

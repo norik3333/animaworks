@@ -9,7 +9,6 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 from core.execution._sanitize import wrap_tool_result
 from core.memory.priming import PrimingResult, format_priming_section

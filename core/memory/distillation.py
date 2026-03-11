@@ -26,7 +26,7 @@ from pathlib import Path
 
 from core.i18n import t
 from core.paths import load_prompt
-from core.time_utils import now_iso, now_jst
+from core.time_utils import now_iso, now_local
 
 logger = logging.getLogger("animaworks.distillation")
 
@@ -331,7 +331,7 @@ class ProceduralDistiller:
             return []
 
         entries: list[dict] = []
-        today = now_jst().date()
+        today = now_local().date()
 
         for offset in range(days):
             target_date = today - timedelta(days=offset)
@@ -687,6 +687,9 @@ class ProceduralDistiller:
             from core.memory.rag.singleton import get_vector_store
 
             vector_store = get_vector_store(self.anima_name)
+            if vector_store is None:
+                logger.debug("RAG vector store unavailable, skipping duplicate check")
+                return None
             indexer = MemoryIndexer(
                 vector_store,
                 self.anima_name,

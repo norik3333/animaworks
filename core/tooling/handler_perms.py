@@ -216,12 +216,19 @@ class PermissionsMixin:
 
         # Framework shared directories — read-only for all Animas
         if not write:
-            from core.paths import get_common_knowledge_dir, get_common_skills_dir, get_company_dir, get_shared_dir
+            from core.paths import (
+                get_common_knowledge_dir,
+                get_common_skills_dir,
+                get_company_dir,
+                get_reference_dir,
+                get_shared_dir,
+            )
 
             for shared_dir in (
                 get_shared_dir(),
                 get_common_knowledge_dir(),
                 get_common_skills_dir(),
+                get_reference_dir(),
                 get_company_dir(),
             ):
                 if shared_dir.exists() and resolved.is_relative_to(shared_dir.resolve()):

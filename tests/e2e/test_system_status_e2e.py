@@ -6,16 +6,16 @@
 Verifies the complete response structure including the scheduler_running
 field through the actual application stack (minus process supervisor startup).
 """
+
 from __future__ import annotations
 
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
 from httpx import ASGITransport, AsyncClient
 
 
-def _create_real_app(tmp_path: Path) -> "FastAPI":  # noqa: F821
+def _create_real_app(tmp_path: Path) -> FastAPI:  # noqa: F821
     """Build a real FastAPI app via create_app with mocked externals.
 
     Returns an app whose setup_complete flag is True so the setup-guard
@@ -60,6 +60,7 @@ def _create_real_app(tmp_path: Path) -> "FastAPI":  # noqa: F821
 
     # Persist auth mock beyond the with-block for request-time middleware
     import server.app as _sa
+
     _auth = MagicMock()
     _auth.auth_mode = "local_trust"
     _sa.load_auth = lambda: _auth
@@ -84,7 +85,8 @@ class TestSystemStatusE2E:
         assert "scheduler_running" in data
 
     async def test_scheduler_running_reflects_cron_files(
-        self, tmp_path: Path,
+        self,
+        tmp_path: Path,
     ) -> None:
         """scheduler_running should be True when cron.md files define jobs."""
         app = _create_real_app(tmp_path)
@@ -94,10 +96,7 @@ class TestSystemStatusE2E:
         alice_dir = animas_dir / "alice"
         alice_dir.mkdir(parents=True, exist_ok=True)
         (alice_dir / "cron.md").write_text(
-            "# Cron: alice\n\n"
-            "## Morning Planning (Daily 9:00 JST)\n"
-            "type: llm\n"
-            "Plan daily tasks.\n",
+            "# Cron: alice\n\n## Morning Planning (Daily 9:00 JST)\ntype: llm\nPlan daily tasks.\n",
             encoding="utf-8",
         )
         app.state.anima_names = ["alice"]
@@ -111,7 +110,8 @@ class TestSystemStatusE2E:
         assert data["scheduler_running"] is True
 
     async def test_scheduler_running_false_without_cron(
-        self, tmp_path: Path,
+        self,
+        tmp_path: Path,
     ) -> None:
         """scheduler_running should be False when no cron.md files exist."""
         app = _create_real_app(tmp_path)

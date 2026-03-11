@@ -19,7 +19,6 @@ Tests cover:
 """
 
 import json
-import time
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -184,18 +183,22 @@ class TestCorruptedLineSkip:
         """
         journal_path = anima_dir / "shortterm" / "streaming_journal_chat.jsonl"
 
-        valid_start = json.dumps({
-            "ev": "start",
-            "trigger": "chat",
-            "from": "user",
-            "session_id": "s1",
-            "ts": "2026-02-17T12:00:00",
-        })
-        valid_text = json.dumps({
-            "ev": "text",
-            "t": "recovered text",
-            "ts": "2026-02-17T12:00:01",
-        })
+        valid_start = json.dumps(
+            {
+                "ev": "start",
+                "trigger": "chat",
+                "from": "user",
+                "session_id": "s1",
+                "ts": "2026-02-17T12:00:00",
+            }
+        )
+        valid_text = json.dumps(
+            {
+                "ev": "text",
+                "t": "recovered text",
+                "ts": "2026-02-17T12:00:01",
+            }
+        )
         corrupted_line = '{"ev": "text", "t": "broken'  # incomplete JSON
 
         lines = [valid_start, corrupted_line, valid_text, "not-json-at-all"]
@@ -311,7 +314,7 @@ class TestDoubleOpen:
 # ── AnimaRunner._recover_streaming_journal() Integration ───────────
 
 
-def _make_runner(anima_dir: Path) -> "AnimaRunner":
+def _make_runner(anima_dir: Path) -> AnimaRunner:
     """Create a minimal AnimaRunner with mocked anima for recovery tests.
 
     Sets only the fields that ``_recover_streaming_journal()`` actually
@@ -364,11 +367,14 @@ class TestRecoverStreamingJournal:
         runner = _make_runner(anima_dir)
         mock_conv = MagicMock()
 
-        with patch(
-            "core.memory.conversation.ConversationMemory",
-            return_value=mock_conv,
-        ) as conv_cls, patch(
-            "core.memory.activity.ActivityLogger",
+        with (
+            patch(
+                "core.memory.conversation.ConversationMemory",
+                return_value=mock_conv,
+            ) as conv_cls,
+            patch(
+                "core.memory.activity.ActivityLogger",
+            ),
         ):
             runner._recover_streaming_journal()
 
@@ -409,13 +415,16 @@ class TestRecoverStreamingJournal:
         runner = _make_runner(anima_dir)
         mock_activity = MagicMock()
 
-        with patch(
-            "core.memory.conversation.ConversationMemory",
-            return_value=MagicMock(),
-        ), patch(
-            "core.memory.activity.ActivityLogger",
-            return_value=mock_activity,
-        ) as activity_cls:
+        with (
+            patch(
+                "core.memory.conversation.ConversationMemory",
+                return_value=MagicMock(),
+            ),
+            patch(
+                "core.memory.activity.ActivityLogger",
+                return_value=mock_activity,
+            ) as activity_cls,
+        ):
             runner._recover_streaming_journal()
 
         # ActivityLogger was instantiated twice (crash event + tool_use events)
@@ -452,11 +461,14 @@ class TestRecoverStreamingJournal:
         """
         runner = _make_runner(anima_dir)
 
-        with patch(
-            "core.memory.conversation.ConversationMemory",
-        ) as conv_cls, patch(
-            "core.memory.activity.ActivityLogger",
-        ) as activity_cls:
+        with (
+            patch(
+                "core.memory.conversation.ConversationMemory",
+            ) as conv_cls,
+            patch(
+                "core.memory.activity.ActivityLogger",
+            ) as activity_cls,
+        ):
             runner._recover_streaming_journal()
 
         conv_cls.assert_not_called()
@@ -470,7 +482,9 @@ class TestToolIdPersistence:
     """Test that tool_id is persisted in journal events."""
 
     def test_tool_id_persisted_in_journal_events(
-        self, journal: StreamingJournal, anima_dir: Path,
+        self,
+        journal: StreamingJournal,
+        anima_dir: Path,
     ):
         """tool_id passed to write_tool_start/end should appear in journal events."""
         journal.open(trigger="chat")
@@ -490,7 +504,9 @@ class TestToolIdPersistence:
         assert tool_end["tool_id"] == "toolu_abc"
 
     def test_tool_id_absent_when_empty(
-        self, journal: StreamingJournal, anima_dir: Path,
+        self,
+        journal: StreamingJournal,
+        anima_dir: Path,
     ):
         """When tool_id is empty, it should not appear in the journal event."""
         journal.open(trigger="chat")
@@ -520,8 +536,24 @@ class TestToolIdRecoveryMatching:
         journal_path = anima_dir / "shortterm" / "streaming_journal_chat.jsonl"
         events = [
             json.dumps({"ev": "start", "trigger": "chat", "ts": "2026-02-22T10:00:00"}),
-            json.dumps({"ev": "tool_start", "tool": "web_search", "args_summary": "q=test", "tool_id": "toolu_1", "ts": "2026-02-22T10:00:01"}),
-            json.dumps({"ev": "tool_end", "tool": "web_search", "result_summary": "found it", "tool_id": "toolu_1", "ts": "2026-02-22T10:00:02"}),
+            json.dumps(
+                {
+                    "ev": "tool_start",
+                    "tool": "web_search",
+                    "args_summary": "q=test",
+                    "tool_id": "toolu_1",
+                    "ts": "2026-02-22T10:00:01",
+                }
+            ),
+            json.dumps(
+                {
+                    "ev": "tool_end",
+                    "tool": "web_search",
+                    "result_summary": "found it",
+                    "tool_id": "toolu_1",
+                    "ts": "2026-02-22T10:00:02",
+                }
+            ),
         ]
         journal_path.write_text("\n".join(events) + "\n", encoding="utf-8")
 
@@ -539,8 +571,12 @@ class TestToolIdRecoveryMatching:
         journal_path = anima_dir / "shortterm" / "streaming_journal_chat.jsonl"
         events = [
             json.dumps({"ev": "start", "trigger": "chat", "ts": "2026-02-22T10:00:00"}),
-            json.dumps({"ev": "tool_start", "tool": "web_search", "args_summary": "q=old", "ts": "2026-02-22T10:00:01"}),
-            json.dumps({"ev": "tool_end", "tool": "web_search", "result_summary": "old result", "ts": "2026-02-22T10:00:02"}),
+            json.dumps(
+                {"ev": "tool_start", "tool": "web_search", "args_summary": "q=old", "ts": "2026-02-22T10:00:01"}
+            ),
+            json.dumps(
+                {"ev": "tool_end", "tool": "web_search", "result_summary": "old result", "ts": "2026-02-22T10:00:02"}
+            ),
         ]
         journal_path.write_text("\n".join(events) + "\n", encoding="utf-8")
 
@@ -559,10 +595,42 @@ class TestToolIdRecoveryMatching:
         journal_path = anima_dir / "shortterm" / "streaming_journal_chat.jsonl"
         events = [
             json.dumps({"ev": "start", "trigger": "chat", "ts": "2026-02-22T10:00:00"}),
-            json.dumps({"ev": "tool_start", "tool": "Bash", "args_summary": "ls", "tool_id": "toolu_A", "ts": "2026-02-22T10:00:01"}),
-            json.dumps({"ev": "tool_start", "tool": "Bash", "args_summary": "pwd", "tool_id": "toolu_B", "ts": "2026-02-22T10:00:02"}),
-            json.dumps({"ev": "tool_end", "tool": "Bash", "result_summary": "result-B", "tool_id": "toolu_B", "ts": "2026-02-22T10:00:03"}),
-            json.dumps({"ev": "tool_end", "tool": "Bash", "result_summary": "result-A", "tool_id": "toolu_A", "ts": "2026-02-22T10:00:04"}),
+            json.dumps(
+                {
+                    "ev": "tool_start",
+                    "tool": "Bash",
+                    "args_summary": "ls",
+                    "tool_id": "toolu_A",
+                    "ts": "2026-02-22T10:00:01",
+                }
+            ),
+            json.dumps(
+                {
+                    "ev": "tool_start",
+                    "tool": "Bash",
+                    "args_summary": "pwd",
+                    "tool_id": "toolu_B",
+                    "ts": "2026-02-22T10:00:02",
+                }
+            ),
+            json.dumps(
+                {
+                    "ev": "tool_end",
+                    "tool": "Bash",
+                    "result_summary": "result-B",
+                    "tool_id": "toolu_B",
+                    "ts": "2026-02-22T10:00:03",
+                }
+            ),
+            json.dumps(
+                {
+                    "ev": "tool_end",
+                    "tool": "Bash",
+                    "result_summary": "result-A",
+                    "tool_id": "toolu_A",
+                    "ts": "2026-02-22T10:00:04",
+                }
+            ),
         ]
         journal_path.write_text("\n".join(events) + "\n", encoding="utf-8")
 
@@ -588,8 +656,24 @@ class TestToolIdRecoveryMatching:
         events = [
             json.dumps({"ev": "start", "trigger": "chat", "ts": "2026-02-22T10:00:00"}),
             json.dumps({"ev": "tool_start", "tool": "Bash", "args_summary": "echo 1", "ts": "2026-02-22T10:00:01"}),
-            json.dumps({"ev": "tool_start", "tool": "Bash", "args_summary": "echo 2", "tool_id": "toolu_X", "ts": "2026-02-22T10:00:02"}),
-            json.dumps({"ev": "tool_end", "tool": "Bash", "result_summary": "result-X", "tool_id": "toolu_X", "ts": "2026-02-22T10:00:03"}),
+            json.dumps(
+                {
+                    "ev": "tool_start",
+                    "tool": "Bash",
+                    "args_summary": "echo 2",
+                    "tool_id": "toolu_X",
+                    "ts": "2026-02-22T10:00:02",
+                }
+            ),
+            json.dumps(
+                {
+                    "ev": "tool_end",
+                    "tool": "Bash",
+                    "result_summary": "result-X",
+                    "tool_id": "toolu_X",
+                    "ts": "2026-02-22T10:00:03",
+                }
+            ),
         ]
         journal_path.write_text("\n".join(events) + "\n", encoding="utf-8")
 
