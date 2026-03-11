@@ -45,6 +45,52 @@ from core.schemas import ImageData
 logger = logging.getLogger("animaworks.execution.litellm_loop")
 
 
+def _try_parse_text_tool_call(text: str, tools: list[dict[str, Any]]) -> tuple[str, str] | None:
+    """Try to parse a Python-style function call from text.
+
+    Some models (e.g. Llama 4 Maverick on Bedrock) occasionally return tool calls
+    embedded in the text content rather than in the structured ``tool_calls`` field::
+
+        read_memory_file(path="shared/users/shizuku/index.md")
+
+    This helper detects such patterns and converts them to ``(tool_name, args_json)``
+    so the caller can treat them as proper tool calls.
+
+    Returns ``(tool_name, arguments_json)`` or ``None`` if no tool call is detected.
+    """
+    import re
+
+    if not tools or not text:
+        return None
+
+    tool_names: set[str] = set()
+    for t in tools:
+        if isinstance(t, dict) and "function" in t:
+            name = t["function"].get("name")
+            if name:
+                tool_names.add(name)
+
+    if not tool_names:
+        return None
+
+    for line in text.strip().splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        m = re.fullmatch(r"(\w+)\(([^)]*)\)", line)
+        if m:
+            func_name = m.group(1)
+            if func_name in tool_names:
+                args: dict[str, Any] = {}
+                for arg_m in re.finditer(r'(\w+)=(?:"([^"]*?)"|\'([^\']*?)\')', m.group(2)):
+                    key = arg_m.group(1)
+                    val = arg_m.group(2) if arg_m.group(2) is not None else arg_m.group(3)
+                    args[key] = val
+                return func_name, _json.dumps(args, ensure_ascii=False)
+
+    return None
+
+
 async def _empty_aiter() -> AsyncGenerator[Any, None]:
     """Yield nothing — used to skip streaming chunk loop for non-streaming responses."""
     return
@@ -210,8 +256,31 @@ class StreamingMixin:
                             _reasoning_seen = True
                             _reasoning_parts.append(thinking_text)
                         if response_text:
-                            iter_text_parts.append(response_text)
-                            yield {"type": "text_delta", "text": response_text}
+                            # Detect text-format tool calls.
+                            # Llama 4 Maverick sometimes returns function calls as plain
+                            # text (e.g. `read_memory_file(path="...")`) instead of using
+                            # the structured tool_calls field.  Parse and treat as a real
+                            # tool call so the execution loop can actually run the tool.
+                            _text_tc: tuple[str, str] | None = None
+                            if not msg_obj.tool_calls and iter_tools:
+                                _text_tc = _try_parse_text_tool_call(response_text, iter_tools)
+                            if _text_tc:
+                                _tc_name, _tc_args_json = _text_tc
+                                _tc_id = "text_call_0"
+                                tool_calls_acc[0] = {
+                                    "id": _tc_id,
+                                    "name": _tc_name,
+                                    "arguments": _tc_args_json,
+                                }
+                                yield {"type": "tool_start", "tool_name": _tc_name, "tool_id": _tc_id}
+                                logger.info(
+                                    "A stream: text-format tool call parsed: %s args=%s",
+                                    _tc_name,
+                                    _tc_args_json,
+                                )
+                            else:
+                                iter_text_parts.append(response_text)
+                                yield {"type": "text_delta", "text": response_text}
                     if msg_obj.tool_calls:
                         for idx, tc in enumerate(msg_obj.tool_calls):
                             tc_id = tc.id or f"call_{idx}"
