@@ -31,7 +31,8 @@ RUN pip install --no-cache-dir \
     "json-repair>=0.30.0" \
     "pwdlib[argon2]>=0.3.0" \
     "markdownify>=0.14.1" \
-    "PyNaCl>=1.5.0"
+    "PyNaCl>=1.5.0" \
+    "tzlocal>=5.0"
 
 # 2) ソースコードをコピーしてパッケージとしてインストール
 COPY core/ core/
