@@ -116,6 +116,15 @@ class ContextMixin:
         # Ollama num_ctx: explicitly set context window to prevent silent truncation
         if self._model_config.model.startswith("ollama/"):
             kwargs["num_ctx"] = self._resolve_cw()
+        # ── Repetition penalty parameters ──
+        from core.config.models import resolve_penalties
+
+        penalties = resolve_penalties(self._model_config.model)
+        if self._model_config.frequency_penalty is not None:
+            penalties["frequency_penalty"] = self._model_config.frequency_penalty
+        if self._model_config.presence_penalty is not None:
+            penalties["presence_penalty"] = self._model_config.presence_penalty
+        kwargs.update(penalties)
         return kwargs
 
     def _build_initial_messages(

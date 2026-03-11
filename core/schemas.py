@@ -93,6 +93,8 @@ class ModelConfig(BaseModel):
     background_credential: str | None = None  # credential for background_model
     extra_keys: dict[str, str] = {}  # provider-specific credential keys (e.g. api_version, vertex_project)
     mode_s_auth: str | None = None  # Mode S auth: "max"|"api"|"bedrock"|"vertex"|None(=max)
+    frequency_penalty: float | None = None
+    presence_penalty: float | None = None
 
 
 class AnimaConfig(BaseModel):

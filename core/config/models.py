@@ -1164,6 +1164,25 @@ def resolve_context_window(
     return None
 
 
+def resolve_penalties(model_name: str) -> dict[str, float]:
+    """Resolve frequency_penalty and presence_penalty from models.json.
+
+    Returns a dict with only the keys that have non-None values.
+    An empty dict means no penalties configured (backward-compatible).
+    """
+    entry = _match_models_json(model_name)
+    result: dict[str, float] = {}
+    if entry is not None:
+        for key in ("frequency_penalty", "presence_penalty"):
+            val = entry.get(key)
+            if val is not None:
+                try:
+                    result[key] = float(val)
+                except (ValueError, TypeError):
+                    pass
+    return result
+
+
 # ---------------------------------------------------------------------------
 # max_tokens resolution
 # ---------------------------------------------------------------------------
