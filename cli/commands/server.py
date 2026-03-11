@@ -424,20 +424,29 @@ def _start_foreground(args: argparse.Namespace) -> None:
     from core.paths import get_animas_dir, get_shared_dir
     from server.app import create_app
 
+    # In Docker, PID 1 is always "alive" (init), so stale PID files from
+    # a previous container run cause false "already running" errors.
+    # Detect container environment and clean up unconditionally.
+    in_container = os.path.exists("/.dockerenv") or os.environ.get("container")
     existing_pid = _read_pid()
-    if existing_pid is not None and _is_process_alive(existing_pid):
-        print(f"Error: Server is already running (pid={existing_pid}).")
-        print("Use 'animaworks stop' first, or 'animaworks restart'.")
-        sys.exit(1)
-    elif existing_pid is not None:
-        logger.info("Stale PID file found (pid=%d). Cleaning up.", existing_pid)
-        _remove_pid_file()
+    if existing_pid is not None:
+        if in_container:
+            logger.info("Container detected — removing stale PID file (pid=%d).", existing_pid)
+            _remove_pid_file()
+        elif _is_process_alive(existing_pid):
+            print(f"Error: Server is already running (pid={existing_pid}).")
+            print("Use 'animaworks stop' first, or 'animaworks restart'.")
+            sys.exit(1)
+        else:
+            logger.info("Stale PID file found (pid=%d). Cleaning up.", existing_pid)
+            _remove_pid_file()
 
-    orphan_pid = _find_server_pid_by_process()
-    if orphan_pid is not None and _is_process_alive(orphan_pid):
-        print(f"Error: Server is already running (pid={orphan_pid}, PID file was missing).")
-        print("Use 'animaworks stop' first, or 'animaworks restart'.")
-        sys.exit(1)
+    if not in_container:
+        orphan_pid = _find_server_pid_by_process()
+        if orphan_pid is not None and _is_process_alive(orphan_pid):
+            print(f"Error: Server is already running (pid={orphan_pid}, PID file was missing).")
+            print("Use 'animaworks stop' first, or 'animaworks restart'.")
+            sys.exit(1)
 
     orphan_count = _kill_orphan_runners()
     if orphan_count:
